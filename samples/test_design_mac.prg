@@ -44,7 +44,6 @@ function Main()
    // Cleanup
    InspectorClose()
 
-   MAC_MsgBox( oForm:ToJSON(), "Final Layout" )
    oForm:Destroy()
 
 return nil

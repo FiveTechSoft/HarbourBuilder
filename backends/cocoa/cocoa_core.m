@@ -437,8 +437,11 @@ static void EnsureNSApp( void )
 
 - (void)createViewInParent:(NSView *)parentView
 {
+   /* In Win32, combobox height is the dropdown height, not the control height.
+      NSPopUpButton has a fixed intrinsic height (~26px). Use that instead. */
+   CGFloat popupHeight = 26;
    NSPopUpButton * popup = [[NSPopUpButton alloc] initWithFrame:
-      NSMakeRect( FLeft, FTop, FWidth, FHeight ) pullsDown:NO];
+      NSMakeRect( FLeft, FTop, FWidth, popupHeight ) pullsDown:NO];
    for( int i = 0; i < FItemCount; i++ )
       [popup addItemWithTitle:[NSString stringWithUTF8String:FItems[i]]];
    if( FItemIndex >= 0 && FItemIndex < FItemCount )
@@ -447,6 +450,7 @@ static void EnsureNSApp( void )
    [popup setTarget:self]; [popup setAction:@selector(comboChanged:)];
    [parentView addSubview:popup];
    FView = popup;
+   FHeight = (int)popupHeight;
 }
 
 - (void)comboChanged:(id)sender

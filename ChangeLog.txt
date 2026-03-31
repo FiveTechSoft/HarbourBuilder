@@ -3,6 +3,25 @@ hbcpp - C++ powered GUI for Harbour
 
 2026-03-31
 ----------
+- Cocoa inspector: nClrPane editable with "..." button and NSColorPanel
+  * Click on nClrPane value or "..." button opens macOS standard color picker
+  * Color swatch shown as cell background in the value column
+  * Continuous color updates applied in real-time via UI_SetProp
+
+- Cocoa inspector: oFont editable with "..." button and NSFontPanel
+  * Click on oFont value or "..." button opens macOS standard font panel
+  * Font displayed as "FontName,Size", applied via UI_SetProp
+  * Initial font pre-selected in the font panel from current value
+
+- Cocoa inspector: category collapse/expand via single-click
+  * Click on category header (Appearance, Position, etc.) toggles collapse
+  * Shows "+" when collapsed, "-" when expanded
+
+- Fixed NSPopUpButton (ComboBox) positioning on macOS
+  * Win32 combobox height is dropdown height, not control height
+  * NSPopUpButton uses fixed intrinsic height (26px) instead of passed height
+  * Fixes mispositioned combobox at startup
+
 - Added macOS Cocoa/AppKit backend
   * cocoa_core.m: full reimplementation of C++ core (TControl, TForm, all controls)
     using NSView/NSWindow with flipped coordinates (top-left origin like Win32)
