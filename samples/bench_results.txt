@@ -1,0 +1,25 @@
+=== IDE Framework C++ Core Benchmark ===
+
+Test 1: Create 500 buttons (C++ direct)
+   Time: 0.0010 sec
+   Rate: 499999 controls/sec
+
+Test 2: Set property 100000 times (C++ bridge)
+   Time: 0.0700 sec
+   Rate: 1428571 sets/sec
+
+Test 3: Get property 100000 times (C++ bridge)
+   Time: 0.0600 sec
+   Rate: 1666666 gets/sec
+
+Test 4: Create 200 controls visual (Label+Button)
+   Time: 0.0010 sec
+
+Test 5: Create 500 buttons (Harbour OOP wrapper)
+   Time: 0.0010 sec
+   Rate: 499999 controls/sec
+
+Test 6: Get 2 properties 100000 times (Harbour OOP)
+   Time: 0.1690 sec
+   Rate: 1183431 gets/sec
+

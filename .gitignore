@@ -1,0 +1,30 @@
+# Compiled / build artifacts
+*.obj
+*.exe
+*.tds
+*.log
+*.c
+!core/*.prg
+!harbour/*.prg
+!backends/**/*.prg
+!samples/*.prg
+
+# Generated files
+samples/*.c
+samples/*.obj
+samples/*.exe
+samples/*.tds
+samples/*.log
+
+# IDE / editor
+.claude/
+*.bak
+*.swp
+
+# Misc generated
+samples/prefs.json
+samples/canvas.html
+samples/form.html
+samples/tui_trace.log
+progreso.md
+TButton.cpp

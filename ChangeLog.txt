@@ -1,0 +1,41 @@
+hbcpp - C++ powered GUI for Harbour
+=====================================
+
+2026-03-31
+----------
+- Added nClrPane (background color) property to all controls
+  * Form: changes background brush and design-mode grid
+  * Controls: handled via WM_CTLCOLOR* messages from parent form
+  * Buttons: uses BS_OWNERDRAW + WM_DRAWITEM for custom background
+  * Inspector shows color value with "..." button to open ChooseColor dialog
+
+- Added oFont property to all controls
+  * Displays as "FontName,Size" in inspector
+  * "..." button opens ChooseFont dialog
+  * Form font change propagates to all children
+  * Individual control font can be set independently
+
+- Applied Hungarian notation to all property names
+  * String: cName, cText, cClassName, cFontName
+  * Number: nLeft, nTop, nWidth, nHeight, nFontSize, nItemIndex, nItemCount
+  * Logical: lVisible, lEnabled, lTabStop, lCenter, lDefault, lCancel,
+             lReadOnly, lPassword, lChecked
+  * Color: nClrPane
+  * Font: oFont
+
+- Inspector: color/font picker button fix
+  * Button subclassed with InsBtnProc to handle click directly
+  * Fixes issue where WM_COMMAND was swallowed by parent ListView
+  * WM_KILLFOCUS ignores focus transfer to "..." button
+
+- Initial project structure with C++ core and Harbour bridge
+  * TControl base class with property system
+  * TForm with design mode (drag, resize, rubber band selection, arrow keys)
+  * TLabel, TEdit, TButton, TCheckBox, TComboBox, TGroupBox controls
+  * Property inspector with collapsible categories and live updates
+  * Overlay-based selection handles (layered window, per-pixel alpha)
+  * Multi-backend: Win32 GUI, Console TUI, Web/HTML5 Canvas
+  * JSON serialization of form layouts
+  * OOP Harbour wrappers (classes.prg) over C++ core
+  * xBase-style command syntax (commands.ch)
+  * Build system for BCC77C + Harbour
