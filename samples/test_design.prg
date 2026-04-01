@@ -119,12 +119,15 @@ function Main()
    UI_OnSelChange( oDesignForm:hCpp, ;
       { |hCtrl| OnDesignSelChange( hCtrl ) } )
 
-   // === Window 4: Code Editor (below design form) ===
-   hCodeEditor := CodeEditorCreate( 270, 540, 700, 300 )
+   // === Window 4: Code Editor (below design form, created first = behind) ===
+   hCodeEditor := CodeEditorCreate( 270, 540, 700, 280 )
    CodeEditorSetText( hCodeEditor, GenerateSampleCode() )
 
-   // Show design form first (no message loop)
+   // Show design form AFTER editor so it appears on top
    oDesignForm:Show()
+
+   // Ensure form is visually above the editor
+   W32_BringToTop( UI_FormGetHwnd( oDesignForm:hCpp ) )
 
    // When IDE closes, destroy all secondary windows first
    oIDE:OnClose := { || InspectorClose(), oDesignForm:Destroy(), ;
@@ -321,15 +324,32 @@ HB_FUNC( W32_GETSCREENHEIGHT )
    hb_retni( GetSystemMetrics( SM_CYSCREEN ) );
 }
 
+HB_FUNC( W32_BRINGTOTOP )
+{
+   /* Bring a HWND to top of z-order. Receives form handle (ptr),
+      get HWND via UI_FormGetHwnd bridge or pass HWND directly. */
+   HWND hWnd = (HWND)(LONG_PTR) hb_parnint(1);
+   if( hWnd )
+      SetWindowPos( hWnd, HWND_TOP, 0, 0, 0, 0,
+         SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE );
+}
+
 /* ======================================================================
  * Code Editor - RichEdit with syntax highlighting
  * ====================================================================== */
 
+#define GUTTER_WIDTH 45
+
 typedef struct {
-   HWND hWnd;     /* Tool window */
-   HWND hEdit;    /* RichEdit control */
-   HFONT hFont;   /* Monospace font */
+   HWND hWnd;       /* Tool window */
+   HWND hEdit;      /* RichEdit control */
+   HWND hGutter;    /* Line number gutter */
+   HFONT hFont;     /* Monospace font */
+   WNDPROC oldEditProc;  /* Original RichEdit WndProc */
 } CODEEDITOR;
+
+static void GutterPaint( CODEEDITOR * ed );
+static void GutterSync( CODEEDITOR * ed );
 
 /* Harbour/xBase keywords for syntax highlighting */
 static const char * s_keywords[] = {
@@ -493,6 +513,125 @@ static void HighlightCode( HWND hEdit )
    free( buf );
 }
 
+/* Gutter: paint line numbers */
+static void GutterPaint( CODEEDITOR * ed )
+{
+   PAINTSTRUCT ps;
+   HDC hDC;
+   RECT rcGutter, rcEdit;
+   int firstLine, lineCount, lineH, y, i;
+   HFONT hOld;
+   char szNum[16];
+
+   if( !ed || !ed->hGutter || !ed->hEdit ) return;
+
+   hDC = BeginPaint( ed->hGutter, &ps );
+   GetClientRect( ed->hGutter, &rcGutter );
+
+   /* Fill background */
+   {
+      HBRUSH hBr = CreateSolidBrush( RGB(240, 240, 240) );
+      FillRect( hDC, &rcGutter, hBr );
+      DeleteObject( hBr );
+   }
+
+   /* Right border line */
+   {
+      HPEN hPen = CreatePen( PS_SOLID, 1, RGB(200, 200, 200) );
+      HPEN hOldPen = (HPEN) SelectObject( hDC, hPen );
+      MoveToEx( hDC, rcGutter.right - 1, 0, NULL );
+      LineTo( hDC, rcGutter.right - 1, rcGutter.bottom );
+      SelectObject( hDC, hOldPen );
+      DeleteObject( hPen );
+   }
+
+   hOld = (HFONT) SelectObject( hDC, ed->hFont );
+   SetBkMode( hDC, TRANSPARENT );
+   SetTextColor( hDC, RGB(128, 128, 128) );
+
+   /* Get first visible line and line height */
+   firstLine = (int) SendMessage( ed->hEdit, EM_GETFIRSTVISIBLELINE, 0, 0 );
+   lineCount = (int) SendMessage( ed->hEdit, EM_GETLINECOUNT, 0, 0 );
+
+   /* Get line height from first char position */
+   {
+      POINTL pt1, pt2;
+      int charIdx1, charIdx2;
+      charIdx1 = (int) SendMessage( ed->hEdit, EM_LINEINDEX, firstLine, 0 );
+      charIdx2 = (int) SendMessage( ed->hEdit, EM_LINEINDEX, firstLine + 1, 0 );
+      SendMessage( ed->hEdit, EM_POSFROMCHAR, (WPARAM) &pt1, charIdx1 );
+      if( charIdx2 > charIdx1 )
+      {
+         SendMessage( ed->hEdit, EM_POSFROMCHAR, (WPARAM) &pt2, charIdx2 );
+         lineH = pt2.y - pt1.y;
+      }
+      else
+         lineH = 18;  /* fallback */
+      if( lineH < 8 ) lineH = 18;
+      y = pt1.y;  /* starting Y from RichEdit's first visible line */
+   }
+
+   /* Draw line numbers */
+   for( i = firstLine; i < lineCount && y < rcGutter.bottom; i++ )
+   {
+      RECT rcNum;
+      sprintf( szNum, "%d", i + 1 );
+      rcNum.left = 2;
+      rcNum.top = y;
+      rcNum.right = GUTTER_WIDTH - 6;
+      rcNum.bottom = y + lineH;
+      DrawTextA( hDC, szNum, -1, &rcNum, DT_RIGHT | DT_SINGLELINE | DT_VCENTER );
+      y += lineH;
+   }
+
+   SelectObject( hDC, hOld );
+   EndPaint( ed->hGutter, &ps );
+}
+
+/* Sync gutter with RichEdit scroll position */
+static void GutterSync( CODEEDITOR * ed )
+{
+   if( ed && ed->hGutter )
+      InvalidateRect( ed->hGutter, NULL, TRUE );
+}
+
+/* Gutter WndProc */
+static LRESULT CALLBACK GutterWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
+{
+   CODEEDITOR * ed = (CODEEDITOR *) GetWindowLongPtr( hWnd, GWLP_USERDATA );
+
+   if( msg == WM_PAINT && ed )
+   {
+      GutterPaint( ed );
+      return 0;
+   }
+
+   return DefWindowProc( hWnd, msg, wParam, lParam );
+}
+
+/* Subclassed RichEdit: intercept scroll/changes to sync gutter */
+static LRESULT CALLBACK CodeEditSubProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
+{
+   CODEEDITOR * ed = (CODEEDITOR *) GetPropA( hWnd, "CodeEd" );
+   LRESULT r;
+
+   if( !ed ) return DefWindowProc( hWnd, msg, wParam, lParam );
+
+   r = CallWindowProc( ed->oldEditProc, hWnd, msg, wParam, lParam );
+
+   /* After scroll, key, or size: sync gutter */
+   if( msg == WM_VSCROLL || msg == WM_MOUSEWHEEL ||
+       msg == WM_KEYUP || msg == WM_SIZE ||
+       msg == WM_CHAR || msg == WM_PASTE )
+   {
+      GutterSync( ed );
+   }
+
+   return r;
+}
+
+static BOOL s_gutterClassReg = FALSE;
+
 static LRESULT CALLBACK CodeEdWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 {
    CODEEDITOR * ed = (CODEEDITOR *) GetWindowLongPtr( hWnd, GWLP_USERDATA );
@@ -502,8 +641,13 @@ static LRESULT CALLBACK CodeEdWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARA
       case WM_SIZE:
       {
          int w = LOWORD(lParam), h = HIWORD(lParam);
-         if( ed && ed->hEdit )
-            MoveWindow( ed->hEdit, 0, 0, w, h, TRUE );
+         if( ed )
+         {
+            if( ed->hGutter )
+               MoveWindow( ed->hGutter, 0, 0, GUTTER_WIDTH, h, TRUE );
+            if( ed->hEdit )
+               MoveWindow( ed->hEdit, GUTTER_WIDTH, 0, w - GUTTER_WIDTH, h, TRUE );
+         }
          return 0;
       }
 
@@ -532,11 +676,11 @@ HB_FUNC( CODEEDITORCREATE )
    ed = (CODEEDITOR *) malloc( sizeof(CODEEDITOR) );
    memset( ed, 0, sizeof(CODEEDITOR) );
 
-   /* Monospace font */
+   /* Monospace font - 13pt Consolas */
    {
       LOGFONTA lf = {0};
       hDC = GetDC( NULL );
-      lf.lfHeight = -MulDiv( 11, GetDeviceCaps( hDC, LOGPIXELSY ), 72 );
+      lf.lfHeight = -MulDiv( 13, GetDeviceCaps( hDC, LOGPIXELSY ), 72 );
       ReleaseDC( NULL, hDC );
       lf.lfCharSet = DEFAULT_CHARSET;
       lf.lfPitchAndFamily = FIXED_PITCH | FF_MODERN;
@@ -562,11 +706,31 @@ HB_FUNC( CODEEDITORCREATE )
 
    SetWindowLongPtr( ed->hWnd, GWLP_USERDATA, (LONG_PTR) ed );
 
-   /* RichEdit control */
+   /* Register gutter class */
+   if( !s_gutterClassReg )
+   {
+      WNDCLASSA gc = {0};
+      gc.lpfnWndProc = GutterWndProc;
+      gc.hInstance = GetModuleHandle(NULL);
+      gc.hCursor = LoadCursor(NULL, IDC_ARROW);
+      gc.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
+      gc.lpszClassName = "HbIdeGutter";
+      RegisterClassA( &gc );
+      s_gutterClassReg = TRUE;
+   }
+
+   /* Gutter (line numbers) */
+   ed->hGutter = CreateWindowExA( 0, "HbIdeGutter", NULL,
+      WS_CHILD | WS_VISIBLE,
+      0, 0, GUTTER_WIDTH, nHeight,
+      ed->hWnd, NULL, GetModuleHandle(NULL), NULL );
+   SetWindowLongPtr( ed->hGutter, GWLP_USERDATA, (LONG_PTR) ed );
+
+   /* RichEdit control (to the right of gutter) */
    ed->hEdit = CreateWindowExA( 0, "RICHEDIT50W", "",
       WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL |
       ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | ES_NOHIDESEL,
-      0, 0, nWidth, nHeight,
+      GUTTER_WIDTH, 0, nWidth - GUTTER_WIDTH, nHeight,
       ed->hWnd, NULL, GetModuleHandle(NULL), NULL );
 
    /* If RICHEDIT50W fails, try RICHEDIT20A */
@@ -576,16 +740,16 @@ HB_FUNC( CODEEDITORCREATE )
       ed->hEdit = CreateWindowExA( 0, "RichEdit20A", "",
          WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL |
          ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | ES_NOHIDESEL,
-         0, 0, nWidth, nHeight,
+         GUTTER_WIDTH, 0, nWidth - GUTTER_WIDTH, nHeight,
          ed->hWnd, NULL, GetModuleHandle(NULL), NULL );
    }
 
    if( ed->hEdit )
    {
-      /* Set default font via CHARFORMAT */
+      /* Set default font via CHARFORMAT - 13pt Consolas */
       cf.cbSize = sizeof(cf);
       cf.dwMask = CFM_FACE | CFM_SIZE | CFM_COLOR;
-      cf.yHeight = 11 * 20;  /* 11pt in twips (1pt = 20 twips) */
+      cf.yHeight = 13 * 20;  /* 13pt in twips (1pt = 20 twips) */
       cf.crTextColor = RGB(0,0,0);
       lstrcpyA( cf.szFaceName, "Consolas" );
       SendMessageA( ed->hEdit, EM_SETCHARFORMAT, SCF_ALL, (LPARAM) &cf );
@@ -595,6 +759,11 @@ HB_FUNC( CODEEDITORCREATE )
 
       /* Enable ENM_CHANGE for future auto-highlight */
       SendMessage( ed->hEdit, EM_SETEVENTMASK, 0, ENM_CHANGE );
+
+      /* Subclass RichEdit to catch scroll events for gutter sync */
+      SetPropA( ed->hEdit, "CodeEd", (HANDLE) ed );
+      ed->oldEditProc = (WNDPROC) SetWindowLongPtr( ed->hEdit,
+         GWLP_WNDPROC, (LONG_PTR) CodeEditSubProc );
    }
 
    ShowWindow( ed->hWnd, SW_SHOW );
