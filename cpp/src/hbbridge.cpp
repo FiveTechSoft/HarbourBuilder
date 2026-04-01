@@ -856,16 +856,24 @@ HB_FUNC( UI_STATUSBARSETTEXT )
 }
 
 /* UI_FormSelectCtrl( hForm, hCtrl ) - select a control in design mode */
+/* UI_FormSelectCtrl( hForm, hCtrl ) - select a control in design mode
+ * Called from inspector combo - suppresses FOnSelChange to avoid recursion */
 HB_FUNC( UI_FORMSELECTCTRL )
 {
    TForm * pForm = GetForm(1);
    TControl * pCtrl = GetCtrl(2);
    if( pForm && pForm->FDesignMode )
    {
+      /* Suppress notification to avoid combo->select->refresh->combo loop */
+      PHB_ITEM pSaved = pForm->FOnSelChange;
+      pForm->FOnSelChange = NULL;
+
       if( pCtrl && pCtrl != (TControl*)pForm )
          pForm->SelectControl( pCtrl, FALSE );
       else
          pForm->ClearSelection();
+
+      pForm->FOnSelChange = pSaved;
    }
 }
 

@@ -315,14 +315,17 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
          {
             FClientTop = FToolBar->GetBarHeight();
          }
-         /* Resize palette to fill remaining width */
+         /* Resize splitter + palette to fill remaining width */
          if( FPalette && FPalette->FTabCtrl )
          {
             RECT rc;
-            int tbW = ( FToolBar ) ? FToolBar->FWidth + 4 : 0;
             GetClientRect( FHandle, &rc );
-            SetWindowPos( FPalette->FTabCtrl, NULL, tbW + 2, 0,
-               rc.right - tbW - 2, rc.bottom, SWP_NOZORDER );
+            if( FPalette->FSplitter )
+               SetWindowPos( FPalette->FSplitter, NULL,
+                  FPalette->FSplitPos, 0, 6, rc.bottom, SWP_NOZORDER );
+            SetWindowPos( FPalette->FTabCtrl, NULL,
+               FPalette->FSplitPos + 6, 0,
+               rc.right - FPalette->FSplitPos - 6, rc.bottom, SWP_NOZORDER );
          }
          /* Resize status bar */
          if( FStatusBar )

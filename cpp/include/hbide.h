@@ -356,11 +356,13 @@ public:
    };
 
    HWND         FTabCtrl;
+   HWND         FSplitter;     /* Draggable vertical splitter */
    HWND         FBtnPanel;     /* Panel to hold buttons for current tab */
    HWND         FBtns[MAX_PALETTE_BTNS]; /* Button HWNDs */
    PaletteTab   FTabs[MAX_PALETTE_TABS];
    int          FTabCount;
    int          FCurrentTab;
+   int          FSplitPos;     /* X position of splitter */
    PHB_ITEM     FOnSelect;     /* callback when component selected */
 
    TComponentPalette();

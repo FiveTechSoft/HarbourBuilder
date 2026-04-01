@@ -176,10 +176,10 @@ static function CreateDesignForm()
    // Sample controls
    @ 13, 12 GROUPBOX "General" OF oDesignForm SIZE 430, 120
 
-   @ 40, 26 SAY "Name:" OF oDesignForm SIZE 60
+   @ 40, 26 SAY "Name:" OF oDesignForm SIZE 70
    @ 38, 100 GET oBtn VAR "John Doe" OF oDesignForm SIZE 200, 24
 
-   @ 75, 26 SAY "City:" OF oDesignForm SIZE 60
+   @ 75, 26 SAY "City:" OF oDesignForm SIZE 70
    @ 73, 100 GET oBtn VAR "Madrid" OF oDesignForm SIZE 200, 24
 
    @ 150, 12 GROUPBOX "Options" OF oDesignForm SIZE 430, 100
@@ -187,7 +187,7 @@ static function CreateDesignForm()
    @ 175, 30 CHECKBOX oChk PROMPT "Active" OF oDesignForm SIZE 120 CHECKED
    @ 175, 180 CHECKBOX oChk PROMPT "Admin" OF oDesignForm SIZE 120
 
-   @ 210, 30 SAY "Role:" OF oDesignForm SIZE 50
+   @ 210, 30 SAY "Role:" OF oDesignForm SIZE 60
    @ 208, 100 COMBOBOX oCbx OF oDesignForm ITEMS { "User", "Manager", "Admin" } SIZE 150
    oCbx:Value := 0
 

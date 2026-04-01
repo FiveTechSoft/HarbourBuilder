@@ -15,7 +15,7 @@ TLabel::TLabel()
    lstrcpy( FClassName, "TLabel" );
    FControlType = CT_LABEL;
    FWidth = 80;
-   FHeight = 15;
+   FHeight = 18;
    FTabStop = FALSE;
    lstrcpy( FText, "Label" );
 }
@@ -458,19 +458,155 @@ const PROPDESC * TToolBar::GetPropDescs( int * pnCount )
 }
 
 /* ======================================================================
- * TComponentPalette
+ * Splitter WndProc
  * ====================================================================== */
 
-static LRESULT CALLBACK PaletteBtnProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam );
+static BOOL s_splitterDragging = FALSE;
+static int  s_splitterStartX = 0;
+static int  s_splitterStartPos = 0;
+
+static LRESULT CALLBACK SplitterWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
+{
+   TComponentPalette * pal = (TComponentPalette *) GetWindowLongPtr( hWnd, GWLP_USERDATA );
+
+   switch( msg )
+   {
+      case WM_PAINT:
+      {
+         PAINTSTRUCT ps;
+         RECT rc;
+         HDC hDC = BeginPaint( hWnd, &ps );
+         GetClientRect( hWnd, &rc );
+         /* Draw etched vertical lines for grip appearance */
+         {
+            int cx = rc.right / 2;
+            HPEN hLight = CreatePen( PS_SOLID, 1, GetSysColor( COLOR_3DHIGHLIGHT ) );
+            HPEN hShadow = CreatePen( PS_SOLID, 1, GetSysColor( COLOR_3DSHADOW ) );
+            HPEN hOld;
+            int y;
+            /* Fill background */
+            FillRect( hDC, &rc, (HBRUSH)(COLOR_BTNFACE + 1) );
+            /* Draw grip dots */
+            hOld = (HPEN) SelectObject( hDC, hShadow );
+            for( y = 4; y < rc.bottom - 4; y += 4 )
+            {
+               MoveToEx( hDC, cx - 1, y, NULL );
+               LineTo( hDC, cx - 1, y + 2 );
+            }
+            SelectObject( hDC, hLight );
+            for( y = 5; y < rc.bottom - 3; y += 4 )
+            {
+               MoveToEx( hDC, cx, y, NULL );
+               LineTo( hDC, cx, y + 2 );
+            }
+            SelectObject( hDC, hOld );
+            DeleteObject( hLight );
+            DeleteObject( hShadow );
+         }
+         EndPaint( hWnd, &ps );
+         return 0;
+      }
+
+      case WM_SETCURSOR:
+         SetCursor( LoadCursor( NULL, IDC_SIZEWE ) );
+         return TRUE;
+
+      case WM_LBUTTONDOWN:
+      {
+         POINT pt;
+         GetCursorPos( &pt );
+         s_splitterDragging = TRUE;
+         s_splitterStartX = pt.x;
+         s_splitterStartPos = pal ? pal->FSplitPos : 0;
+         SetCapture( hWnd );
+         return 0;
+      }
+
+      case WM_MOUSEMOVE:
+         if( s_splitterDragging && pal )
+         {
+            POINT pt;
+            int dx, newPos;
+            HWND hParent;
+            RECT rcParent;
+
+            GetCursorPos( &pt );
+            dx = pt.x - s_splitterStartX;
+            newPos = s_splitterStartPos + dx;
+
+            /* Clamp to reasonable range */
+            if( newPos < 80 ) newPos = 80;
+            hParent = GetParent( hWnd );
+            if( hParent )
+            {
+               GetClientRect( hParent, &rcParent );
+               if( newPos > rcParent.right - 200 )
+                  newPos = rcParent.right - 200;
+            }
+
+            pal->FSplitPos = newPos;
+
+            /* Reposition splitter */
+            SetWindowPos( hWnd, NULL, newPos, 0, 0, 0,
+               SWP_NOSIZE | SWP_NOZORDER );
+
+            /* Reposition palette tab control */
+            if( pal->FTabCtrl && hParent )
+            {
+               GetClientRect( hParent, &rcParent );
+               SetWindowPos( pal->FTabCtrl, NULL,
+                  newPos + 6, 0,
+                  rcParent.right - newPos - 6, rcParent.bottom,
+                  SWP_NOZORDER );
+               /* Re-show current tab buttons */
+               pal->ShowTab( pal->FCurrentTab );
+            }
+         }
+         return 0;
+
+      case WM_LBUTTONUP:
+         if( s_splitterDragging )
+         {
+            s_splitterDragging = FALSE;
+            ReleaseCapture();
+         }
+         return 0;
+   }
+
+   return DefWindowProc( hWnd, msg, wParam, lParam );
+}
+
+static BOOL s_splitterClassReg = FALSE;
+
+static void EnsureSplitterClass( void )
+{
+   if( !s_splitterClassReg )
+   {
+      WNDCLASSA wc = {0};
+      wc.lpfnWndProc   = SplitterWndProc;
+      wc.hInstance      = GetModuleHandle( NULL );
+      wc.hCursor        = LoadCursor( NULL, IDC_SIZEWE );
+      wc.hbrBackground  = (HBRUSH)(COLOR_BTNFACE + 1);
+      wc.lpszClassName  = "HbIdeSplitter";
+      RegisterClassA( &wc );
+      s_splitterClassReg = TRUE;
+   }
+}
+
+/* ======================================================================
+ * TComponentPalette
+ * ====================================================================== */
 
 TComponentPalette::TComponentPalette()
 {
    lstrcpy( FClassName, "TComponentPalette" );
    FControlType = CT_TABCONTROL;
    FTabCtrl = NULL;
+   FSplitter = NULL;
    FBtnPanel = NULL;
    FTabCount = 0;
    FCurrentTab = 0;
+   FSplitPos = 0;
    FOnSelect = NULL;
    FTabStop = FALSE;
    memset( FTabs, 0, sizeof(FTabs) );
@@ -496,20 +632,23 @@ void TComponentPalette::CreateHandle( HWND hParent )
 
    GetClientRect( hParent, &rcParent );
 
-   /* Vertical splitter line between speedbar and palette */
-   if( tbWidth > 0 )
-   {
-      CreateWindowExA( 0, "STATIC", NULL,
-         WS_CHILD | WS_VISIBLE | SS_ETCHEDVERT,
-         tbWidth - 2, 2, 2, rcParent.bottom - 4,
-         hParent, NULL, GetModuleHandle(NULL), NULL );
-   }
+   /* Store initial split position */
+   FSplitPos = tbWidth;
 
-   /* Create tab control to the right of the toolbar */
+   /* Draggable vertical splitter between speedbar and palette */
+   EnsureSplitterClass();
+   FSplitter = CreateWindowExA( 0, "HbIdeSplitter", NULL,
+      WS_CHILD | WS_VISIBLE,
+      FSplitPos, 0, 6, rcParent.bottom,
+      hParent, NULL, GetModuleHandle(NULL), NULL );
+   if( FSplitter )
+      SetWindowLongPtr( FSplitter, GWLP_USERDATA, (LONG_PTR) this );
+
+   /* Create tab control to the right of the splitter */
    FTabCtrl = CreateWindowExA( 0, WC_TABCONTROLA, NULL,
       WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | TCS_TABS,
-      tbWidth + 2, 0,
-      rcParent.right - tbWidth - 2, rcParent.bottom,
+      FSplitPos + 6, 0,
+      rcParent.right - FSplitPos - 6, rcParent.bottom,
       hParent, NULL, GetModuleHandle(NULL), NULL );
 
    if( !FTabCtrl ) return;
