@@ -304,6 +304,7 @@ return nil
 #include <windows.h>
 #include <commctrl.h>
 #include <richedit.h>
+#include <ctype.h>
 
 HB_FUNC( W32_MSGBOX )
 {
@@ -321,14 +322,176 @@ HB_FUNC( W32_GETSCREENHEIGHT )
 }
 
 /* ======================================================================
- * Code Editor - independent window with multiline edit (monospace font)
+ * Code Editor - RichEdit with syntax highlighting
  * ====================================================================== */
 
 typedef struct {
    HWND hWnd;     /* Tool window */
-   HWND hEdit;    /* Multiline edit control */
+   HWND hEdit;    /* RichEdit control */
    HFONT hFont;   /* Monospace font */
 } CODEEDITOR;
+
+/* Harbour/xBase keywords for syntax highlighting */
+static const char * s_keywords[] = {
+   "function", "procedure", "return", "local", "static", "private", "public",
+   "if", "else", "elseif", "endif", "do", "while", "enddo", "for", "next", "to", "step",
+   "switch", "case", "otherwise", "endswitch", "endcase",
+   "class", "endclass", "method", "data", "access", "assign", "inherit", "inline",
+   "nil", "self", "begin", "end", "exit", "loop", "with",
+   NULL
+};
+
+/* xBase commands (uppercase) */
+static const char * s_commands[] = {
+   "DEFINE", "ACTIVATE", "FORM", "TITLE", "SIZE", "FONT", "SIZABLE", "APPBAR", "TOOLWINDOW",
+   "CENTERED", "SAY", "GET", "BUTTON", "PROMPT", "CHECKBOX", "COMBOBOX", "GROUPBOX",
+   "ITEMS", "CHECKED", "DEFAULT", "CANCEL", "OF", "VAR", "ACTION",
+   "TOOLBAR", "SEPARATOR", "TOOLTIP", "MENUBAR", "POPUP", "MENUITEM", "MENUSEPARATOR",
+   "PALETTE", "REQUEST",
+   NULL
+};
+
+static int IsWordChar( char c )
+{
+   return ( c >= 'A' && c <= 'Z' ) || ( c >= 'a' && c <= 'z' ) ||
+          ( c >= '0' && c <= '9' ) || c == '_';
+}
+
+static int IsKeyword( const char * word, int len )
+{
+   int i;
+   char buf[64];
+   if( len <= 0 || len >= 63 ) return 0;
+   for( i = 0; i < len; i++ ) buf[i] = (char)tolower( (unsigned char)word[i] );
+   buf[len] = 0;
+   for( i = 0; s_keywords[i]; i++ )
+      if( lstrcmpA( buf, s_keywords[i] ) == 0 ) return 1;
+   return 0;
+}
+
+static int IsCommand( const char * word, int len )
+{
+   int i;
+   char buf[64];
+   if( len <= 0 || len >= 63 ) return 0;
+   for( i = 0; i < len; i++ ) buf[i] = (char)toupper( (unsigned char)word[i] );
+   buf[len] = 0;
+   for( i = 0; s_commands[i]; i++ )
+      if( lstrcmpA( buf, s_commands[i] ) == 0 ) return 1;
+   return 0;
+}
+
+/* Apply color to a range in RichEdit */
+static void SetRichColor( HWND hEdit, int nStart, int nEnd, COLORREF clr, BOOL bBold )
+{
+   CHARRANGE cr;
+   CHARFORMATA cf = {0};
+   cr.cpMin = nStart; cr.cpMax = nEnd;
+   SendMessage( hEdit, EM_EXSETSEL, 0, (LPARAM) &cr );
+   cf.cbSize = sizeof(cf);
+   cf.dwMask = CFM_COLOR | CFM_BOLD;
+   cf.crTextColor = clr;
+   if( bBold ) cf.dwEffects = CFE_BOLD;
+   SendMessageA( hEdit, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM) &cf );
+}
+
+/* Full syntax highlight pass */
+static void HighlightCode( HWND hEdit )
+{
+   int nLen, i, ws;
+   char * buf;
+   CHARRANGE crSave;
+
+   nLen = GetWindowTextLengthA( hEdit );
+   if( nLen <= 0 ) return;
+
+   buf = (char *) malloc( nLen + 1 );
+   GetWindowTextA( hEdit, buf, nLen + 1 );
+
+   /* Save selection, disable redraw */
+   SendMessage( hEdit, EM_EXGETSEL, 0, (LPARAM) &crSave );
+   SendMessage( hEdit, WM_SETREDRAW, FALSE, 0 );
+
+   /* Reset all to black */
+   SetRichColor( hEdit, 0, nLen, RGB(0,0,0), FALSE );
+
+   i = 0;
+   while( i < nLen )
+   {
+      /* Line comments: // */
+      if( buf[i] == '/' && i + 1 < nLen && buf[i+1] == '/' )
+      {
+         int start = i;
+         while( i < nLen && buf[i] != '\r' && buf[i] != '\n' ) i++;
+         SetRichColor( hEdit, start, i, RGB(0,128,0), FALSE );
+         continue;
+      }
+
+      /* Block comments */
+      if( buf[i] == '/' && i + 1 < nLen && buf[i+1] == '*' )
+      {
+         int start = i;
+         i += 2;
+         while( i + 1 < nLen && !( buf[i] == '*' && buf[i+1] == '/' ) ) i++;
+         if( i + 1 < nLen ) i += 2;
+         SetRichColor( hEdit, start, i, RGB(0,128,0), FALSE );
+         continue;
+      }
+
+      /* Strings: "..." or '...' */
+      if( buf[i] == '"' || buf[i] == '\'' )
+      {
+         char q = buf[i];
+         int start = i;
+         i++;
+         while( i < nLen && buf[i] != q && buf[i] != '\r' && buf[i] != '\n' ) i++;
+         if( i < nLen && buf[i] == q ) i++;
+         SetRichColor( hEdit, start, i, RGB(163,21,21), FALSE );
+         continue;
+      }
+
+      /* Preprocessor: #include, #define, #xcommand */
+      if( buf[i] == '#' )
+      {
+         int start = i;
+         i++;
+         while( i < nLen && IsWordChar(buf[i]) ) i++;
+         SetRichColor( hEdit, start, i, RGB(128,0,128), TRUE );
+         continue;
+      }
+
+      /* Logical literals: .T. .F. .AND. .OR. .NOT. */
+      if( buf[i] == '.' && i + 2 < nLen )
+      {
+         int start = i;
+         i++;
+         while( i < nLen && buf[i] != '.' && IsWordChar(buf[i]) ) i++;
+         if( i < nLen && buf[i] == '.' ) { i++; SetRichColor( hEdit, start, i, RGB(128,0,128), FALSE ); }
+         continue;
+      }
+
+      /* Words: keywords and commands */
+      if( IsWordChar(buf[i]) )
+      {
+         ws = i;
+         while( i < nLen && IsWordChar(buf[i]) ) i++;
+         if( IsKeyword( buf + ws, i - ws ) )
+            SetRichColor( hEdit, ws, i, RGB(0,0,180), TRUE );
+         else if( IsCommand( buf + ws, i - ws ) )
+            SetRichColor( hEdit, ws, i, RGB(0,0,180), FALSE );
+         continue;
+      }
+
+      i++;
+   }
+
+   /* Restore selection and redraw */
+   SendMessage( hEdit, EM_EXSETSEL, 0, (LPARAM) &crSave );
+   SendMessage( hEdit, WM_SETREDRAW, TRUE, 0 );
+   InvalidateRect( hEdit, NULL, TRUE );
+
+   free( buf );
+}
 
 static LRESULT CALLBACK CodeEdWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 {
@@ -358,22 +521,28 @@ HB_FUNC( CODEEDITORCREATE )
    CODEEDITOR * ed;
    WNDCLASSA wc = {0};
    static BOOL bReg = FALSE;
-   LOGFONTA lf = {0};
+   CHARFORMATA cf = {0};
    HDC hDC;
    int nLeft = hb_parni(1), nTop = hb_parni(2);
    int nWidth = hb_parni(3), nHeight = hb_parni(4);
+
+   /* Load RichEdit library */
+   LoadLibraryA( "Msftedit.dll" );
 
    ed = (CODEEDITOR *) malloc( sizeof(CODEEDITOR) );
    memset( ed, 0, sizeof(CODEEDITOR) );
 
    /* Monospace font */
-   hDC = GetDC( NULL );
-   lf.lfHeight = -MulDiv( 10, GetDeviceCaps( hDC, LOGPIXELSY ), 72 );
-   ReleaseDC( NULL, hDC );
-   lf.lfCharSet = DEFAULT_CHARSET;
-   lf.lfPitchAndFamily = FIXED_PITCH | FF_MODERN;
-   lstrcpyA( lf.lfFaceName, "Consolas" );
-   ed->hFont = CreateFontIndirectA( &lf );
+   {
+      LOGFONTA lf = {0};
+      hDC = GetDC( NULL );
+      lf.lfHeight = -MulDiv( 11, GetDeviceCaps( hDC, LOGPIXELSY ), 72 );
+      ReleaseDC( NULL, hDC );
+      lf.lfCharSet = DEFAULT_CHARSET;
+      lf.lfPitchAndFamily = FIXED_PITCH | FF_MODERN;
+      lstrcpyA( lf.lfFaceName, "Consolas" );
+      ed->hFont = CreateFontIndirectA( &lf );
+   }
 
    if( !bReg ) {
       wc.lpfnWndProc = CodeEdWndProc;
@@ -393,19 +562,39 @@ HB_FUNC( CODEEDITORCREATE )
 
    SetWindowLongPtr( ed->hWnd, GWLP_USERDATA, (LONG_PTR) ed );
 
-   /* Multiline edit with horizontal and vertical scrollbars */
-   ed->hEdit = CreateWindowExA( 0, "EDIT", "",
+   /* RichEdit control */
+   ed->hEdit = CreateWindowExA( 0, "RICHEDIT50W", "",
       WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL |
-      ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN,
+      ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | ES_NOHIDESEL,
       0, 0, nWidth, nHeight,
       ed->hWnd, NULL, GetModuleHandle(NULL), NULL );
 
-   SendMessage( ed->hEdit, WM_SETFONT, (WPARAM) ed->hFont, TRUE );
-
-   /* Set tab stops to 4 characters */
+   /* If RICHEDIT50W fails, try RICHEDIT20A */
+   if( !ed->hEdit )
    {
-      int nTabStop = 16;  /* in dialog units (approx 4 chars) */
-      SendMessage( ed->hEdit, EM_SETTABSTOPS, 1, (LPARAM) &nTabStop );
+      LoadLibraryA( "Riched20.dll" );
+      ed->hEdit = CreateWindowExA( 0, "RichEdit20A", "",
+         WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL |
+         ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | ES_NOHIDESEL,
+         0, 0, nWidth, nHeight,
+         ed->hWnd, NULL, GetModuleHandle(NULL), NULL );
+   }
+
+   if( ed->hEdit )
+   {
+      /* Set default font via CHARFORMAT */
+      cf.cbSize = sizeof(cf);
+      cf.dwMask = CFM_FACE | CFM_SIZE | CFM_COLOR;
+      cf.yHeight = 11 * 20;  /* 11pt in twips (1pt = 20 twips) */
+      cf.crTextColor = RGB(0,0,0);
+      lstrcpyA( cf.szFaceName, "Consolas" );
+      SendMessageA( ed->hEdit, EM_SETCHARFORMAT, SCF_ALL, (LPARAM) &cf );
+
+      /* White background */
+      SendMessage( ed->hEdit, EM_SETBKGNDCOLOR, 0, (LPARAM) RGB(255,255,255) );
+
+      /* Enable ENM_CHANGE for future auto-highlight */
+      SendMessage( ed->hEdit, EM_SETEVENTMASK, 0, ENM_CHANGE );
    }
 
    ShowWindow( ed->hWnd, SW_SHOW );
@@ -413,12 +602,15 @@ HB_FUNC( CODEEDITORCREATE )
    hb_retnint( (HB_PTRUINT) ed );
 }
 
-/* CodeEditorSetText( hEditor, cText ) */
+/* CodeEditorSetText( hEditor, cText ) - sets text and applies syntax highlighting */
 HB_FUNC( CODEEDITORSETTEXT )
 {
    CODEEDITOR * ed = (CODEEDITOR *) (HB_PTRUINT) hb_parnint(1);
    if( ed && ed->hEdit && HB_ISCHAR(2) )
+   {
       SetWindowTextA( ed->hEdit, hb_parc(2) );
+      HighlightCode( ed->hEdit );
+   }
 }
 
 /* CodeEditorGetText( hEditor ) --> cText */
