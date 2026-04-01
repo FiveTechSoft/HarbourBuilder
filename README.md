@@ -63,7 +63,7 @@ hbcpp uses a layered architecture that achieves native performance on each platf
 
 ## IDE Layout
 
-The visual designer follows the C++Builder paradigm with 3 independent top-level windows:
+The visual designer follows the C++Builder paradigm with 4 independent top-level windows:
 
 ```
 +== IDE Bar (top strip, full screen width) =========================+
@@ -82,11 +82,12 @@ The visual designer follows the C++Builder paradigm with 3 independent top-level
 +---------------------+
 ```
 
-- **IDE Bar**: Menu + speedbar + component palette (TabControl) + status bar
+- **IDE Bar**: Menu + speedbar + component palette (TabControl)
 - **Object Inspector**: ComboBox (all controls) + Properties/Events tabs + property grid
+- **Code Editor**: Dark theme (Consolas 15pt), syntax highlighting, line number gutter
 - **Design Form**: Independent floating window with grid dots and selection handles
 
-All 3 share one Win32 message loop via `TForm:Show()` (no loop) + `TForm:Activate()` (enters loop).
+All 4 share one message loop via `TForm:Show()` (no loop) + `TForm:Activate()` (enters loop).
 
 ## File Structure
 
@@ -111,7 +112,10 @@ backends/
   web/backend.prg        - HTML5 Canvas backend
 
 samples/
-  test_design.prg        - IDE main window with C++Builder layout
+  hbcpp_win32.prg        - Windows IDE: full C++Builder layout with 4 windows
+  hbcpp_macos.prg        - macOS IDE: full C++Builder layout with 4 windows
+  hbcpp_linux.prg        - Linux IDE: full C++Builder layout with 4 windows
+  test_design.prg        - Windows IDE (legacy, hardcoded positions)
   build_cpp.bat          - Windows build script (BCC77C + Harbour)
 ```
 

@@ -940,6 +940,14 @@ HB_FUNC( INS_BRINGTOFRONT )
 }
 
 /* INS_Destroy( hInsData ) */
+/* INS_SetPos( hInsData, nLeft, nTop, nWidth, nHeight ) */
+HB_FUNC( INS_SETPOS )
+{
+   INSDATA * d = (INSDATA *) (HB_PTRUINT) hb_parnint(1);
+   if( !d || !d->hWnd ) return;
+   MoveWindow( d->hWnd, hb_parni(2), hb_parni(3), hb_parni(4), hb_parni(5), TRUE );
+}
+
 HB_FUNC( INS_DESTROY )
 {
    INSDATA * d = (INSDATA *) (HB_PTRUINT) hb_parnint(1);

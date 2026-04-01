@@ -90,6 +90,9 @@ void TForm::CreateHandle( HWND hParent )
    WNDCLASSA wc = {0};
    char szClass[32];
 
+   /* Prevent double creation */
+   if( FHandle ) return;
+
    /* Create default font only if not already set by UI_FormNew */
    if( !FFormFont )
    {
@@ -1146,6 +1149,13 @@ void TForm::AttachToolBar( TToolBar * pTB )
    FToolBar = pTB;
    pTB->FCtrlParent = this;
    pTB->FParent = this;
+
+   /* If form already has HWND, create toolbar immediately */
+   if( FHandle )
+   {
+      pTB->CreateHandle( FHandle );
+      FClientTop = pTB->GetBarHeight();
+   }
 }
 
 /* ======================================================================

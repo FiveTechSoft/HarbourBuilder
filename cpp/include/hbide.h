@@ -321,8 +321,9 @@ public:
        PHB_ITEM pOnClick;
    };
 
-   ToolBtn  FBtns[MAX_TOOLBTNS];
-   int      FBtnCount;
+   ToolBtn     FBtns[MAX_TOOLBTNS];
+   int         FBtnCount;
+   HIMAGELIST  FImageList;
 
    TToolBar();
    virtual ~TToolBar();
@@ -333,6 +334,7 @@ public:
    void SetBtnClick( int nIdx, PHB_ITEM pBlock );
    void DoCommand( int nBtnIdx );
    int  GetBarHeight();
+   void LoadImages( const char * szBmpPath );
    const PROPDESC * GetPropDescs( int * pnCount );
 };
 

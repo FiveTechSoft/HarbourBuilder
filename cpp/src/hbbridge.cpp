@@ -729,6 +729,14 @@ HB_FUNC( UI_TOOLBTNONCLICK )
       p->SetBtnClick( nIdx, pBlock );
 }
 
+/* UI_ToolBarLoadImages( hToolBar, cBmpPath ) */
+HB_FUNC( UI_TOOLBARLOADIMAGES )
+{
+   TToolBar * p = (TToolBar *) GetCtrl(1);
+   if( p && p->FControlType == CT_TOOLBAR && HB_ISCHAR(2) )
+      p->LoadImages( hb_parc(2) );
+}
+
 /* ======================================================================
  * Menu
  * ====================================================================== */

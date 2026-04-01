@@ -304,6 +304,7 @@ TToolBar::TToolBar()
    FBtnCount = 0;
    FTabStop = FALSE;
    FHeight = 28;
+   FImageList = NULL;
    memset( FBtns, 0, sizeof(FBtns) );
 }
 
@@ -376,6 +377,91 @@ void TToolBar::CreateHandle( HWND hParent )
       FWidth = sz.cx + 8;
       FHeight = sz.cy;
       SetWindowPos( FHandle, NULL, 0, 0, FWidth, FHeight, SWP_NOZORDER );
+   }
+}
+
+static void TBLog( const char * fmt, ... )
+{
+   FILE * f = fopen( "c:\\ide\\toolbar.log", "a" );
+   if( f ) {
+      va_list ap; va_start( ap, fmt );
+      vfprintf( f, fmt, ap );
+      fprintf( f, "\n" );
+      va_end( ap );
+      fclose( f );
+   }
+}
+
+void TToolBar::LoadImages( const char * szBmpPath )
+{
+   HBITMAP hBmp;
+   int i, imgIdx;
+
+   TBLog( "LoadImages called: path='%s' hWnd=%p", szBmpPath, (void*)FHandle );
+
+   if( !FHandle || !szBmpPath ) { TBLog("ABORT: null handle or path"); return; }
+
+   hBmp = (HBITMAP) LoadImageA( NULL, szBmpPath, IMAGE_BITMAP,
+      0, 0, LR_LOADFROMFILE );
+   TBLog( "LoadImageA: hBmp=%p error=%lu", (void*)hBmp, GetLastError() );
+   if( !hBmp ) return;
+
+   FImageList = ImageList_Create( 32, 32, ILC_COLOR24 | ILC_MASK, 16, 4 );
+   int nAdded = ImageList_AddMasked( FImageList, hBmp, RGB(255, 0, 255) );
+   int nCount = ImageList_GetImageCount( FImageList );
+   TBLog( "ImageList: handle=%p added=%d count=%d", (void*)FImageList, nAdded, nCount );
+   DeleteObject( hBmp );
+
+   SendMessage( FHandle, TB_SETIMAGELIST, 0, (LPARAM) FImageList );
+   SendMessage( FHandle, TB_SETBUTTONSIZE, 0, MAKELONG(36, 36) );
+   TBLog( "TB_SETIMAGELIST and TB_SETBUTTONSIZE sent" );
+
+   /* Remove LIST style and MIXEDBUTTONS so buttons show only icons */
+   {
+      LONG style = GetWindowLong( FHandle, GWL_STYLE );
+      style &= ~TBSTYLE_LIST;
+      SetWindowLong( FHandle, GWL_STYLE, style );
+   }
+   SendMessage( FHandle, TB_SETEXTENDEDSTYLE, 0, 0 );
+
+   /* Delete all buttons and re-add with images (cleanest approach) */
+   {
+      int nBtns = (int) SendMessage( FHandle, TB_BUTTONCOUNT, 0, 0 );
+      TBLog( "  Deleting %d old buttons", nBtns );
+      while( nBtns-- > 0 )
+         SendMessage( FHandle, TB_DELETEBUTTON, 0, 0 );
+   }
+
+   imgIdx = 0;
+   for( i = 0; i < FBtnCount; i++ )
+   {
+      TBBUTTON tbb;
+      memset( &tbb, 0, sizeof(tbb) );
+      if( FBtns[i].bSeparator )
+      {
+         tbb.fsStyle = BTNS_SEP;
+      }
+      else
+      {
+         tbb.iBitmap = imgIdx;
+         tbb.idCommand = TOOLBAR_BTN_ID_BASE + i;
+         tbb.fsState = TBSTATE_ENABLED;
+         tbb.fsStyle = BTNS_BUTTON;
+         imgIdx++;
+      }
+      SendMessage( FHandle, TB_ADDBUTTONS, 1, (LPARAM) &tbb );
+      TBLog( "  Added btn %d img=%d sep=%d", i, tbb.iBitmap, FBtns[i].bSeparator );
+   }
+
+   /* Recalculate size */
+   SendMessage( FHandle, TB_AUTOSIZE, 0, 0 );
+   {
+      SIZE sz = {0};
+      SendMessage( FHandle, TB_GETMAXSIZE, 0, (LPARAM) &sz );
+      FWidth = sz.cx + 8;
+      FHeight = sz.cy;
+      SetWindowPos( FHandle, NULL, 0, 0, FWidth, FHeight, SWP_NOZORDER );
+      TBLog( "Final size: %dx%d", FWidth, FHeight );
    }
 }
 
@@ -718,23 +804,20 @@ void TComponentPalette::ShowTab( int nTab )
    GetClientRect( FTabCtrl, &rcTab );
    SendMessage( FTabCtrl, TCM_ADJUSTRECT, FALSE, (LPARAM) &rcTab );
 
-   /* Create buttons for this tab */
+   /* Create square buttons for this tab (as large as the tab area allows) */
    {
       PaletteTab * t = &FTabs[nTab];
-      int y = rcTab.top + 2;
-      int btnH = rcTab.bottom - rcTab.top - 4;
-      if( btnH > 24 ) btnH = 24;
-      if( btnH < 16 ) btnH = 16;
+      int areaH = rcTab.bottom - rcTab.top - 4;
+      int btnSize = areaH;          /* square: width = height */
+      if( btnSize < 16 ) btnSize = 16;
+      int y = rcTab.top + ( rcTab.bottom - rcTab.top - btnSize ) / 2;
 
       xPos = rcTab.left + 4;
       for( i = 0; i < t->nBtnCount; i++ )
       {
-         int btnW = lstrlenA( t->btns[i].szText ) * 7 + 16;
-         if( btnW < 32 ) btnW = 32;
-
          FBtns[i] = CreateWindowExA( 0, "BUTTON", t->btns[i].szText,
-            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_FLAT,
-            xPos, y, btnW, btnH,
+            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_FLAT | BS_CENTER,
+            xPos, y, btnSize, btnSize,
             FTabCtrl, (HMENU)(LONG_PTR)(200 + i),
             GetModuleHandle(NULL), NULL );
 
@@ -744,7 +827,7 @@ void TComponentPalette::ShowTab( int nTab )
                SendMessage( FTabCtrl, WM_GETFONT, 0, 0 ), TRUE );
          }
 
-         xPos += btnW + 2;
+         xPos += btnSize + 2;
       }
    }
 }

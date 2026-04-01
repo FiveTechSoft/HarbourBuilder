@@ -1,6 +1,32 @@
 hbcpp - C++ powered GUI for Harbour
 =====================================
 
+2026-04-01 (Windows IDE update)
+-------------------------------
+- Windows IDE: full C++Builder layout with 4 independent windows
+  * New hbcpp_win32.prg: feature parity with macOS/Linux IDE
+  * Dynamic screen-based positioning (W32_GetScreenWidth/Height/GetWindowBottom)
+  * Menu bar with 9 menus (File, Edit, Search, View, Project, Run, Component,
+    Tools, Help) using separate variables per popup
+  * Toolbar with Silk icon set (famfamfam, CC BY 2.5): New, Open, Save, Cut,
+    Copy, Paste, Undo, Redo, Run - 32x32 icons loaded from BMP strip
+  * Component Palette: square buttons (maximized height), 4 tabs
+  * Code Editor: RichEdit with dark theme, Consolas 15pt, VS Code-style
+    syntax highlighting, line number gutter
+  * Object Inspector: dynamic positioning via INS_SetPos
+  * Form Designer: 400x340, centered in editor area
+  * New C++ features:
+    - TToolBar::LoadImages(): loads BMP strip into ImageList, replaces text
+      buttons with icon-only buttons
+    - UI_ToolBarLoadImages() bridge function
+    - TForm::AttachToolBar() creates toolbar immediately if form has HWND
+    - TForm::CreateHandle() guard against duplicate creation
+    - TComponentPalette::ShowTab() creates square buttons (height = area)
+    - INS_SETPOS() for Win32 inspector window positioning
+    - W32_GetWindowBottom() for dynamic layout calculations
+  * Resources: toolbar.bmp (9 Silk icons), individual PNGs in resources/icons/
+  * README updated: 4-window layout, 3 IDE files per platform
+
 2026-04-01
 ----------
 - Linux IDE: full Borland C++Builder-style layout with 4 independent windows
