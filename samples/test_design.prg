@@ -180,10 +180,10 @@ static function CreateDesignForm()
    @ 13, 12 GROUPBOX "General" OF oDesignForm SIZE 430, 120
 
    @ 40, 26 SAY "Name:" OF oDesignForm SIZE 70
-   @ 38, 100 GET oBtn VAR "John Doe" OF oDesignForm SIZE 200, 24
+   @ 38, 100 GET oBtn VAR "John Doe" OF oDesignForm SIZE 200, 26
 
    @ 75, 26 SAY "City:" OF oDesignForm SIZE 70
-   @ 73, 100 GET oBtn VAR "Madrid" OF oDesignForm SIZE 200, 24
+   @ 73, 100 GET oBtn VAR "Madrid" OF oDesignForm SIZE 200, 26
 
    @ 150, 12 GROUPBOX "Options" OF oDesignForm SIZE 430, 100
 
