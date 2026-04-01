@@ -82,12 +82,29 @@ HB_FUNC( _INSSETDATA ) { s_insData = (HB_PTRUINT) hb_parnint(1); }
 #include <hbapi.h>
 #include <hbapiitm.h>
 #include <hbvm.h>
+#include <hbstack.h>
 #include <windows.h>
 #include <commctrl.h>
 #include <string.h>
+#include <stdio.h>
+#include <stdarg.h>
 
 #define MAX_ROWS 64
 #define COL_NAME_W 95
+
+/* Debug log to file */
+static void INSLOG( const char * fmt, ... )
+{
+   FILE * f = fopen( "c:\\ide\\samples\\inspector.log", "a" );
+   if( f ) {
+      va_list ap;
+      va_start( ap, fmt );
+      vfprintf( f, fmt, ap );
+      fprintf( f, "\n" );
+      va_end( ap );
+      fclose( f );
+   }
+}
 
 typedef struct {
    char szName[32];
@@ -356,43 +373,80 @@ static LRESULT CALLBACK InsWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
          WORD wId = LOWORD(wParam);
          WORD wNotify = HIWORD(wParam);
          /* ComboBox selection changed - select control in design form */
-         if( wId == 101 && wNotify == CBN_SELCHANGE && d && d->hCombo )
+         if( wId == 101 && wNotify == CBN_SELCHANGE && d && d->hCombo && d->hFormCtrl )
          {
             int sel = (int) SendMessage( d->hCombo, CB_GETCURSEL, 0, 0 );
-            if( d->hFormCtrl && sel >= 0 )
+            if( sel >= 0 )
             {
-               /* Fire a Harbour callback to select the control */
-               /* sel 0 = form, sel N = child N */
-               HB_PTRUINT hTarget = d->hFormCtrl;
-               if( sel > 0 )
+               /* Use direct C bridge calls instead of hb_vmPushDynSym.
+                * Store the selected index and post a custom message to
+                * handle it safely outside the combo notification. */
+               PostMessage( hWnd, WM_USER + 100, (WPARAM) sel, 0 );
+            }
+         }
+         break;
+      }
+
+      case WM_USER + 100:
+      {
+         /* Deferred combo selection - safe to call Harbour VM here */
+         if( d && d->hFormCtrl )
+         {
+            int sel = (int) wParam;
+            HB_PTRUINT hTarget = d->hFormCtrl;  /* sel 0 = form */
+            PHB_DYNS pDyn;
+
+            INSLOG( "ComboSel: sel=%d hFormCtrl=%p", sel, (void*)(LONG_PTR)d->hFormCtrl );
+
+            if( sel > 0 )
+            {
+               /* Get child handle via HB_FUNC call */
+               pDyn = hb_dynsymFind( "UI_GETCHILD" );
+               INSLOG( "  UI_GETCHILD dynsym=%p", (void*)pDyn );
+               if( pDyn )
                {
-                  /* Get child at index sel (1-based in bridge) */
-                  hb_vmPushDynSym( hb_dynsymFind( "UI_GETCHILD" ) );
+                  hb_vmPushDynSym( pDyn );
                   hb_vmPushNil();
                   hb_vmPushNumInt( (HB_MAXINT) d->hFormCtrl );
                   hb_vmPushInteger( sel );
                   hb_vmDo( 2 );
-                  hTarget = (HB_PTRUINT) hb_parnint( -1 );
+                  hTarget = (HB_PTRUINT) hb_itemGetNInt( hb_stackReturnItem() );
+                  INSLOG( "  UI_GETCHILD result: hTarget=%p", (void*)(LONG_PTR)hTarget );
                }
-               /* Refresh inspector and select control in design form */
-               if( hTarget )
+            }
+
+            if( hTarget )
+            {
+               d->hCtrl = hTarget;
+
+               /* Select control in design form */
+               pDyn = hb_dynsymFind( "UI_FORMSELECTCTRL" );
+               INSLOG( "  UI_FORMSELECTCTRL dynsym=%p", (void*)pDyn );
+               if( pDyn )
                {
-                  d->hCtrl = hTarget;
-                  /* Select control in design form */
-                  hb_vmPushDynSym( hb_dynsymFind( "UI_FORMSELECTCTRL" ) );
+                  hb_vmPushDynSym( pDyn );
                   hb_vmPushNil();
                   hb_vmPushNumInt( (HB_MAXINT) d->hFormCtrl );
                   hb_vmPushNumInt( (HB_MAXINT) hTarget );
                   hb_vmDo( 2 );
-                  /* Refresh inspector properties */
-                  hb_vmPushDynSym( hb_dynsymFind( "INSPECTORREFRESH" ) );
+                  INSLOG( "  UI_FORMSELECTCTRL done" );
+               }
+
+               /* Refresh inspector properties */
+               pDyn = hb_dynsymFind( "INSPECTORREFRESH" );
+               INSLOG( "  INSPECTORREFRESH dynsym=%p", (void*)pDyn );
+               if( pDyn )
+               {
+                  hb_vmPushDynSym( pDyn );
                   hb_vmPushNil();
                   hb_vmPushNumInt( (HB_MAXINT) hTarget );
                   hb_vmDo( 1 );
+                  INSLOG( "  INSPECTORREFRESH done" );
                }
             }
+            INSLOG( "ComboSel: complete" );
          }
-         break;
+         return 0;
       }
 
       case WM_CLOSE:
