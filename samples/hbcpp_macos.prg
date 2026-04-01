@@ -123,7 +123,10 @@ function Main()
    SEPARATOR OF oTB
    BUTTON "Run"   OF oTB TOOLTIP "Run project (Cmd+R)"  ACTION MsgInfo( "Run" )
 
-   // Component Palette (28x28 icon grid, tabbed, right of splitter)
+   // Load toolbar icons (Silk icon set by famfamfam, CC BY 2.5)
+   UI_ToolBarLoadImages( oTB:hCpp, "../resources/toolbar.bmp" )
+
+   // Component Palette (icon grid, tabbed, right of splitter)
    CreatePalette()
 
    // === Window 4: Code Editor (background, right of inspector, full area) ===
@@ -192,6 +195,9 @@ static function CreatePalette()
    nAdd := oPal:AddTab( "Data Controls" )
    oPal:AddComp( nAdd, "DBG",  "DBGrid",   0 )
    oPal:AddComp( nAdd, "DBN",  "DBNav",    0 )
+
+   // Load palette icons (Silk icon set by famfamfam, CC BY 2.5)
+   UI_PaletteLoadImages( oPal:hCpp, "../resources/palette.bmp" )
 
 return nil
 

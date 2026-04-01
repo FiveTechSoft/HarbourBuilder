@@ -69,6 +69,7 @@ typedef struct {
    int                nCurrentTab;
    int                nSplitPos;
    PHB_ITEM           pOnSelect;
+   NSMutableArray *   palImages;
 } PALDATA;
 
 static PALDATA * s_palData = NULL;
@@ -241,6 +242,7 @@ static void EnsureNSApp( void )
    BOOL     FBtnSeparator[MAX_TOOLBTNS];
    PHB_ITEM FBtnOnClick[MAX_TOOLBTNS];
    int      FBtnCount;
+   NSMutableArray * FIconImages;
 }
 - (int)addButton:(const char *)text tooltip:(const char *)tooltip;
 - (void)addSeparator;
@@ -646,6 +648,49 @@ static void EnsureNSApp( void )
 
    [parentView addSubview:toolbar];
    FView = toolbar;
+
+   /* Apply stored icon images if available */
+   if( FIconImages && [FIconImages count] > 0 )
+   {
+      int imgIdx = 0;
+      xPos = 4;
+      for( NSView * sv in [toolbar subviews] )
+      {
+         if( imgIdx >= (int)[FIconImages count] ) break;
+         if( ![sv isKindOfClass:[NSButton class]] ) continue;
+
+         NSButton * btn = (NSButton *)sv;
+         NSImage * img = FIconImages[imgIdx];
+         [img setSize:NSMakeSize(28, 28)];
+         [btn setImage:img];
+         [btn setImagePosition:NSImageOnly];
+         [btn setTitle:@""];
+         [btn setBordered:NO];
+         NSRect f = [btn frame];
+         f.size.width = 40;
+         f.size.height = 40;
+         [btn setFrame:f];
+         imgIdx++;
+      }
+      /* Re-layout with new sizes */
+      xPos = 4;
+      int maxH = 0;
+      for( NSView * sv in [toolbar subviews] )
+      {
+         NSRect f = [sv frame];
+         f.origin.x = xPos;
+         f.origin.y = 2;
+         [sv setFrame:f];
+         if( (int)f.size.height > maxH ) maxH = (int)f.size.height;
+         if( [sv isKindOfClass:[NSBox class]] )
+            xPos += 8;
+         else
+            xPos += (int)f.size.width + 2;
+      }
+      FWidth = xPos + 4;
+      tbHeight = maxH + 4;
+      [toolbar setFrame:NSMakeRect( 0, 0, FWidth, tbHeight )];
+   }
 }
 
 - (void)toolBtnClicked:(id)sender
@@ -1053,6 +1098,23 @@ static HBPaletteTarget * s_palTarget = nil;
 - (void)createWindowWithRunLoop:(BOOL)enterLoop
 {
    EnsureNSApp();
+
+   if( FWindow )
+   {
+      /* Window already created (by Show before Activate).
+         Re-create children to pick up toolbar/palette added after Show. */
+      for( NSView * sv in [[FContentView subviews] copy] )
+         [sv removeFromSuperview];
+      [self createAllChildren];
+      [FWindow makeKeyAndOrderFront:nil];
+      [NSApp activateIgnoringOtherApps:YES];
+      FRunning = YES;
+      if( enterLoop ) {
+         [NSApp run];
+         FRunning = NO;
+      }
+      return;
+   }
 
    NSRect frame = NSMakeRect( 0, 0, FWidth, FHeight );
    NSUInteger style = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable;
@@ -1698,6 +1760,128 @@ HB_FUNC( UI_TOOLBTNONCLICK )
       [p setBtnClick:hb_parni(2) block:pBlock];
 }
 
+/* SliceBmpStrip - load a BMP strip, slice into 32x32 icons with magenta transparency.
+ * BMP has no alpha channel, so we create a new RGBA bitmap and write pixels directly. */
+static NSMutableArray * SliceBmpStrip( const char * szPath )
+{
+   NSString * path = [NSString stringWithUTF8String:szPath];
+   NSImage * strip = [[NSImage alloc] initWithContentsOfFile:path];
+   if( !strip ) return nil;
+
+   /* Use actual pixel dimensions from CGImage, not point size (which varies with DPI/Retina) */
+   CGImageRef cgStrip = [strip CGImageForProposedRect:NULL context:nil hints:nil];
+   if( !cgStrip ) return nil;
+
+   int pixelW = (int)CGImageGetWidth( cgStrip );
+   int pixelH = (int)CGImageGetHeight( cgStrip );
+   int iconW = 32, iconH = pixelH;
+   int nIcons = pixelW / iconW;
+
+   NSMutableArray * icons = [NSMutableArray arrayWithCapacity:nIcons];
+   for( int i = 0; i < nIcons; i++ )
+   {
+      CGImageRef tile = CGImageCreateWithImageInRect( cgStrip,
+         CGRectMake( i * iconW, 0, iconW, iconH ) );
+      if( !tile ) continue;
+
+      /* Draw tile into a 32-bit RGBA context so we have an alpha channel */
+      CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+      uint8_t * pixels = (uint8_t *)calloc( iconW * iconH * 4, 1 );
+      CGContextRef ctx = CGBitmapContextCreate( pixels, iconW, iconH, 8,
+         iconW * 4, cs, kCGImageAlphaPremultipliedLast );
+      CGContextDrawImage( ctx, CGRectMake( 0, 0, iconW, iconH ), tile );
+      CGImageRelease( tile );
+
+      /* Replace magenta (R>240, G<16, B>240) with transparent */
+      for( int p = 0; p < iconW * iconH; p++ )
+      {
+         uint8_t r = pixels[p * 4];
+         uint8_t g = pixels[p * 4 + 1];
+         uint8_t b = pixels[p * 4 + 2];
+         if( r > 240 && g < 16 && b > 240 )
+         {
+            pixels[p * 4]     = 0;
+            pixels[p * 4 + 1] = 0;
+            pixels[p * 4 + 2] = 0;
+            pixels[p * 4 + 3] = 0;
+         }
+      }
+
+      CGImageRef rgbaImage = CGBitmapContextCreateImage( ctx );
+      CGContextRelease( ctx );
+      free( pixels );
+      CGColorSpaceRelease( cs );
+
+      if( rgbaImage )
+      {
+         NSImage * icon = [[NSImage alloc] initWithCGImage:rgbaImage
+            size:NSMakeSize( iconW, iconH )];
+         CGImageRelease( rgbaImage );
+         [icons addObject:icon];
+      }
+   }
+   return icons;
+}
+
+/* UI_ToolBarLoadImages( hToolBar, cBmpPath )
+ * Load a BMP strip of 32x32 icons and apply to toolbar buttons.
+ * Magenta (255,0,255) is treated as transparency mask. */
+HB_FUNC( UI_TOOLBARLOADIMAGES )
+{
+   HBToolBar * p = (__bridge HBToolBar *)(void *)(HB_PTRUINT)hb_parnint(1);
+   const char * szPath = hb_parc(2);
+   if( !p || p->FControlType != CT_TOOLBAR || !szPath ) return;
+
+   NSMutableArray * icons = SliceBmpStrip( szPath );
+   if( !icons || [icons count] == 0 ) return;
+
+   /* Store icons - they will be applied when createViewInParent runs */
+   p->FIconImages = icons;
+
+   /* If view already exists, apply icons now */
+   if( p->FView )
+   {
+      int imgIdx = 0;
+      for( NSView * sv in [p->FView subviews] )
+      {
+         if( imgIdx >= (int)[icons count] ) break;
+         if( ![sv isKindOfClass:[NSButton class]] ) continue;
+         NSButton * btn = (NSButton *)sv;
+         NSImage * img = icons[imgIdx];
+         [img setSize:NSMakeSize(28, 28)];
+         [btn setImage:img];
+         [btn setImagePosition:NSImageOnly];
+         [btn setTitle:@""];
+         [btn setBordered:NO];
+         NSRect f = [btn frame];
+         f.size.width = 40;
+         f.size.height = 40;
+         [btn setFrame:f];
+         imgIdx++;
+      }
+      /* Re-layout */
+      int xPos = 4;
+      int maxH = 0;
+      for( NSView * sv in [p->FView subviews] )
+      {
+         NSRect f = [sv frame];
+         f.origin.x = xPos;
+         f.origin.y = 2;
+         [sv setFrame:f];
+         if( (int)f.size.height > maxH ) maxH = (int)f.size.height;
+         if( [sv isKindOfClass:[NSBox class]] )
+            xPos += 8;
+         else
+            xPos += (int)f.size.width + 2;
+      }
+      p->FWidth = xPos + 4;
+      NSRect tbFrame = [p->FView frame];
+      tbFrame.size.width = p->FWidth;
+      tbFrame.size.height = maxH + 4;
+      [p->FView setFrame:tbFrame];
+   }
+}
+
 /* ======================================================================
  * Menu bridge
  * ====================================================================== */
@@ -1831,16 +2015,31 @@ static void PalShowTab( PALDATA * pd, int nTab )
    for( int i = 0; i < t->nBtnCount; i++ ) {
       NSString * title = [NSString stringWithUTF8String:t->btns[i].szText];
       NSFont * btnFont = [NSFont systemFontOfSize:11];
-      NSDictionary * attrs = @{ NSFontAttributeName: btnFont };
-      CGFloat textW = [title sizeWithAttributes:attrs].width;
-      int thisBtnW = (int)(textW + 24);
-      if( thisBtnW < btnW ) thisBtnW = btnW;
+      int thisBtnW = btnW;
+
+      /* If palette images loaded, use icon index from nControlType */
+      int imgIdx = t->btns[i].nControlType;
+      BOOL hasImage = ( pd->palImages && imgIdx > 0 && imgIdx <= (int)[pd->palImages count] );
+
+      if( !hasImage ) {
+         NSDictionary * attrs = @{ NSFontAttributeName: btnFont };
+         CGFloat textW = [title sizeWithAttributes:attrs].width;
+         thisBtnW = (int)(textW + 24);
+         if( thisBtnW < btnW ) thisBtnW = btnW;
+      }
 
       NSButton * btn = [[NSButton alloc] initWithFrame:NSMakeRect( xPos, y, thisBtnW, btnH )];
-      [btn setTitle:title];
-      [btn setToolTip:[NSString stringWithUTF8String:t->btns[i].szTooltip]];
       [btn setBezelStyle:NSBezelStyleSmallSquare];
       [btn setFont:btnFont];
+
+      if( hasImage ) {
+         [btn setImage:pd->palImages[imgIdx - 1]];
+         [btn setImagePosition:NSImageOnly];
+         [btn setTitle:@""];
+      } else {
+         [btn setTitle:title];
+      }
+      [btn setToolTip:[NSString stringWithUTF8String:t->btns[i].szTooltip]];
       [pd->btnPanel addSubview:btn];
       pd->buttons[i] = btn;
       xPos += thisBtnW + 2;
@@ -1903,6 +2102,25 @@ HB_FUNC( UI_PALETTEONSELECT )
       if( pd->pOnSelect ) hb_itemRelease( pd->pOnSelect );
       pd->pOnSelect = pBlock ? hb_itemNew( pBlock ) : NULL;
    }
+}
+
+/* UI_PaletteLoadImages( hPalette, cBmpPath )
+ * Load a BMP strip of 32x32 icons for component palette buttons.
+ * Magenta (255,0,255) is treated as transparency mask. */
+HB_FUNC( UI_PALETTELOADIMAGES )
+{
+   PALDATA * pd = s_palData;
+   const char * szPath = hb_parc(2);
+   if( !pd || !szPath ) return;
+
+   NSMutableArray * icons = SliceBmpStrip( szPath );
+   if( !icons || [icons count] == 0 ) return;
+
+   pd->palImages = icons;
+
+   /* Refresh current tab to show icons */
+   if( pd->nTabCount > 0 )
+      PalShowTab( pd, pd->nCurrentTab );
 }
 
 HB_FUNC( UI_TOOLBARGETWIDTH )

@@ -1,6 +1,28 @@
 hbcpp - C++ powered GUI for Harbour
 =====================================
 
+2026-04-01 (Icon images fix)
+----------------------------
+- Fixed magenta transparency mask for BMP icon strips on macOS
+  * Replaced NSBitmapImageRep colorAtX/setColor approach (fails on BMP
+    without alpha channel) with direct CGBitmapContext RGBA pixel manipulation
+  * Magenta pixels (R>240, G<16, B>240) correctly replaced with transparent
+- Fixed Retina display icon count bug
+  * NSImage size returns points (scaled by DPI), not pixels
+  * Changed to CGImageGetWidth/Height for actual pixel dimensions
+  * Fixes toolbar.bmp (288x32) being read as 192x21 → only 6 of 9 icons
+- Fixed duplicate window creation when Show() called before Activate()
+  * createWindowWithRunLoop now reuses existing NSWindow if already created
+  * Re-creates children to pick up toolbar/palette added after Show()
+- Toolbar icon images stored in FIconImages and applied at createViewInParent
+  * Solves timing issue: UI_ToolBarLoadImages called before view exists
+  * Icons auto-applied when toolbar view is actually created
+- Extracted SliceBmpStrip() helper: shared by toolbar and palette image loading
+  * Loads BMP strip, slices into 32xH tiles, applies magenta transparency
+  * Eliminates code duplication between UI_ToolBarLoadImages/UI_PaletteLoadImages
+- Toolbar buttons: 40x40 borderless with 28x28 icon images (Silk icon set)
+- Palette buttons: 32x32 icons with magenta transparency
+
 2026-04-01 (Windows IDE update)
 -------------------------------
 - Windows IDE: full C++Builder layout with 4 independent windows
