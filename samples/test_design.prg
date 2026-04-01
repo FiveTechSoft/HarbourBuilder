@@ -110,6 +110,10 @@ function Main()
    InspectorRefresh( oDesignForm:hCpp )
    InspectorPopulateCombo( oDesignForm:hCpp )
 
+   // When user selects a control from the inspector combo:
+   // nSel=0 means form, nSel=N means child N
+   INS_SetOnComboSel( _InsGetData(), { |nSel| OnComboSelect( nSel ) } )
+
    // Sync: selection change in design form -> refresh inspector + status
    UI_OnSelChange( oDesignForm:hCpp, ;
       { |hCtrl| OnDesignSelChange( hCtrl ) } )
@@ -169,9 +173,8 @@ static function CreateDesignForm()
 
    DEFINE FORM oDesignForm TITLE "Form1" SIZE 470, 380 FONT "Segoe UI", 9 TOOLWINDOW
 
-   // Position: right of inspector area, below IDE bar
-   // Inspector is ~215px wide on the left, IDE bar is ~120px tall at top
-   UI_FormSetPos( oDesignForm:hCpp, 230, 130 )
+   // Position: right of inspector, below IDE bar
+   UI_FormSetPos( oDesignForm:hCpp, 270, 145 )
 
    // Sample controls
    @ 13, 12 GROUPBOX "General" OF oDesignForm SIZE 430, 120
@@ -193,6 +196,26 @@ static function CreateDesignForm()
 
    @ 290, 150 BUTTON oBtn PROMPT "&OK" OF oDesignForm SIZE 88, 26
    @ 290, 250 BUTTON oBtn PROMPT "&Cancel" OF oDesignForm SIZE 88, 26
+
+return nil
+
+static function OnComboSelect( nSel )
+
+   local hTarget
+
+   // nSel: 0 = form, N = child N (1-based)
+   if nSel == 0
+      hTarget := oDesignForm:hCpp
+   else
+      hTarget := UI_GetChild( oDesignForm:hCpp, nSel )
+   endif
+
+   if hTarget != 0
+      // Select control in design form (shows dotted handles)
+      UI_FormSelectCtrl( oDesignForm:hCpp, hTarget )
+      // Refresh inspector properties for the selected control
+      InspectorRefresh( hTarget )
+   endif
 
 return nil
 

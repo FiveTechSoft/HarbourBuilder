@@ -136,6 +136,7 @@ typedef struct {
    int    nEditRow;     /* listview row being edited */
    WNDPROC oldEditProc;
    int    nActiveTab;   /* 0=Properties, 1=Events */
+   PHB_ITEM pOnComboSel; /* callback when combo selection changes: {|nIndex| ... } */
 } INSDATA;
 
 /* Forward */
@@ -389,62 +390,16 @@ static LRESULT CALLBACK InsWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
 
       case WM_USER + 100:
       {
-         /* Deferred combo selection - safe to call Harbour VM here */
-         if( d && d->hFormCtrl )
+         /* Deferred combo selection - eval Harbour codeblock */
+         if( d && d->pOnComboSel && HB_IS_BLOCK( d->pOnComboSel ) )
          {
             int sel = (int) wParam;
-            HB_PTRUINT hTarget = d->hFormCtrl;  /* sel 0 = form */
-            PHB_DYNS pDyn;
-
-            INSLOG( "ComboSel: sel=%d hFormCtrl=%p", sel, (void*)(LONG_PTR)d->hFormCtrl );
-
-            if( sel > 0 )
-            {
-               /* Get child handle via HB_FUNC call */
-               pDyn = hb_dynsymFind( "UI_GETCHILD" );
-               INSLOG( "  UI_GETCHILD dynsym=%p", (void*)pDyn );
-               if( pDyn )
-               {
-                  hb_vmPushDynSym( pDyn );
-                  hb_vmPushNil();
-                  hb_vmPushNumInt( (HB_MAXINT) d->hFormCtrl );
-                  hb_vmPushInteger( sel );
-                  hb_vmDo( 2 );
-                  hTarget = (HB_PTRUINT) hb_itemGetNInt( hb_stackReturnItem() );
-                  INSLOG( "  UI_GETCHILD result: hTarget=%p", (void*)(LONG_PTR)hTarget );
-               }
-            }
-
-            if( hTarget )
-            {
-               d->hCtrl = hTarget;
-
-               /* Select control in design form */
-               pDyn = hb_dynsymFind( "UI_FORMSELECTCTRL" );
-               INSLOG( "  UI_FORMSELECTCTRL dynsym=%p", (void*)pDyn );
-               if( pDyn )
-               {
-                  hb_vmPushDynSym( pDyn );
-                  hb_vmPushNil();
-                  hb_vmPushNumInt( (HB_MAXINT) d->hFormCtrl );
-                  hb_vmPushNumInt( (HB_MAXINT) hTarget );
-                  hb_vmDo( 2 );
-                  INSLOG( "  UI_FORMSELECTCTRL done" );
-               }
-
-               /* Refresh inspector properties */
-               pDyn = hb_dynsymFind( "INSPECTORREFRESH" );
-               INSLOG( "  INSPECTORREFRESH dynsym=%p", (void*)pDyn );
-               if( pDyn )
-               {
-                  hb_vmPushDynSym( pDyn );
-                  hb_vmPushNil();
-                  hb_vmPushNumInt( (HB_MAXINT) hTarget );
-                  hb_vmDo( 1 );
-                  INSLOG( "  INSPECTORREFRESH done" );
-               }
-            }
-            INSLOG( "ComboSel: complete" );
+            INSLOG( "ComboSel: sel=%d, firing codeblock", sel );
+            hb_vmPushEvalSym();
+            hb_vmPush( d->pOnComboSel );
+            hb_vmPushInteger( sel );
+            hb_vmSend( 1 );
+            INSLOG( "ComboSel: codeblock done" );
          }
          return 0;
       }
@@ -697,6 +652,7 @@ HB_FUNC( INS_CREATE )
    d->hBtn = NULL;
    d->nActiveTab = 0;
    d->hFormCtrl = 0;
+   d->pOnComboSel = NULL;
 
    { LOGFONTA lf = {0}; lf.lfHeight = -12; lf.lfCharSet = DEFAULT_CHARSET;
      lstrcpyA(lf.lfFaceName, "Segoe UI");
@@ -716,7 +672,7 @@ HB_FUNC( INS_CREATE )
 
    d->hWnd = CreateWindowExA( WS_EX_TOOLWINDOW, "HbIdeInspector", "Object Inspector",
       WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME,
-      0, 130, 220, 500,
+      0, 130, 250, 500,
       NULL, NULL, GetModuleHandle(NULL), NULL );
 
    SetWindowLongPtr( d->hWnd, GWLP_USERDATA, (LONG_PTR) d );
@@ -753,13 +709,13 @@ HB_FUNC( INS_CREATE )
    lvc.mask = LVCF_TEXT | LVCF_WIDTH;
    lvc.cx = COL_NAME_W; lvc.pszText = "Property";
    SendMessageA( d->hList, LVM_INSERTCOLUMNA, 0, (LPARAM) &lvc );
-   lvc.cx = 100; lvc.pszText = "Value";
+   lvc.cx = 130; lvc.pszText = "Value";
    SendMessageA( d->hList, LVM_INSERTCOLUMNA, 1, (LPARAM) &lvc );
 
    /* Events ListView (hidden by default) */
    d->hEventList = CreateWindowExA( 0, WC_LISTVIEWA, "",
       WS_CHILD | LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOCOLUMNHEADER,
-      0, topY, 215, 440 - topY, d->hWnd, (HMENU)103, GetModuleHandle(NULL), NULL );
+      0, topY, 245, 440 - topY, d->hWnd, (HMENU)103, GetModuleHandle(NULL), NULL );
 
    SendMessage( d->hEventList, LVM_SETEXTENDEDLISTVIEWSTYLE, 0,
       LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_DOUBLEBUFFER );
@@ -767,7 +723,7 @@ HB_FUNC( INS_CREATE )
 
    lvc.cx = COL_NAME_W; lvc.pszText = "Event";
    SendMessageA( d->hEventList, LVM_INSERTCOLUMNA, 0, (LPARAM) &lvc );
-   lvc.cx = 100; lvc.pszText = "Handler";
+   lvc.cx = 130; lvc.pszText = "Handler";
    SendMessageA( d->hEventList, LVM_INSERTCOLUMNA, 1, (LPARAM) &lvc );
 
    ShowWindow( d->hWnd, SW_SHOW );
@@ -869,6 +825,18 @@ HB_FUNC( INS_SETFORMCTRL )
 {
    INSDATA * d = (INSDATA *) (HB_PTRUINT) hb_parnint(1);
    if( d ) d->hFormCtrl = (HB_PTRUINT) hb_parnint(2);
+}
+
+/* INS_SetOnComboSel( hInsData, bBlock ) - set callback for combo selection change */
+HB_FUNC( INS_SETONCOMBOSEL )
+{
+   INSDATA * d = (INSDATA *) (HB_PTRUINT) hb_parnint(1);
+   PHB_ITEM pBlock = hb_param(2, HB_IT_BLOCK);
+   if( d )
+   {
+      if( d->pOnComboSel ) hb_itemRelease( d->pOnComboSel );
+      d->pOnComboSel = pBlock ? hb_itemNew( pBlock ) : NULL;
+   }
 }
 
 /* INS_BringToFront( hInsData ) */
@@ -976,6 +944,7 @@ HB_FUNC( INS_DESTROY )
 {
    INSDATA * d = (INSDATA *) (HB_PTRUINT) hb_parnint(1);
    if( !d ) return;
+   if( d->pOnComboSel ) hb_itemRelease( d->pOnComboSel );
    if( d->hWnd ) DestroyWindow( d->hWnd );
    DeleteObject( d->hFont );
    DeleteObject( d->hBold );
