@@ -366,6 +366,7 @@ public:
    int          FCurrentTab;
    int          FSplitPos;     /* X position of splitter */
    PHB_ITEM     FOnSelect;     /* callback when component selected */
+   HIMAGELIST   FPalImageList; /* Image list for component buttons */
 
    TComponentPalette();
    virtual ~TComponentPalette();
@@ -375,6 +376,7 @@ public:
    void ShowTab( int nTab );
    void HandleTabChange();
    int  GetBarHeight();
+   void LoadImages( const char * szBmpPath );
    const PROPDESC * GetPropDescs( int * pnCount );
 };
 

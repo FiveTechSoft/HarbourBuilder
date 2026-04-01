@@ -694,6 +694,7 @@ TComponentPalette::TComponentPalette()
    FCurrentTab = 0;
    FSplitPos = 0;
    FOnSelect = NULL;
+   FPalImageList = NULL;
    FTabStop = FALSE;
    memset( FTabs, 0, sizeof(FTabs) );
    memset( FBtns, 0, sizeof(FBtns) );
@@ -787,9 +788,8 @@ void TComponentPalette::AddComponent( int nTab, const char * szText, const char 
 
 void TComponentPalette::ShowTab( int nTab )
 {
-   int i, xPos = 4;
+   int i, xPos = 4, imgBase = 0;
    RECT rcTab;
-   HWND hToolTip;
 
    if( nTab < 0 || nTab >= FTabCount ) return;
    FCurrentTab = nTab;
@@ -804,6 +804,10 @@ void TComponentPalette::ShowTab( int nTab )
    GetClientRect( FTabCtrl, &rcTab );
    SendMessage( FTabCtrl, TCM_ADJUSTRECT, FALSE, (LPARAM) &rcTab );
 
+   /* Calculate image base index: sum of buttons in all previous tabs */
+   for( i = 0; i < nTab; i++ )
+      imgBase += FTabs[i].nBtnCount;
+
    /* Create square buttons for this tab (as large as the tab area allows) */
    {
       PaletteTab * t = &FTabs[nTab];
@@ -815,21 +819,58 @@ void TComponentPalette::ShowTab( int nTab )
       xPos = rcTab.left + 4;
       for( i = 0; i < t->nBtnCount; i++ )
       {
-         FBtns[i] = CreateWindowExA( 0, "BUTTON", t->btns[i].szText,
-            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_FLAT | BS_CENTER,
-            xPos, y, btnSize, btnSize,
-            FTabCtrl, (HMENU)(LONG_PTR)(200 + i),
-            GetModuleHandle(NULL), NULL );
-
-         if( FBtns[i] )
+         if( FPalImageList )
          {
-            SendMessage( FBtns[i], WM_SETFONT,
-               SendMessage( FTabCtrl, WM_GETFONT, 0, 0 ), TRUE );
+            /* Icon button (BS_ICON style with image from ImageList) */
+            FBtns[i] = CreateWindowExA( 0, "BUTTON", NULL,
+               WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_FLAT | BS_ICON,
+               xPos, y, btnSize, btnSize,
+               FTabCtrl, (HMENU)(LONG_PTR)(200 + i),
+               GetModuleHandle(NULL), NULL );
+
+            if( FBtns[i] )
+            {
+               HICON hIcon = ImageList_GetIcon( FPalImageList, imgBase + i, ILD_TRANSPARENT );
+               if( hIcon )
+                  SendMessage( FBtns[i], BM_SETIMAGE, IMAGE_ICON, (LPARAM) hIcon );
+            }
+         }
+         else
+         {
+            /* Text fallback */
+            FBtns[i] = CreateWindowExA( 0, "BUTTON", t->btns[i].szText,
+               WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_FLAT | BS_CENTER,
+               xPos, y, btnSize, btnSize,
+               FTabCtrl, (HMENU)(LONG_PTR)(200 + i),
+               GetModuleHandle(NULL), NULL );
+
+            if( FBtns[i] )
+               SendMessage( FBtns[i], WM_SETFONT,
+                  SendMessage( FTabCtrl, WM_GETFONT, 0, 0 ), TRUE );
          }
 
          xPos += btnSize + 2;
       }
    }
+}
+
+void TComponentPalette::LoadImages( const char * szBmpPath )
+{
+   HBITMAP hBmp;
+
+   if( !szBmpPath ) return;
+
+   hBmp = (HBITMAP) LoadImageA( NULL, szBmpPath, IMAGE_BITMAP,
+      0, 0, LR_LOADFROMFILE );
+   if( !hBmp ) return;
+
+   FPalImageList = ImageList_Create( 32, 32, ILC_COLOR24 | ILC_MASK, 16, 4 );
+   ImageList_AddMasked( FPalImageList, hBmp, RGB(255, 0, 255) );
+   DeleteObject( hBmp );
+
+   /* Refresh current tab to use images */
+   if( FTabCtrl )
+      ShowTab( FCurrentTab );
 }
 
 void TComponentPalette::HandleTabChange()

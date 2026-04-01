@@ -200,6 +200,9 @@ static function CreatePalette()
    oPal:AddComp( nAdd, "DBG",  "DBGrid",   0 )
    oPal:AddComp( nAdd, "DBN",  "DBNav",    0 )
 
+   // Load palette icons (Silk icon set by famfamfam, CC BY 2.5)
+   UI_PaletteLoadImages( oPal:hCpp, "c:\ide\resources\palette.bmp" )
+
 return nil
 
 static function CreateDesignForm( nX, nY )

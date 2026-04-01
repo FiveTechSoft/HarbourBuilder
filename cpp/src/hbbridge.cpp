@@ -831,6 +831,14 @@ HB_FUNC( UI_PALETTEADDCOMP )
          HB_ISCHAR(4) ? hb_parc(4) : "", hb_parni(5) );
 }
 
+/* UI_PaletteLoadImages( hPalette, cBmpPath ) */
+HB_FUNC( UI_PALETTELOADIMAGES )
+{
+   TComponentPalette * p = (TComponentPalette *) GetCtrl(1);
+   if( p && p->FControlType == CT_TABCONTROL && HB_ISCHAR(2) )
+      p->LoadImages( hb_parc(2) );
+}
+
 /* UI_PaletteOnSelect( hPalette, bBlock ) */
 HB_FUNC( UI_PALETTEONSELECT )
 {
