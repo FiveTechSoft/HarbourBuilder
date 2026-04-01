@@ -1,6 +1,32 @@
 hbcpp - C++ powered GUI for Harbour
 =====================================
 
+2026-04-01
+----------
+- Added Linux GTK3 backend
+  * gtk3_core.c: full reimplementation of C++ core using GTK3
+    GtkWindow, GtkFixed for absolute positioning, all controls
+    (Label, Edit, Button, CheckBox, ComboBox, GroupBox)
+  * Design mode with GtkOverlay + GtkDrawingArea + Cairo
+    Drag, resize with 8 handles, multi-selection, arrow keys
+  * gtk3_inspector.c: property inspector using GtkTreeView/GtkListStore
+    Color picker via GtkColorChooserDialog
+    Font picker via GtkFontChooserDialog
+    Category collapse/expand via double-click
+  * inspector_gtk.prg: Harbour wrapper for GTK3 inspector
+  * test_design_gtk.prg: design-mode sample for Linux
+  * build_gtk.sh: build script with auto-detection of Harbour paths
+  * Same Harbour OOP layer (classes.prg, commands.ch) works unchanged
+  * Prerequisite: sudo apt install libgtk-3-dev
+  * Build and run:
+      cd samples
+      ./build_gtk.sh
+      ./test_design_gtk
+
+- Moved screenshot images to images/ folder
+  * images/MacOS.png, images/gtk3.png, images/linux.png
+  * Updated README.md to reference new paths
+
 2026-03-31
 ----------
 - Cocoa inspector: nClrPane editable with "..." button and NSColorPanel

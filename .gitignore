@@ -7,6 +7,7 @@
 !core/*.prg
 !harbour/*.prg
 !backends/**/*.prg
+!backends/**/*.c
 !samples/*.prg
 
 # Generated files
