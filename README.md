@@ -1,6 +1,6 @@
-# hbcpp
+# Harbour Builder
 
-C++ powered cross-platform GUI framework for Harbour
+C++ powered cross-platform visual IDE for Harbour
 
 This entire framework has been **vibe coded from scratch using [Claude Code](https://claude.ai/claude-code)** -- from the C++ core and native backends (Win32, Cocoa, GTK3) to the Harbour OOP layer, the visual designer with live inspector, and the IDE layout with 4 independent windows.
 
@@ -12,7 +12,7 @@ This entire framework has been **vibe coded from scratch using [Claude Code](htt
 
 ## Architecture
 
-hbcpp uses a layered architecture that achieves native performance on each platform while keeping application code 100% portable.
+Harbour Builder uses a layered architecture that achieves native performance on each platform while keeping application code 100% portable.
 
 ```
 +------------------------------------------------------+
@@ -56,7 +56,7 @@ hbcpp uses a layered architecture that achieves native performance on each platf
 
 ### Performance vs FiveWin
 
-| Test | FiveWin | hbcpp C++ | Factor |
+| Test | FiveWin | Harbour Builder | Factor |
 |------|---------|-----------|--------|
 | Create 500 buttons | 0.243s | 0.001s | **243x** |
 | Set property 100K times | 24.86s | 0.07s | **355x** |
@@ -112,9 +112,9 @@ backends/
   web/backend.prg        - HTML5 Canvas backend
 
 samples/
-  hbcpp_win32.prg        - Windows IDE: full C++Builder layout with 4 windows
-  hbcpp_macos.prg        - macOS IDE: full C++Builder layout with 4 windows
-  hbcpp_linux.prg        - Linux IDE: full C++Builder layout with 4 windows
+  hbcpp_win32.prg        - Windows IDE
+  hbbuilder_macos.prg    - macOS IDE: save/build/run projects
+  hbbuilder_linux.prg    - Linux IDE: save/build/run projects
   test_design.prg        - Windows IDE (legacy, hardcoded positions)
   build_cpp.bat          - Windows build script (BCC77C + Harbour)
 ```
