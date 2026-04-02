@@ -4,10 +4,8 @@ C++ powered cross-platform visual IDE for Harbour
 
 This entire framework has been **vibe coded from scratch using [Claude Code](https://claude.ai/claude-code)** -- from the C++ core and native backends (Win32, Cocoa, GTK3) to the Harbour OOP layer, the visual designer with live inspector, and the IDE layout with 4 independent windows.
 
-### macOS
 ![macOS](images/macos_now.png)
 
-### Linux
 ![Linux](images/linux_now.png)
 
 ## Architecture
