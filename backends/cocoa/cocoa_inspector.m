@@ -11,6 +11,7 @@
 #include <hbapiitm.h>
 #include <hbvm.h>
 #include <string.h>
+#include <hbstack.h>
 #include <stdio.h>
 
 #define MAX_ROWS 64
@@ -43,7 +44,21 @@ typedef struct {
    NSScrollView * scrollView;
    NSPopUpButton * combo;    /* control selection combo */
    PHB_ITEM     pOnComboSel; /* callback for combo selection change */
+   NSSegmentedControl * tabCtrl; /* Properties / Events tabs */
+   int          nTab;        /* 0 = Properties, 1 = Events */
+   /* Cached event data */
+   IROW         evRows[MAX_ROWS];
+   int          nEvRows;
+   int          evMap[MAX_ROWS];
+   int          nEvVisible;
+   /* Callback for double-click on event */
+   PHB_ITEM     pOnEventDblClick;
 } INSDATA;
+
+/* Forward declarations */
+static void InsBuildRows( INSDATA * d, PHB_ITEM pArray );
+static void InsBuildEventRows( INSDATA * d );
+static void InsRefreshTab( INSDATA * d );
 
 /* ======================================================================
  * Table view data source / delegate
@@ -222,6 +237,7 @@ static HBFontPickerTarget * s_fontTarget = nil;
    if( d->rows[nReal].bIsCat ) return NO;
    if( [[col identifier] isEqualToString:@"name"] ) return NO;
    if( [[col identifier] isEqualToString:@"button"] ) return NO;
+   if( d->rows[nReal].cType == 'E' ) return NO; /* Events not editable */
 
    /* For color properties, open NSColorPanel instead of inline editing */
    if( d->rows[nReal].cType == 'C' && [[col identifier] isEqualToString:@"value"] )
@@ -420,6 +436,64 @@ static HBFontPickerTarget * s_fontTarget = nil;
    }
 }
 
+/* Tab changed (Properties / Events) */
+- (void)tabChanged:(id)sender
+{
+   if( !d || !d->tabCtrl ) return;
+   d->nTab = (int)[d->tabCtrl selectedSegment];
+
+   /* Update column headers */
+   NSTableColumn * nameCol = [d->tableView tableColumnWithIdentifier:@"name"];
+   if( nameCol )
+      [[nameCol headerCell] setStringValue: d->nTab == 0 ? @"Property" : @"Event"];
+
+   NSTableColumn * valCol = [d->tableView tableColumnWithIdentifier:@"value"];
+   if( valCol )
+      [[valCol headerCell] setStringValue: d->nTab == 0 ? @"Value" : @"Handler"];
+
+   InsRefreshTab( d );
+   [d->tableView setNeedsDisplay:YES];
+   [[d->tableView headerView] setNeedsDisplay:YES];
+}
+
+/* Double-click on event row: generate handler */
+- (void)tableViewDoubleClicked:(id)sender
+{
+   if( !d || d->nTab != 1 ) return;  /* Only on Events tab */
+
+   NSInteger row = [d->tableView clickedRow];
+   if( row < 0 || row >= d->nVisible ) return;
+
+   int nReal = d->map[row];
+   if( d->rows[nReal].bIsCat ) return;  /* Skip category headers */
+
+   /* Fire Harbour callback with event name and control handle */
+   if( d->pOnEventDblClick && HB_IS_BLOCK( d->pOnEventDblClick ) )
+   {
+      const char * szEvent = d->rows[nReal].szName;
+      hb_vmPushEvalSym();
+      hb_vmPush( d->pOnEventDblClick );
+      hb_vmPushNumInt( d->hCtrl );
+      hb_vmPushString( szEvent, strlen(szEvent) );
+      hb_vmSend( 2 );
+
+      /* Update the value in the row from Harbour return value */
+      PHB_ITEM pRet = hb_stackReturnItem();
+      if( pRet && HB_IS_STRING( pRet ) )
+      {
+         const char * szHandler = hb_itemGetCPtr( pRet );
+         if( szHandler && szHandler[0] )
+         {
+            strncpy( d->rows[nReal].szValue, szHandler, sizeof(d->rows[0].szValue) - 1 );
+            /* Also update evRows */
+            if( nReal < d->nEvRows )
+               strncpy( d->evRows[nReal].szValue, szHandler, sizeof(d->evRows[0].szValue) - 1 );
+            [d->tableView reloadData];
+         }
+      }
+   }
+}
+
 /* Combo selection changed - fire Harbour callback */
 - (void)comboSelChanged:(id)sender
 {
@@ -572,6 +646,120 @@ static void InsBuildRows( INSDATA * d, PHB_ITEM pArray )
 }
 
 /* ======================================================================
+ * Build event rows from cached evRows data
+ * ====================================================================== */
+
+static void InsBuildEventRows( INSDATA * d )
+{
+   /* Nothing to do — evRows are pre-built by INS_SetEvents */
+   (void)d;
+}
+
+/* Build evRows from Harbour event array { { "name", lAssigned, "category" }, ... } */
+static void InsBuildEvRowsFromArray( INSDATA * d, PHB_ITEM pArray )
+{
+   d->nEvRows = 0;
+   d->nEvVisible = 0;
+   if( !pArray || hb_arrayLen(pArray) == 0 ) return;
+
+   HB_SIZE nLen = hb_arrayLen( pArray );
+   char szCats[16][32];
+   int nCats = 0, j;
+
+   /* Collect categories */
+   for( HB_SIZE i = 1; i <= nLen && nCats < 16; i++ )
+   {
+      PHB_ITEM pRow = hb_arrayGetItemPtr( pArray, i );
+      const char * c = hb_arrayGetCPtr( pRow, 3 );
+      BOOL bNew = YES;
+      for( j = 0; j < nCats; j++ )
+         if( strcasecmp(szCats[j], c) == 0 ) { bNew = NO; break; }
+      if( bNew ) strncpy( szCats[nCats++], c, 31 );
+   }
+
+   /* Build rows grouped by category */
+   for( j = 0; j < nCats && d->nEvRows < MAX_ROWS - 1; j++ )
+   {
+      /* Category header */
+      strncpy( d->evRows[d->nEvRows].szName, szCats[j], 31 );
+      d->evRows[d->nEvRows].szValue[0] = 0;
+      strncpy( d->evRows[d->nEvRows].szCategory, szCats[j], 31 );
+      d->evRows[d->nEvRows].cType = 0;
+      d->evRows[d->nEvRows].bIsCat = YES;
+      d->evRows[d->nEvRows].bCollapsed = NO;
+      d->evRows[d->nEvRows].bVisible = YES;
+      d->nEvRows++;
+
+      for( HB_SIZE i = 1; i <= nLen && d->nEvRows < MAX_ROWS; i++ )
+      {
+         PHB_ITEM pRow = hb_arrayGetItemPtr( pArray, i );
+         if( strcasecmp( hb_arrayGetCPtr(pRow,3), szCats[j] ) != 0 ) continue;
+
+         strncpy( d->evRows[d->nEvRows].szName, hb_arrayGetCPtr(pRow,1), 31 );
+         strncpy( d->evRows[d->nEvRows].szCategory, hb_arrayGetCPtr(pRow,3), 31 );
+         d->evRows[d->nEvRows].cType = 'E';  /* E = event */
+         d->evRows[d->nEvRows].bIsCat = NO;
+         d->evRows[d->nEvRows].bCollapsed = NO;
+         d->evRows[d->nEvRows].bVisible = YES;
+
+         BOOL assigned = hb_arrayGetL( pRow, 2 );
+         strcpy( d->evRows[d->nEvRows].szValue, assigned ? "(Block)" : "" );
+
+         d->nEvRows++;
+      }
+   }
+
+   /* Build visible map */
+   d->nEvVisible = 0;
+   for( int k = 0; k < d->nEvRows; k++ )
+   {
+      if( d->evRows[k].bVisible || d->evRows[k].bIsCat )
+         d->evMap[d->nEvVisible++] = k;
+   }
+}
+
+/* Switch rows/map/nVisible based on current tab */
+static void InsActivateTab( INSDATA * d )
+{
+   if( d->nTab == 1 )
+   {
+      /* Copy evRows into active rows for display */
+      memcpy( d->rows, d->evRows, sizeof(d->evRows) );
+      d->nRows = d->nEvRows;
+      memcpy( d->map, d->evMap, sizeof(d->evMap) );
+      d->nVisible = d->nEvVisible;
+   }
+   /* For tab 0, rows are already set by InsBuildRows */
+}
+
+/* Refresh the inspector table based on current tab */
+static void InsRefreshTab( INSDATA * d )
+{
+   if( d->nTab == 0 )
+   {
+      /* Properties: re-fetch via dynamic symbol */
+      PHB_DYNS pDyn = hb_dynsymFindName( "UI_GETALLPROPS" );
+      if( pDyn && d->hCtrl != 0 )
+      {
+         hb_vmPushDynSym( pDyn ); hb_vmPushNil();
+         hb_vmPushNumInt( d->hCtrl );
+         hb_vmDo( 1 );
+         PHB_ITEM pResult = hb_stackReturnItem();
+         InsBuildRows( d, pResult );
+      }
+      else
+      {
+         d->nRows = 0; d->nVisible = 0;
+      }
+   }
+   else
+   {
+      InsActivateTab( d );
+   }
+   [d->tableView reloadData];
+}
+
+/* ======================================================================
  * Global inspector data storage
  * ====================================================================== */
 
@@ -605,6 +793,7 @@ HB_FUNC( INS_CREATE )
    /* Control selection combo at top */
    NSRect contentFrame = [[d->window contentView] bounds];
    CGFloat comboHeight = 28;
+   CGFloat tabHeight = 24;
    d->combo = [[NSPopUpButton alloc] initWithFrame:
       NSMakeRect( 0, contentFrame.size.height - comboHeight, contentFrame.size.width, comboHeight )
       pullsDown:NO];
@@ -612,9 +801,22 @@ HB_FUNC( INS_CREATE )
    [d->combo setFont:[NSFont systemFontOfSize:11]];
    [[d->window contentView] addSubview:d->combo];
 
-   /* Scroll view + table view (below combo) */
+   /* Properties / Events tab selector (below combo) */
+   d->nTab = 0;
+   d->tabCtrl = [NSSegmentedControl segmentedControlWithLabels:@[@"Properties", @"Events"]
+      trackingMode:NSSegmentSwitchTrackingSelectOne
+      target:nil action:nil];
+   [d->tabCtrl setSegmentCount:2];
+   [d->tabCtrl setSelectedSegment:0];
+   [d->tabCtrl setFrame:NSMakeRect( 4, contentFrame.size.height - comboHeight - tabHeight - 2,
+      contentFrame.size.width - 8, tabHeight )];
+   [d->tabCtrl setAutoresizingMask:NSViewWidthSizable | NSViewMinYMargin];
+   [d->tabCtrl setFont:[NSFont systemFontOfSize:11]];
+   [[d->window contentView] addSubview:d->tabCtrl];
+
+   /* Scroll view + table view (below tabs) */
    NSRect tableFrame = NSMakeRect( 0, 0, contentFrame.size.width,
-      contentFrame.size.height - comboHeight );
+      contentFrame.size.height - comboHeight - tabHeight - 4 );
    d->scrollView = [[NSScrollView alloc] initWithFrame:tableFrame];
    [d->scrollView setHasVerticalScroller:YES];
    [d->scrollView setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
@@ -662,6 +864,7 @@ HB_FUNC( INS_CREATE )
    /* Single-click action for "..." button column */
    [d->tableView setTarget:s_delegate];
    [d->tableView setAction:@selector(tableViewClicked:)];
+   [d->tableView setDoubleAction:@selector(tableViewDoubleClicked:)];
 
    [d->scrollView setDocumentView:d->tableView];
    [[d->window contentView] addSubview:d->scrollView];
@@ -669,6 +872,10 @@ HB_FUNC( INS_CREATE )
    /* Wire combo action to delegate */
    [d->combo setTarget:s_delegate];
    [d->combo setAction:@selector(comboSelChanged:)];
+
+   /* Wire tab control to delegate */
+   [d->tabCtrl setTarget:s_delegate];
+   [d->tabCtrl setAction:@selector(tabChanged:)];
 
    [d->window orderFront:nil];
 
@@ -704,7 +911,13 @@ HB_FUNC( INS_REFRESHWITHDATA )
       [d->window setTitle:[NSString stringWithFormat:@"Inspector: %s", cls ? cls : ""]];
    }
 
+   /* Always build property rows from the passed array */
    InsBuildRows( d, pArray );
+
+   /* If Events tab is active, switch to cached event rows */
+   if( d->nTab == 1 )
+      InsActivateTab( d );
+
    [d->tableView reloadData];
 }
 
@@ -728,6 +941,7 @@ HB_FUNC( INS_DESTROY )
    INSDATA * d = (INSDATA *)(HB_PTRUINT) hb_parnint(1);
    if( !d ) return;
    if( d->pOnComboSel ) { hb_itemRelease( d->pOnComboSel ); d->pOnComboSel = NULL; }
+   if( d->pOnEventDblClick ) { hb_itemRelease( d->pOnEventDblClick ); d->pOnEventDblClick = NULL; }
    if( d->window ) [d->window close];
    free( d );
 }
@@ -811,4 +1025,42 @@ HB_FUNC( INS_SETPOS )
       screenFrame.size.height - nTop - nHeight,
       nWidth, nHeight );
    [d->window setFrame:frame display:YES];
+}
+
+/* ======================================================================
+ * INS_SetEvents( hInsData, aEvents )
+ * Store event data so the Events tab can display it
+ * ====================================================================== */
+
+HB_FUNC( INS_SETEVENTS )
+{
+   INSDATA * d = (INSDATA *)(HB_PTRUINT) hb_parnint(1);
+   PHB_ITEM pArray = hb_param(2, HB_IT_ARRAY);
+   if( !d ) return;
+
+   InsBuildEvRowsFromArray( d, pArray );
+
+   /* If Events tab is active, refresh display */
+   if( d->nTab == 1 )
+   {
+      InsActivateTab( d );
+      [d->tableView reloadData];
+   }
+}
+
+/* ======================================================================
+ * INS_SetOnEventDblClick( hInsData, bBlock )
+ * Set callback for double-click on event row
+ * Block receives ( hCtrl, cEventName ) and returns cHandlerName
+ * ====================================================================== */
+
+HB_FUNC( INS_SETONEVENTDBLCLICK )
+{
+   INSDATA * d = (INSDATA *)(HB_PTRUINT) hb_parnint(1);
+   PHB_ITEM pBlock = hb_param(2, HB_IT_BLOCK);
+   if( d )
+   {
+      if( d->pOnEventDblClick ) hb_itemRelease( d->pOnEventDblClick );
+      d->pOnEventDblClick = pBlock ? hb_itemNew( pBlock ) : NULL;
+   }
 }

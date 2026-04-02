@@ -90,7 +90,7 @@ static void EnsureNSApp( void )
 
       NSMenu * menuBar = [[NSMenu alloc] init];
       NSMenuItem * appMenuItem = [[NSMenuItem alloc] init];
-      NSMenu * appMenu = [[NSMenu alloc] initWithTitle:@"hbcpp"];
+      NSMenu * appMenu = [[NSMenu alloc] initWithTitle:@"HbBuilder"];
       [appMenu addItemWithTitle:@"Quit" action:@selector(terminate:) keyEquivalent:@"q"];
       [appMenuItem setSubmenu:appMenu];
       [menuBar addItem:appMenuItem];
@@ -145,6 +145,46 @@ static void EnsureNSApp( void )
 - (void)applyFont;
 @end
 
+/* BorderStyle constants (match C++Builder) */
+#define BS_NONE        0
+#define BS_SINGLE      1
+#define BS_SIZEABLE    2
+#define BS_DIALOG      3
+#define BS_TOOLWINDOW  4
+#define BS_SIZETOOLWIN 5
+
+/* Position constants */
+#define POS_DESIGNED       0
+#define POS_DEFAULT        1
+#define POS_SCREENCENTER   2
+#define POS_DESKTOPCENTER  3
+#define POS_MAINFORMCENTER 4
+
+/* WindowState constants */
+#define WS_NORMAL    0
+#define WS_MINIMIZED 1
+#define WS_MAXIMIZED 2
+
+/* FormStyle constants */
+#define FS_NORMAL      0
+#define FS_STAYONTOP   1
+#define FS_MDICHILD    2
+#define FS_MDIFORM     3
+
+/* Cursor constants */
+#define CR_DEFAULT    0
+#define CR_ARROW      1
+#define CR_IBEAM      2
+#define CR_CROSS      3
+#define CR_HAND       4
+#define CR_SIZENESW   5
+#define CR_SIZENS     6
+#define CR_SIZENWSE   7
+#define CR_SIZEWE     8
+#define CR_WAIT       9
+#define CR_HELP      10
+#define CR_NO        11
+
 /* --- HBForm --- */
 @interface HBForm : HBControl <NSWindowDelegate>
 {
@@ -171,6 +211,39 @@ static void EnsureNSApp( void )
    /* Menu */
    PHB_ITEM    FMenuActions[MAX_MENUITEMS];
    int         FMenuItemCount;
+   /* C++Builder TForm properties */
+   int        FBorderStyle;     /* BS_NONE..BS_SIZETOOLWIN */
+   int        FBorderIcons;     /* bitmask: 1=SystemMenu, 2=Minimize, 4=Maximize, 8=Help */
+   int        FPosition;        /* POS_DESIGNED..POS_MAINFORMCENTER */
+   int        FWindowState;     /* WS_NORMAL..WS_MAXIMIZED */
+   int        FFormStyle;       /* FS_NORMAL..FS_MDIFORM */
+   BOOL       FKeyPreview;
+   BOOL       FAlphaBlend;
+   int        FAlphaBlendValue; /* 0..255 */
+   int        FCursor;          /* CR_DEFAULT..CR_NO */
+   BOOL       FShowHint;
+   char       FHint[256];
+   BOOL       FAutoScroll;
+   BOOL       FDoubleBuffered;
+   int        FBorderWidth;
+   /* Events */
+   PHB_ITEM   FOnActivate;
+   PHB_ITEM   FOnDeactivate;
+   PHB_ITEM   FOnResize;
+   PHB_ITEM   FOnPaint;
+   PHB_ITEM   FOnShow;
+   PHB_ITEM   FOnHide;
+   PHB_ITEM   FOnCloseQuery;
+   PHB_ITEM   FOnCreate;
+   PHB_ITEM   FOnDestroy;
+   PHB_ITEM   FOnKeyDown;
+   PHB_ITEM   FOnKeyUp;
+   PHB_ITEM   FOnKeyPress;
+   PHB_ITEM   FOnMouseDown;
+   PHB_ITEM   FOnMouseUp;
+   PHB_ITEM   FOnMouseMove;
+   PHB_ITEM   FOnDblClick;
+   PHB_ITEM   FOnMouseWheel;
 }
 - (void)run;
 - (void)showOnly;  /* Create + show without entering run loop */
@@ -322,6 +395,27 @@ static void EnsureNSApp( void )
    else if( strcasecmp( event, "OnChange" ) == 0 )  ppTarget = &FOnChange;
    else if( strcasecmp( event, "OnInit" ) == 0 )    ppTarget = &FOnInit;
    else if( strcasecmp( event, "OnClose" ) == 0 )   ppTarget = &FOnClose;
+   /* Form-specific events */
+   else if( FControlType == CT_FORM ) {
+      HBForm * f = (HBForm *)self;
+      if( strcasecmp( event, "OnActivate" ) == 0 )       ppTarget = &f->FOnActivate;
+      else if( strcasecmp( event, "OnDeactivate" ) == 0 ) ppTarget = &f->FOnDeactivate;
+      else if( strcasecmp( event, "OnResize" ) == 0 )     ppTarget = &f->FOnResize;
+      else if( strcasecmp( event, "OnPaint" ) == 0 )      ppTarget = &f->FOnPaint;
+      else if( strcasecmp( event, "OnShow" ) == 0 )       ppTarget = &f->FOnShow;
+      else if( strcasecmp( event, "OnHide" ) == 0 )       ppTarget = &f->FOnHide;
+      else if( strcasecmp( event, "OnCloseQuery" ) == 0 ) ppTarget = &f->FOnCloseQuery;
+      else if( strcasecmp( event, "OnCreate" ) == 0 )     ppTarget = &f->FOnCreate;
+      else if( strcasecmp( event, "OnDestroy" ) == 0 )    ppTarget = &f->FOnDestroy;
+      else if( strcasecmp( event, "OnKeyDown" ) == 0 )    ppTarget = &f->FOnKeyDown;
+      else if( strcasecmp( event, "OnKeyUp" ) == 0 )      ppTarget = &f->FOnKeyUp;
+      else if( strcasecmp( event, "OnKeyPress" ) == 0 )   ppTarget = &f->FOnKeyPress;
+      else if( strcasecmp( event, "OnMouseDown" ) == 0 )  ppTarget = &f->FOnMouseDown;
+      else if( strcasecmp( event, "OnMouseUp" ) == 0 )    ppTarget = &f->FOnMouseUp;
+      else if( strcasecmp( event, "OnMouseMove" ) == 0 )  ppTarget = &f->FOnMouseMove;
+      else if( strcasecmp( event, "OnDblClick" ) == 0 )   ppTarget = &f->FOnDblClick;
+      else if( strcasecmp( event, "OnMouseWheel" ) == 0 ) ppTarget = &f->FOnMouseWheel;
+   }
    if( ppTarget ) {
       if( *ppTarget ) hb_itemRelease( *ppTarget );
       *ppTarget = hb_itemNew( block );
@@ -1077,6 +1171,30 @@ static HBPaletteTarget * s_palTarget = nil;
       strcpy( FText, "New Form" );
       FClrPane = 0x00F0F0F0;
       FWindow = nil;
+      /* C++Builder defaults */
+      FBorderStyle = BS_SIZEABLE;
+      FBorderIcons = 1 | 2 | 4;  /* biSystemMenu | biMinimize | biMaximize */
+      FPosition = POS_SCREENCENTER;
+      FWindowState = WS_NORMAL;
+      FFormStyle = FS_NORMAL;
+      FKeyPreview = NO;
+      FAlphaBlend = NO;
+      FAlphaBlendValue = 255;
+      FCursor = CR_DEFAULT;
+      FShowHint = YES;
+      FHint[0] = 0;
+      FAutoScroll = YES;
+      FDoubleBuffered = NO;
+      FBorderWidth = 0;
+      /* Events */
+      FOnActivate = NULL; FOnDeactivate = NULL;
+      FOnResize = NULL; FOnPaint = NULL;
+      FOnShow = NULL; FOnHide = NULL;
+      FOnCloseQuery = NULL;
+      FOnCreate = NULL; FOnDestroy = NULL;
+      FOnKeyDown = NULL; FOnKeyUp = NULL; FOnKeyPress = NULL;
+      FOnMouseDown = NULL; FOnMouseUp = NULL; FOnMouseMove = NULL;
+      FOnDblClick = NULL; FOnMouseWheel = NULL;
    }
    return self;
 }
@@ -1086,6 +1204,24 @@ static HBPaletteTarget * s_palTarget = nil;
    if( FOnSelChange ) { hb_itemRelease( FOnSelChange ); FOnSelChange = NULL; }
    for( int i = 0; i < FMenuItemCount; i++ )
       if( FMenuActions[i] ) { hb_itemRelease( FMenuActions[i] ); FMenuActions[i] = NULL; }
+   /* Release form events */
+   if( FOnActivate )   { hb_itemRelease( FOnActivate );   FOnActivate = NULL; }
+   if( FOnDeactivate ) { hb_itemRelease( FOnDeactivate ); FOnDeactivate = NULL; }
+   if( FOnResize )     { hb_itemRelease( FOnResize );     FOnResize = NULL; }
+   if( FOnPaint )      { hb_itemRelease( FOnPaint );      FOnPaint = NULL; }
+   if( FOnShow )       { hb_itemRelease( FOnShow );       FOnShow = NULL; }
+   if( FOnHide )       { hb_itemRelease( FOnHide );       FOnHide = NULL; }
+   if( FOnCloseQuery ) { hb_itemRelease( FOnCloseQuery ); FOnCloseQuery = NULL; }
+   if( FOnCreate )     { hb_itemRelease( FOnCreate );     FOnCreate = NULL; }
+   if( FOnDestroy )    { hb_itemRelease( FOnDestroy );    FOnDestroy = NULL; }
+   if( FOnKeyDown )    { hb_itemRelease( FOnKeyDown );    FOnKeyDown = NULL; }
+   if( FOnKeyUp )      { hb_itemRelease( FOnKeyUp );      FOnKeyUp = NULL; }
+   if( FOnKeyPress )   { hb_itemRelease( FOnKeyPress );   FOnKeyPress = NULL; }
+   if( FOnMouseDown )  { hb_itemRelease( FOnMouseDown );  FOnMouseDown = NULL; }
+   if( FOnMouseUp )    { hb_itemRelease( FOnMouseUp );    FOnMouseUp = NULL; }
+   if( FOnMouseMove )  { hb_itemRelease( FOnMouseMove );  FOnMouseMove = NULL; }
+   if( FOnDblClick )   { hb_itemRelease( FOnDblClick );   FOnDblClick = NULL; }
+   if( FOnMouseWheel ) { hb_itemRelease( FOnMouseWheel ); FOnMouseWheel = NULL; }
 }
 
 - (void)run
@@ -1117,20 +1253,57 @@ static HBPaletteTarget * s_palTarget = nil;
    }
 
    NSRect frame = NSMakeRect( 0, 0, FWidth, FHeight );
-   NSUInteger style = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable;
+   NSUInteger style = 0;
+
    if( FAppBar ) {
       /* AppBar: no title bar, no shadow - thin strip flush with content below */
       style = NSWindowStyleMaskBorderless;
    }
-   else if( FSizable )
-      style |= NSWindowStyleMaskResizable | NSWindowStyleMaskMiniaturizable;
+   else {
+      switch( FBorderStyle ) {
+         case BS_NONE:
+            style = NSWindowStyleMaskBorderless;
+            break;
+         case BS_SINGLE:
+         case BS_DIALOG:
+            style = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable;
+            if( FBorderIcons & 2 ) style |= NSWindowStyleMaskMiniaturizable;
+            break;
+         case BS_TOOLWINDOW:
+            style = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable
+                  | NSWindowStyleMaskUtilityWindow;
+            break;
+         case BS_SIZETOOLWIN:
+            style = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable
+                  | NSWindowStyleMaskResizable | NSWindowStyleMaskUtilityWindow;
+            break;
+         case BS_SIZEABLE:
+         default:
+            style = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable;
+            if( FBorderIcons & 2 ) style |= NSWindowStyleMaskMiniaturizable;
+            if( FBorderIcons & 4 ) style |= NSWindowStyleMaskResizable;
+            break;
+      }
+      /* Legacy FSizable override */
+      if( FSizable && FBorderStyle != BS_NONE )
+         style |= NSWindowStyleMaskResizable | NSWindowStyleMaskMiniaturizable;
+   }
+
    FWindow = [[NSWindow alloc] initWithContentRect:frame
       styleMask:style
       backing:NSBackingStoreBuffered defer:NO];
    [FWindow setTitle:[NSString stringWithUTF8String:FText]];
    [FWindow setDelegate:self];
    [FWindow setReleasedWhenClosed:NO];
-   if( FAppBar ) [FWindow setHasShadow:NO];  /* no shadow gap for appbar */
+   if( FAppBar ) [FWindow setHasShadow:NO];
+
+   /* FormStyle: stay on top */
+   if( FFormStyle == FS_STAYONTOP )
+      [FWindow setLevel:NSFloatingWindowLevel];
+
+   /* AlphaBlend */
+   if( FAlphaBlend )
+      [FWindow setAlphaValue:FAlphaBlendValue / 255.0];
 
    FContentView = [[HBFlippedView alloc] initWithFrame:[[FWindow contentView] bounds]];
    [FContentView setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
@@ -1151,14 +1324,38 @@ static HBPaletteTarget * s_palTarget = nil;
       [FWindow makeFirstResponder:ov];
    }
 
-   if( FCenter ) [self center];
-   else if( !FCenter ) {
-      NSRect screenFrame = [[NSScreen mainScreen] frame];
-      NSPoint origin;
-      origin.x = FLeft;
-      origin.y = screenFrame.size.height - FTop - FHeight;
-      [FWindow setFrameOrigin:origin];
+   /* Position: FCenter is legacy, FPosition is C++Builder style */
+   if( FCenter && FPosition == POS_SCREENCENTER )
+      [self center];
+   else {
+      switch( FPosition ) {
+         case POS_SCREENCENTER:
+         case POS_DESKTOPCENTER:
+         case POS_MAINFORMCENTER:
+            [self center];
+            break;
+         case POS_DESIGNED:
+         case POS_DEFAULT:
+         default: {
+            NSRect screenFrame = [[NSScreen mainScreen] frame];
+            NSPoint origin;
+            origin.x = FLeft;
+            origin.y = screenFrame.size.height - FTop - FHeight;
+            [FWindow setFrameOrigin:origin];
+            break;
+         }
+      }
    }
+
+   /* WindowState */
+   switch( FWindowState ) {
+      case WS_MINIMIZED: [FWindow miniaturize:nil]; break;
+      case WS_MAXIMIZED: [FWindow zoom:nil]; break;
+   }
+
+   /* Fire OnShow */
+   if( FOnShow ) [self fireEvent:FOnShow];
+
    [FWindow makeKeyAndOrderFront:nil];
    [NSApp activateIgnoringOtherApps:YES];
 
@@ -1351,6 +1548,8 @@ static HBPaletteTarget * s_palTarget = nil;
 
 - (void)windowWillClose:(NSNotification *)notification
 {
+   if( FOnClose ) [self fireEvent:FOnClose];
+   if( FOnHide ) [self fireEvent:FOnHide];
    FRunning = NO;
    [NSApp stop:nil];
    [NSApp postEvent:[NSEvent otherEventWithType:NSEventTypeApplicationDefined
@@ -1358,7 +1557,49 @@ static HBPaletteTarget * s_palTarget = nil;
       windowNumber:0 context:nil subtype:0 data1:0 data2:0] atStart:YES];
 }
 
-- (BOOL)windowShouldClose:(NSWindow *)sender { return YES; }
+- (BOOL)windowShouldClose:(NSWindow *)sender
+{
+   if( FOnCloseQuery && HB_IS_BLOCK( FOnCloseQuery ) ) {
+      hb_vmPushEvalSym();
+      hb_vmPush( FOnCloseQuery );
+      hb_vmSend( 0 );
+      /* Block returns .T. to allow close, .F. to prevent */
+      PHB_ITEM pResult = hb_stackReturnItem();
+      if( pResult && HB_IS_LOGICAL( pResult ) )
+         return hb_itemGetL( pResult );
+   }
+   return YES;
+}
+
+- (void)windowDidBecomeKey:(NSNotification *)notification
+{
+   if( FOnActivate ) [self fireEvent:FOnActivate];
+}
+
+- (void)windowDidResignKey:(NSNotification *)notification
+{
+   if( FOnDeactivate ) [self fireEvent:FOnDeactivate];
+}
+
+- (void)windowDidResize:(NSNotification *)notification
+{
+   if( FWindow ) {
+      NSRect fr = [FWindow contentRectForFrameRect:[FWindow frame]];
+      FWidth = (int)fr.size.width;
+      FHeight = (int)fr.size.height;
+   }
+   if( FOnResize ) [self fireEvent:FOnResize];
+}
+
+- (void)windowDidMiniaturize:(NSNotification *)notification
+{
+   FWindowState = WS_MINIMIZED;
+}
+
+- (void)windowDidDeminiaturize:(NSNotification *)notification
+{
+   FWindowState = WS_NORMAL;
+}
 
 @end
 
@@ -1524,6 +1765,61 @@ HB_FUNC( UI_SETPROP )
       ((HBForm *)p)->FSizable = hb_parl(3);
    else if( strcasecmp(szProp,"lAppBar")==0 && p->FControlType == CT_FORM )
       ((HBForm *)p)->FAppBar = hb_parl(3);
+   else if( strcasecmp(szProp,"lToolWindow")==0 && p->FControlType == CT_FORM ) {
+      if( hb_parl(3) ) ((HBForm *)p)->FBorderStyle = BS_TOOLWINDOW;
+   }
+   else if( strcasecmp(szProp,"nBorderStyle")==0 && p->FControlType == CT_FORM )
+      ((HBForm *)p)->FBorderStyle = hb_parni(3);
+   else if( strcasecmp(szProp,"nBorderIcons")==0 && p->FControlType == CT_FORM )
+      ((HBForm *)p)->FBorderIcons = hb_parni(3);
+   else if( strcasecmp(szProp,"nPosition")==0 && p->FControlType == CT_FORM )
+      ((HBForm *)p)->FPosition = hb_parni(3);
+   else if( strcasecmp(szProp,"nWindowState")==0 && p->FControlType == CT_FORM ) {
+      HBForm * f = (HBForm *)p;
+      f->FWindowState = hb_parni(3);
+      if( f->FWindow ) {
+         switch( f->FWindowState ) {
+            case WS_MINIMIZED: [f->FWindow miniaturize:nil]; break;
+            case WS_MAXIMIZED: [f->FWindow zoom:nil]; break;
+            case WS_NORMAL:
+               if( [f->FWindow isMiniaturized] ) [f->FWindow deminiaturize:nil];
+               else if( [f->FWindow isZoomed] ) [f->FWindow zoom:nil];
+               break;
+         }
+      }
+   }
+   else if( strcasecmp(szProp,"nFormStyle")==0 && p->FControlType == CT_FORM ) {
+      HBForm * f = (HBForm *)p;
+      f->FFormStyle = hb_parni(3);
+      if( f->FWindow )
+         [f->FWindow setLevel:(f->FFormStyle == FS_STAYONTOP) ? NSFloatingWindowLevel : NSNormalWindowLevel];
+   }
+   else if( strcasecmp(szProp,"lKeyPreview")==0 && p->FControlType == CT_FORM )
+      ((HBForm *)p)->FKeyPreview = hb_parl(3);
+   else if( strcasecmp(szProp,"lAlphaBlend")==0 && p->FControlType == CT_FORM ) {
+      HBForm * f = (HBForm *)p;
+      f->FAlphaBlend = hb_parl(3);
+      if( f->FWindow )
+         [f->FWindow setAlphaValue:f->FAlphaBlend ? f->FAlphaBlendValue / 255.0 : 1.0];
+   }
+   else if( strcasecmp(szProp,"nAlphaBlendValue")==0 && p->FControlType == CT_FORM ) {
+      HBForm * f = (HBForm *)p;
+      f->FAlphaBlendValue = hb_parni(3);
+      if( f->FAlphaBlend && f->FWindow )
+         [f->FWindow setAlphaValue:f->FAlphaBlendValue / 255.0];
+   }
+   else if( strcasecmp(szProp,"nCursor")==0 && p->FControlType == CT_FORM )
+      ((HBForm *)p)->FCursor = hb_parni(3);
+   else if( strcasecmp(szProp,"lShowHint")==0 && p->FControlType == CT_FORM )
+      ((HBForm *)p)->FShowHint = hb_parl(3);
+   else if( strcasecmp(szProp,"cHint")==0 && p->FControlType == CT_FORM && HB_ISCHAR(3) )
+      strncpy( ((HBForm *)p)->FHint, hb_parc(3), sizeof(((HBForm *)p)->FHint)-1 );
+   else if( strcasecmp(szProp,"lAutoScroll")==0 && p->FControlType == CT_FORM )
+      ((HBForm *)p)->FAutoScroll = hb_parl(3);
+   else if( strcasecmp(szProp,"lDoubleBuffered")==0 && p->FControlType == CT_FORM )
+      ((HBForm *)p)->FDoubleBuffered = hb_parl(3);
+   else if( strcasecmp(szProp,"nBorderWidth")==0 && p->FControlType == CT_FORM )
+      ((HBForm *)p)->FBorderWidth = hb_parni(3);
    else if( strcasecmp(szProp,"nClrPane")==0 ) {
       p->FClrPane = (unsigned int)hb_parnint(3);
       CGFloat r = (p->FClrPane & 0xFF)/255.0;
@@ -1572,6 +1868,52 @@ HB_FUNC( UI_GETPROP )
       hb_retl( ((HBForm *)p)->FSizable );
    else if( strcasecmp(szProp,"lAppBar")==0 && p->FControlType==CT_FORM )
       hb_retl( ((HBForm *)p)->FAppBar );
+   else if( strcasecmp(szProp,"lToolWindow")==0 && p->FControlType==CT_FORM )
+      hb_retl( ((HBForm *)p)->FBorderStyle == BS_TOOLWINDOW || ((HBForm *)p)->FBorderStyle == BS_SIZETOOLWIN );
+   else if( strcasecmp(szProp,"nBorderStyle")==0 && p->FControlType==CT_FORM )
+      hb_retni( ((HBForm *)p)->FBorderStyle );
+   else if( strcasecmp(szProp,"nBorderIcons")==0 && p->FControlType==CT_FORM )
+      hb_retni( ((HBForm *)p)->FBorderIcons );
+   else if( strcasecmp(szProp,"nPosition")==0 && p->FControlType==CT_FORM )
+      hb_retni( ((HBForm *)p)->FPosition );
+   else if( strcasecmp(szProp,"nWindowState")==0 && p->FControlType==CT_FORM ) {
+      HBForm * f = (HBForm *)p;
+      if( f->FWindow ) {
+         if( [f->FWindow isMiniaturized] ) hb_retni( WS_MINIMIZED );
+         else if( [f->FWindow isZoomed] ) hb_retni( WS_MAXIMIZED );
+         else hb_retni( WS_NORMAL );
+      } else hb_retni( f->FWindowState );
+   }
+   else if( strcasecmp(szProp,"nFormStyle")==0 && p->FControlType==CT_FORM )
+      hb_retni( ((HBForm *)p)->FFormStyle );
+   else if( strcasecmp(szProp,"lKeyPreview")==0 && p->FControlType==CT_FORM )
+      hb_retl( ((HBForm *)p)->FKeyPreview );
+   else if( strcasecmp(szProp,"lAlphaBlend")==0 && p->FControlType==CT_FORM )
+      hb_retl( ((HBForm *)p)->FAlphaBlend );
+   else if( strcasecmp(szProp,"nAlphaBlendValue")==0 && p->FControlType==CT_FORM )
+      hb_retni( ((HBForm *)p)->FAlphaBlendValue );
+   else if( strcasecmp(szProp,"nCursor")==0 && p->FControlType==CT_FORM )
+      hb_retni( ((HBForm *)p)->FCursor );
+   else if( strcasecmp(szProp,"lShowHint")==0 && p->FControlType==CT_FORM )
+      hb_retl( ((HBForm *)p)->FShowHint );
+   else if( strcasecmp(szProp,"cHint")==0 && p->FControlType==CT_FORM )
+      hb_retc( ((HBForm *)p)->FHint );
+   else if( strcasecmp(szProp,"lAutoScroll")==0 && p->FControlType==CT_FORM )
+      hb_retl( ((HBForm *)p)->FAutoScroll );
+   else if( strcasecmp(szProp,"lDoubleBuffered")==0 && p->FControlType==CT_FORM )
+      hb_retl( ((HBForm *)p)->FDoubleBuffered );
+   else if( strcasecmp(szProp,"nBorderWidth")==0 && p->FControlType==CT_FORM )
+      hb_retni( ((HBForm *)p)->FBorderWidth );
+   else if( strcasecmp(szProp,"nClientWidth")==0 && p->FControlType==CT_FORM ) {
+      HBForm * f = (HBForm *)p;
+      if( f->FWindow ) hb_retni( (int)[[f->FWindow contentView] bounds].size.width );
+      else hb_retni( f->FWidth );
+   }
+   else if( strcasecmp(szProp,"nClientHeight")==0 && p->FControlType==CT_FORM ) {
+      HBForm * f = (HBForm *)p;
+      if( f->FWindow ) hb_retni( (int)[[f->FWindow contentView] bounds].size.height );
+      else hb_retni( f->FHeight );
+   }
    else if( strcasecmp(szProp,"nItemIndex")==0 && p->FControlType==CT_COMBOBOX )
       hb_retni( ((HBComboBox *)p)->FItemIndex );
    else if( strcasecmp(szProp,"nClrPane")==0 )   hb_retnint( (HB_MAXINT)p->FClrPane );
@@ -1676,6 +2018,31 @@ HB_FUNC( UI_GETALLPROPS )
    ADD_C("nClrPane",p->FClrPane,"Appearance");
 
    switch(p->FControlType) {
+      case CT_FORM: {
+         HBForm * f = (HBForm *)p;
+         ADD_N("nBorderStyle",f->FBorderStyle,"Appearance");
+         ADD_N("nBorderIcons",f->FBorderIcons,"Appearance");
+         ADD_N("nBorderWidth",f->FBorderWidth,"Appearance");
+         ADD_N("nPosition",f->FPosition,"Position");
+         ADD_N("nWindowState",f->FWindowState,"Appearance");
+         ADD_N("nFormStyle",f->FFormStyle,"Appearance");
+         ADD_L("lSizable",f->FSizable,"Behavior");
+         ADD_L("lAppBar",f->FAppBar,"Behavior");
+         ADD_L("lKeyPreview",f->FKeyPreview,"Behavior");
+         ADD_L("lAlphaBlend",f->FAlphaBlend,"Appearance");
+         ADD_N("nAlphaBlendValue",f->FAlphaBlendValue,"Appearance");
+         ADD_N("nCursor",f->FCursor,"Appearance");
+         ADD_L("lShowHint",f->FShowHint,"Behavior");
+         ADD_S("cHint",f->FHint,"Behavior");
+         ADD_L("lAutoScroll",f->FAutoScroll,"Behavior");
+         ADD_L("lDoubleBuffered",f->FDoubleBuffered,"Behavior");
+         int cw = f->FWidth, ch = f->FHeight;
+         if( f->FWindow ) { cw = (int)[[f->FWindow contentView] bounds].size.width;
+            ch = (int)[[f->FWindow contentView] bounds].size.height; }
+         ADD_N("nClientWidth",cw,"Position");
+         ADD_N("nClientHeight",ch,"Position");
+         break;
+      }
       case CT_BUTTON:
          ADD_L("lDefault",((HBButton*)p)->FDefault,"Behavior");
          ADD_L("lCancel",((HBButton*)p)->FCancel,"Behavior"); break;
@@ -1687,6 +2054,133 @@ HB_FUNC( UI_GETALLPROPS )
          ADD_N("nItemIndex",((HBComboBox*)p)->FItemIndex,"Data");
          ADD_N("nItemCount",((HBComboBox*)p)->FItemCount,"Data"); break;
    }
+   hb_itemReturnRelease(pArray);
+}
+
+/* UI_GetAllEvents( hCtrl ) --> { { "EventName", lAssigned, "Category" }, ... }
+ * Returns all events for a control with assignment status */
+HB_FUNC( UI_GETALLEVENTS )
+{
+   HBControl * p = GetCtrl(1);
+   PHB_ITEM pArray, pRow;
+   if( !p ) { hb_reta(0); return; }
+   pArray = hb_itemArrayNew(0);
+
+   #define ADD_E(n,assigned,c) pRow=hb_itemArrayNew(3); hb_arraySetC(pRow,1,n); \
+      hb_arraySetL(pRow,2,assigned); hb_arraySetC(pRow,3,c); \
+      hb_arrayAdd(pArray,pRow); hb_itemRelease(pRow);
+
+   switch( p->FControlType ) {
+      case CT_FORM: {
+         HBForm * f = (HBForm *)p;
+         /* Action */
+         ADD_E("OnClick",       f->FOnClick != NULL,      "Action");
+         ADD_E("OnDblClick",    f->FOnDblClick != NULL,   "Action");
+         /* Lifecycle */
+         ADD_E("OnCreate",      f->FOnCreate != NULL,     "Lifecycle");
+         ADD_E("OnDestroy",     f->FOnDestroy != NULL,    "Lifecycle");
+         ADD_E("OnShow",        f->FOnShow != NULL,       "Lifecycle");
+         ADD_E("OnHide",        f->FOnHide != NULL,       "Lifecycle");
+         ADD_E("OnClose",       f->FOnClose != NULL,      "Lifecycle");
+         ADD_E("OnCloseQuery",  f->FOnCloseQuery != NULL, "Lifecycle");
+         ADD_E("OnActivate",    f->FOnActivate != NULL,   "Lifecycle");
+         ADD_E("OnDeactivate",  f->FOnDeactivate != NULL, "Lifecycle");
+         /* Layout */
+         ADD_E("OnResize",      f->FOnResize != NULL,     "Layout");
+         ADD_E("OnPaint",       f->FOnPaint != NULL,      "Layout");
+         /* Keyboard */
+         ADD_E("OnKeyDown",     f->FOnKeyDown != NULL,    "Keyboard");
+         ADD_E("OnKeyUp",       f->FOnKeyUp != NULL,      "Keyboard");
+         ADD_E("OnKeyPress",    f->FOnKeyPress != NULL,   "Keyboard");
+         /* Mouse */
+         ADD_E("OnMouseDown",   f->FOnMouseDown != NULL,  "Mouse");
+         ADD_E("OnMouseUp",     f->FOnMouseUp != NULL,    "Mouse");
+         ADD_E("OnMouseMove",   f->FOnMouseMove != NULL,  "Mouse");
+         ADD_E("OnMouseWheel",  f->FOnMouseWheel != NULL, "Mouse");
+         break;
+      }
+      case CT_BUTTON:
+         ADD_E("OnClick",       p->FOnClick != NULL,   "Action");
+         ADD_E("OnEnter",       0,                     "Focus");
+         ADD_E("OnExit",        0,                     "Focus");
+         ADD_E("OnKeyDown",     0,                     "Keyboard");
+         ADD_E("OnKeyUp",       0,                     "Keyboard");
+         ADD_E("OnKeyPress",    0,                     "Keyboard");
+         ADD_E("OnMouseDown",   0,                     "Mouse");
+         ADD_E("OnMouseUp",     0,                     "Mouse");
+         ADD_E("OnMouseMove",   0,                     "Mouse");
+         break;
+      case CT_EDIT:
+         ADD_E("OnChange",      p->FOnChange != NULL,  "Action");
+         ADD_E("OnClick",       p->FOnClick != NULL,   "Action");
+         ADD_E("OnDblClick",    0,                     "Action");
+         ADD_E("OnEnter",       0,                     "Focus");
+         ADD_E("OnExit",        0,                     "Focus");
+         ADD_E("OnKeyDown",     0,                     "Keyboard");
+         ADD_E("OnKeyUp",       0,                     "Keyboard");
+         ADD_E("OnKeyPress",    0,                     "Keyboard");
+         ADD_E("OnMouseDown",   0,                     "Mouse");
+         ADD_E("OnMouseUp",     0,                     "Mouse");
+         ADD_E("OnMouseMove",   0,                     "Mouse");
+         break;
+      case CT_CHECKBOX:
+         ADD_E("OnClick",       p->FOnClick != NULL,   "Action");
+         ADD_E("OnEnter",       0,                     "Focus");
+         ADD_E("OnExit",        0,                     "Focus");
+         ADD_E("OnKeyDown",     0,                     "Keyboard");
+         ADD_E("OnKeyUp",       0,                     "Keyboard");
+         ADD_E("OnKeyPress",    0,                     "Keyboard");
+         ADD_E("OnMouseDown",   0,                     "Mouse");
+         ADD_E("OnMouseUp",     0,                     "Mouse");
+         ADD_E("OnMouseMove",   0,                     "Mouse");
+         break;
+      case CT_COMBOBOX:
+         ADD_E("OnChange",      p->FOnChange != NULL,  "Action");
+         ADD_E("OnClick",       p->FOnClick != NULL,   "Action");
+         ADD_E("OnDblClick",    0,                     "Action");
+         ADD_E("OnDropDown",    0,                     "Action");
+         ADD_E("OnCloseUp",     0,                     "Action");
+         ADD_E("OnEnter",       0,                     "Focus");
+         ADD_E("OnExit",        0,                     "Focus");
+         ADD_E("OnKeyDown",     0,                     "Keyboard");
+         ADD_E("OnKeyUp",       0,                     "Keyboard");
+         ADD_E("OnKeyPress",    0,                     "Keyboard");
+         ADD_E("OnMouseDown",   0,                     "Mouse");
+         ADD_E("OnMouseUp",     0,                     "Mouse");
+         ADD_E("OnMouseMove",   0,                     "Mouse");
+         break;
+      case CT_LABEL:
+         ADD_E("OnClick",       p->FOnClick != NULL,   "Action");
+         ADD_E("OnDblClick",    0,                     "Action");
+         ADD_E("OnMouseDown",   0,                     "Mouse");
+         ADD_E("OnMouseUp",     0,                     "Mouse");
+         ADD_E("OnMouseMove",   0,                     "Mouse");
+         break;
+      case CT_GROUPBOX:
+         ADD_E("OnClick",       p->FOnClick != NULL,   "Action");
+         ADD_E("OnDblClick",    0,                     "Action");
+         ADD_E("OnEnter",       0,                     "Focus");
+         ADD_E("OnExit",        0,                     "Focus");
+         ADD_E("OnMouseDown",   0,                     "Mouse");
+         ADD_E("OnMouseUp",     0,                     "Mouse");
+         ADD_E("OnMouseMove",   0,                     "Mouse");
+         break;
+      default:
+         /* Generic fallback */
+         ADD_E("OnClick",       p->FOnClick != NULL,   "Action");
+         ADD_E("OnChange",      p->FOnChange != NULL,  "Action");
+         ADD_E("OnEnter",       0,                     "Focus");
+         ADD_E("OnExit",        0,                     "Focus");
+         ADD_E("OnKeyDown",     0,                     "Keyboard");
+         ADD_E("OnKeyUp",       0,                     "Keyboard");
+         ADD_E("OnKeyPress",    0,                     "Keyboard");
+         ADD_E("OnMouseDown",   0,                     "Mouse");
+         ADD_E("OnMouseUp",     0,                     "Mouse");
+         ADD_E("OnMouseMove",   0,                     "Mouse");
+         break;
+   }
+   #undef ADD_E
+
    hb_itemReturnRelease(pArray);
 }
 
@@ -2174,6 +2668,7 @@ HB_FUNC( UI_FORMSETPOS )
       p->FLeft = hb_parni(2);
       p->FTop = hb_parni(3);
       p->FCenter = NO;
+      p->FPosition = POS_DESIGNED;
       if( p->FWindow ) {
          /* macOS uses bottom-left origin, flip Y */
          NSRect screenFrame = [[NSScreen mainScreen] frame];
@@ -2685,6 +3180,114 @@ HB_FUNC( CODEEDITORGETTEXT )
    }
    else
       hb_retc( "" );
+}
+
+/* CodeEditorAppendText( hEditor, cText ) - append text and scroll to it */
+HB_FUNC( CODEEDITORAPPENDTEXT )
+{
+   CODEEDITOR * ed = (CODEEDITOR *)(HB_PTRUINT) hb_parnint(1);
+   if( ed && ed->textView && HB_ISCHAR(2) )
+   {
+      NSString * text = [NSString stringWithUTF8String:hb_parc(2)];
+      NSTextStorage * ts = [ed->textView textStorage];
+      NSUInteger endPos = [ts length];
+      [ts replaceCharactersInRange:NSMakeRange(endPos, 0) withString:text];
+      [ed->textView setFont:ed->font];
+      CE_HighlightCode( ed->textView );
+      [ed->gutterView setNeedsDisplay:YES];
+      /* Position cursor at insertion point + offset (param 3, optional) */
+      NSUInteger cursorPos = endPos + [text length];
+      if( HB_ISNUM(3) )
+         cursorPos = endPos + (NSUInteger)hb_parni(3);
+      [ed->textView setSelectedRange:NSMakeRange(cursorPos, 0)];
+      [ed->textView scrollRangeToVisible:NSMakeRange(cursorPos, 0)];
+      /* Bring editor window to front */
+      [ed->window makeKeyAndOrderFront:nil];
+   }
+}
+
+/* CodeEditorGetText( hEditor ) --> cText */
+HB_FUNC( CODEEDITORGETTEXT2 )
+{
+   /* Alias so we can search for handler name in existing code */
+   CODEEDITOR * ed = (CODEEDITOR *)(HB_PTRUINT) hb_parnint(1);
+   if( ed && ed->textView )
+   {
+      NSString * text = [[ed->textView textStorage] string];
+      const char * utf8 = [text UTF8String];
+      hb_retc( utf8 ? utf8 : "" );
+   }
+   else
+      hb_retc( "" );
+}
+
+/* CodeEditorGotoFunction( hEditor, cFuncName ) - find function/method and place cursor inside */
+HB_FUNC( CODEEDITORGOTOFUNCTION )
+{
+   CODEEDITOR * ed = (CODEEDITOR *)(HB_PTRUINT) hb_parnint(1);
+   if( !ed || !ed->textView || !HB_ISCHAR(2) ) { hb_retl(0); return; }
+
+   NSString * funcName = [NSString stringWithUTF8String:hb_parc(2)];
+   NSString * text = [[ed->textView textStorage] string];
+
+   /* Search for "METHOD name(" or "function name(" */
+   NSString * searches[] = {
+      [NSString stringWithFormat:@"METHOD %@(", funcName],
+      [NSString stringWithFormat:@"function %@(", funcName],
+      [NSString stringWithFormat:@"METHOD %@ (", funcName],
+      [NSString stringWithFormat:@"function %@ (", funcName]
+   };
+
+   NSRange range = NSMakeRange(NSNotFound, 0);
+   for( int i = 0; i < 4; i++ )
+   {
+      range = [text rangeOfString:searches[i] options:NSCaseInsensitiveSearch];
+      if( range.location != NSNotFound ) break;
+   }
+
+   if( range.location != NSNotFound )
+   {
+      /* Find the second line after the match — skip past "CLASS TForm1" on same line */
+      NSUInteger lineEnd = range.location + range.length;
+      NSRange nlRange = [text rangeOfString:@"\n" options:0
+         range:NSMakeRange(lineEnd, [text length] - lineEnd)];
+      NSUInteger cursorPos = (nlRange.location != NSNotFound) ? nlRange.location + 1 : lineEnd;
+      /* Skip one more line to land inside the body */
+      if( cursorPos < [text length] ) {
+         NSRange nl2 = [text rangeOfString:@"\n" options:0
+            range:NSMakeRange(cursorPos, [text length] - cursorPos)];
+         if( nl2.location != NSNotFound ) cursorPos = nl2.location + 1;
+      }
+      [ed->textView setSelectedRange:NSMakeRange(cursorPos, 0)];
+      [ed->textView scrollRangeToVisible:NSMakeRange(cursorPos, 0)];
+      [ed->window makeKeyAndOrderFront:nil];
+   }
+   hb_retl( range.location != NSNotFound );
+}
+
+/* CodeEditorInsertAfter( hEditor, cSearchLine, cTextToInsert )
+ * Find a line containing cSearchLine and insert cTextToInsert after it */
+HB_FUNC( CODEEDITORINSERTAFTER )
+{
+   CODEEDITOR * ed = (CODEEDITOR *)(HB_PTRUINT) hb_parnint(1);
+   if( !ed || !ed->textView || !HB_ISCHAR(2) || !HB_ISCHAR(3) ) return;
+
+   NSString * search = [NSString stringWithUTF8String:hb_parc(2)];
+   NSString * insert = [NSString stringWithUTF8String:hb_parc(3)];
+   NSTextStorage * ts = [ed->textView textStorage];
+   NSString * text = [ts string];
+
+   NSRange range = [text rangeOfString:search options:NSCaseInsensitiveSearch];
+   if( range.location == NSNotFound ) return;
+
+   /* Find end of the line containing the search string */
+   NSRange lineRange = [text lineRangeForRange:range];
+   NSUInteger insertPos = lineRange.location + lineRange.length;
+
+   [ts replaceCharactersInRange:NSMakeRange(insertPos, 0) withString:insert];
+   [ed->textView setFont:ed->font];
+   CE_HighlightCode( ed->textView );
+   [ed->gutterView setNeedsDisplay:YES];
 }
 
 /* CodeEditorDestroy( hEditor ) */

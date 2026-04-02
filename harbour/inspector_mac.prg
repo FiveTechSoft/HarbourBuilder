@@ -10,13 +10,16 @@ return nil
 
 function InspectorRefresh( hCtrl )
    local h := _InsGetData()
-   local aProps
+   local aProps, aEvents
    if h != 0
       if hCtrl != nil .and. hCtrl != 0
-         aProps := UI_GetAllProps( hCtrl )
+         aProps  := UI_GetAllProps( hCtrl )
+         aEvents := UI_GetAllEvents( hCtrl )
          INS_RefreshWithData( h, hCtrl, aProps )
+         INS_SetEvents( h, aEvents )
       else
          INS_RefreshWithData( h, 0, {} )
+         INS_SetEvents( h, {} )
       endif
    endif
 return nil

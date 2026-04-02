@@ -10,21 +10,22 @@ HBBIN="$HBDIR/bin/darwin/clang"
 HBINC="$HBDIR/include"
 HBLIB="$HBDIR/lib/darwin/clang"
 PROJDIR="$(cd "$(dirname "$0")/.." && pwd)"
-PROG="hbcpp_macos"
+SRC="hbcpp_macos"
+PROG="HbBuilder"
 
 cd "$(dirname "$0")"
 
-echo "[1/4] Compiling ${PROG}.prg..."
-"$HBBIN/harbour" ${PROG}.prg -n -w -q \
+echo "[1/4] Compiling ${SRC}.prg..."
+"$HBBIN/harbour" ${SRC}.prg -n -w -q \
    -I"$HBINC" \
    -I"$PROJDIR/include" \
    -I"$PROJDIR/harbour" \
-   -o${PROG}.c
+   -o${SRC}.c
 
-echo "[2/4] Compiling ${PROG}.c..."
+echo "[2/4] Compiling ${SRC}.c..."
 clang -c -O2 -Wno-unused-value \
    -I"$HBINC" \
-   ${PROG}.c -o ${PROG}.o
+   ${SRC}.c -o ${SRC}.o
 
 echo "[3/4] Compiling Cocoa sources..."
 clang -c -O2 -fobjc-arc \
@@ -37,7 +38,7 @@ clang -c -O2 -fobjc-arc \
 
 echo "[4/4] Linking ${PROG}..."
 clang++ -o ${PROG} \
-   ${PROG}.o cocoa_core.o cocoa_inspector.o \
+   ${SRC}.o cocoa_core.o cocoa_inspector.o \
    -L"$HBLIB" \
    -lhbvm -lhbrtl -lhbcommon -lhbcpage -lhblang \
    -lhbmacro -lhbpp -lhbrdd -lhbcplr -lhbdebug \

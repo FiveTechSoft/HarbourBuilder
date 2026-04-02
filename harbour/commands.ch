@@ -4,6 +4,52 @@
 #ifndef _IDECOMMANDS_CH
 #define _IDECOMMANDS_CH
 
+// BorderStyle constants (C++Builder TFormBorderStyle)
+#define bsNone           0
+#define bsSingle         1
+#define bsSizeable       2
+#define bsDialog         3
+#define bsToolWindow     4
+#define bsSizeToolWin    5
+
+// BorderIcons (bitmask, C++Builder TBorderIcons)
+#define biSystemMenu     1
+#define biMinimize       2
+#define biMaximize       4
+#define biHelp           8
+
+// Position constants (C++Builder TPosition)
+#define poDesigned       0
+#define poDefault        1
+#define poScreenCenter   2
+#define poDesktopCenter  3
+#define poMainFormCenter 4
+
+// WindowState constants (C++Builder TWindowState)
+#define wsNormal         0
+#define wsMinimized      1
+#define wsMaximized      2
+
+// FormStyle constants (C++Builder TFormStyle)
+#define fsNormal         0
+#define fsStayOnTop      1
+#define fsMDIChild       2
+#define fsMDIForm        3
+
+// Cursor constants (C++Builder TCursor)
+#define crDefault        0
+#define crArrow          1
+#define crIBeam          2
+#define crCross          3
+#define crHand           4
+#define crSizeNESW       5
+#define crSizeNS         6
+#define crSizeNWSE       7
+#define crSizeWE         8
+#define crWait           9
+#define crHelp          10
+#define crNo            11
+
 // Form
 #xcommand DEFINE FORM <oForm> ;
       [ TITLE <cTitle> ] ;

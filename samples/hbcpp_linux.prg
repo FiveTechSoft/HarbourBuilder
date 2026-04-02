@@ -179,19 +179,19 @@ static function CreatePalette()
 
    // Additional tab
    nAdd := oPal:AddTab( "Additional" )
-   oPal:AddComp( nAdd, "Img",  "Image",    0 )
-   oPal:AddComp( nAdd, "Shp",  "Shape",    0 )
-   oPal:AddComp( nAdd, "Spd",  "SpeedBtn", 0 )
+   oPal:AddComp( nAdd, "Img",  "Image",    9 )
+   oPal:AddComp( nAdd, "Shp",  "Shape",   10 )
+   oPal:AddComp( nAdd, "Spd",  "SpeedBtn",11 )
 
    // Data Access tab
    nAdd := oPal:AddTab( "Data Access" )
-   oPal:AddComp( nAdd, "Tbl",  "Table",    0 )
-   oPal:AddComp( nAdd, "Qry",  "Query",    0 )
+   oPal:AddComp( nAdd, "Tbl",  "Table",   12 )
+   oPal:AddComp( nAdd, "Qry",  "Query",   13 )
 
    // Data Controls tab
    nAdd := oPal:AddTab( "Data Controls" )
-   oPal:AddComp( nAdd, "DBG",  "DBGrid",   0 )
-   oPal:AddComp( nAdd, "DBN",  "DBNav",    0 )
+   oPal:AddComp( nAdd, "DBG",  "DBGrid",  14 )
+   oPal:AddComp( nAdd, "DBN",  "DBNav",   15 )
 
 return nil
 

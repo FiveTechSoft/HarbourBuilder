@@ -42,12 +42,36 @@ ENDCLASS
 
 CLASS TForm INHERIT TControl
 
+   // Font
    ACCESS FontName      INLINE UI_GetProp( ::hCpp, "cFontName" )
    ASSIGN FontName( c ) INLINE UI_SetProp( ::hCpp, "cFontName", c )
 
    ACCESS FontSize      INLINE UI_GetProp( ::hCpp, "nFontSize" )
    ASSIGN FontSize( n ) INLINE UI_SetProp( ::hCpp, "nFontSize", n )
 
+   // Window appearance
+   ACCESS BorderStyle      INLINE UI_GetProp( ::hCpp, "nBorderStyle" )
+   ASSIGN BorderStyle( n ) INLINE UI_SetProp( ::hCpp, "nBorderStyle", n )
+
+   ACCESS BorderIcons      INLINE UI_GetProp( ::hCpp, "nBorderIcons" )
+   ASSIGN BorderIcons( n ) INLINE UI_SetProp( ::hCpp, "nBorderIcons", n )
+
+   ACCESS BorderWidth      INLINE UI_GetProp( ::hCpp, "nBorderWidth" )
+   ASSIGN BorderWidth( n ) INLINE UI_SetProp( ::hCpp, "nBorderWidth", n )
+
+   ACCESS Position         INLINE UI_GetProp( ::hCpp, "nPosition" )
+   ASSIGN Position( n )    INLINE UI_SetProp( ::hCpp, "nPosition", n )
+
+   ACCESS WindowState      INLINE UI_GetProp( ::hCpp, "nWindowState" )
+   ASSIGN WindowState( n ) INLINE UI_SetProp( ::hCpp, "nWindowState", n )
+
+   ACCESS FormStyle        INLINE UI_GetProp( ::hCpp, "nFormStyle" )
+   ASSIGN FormStyle( n )   INLINE UI_SetProp( ::hCpp, "nFormStyle", n )
+
+   ACCESS Cursor           INLINE UI_GetProp( ::hCpp, "nCursor" )
+   ASSIGN Cursor( n )      INLINE UI_SetProp( ::hCpp, "nCursor", n )
+
+   // Behavior
    ACCESS Sizable       INLINE UI_GetProp( ::hCpp, "lSizable" )
    ASSIGN Sizable( l )  INLINE UI_SetProp( ::hCpp, "lSizable", l )
 
@@ -57,8 +81,53 @@ CLASS TForm INHERIT TControl
    ACCESS ToolWindow    INLINE UI_GetProp( ::hCpp, "lToolWindow" )
    ASSIGN ToolWindow( l ) INLINE UI_SetProp( ::hCpp, "lToolWindow", l )
 
-   ACCESS ModalResult   INLINE UI_FormResult( ::hCpp )
+   ACCESS KeyPreview       INLINE UI_GetProp( ::hCpp, "lKeyPreview" )
+   ASSIGN KeyPreview( l )  INLINE UI_SetProp( ::hCpp, "lKeyPreview", l )
 
+   ACCESS ShowHint         INLINE UI_GetProp( ::hCpp, "lShowHint" )
+   ASSIGN ShowHint( l )    INLINE UI_SetProp( ::hCpp, "lShowHint", l )
+
+   ACCESS Hint             INLINE UI_GetProp( ::hCpp, "cHint" )
+   ASSIGN Hint( c )        INLINE UI_SetProp( ::hCpp, "cHint", c )
+
+   ACCESS AutoScroll       INLINE UI_GetProp( ::hCpp, "lAutoScroll" )
+   ASSIGN AutoScroll( l )  INLINE UI_SetProp( ::hCpp, "lAutoScroll", l )
+
+   ACCESS DoubleBuffered       INLINE UI_GetProp( ::hCpp, "lDoubleBuffered" )
+   ASSIGN DoubleBuffered( l )  INLINE UI_SetProp( ::hCpp, "lDoubleBuffered", l )
+
+   // Transparency
+   ACCESS AlphaBlend          INLINE UI_GetProp( ::hCpp, "lAlphaBlend" )
+   ASSIGN AlphaBlend( l )     INLINE UI_SetProp( ::hCpp, "lAlphaBlend", l )
+
+   ACCESS AlphaBlendValue     INLINE UI_GetProp( ::hCpp, "nAlphaBlendValue" )
+   ASSIGN AlphaBlendValue( n ) INLINE UI_SetProp( ::hCpp, "nAlphaBlendValue", n )
+
+   // Read-only
+   ACCESS ClientWidth    INLINE UI_GetProp( ::hCpp, "nClientWidth" )
+   ACCESS ClientHeight   INLINE UI_GetProp( ::hCpp, "nClientHeight" )
+   ACCESS ModalResult    INLINE UI_FormResult( ::hCpp )
+
+   // Events
+   ASSIGN OnActivate( b )   INLINE UI_OnEvent( ::hCpp, "OnActivate", b )
+   ASSIGN OnDeactivate( b ) INLINE UI_OnEvent( ::hCpp, "OnDeactivate", b )
+   ASSIGN OnResize( b )     INLINE UI_OnEvent( ::hCpp, "OnResize", b )
+   ASSIGN OnPaint( b )      INLINE UI_OnEvent( ::hCpp, "OnPaint", b )
+   ASSIGN OnShow( b )       INLINE UI_OnEvent( ::hCpp, "OnShow", b )
+   ASSIGN OnHide( b )       INLINE UI_OnEvent( ::hCpp, "OnHide", b )
+   ASSIGN OnCloseQuery( b ) INLINE UI_OnEvent( ::hCpp, "OnCloseQuery", b )
+   ASSIGN OnCreate( b )     INLINE UI_OnEvent( ::hCpp, "OnCreate", b )
+   ASSIGN OnDestroy( b )    INLINE UI_OnEvent( ::hCpp, "OnDestroy", b )
+   ASSIGN OnKeyDown( b )    INLINE UI_OnEvent( ::hCpp, "OnKeyDown", b )
+   ASSIGN OnKeyUp( b )      INLINE UI_OnEvent( ::hCpp, "OnKeyUp", b )
+   ASSIGN OnKeyPress( b )   INLINE UI_OnEvent( ::hCpp, "OnKeyPress", b )
+   ASSIGN OnMouseDown( b )  INLINE UI_OnEvent( ::hCpp, "OnMouseDown", b )
+   ASSIGN OnMouseUp( b )    INLINE UI_OnEvent( ::hCpp, "OnMouseUp", b )
+   ASSIGN OnMouseMove( b )  INLINE UI_OnEvent( ::hCpp, "OnMouseMove", b )
+   ASSIGN OnDblClick( b )   INLINE UI_OnEvent( ::hCpp, "OnDblClick", b )
+   ASSIGN OnMouseWheel( b ) INLINE UI_OnEvent( ::hCpp, "OnMouseWheel", b )
+
+   // Methods
    METHOD New( cTitle, nWidth, nHeight )
    METHOD Activate()
    METHOD Show()       INLINE UI_FormShow( ::hCpp )

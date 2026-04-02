@@ -1,4 +1,4 @@
-// test_design_mac.prg - IDE with 4 independent windows (Borland C++Builder layout)
+// hbcpp_macos.prg - HbBuilder: visual IDE for Harbour (C++Builder layout)
 //
 // Classic layout (originally 1024x768, scaled proportionally):
 //
@@ -39,7 +39,7 @@ function Main()
    nInsW    := Int( nScreenW * 0.18 )        // ~18% of screen width
 
    // === Window 1: Main Bar (full screen width) ===
-   DEFINE FORM oIDE TITLE "hbcpp (GUI framework for Harbour)" ;
+   DEFINE FORM oIDE TITLE "HbBuilder" ;
       SIZE nScreenW, nBarH FONT "Helvetica Neue", 12 APPBAR
 
    UI_FormSetPos( oIDE:hCpp, 0, 0 )
@@ -105,8 +105,8 @@ function Main()
    MENUITEM "Environment Options..." OF oTools ACTION MsgInfo( "Options" )
 
    DEFINE POPUP oHelp PROMPT "Help" OF oIDE
-   MENUITEM "About IDE..." OF oHelp ACTION ;
-      MsgInfo( "IDE v0.1 - Cross-platform visual designer" )
+   MENUITEM "About..." OF oHelp ACTION ;
+      MsgInfo( "HbBuilder v0.1 - Visual development environment for Harbour" )
 
    // Speedbar (toolbar with 28x28 icon-sized buttons)
    DEFINE TOOLBAR oTB OF oIDE
@@ -145,6 +145,8 @@ function Main()
    InspectorPopulateCombo( oDesignForm:hCpp )
 
    INS_SetOnComboSel( _InsGetData(), { |nSel| OnComboSelect( nSel ) } )
+   INS_SetOnEventDblClick( _InsGetData(), ;
+      { |hCtrl, cEvent| OnEventDblClick( hCtrl, cEvent ) } )
    INS_SetPos( _InsGetData(), 0, nInsTop, nInsW, nBottomY - nInsTop - 50 )
 
    // Sync: selection change in design form -> refresh inspector
@@ -182,19 +184,19 @@ static function CreatePalette()
 
    // Additional tab
    nAdd := oPal:AddTab( "Additional" )
-   oPal:AddComp( nAdd, "Img",  "Image",    0 )
-   oPal:AddComp( nAdd, "Shp",  "Shape",    0 )
-   oPal:AddComp( nAdd, "Spd",  "SpeedBtn", 0 )
+   oPal:AddComp( nAdd, "Img",  "Image",    9 )
+   oPal:AddComp( nAdd, "Shp",  "Shape",   10 )
+   oPal:AddComp( nAdd, "Spd",  "SpeedBtn",11 )
 
    // Data Access tab
    nAdd := oPal:AddTab( "Data Access" )
-   oPal:AddComp( nAdd, "Tbl",  "Table",    0 )
-   oPal:AddComp( nAdd, "Qry",  "Query",    0 )
+   oPal:AddComp( nAdd, "Tbl",  "Table",   12 )
+   oPal:AddComp( nAdd, "Qry",  "Query",   13 )
 
    // Data Controls tab
    nAdd := oPal:AddTab( "Data Controls" )
-   oPal:AddComp( nAdd, "DBG",  "DBGrid",   0 )
-   oPal:AddComp( nAdd, "DBN",  "DBNav",    0 )
+   oPal:AddComp( nAdd, "DBG",  "DBGrid",  14 )
+   oPal:AddComp( nAdd, "DBN",  "DBNav",   15 )
 
    // Load palette icons (Silk icon set by famfamfam, CC BY 2.5)
    UI_PaletteLoadImages( oPal:hCpp, "../resources/palette.bmp" )
@@ -203,33 +205,10 @@ return nil
 
 static function CreateDesignForm( nX, nY )
 
-   local oCbx, oChk, oBtn, oEdit
-
-   // C++Builder default form: 400x300
+   // New empty form, like C++Builder "File > New > VCL Forms Application"
    DEFINE FORM oDesignForm TITLE "Form1" SIZE 400, 300 FONT "Helvetica Neue", 12
 
    UI_FormSetPos( oDesignForm:hCpp, nX, nY )
-
-   // Sample controls
-   @ 13, 12 GROUPBOX "General" OF oDesignForm SIZE 370, 100
-
-   @ 36, 26 SAY "Name:" OF oDesignForm SIZE 60
-   @ 34, 100 GET oEdit VAR "John Doe" OF oDesignForm SIZE 200, 24
-
-   @ 67, 26 SAY "City:" OF oDesignForm SIZE 60
-   @ 65, 100 GET oEdit VAR "Madrid" OF oDesignForm SIZE 200, 24
-
-   @ 125, 12 GROUPBOX "Options" OF oDesignForm SIZE 370, 80
-
-   @ 147, 30 CHECKBOX oChk PROMPT "Active" OF oDesignForm SIZE 120 CHECKED
-   @ 147, 180 CHECKBOX oChk PROMPT "Admin" OF oDesignForm SIZE 120
-
-   @ 175, 30 SAY "Role:" OF oDesignForm SIZE 50
-   @ 173, 100 COMBOBOX oCbx OF oDesignForm ITEMS { "User", "Manager", "Admin" } SIZE 150
-   oCbx:Value := 0
-
-   @ 240, 120 BUTTON oBtn PROMPT "&OK" OF oDesignForm SIZE 88, 26
-   @ 240, 220 BUTTON oBtn PROMPT "&Cancel" OF oDesignForm SIZE 88, 26
 
 return nil
 
@@ -273,35 +252,108 @@ return nil
 
 static function GenerateSampleCode()
 
-   local cCode := ""
+   local cCode := "", e := Chr(13) + Chr(10)
+   local cSep := "//" + Replicate( "-", 68 ) + e
 
-   cCode += '// Form1.prg - Generated code' + Chr(13) + Chr(10)
-   cCode += '' + Chr(13) + Chr(10)
-   cCode += '#include "commands.ch"' + Chr(13) + Chr(10)
-   cCode += '' + Chr(13) + Chr(10)
-   cCode += 'function Main()' + Chr(13) + Chr(10)
-   cCode += '' + Chr(13) + Chr(10)
-   cCode += '   local oForm, oBtn' + Chr(13) + Chr(10)
-   cCode += '' + Chr(13) + Chr(10)
-   cCode += '   DEFINE FORM oForm TITLE "Form1" ;' + Chr(13) + Chr(10)
-   cCode += '      SIZE 400, 300 FONT "Helvetica Neue", 12' + Chr(13) + Chr(10)
-   cCode += '' + Chr(13) + Chr(10)
-   cCode += '   @ 13, 12 GROUPBOX "General" OF oForm ;' + Chr(13) + Chr(10)
-   cCode += '      SIZE 370, 100' + Chr(13) + Chr(10)
-   cCode += '' + Chr(13) + Chr(10)
-   cCode += '   @ 36, 26 SAY "Name:" OF oForm SIZE 60' + Chr(13) + Chr(10)
-   cCode += '   @ 34, 100 GET oEdit VAR "" OF oForm ;' + Chr(13) + Chr(10)
-   cCode += '      SIZE 200, 26' + Chr(13) + Chr(10)
-   cCode += '' + Chr(13) + Chr(10)
-   cCode += '   @ 240, 120 BUTTON oBtn PROMPT "&OK" ;' + Chr(13) + Chr(10)
-   cCode += '      OF oForm SIZE 88, 26' + Chr(13) + Chr(10)
-   cCode += '   oBtn:OnClick := { || oForm:Close() }' + Chr(13) + Chr(10)
-   cCode += '' + Chr(13) + Chr(10)
-   cCode += '   ACTIVATE FORM oForm CENTERED' + Chr(13) + Chr(10)
-   cCode += '' + Chr(13) + Chr(10)
-   cCode += 'return nil' + Chr(13) + Chr(10)
+   // === Project1.prg section ===
+   cCode += "// Project1.prg" + e
+   cCode += cSep
+   cCode += '#include "commands.ch"' + e
+   cCode += cSep
+   cCode += e
+   cCode += "PROCEDURE Main()" + e
+   cCode += e
+   cCode += "   local oApp" + e
+   cCode += e
+   cCode += "   oApp := TApplication():New()" + e
+   cCode += '   oApp:Title := "Project1"' + e
+   cCode += "   oApp:CreateForm( TForm1() )" + e
+   cCode += "   oApp:Run()" + e
+   cCode += e
+   cCode += "return" + e
+   cCode += e
+   cCode += cSep
+   cCode += "// Form1.prg" + e
+   cCode += cSep
+   cCode += e
+
+   // === Form1.prg section (C++Builder Unit1.h + Unit1.cpp equivalent) ===
+   cCode += "CLASS TForm1 FROM TForm" + e
+   cCode += e
+   cCode += "   // IDE-managed Components" + e
+   cCode += e
+   cCode += "   // Event handlers" + e
+   cCode += e
+   cCode += "   METHOD CreateForm()" + e
+   cCode += e
+   cCode += "ENDCLASS" + e
+   cCode += cSep
+   cCode += e
+   cCode += "METHOD CreateForm() CLASS TForm1" + e
+   cCode += e
+   cCode += '   ::Title  := "Form1"' + e
+   cCode += "   ::Width  := 400" + e
+   cCode += "   ::Height := 300" + e
+   cCode += e
+   cCode += "return nil" + e
+   cCode += cSep
 
 return cCode
+
+// Double-click on event in inspector: generate METHOD handler
+// Follows C++Builder pattern: ComponentName + EventNameWithoutOn
+// e.g. Button1 + OnClick -> Button1Click
+// e.g. Form1 + OnCreate -> Form1Create
+// e.g. Edit1 + OnChange -> Edit1Change
+static function OnEventDblClick( hCtrl, cEvent )
+
+   local cName, cClass, cHandler, cCode, cDecl, e, cSep, nCursorOfs
+   local cEditorText
+
+   e := Chr(13) + Chr(10)
+   cSep := "//" + Replicate( "-", 68 ) + e
+
+   // Get component name and class
+   cName  := UI_GetProp( hCtrl, "cName" )
+   cClass := UI_GetProp( hCtrl, "cClassName" )
+   if Empty( cName )
+      if cClass == "TForm"
+         cName := "Form1"
+      else
+         cName := "ctrl"
+      endif
+   endif
+
+   // Build handler name: ComponentName + EventWithoutOn
+   cHandler := cName + SubStr( cEvent, 3 )  // skip "On"
+
+   // Check if handler already exists in code editor -> jump to it
+   if CodeEditorGotoFunction( hCodeEditor, cHandler )
+      return cHandler
+   endif
+
+   // Generate the METHOD implementation (C++Builder pattern)
+   cCode := cSep
+   cCode += "METHOD " + cHandler + "( oSender ) CLASS TForm1" + e
+   cCode += e
+   cCode += "   " + e
+   cCode += e
+   cCode += "return nil" + e
+
+   // Cursor offset: place cursor on the empty line inside the method body
+   nCursorOfs := Len( cSep ) + ;
+                 Len( "METHOD " + cHandler + "( oSender ) CLASS TForm1" ) + ;
+                 Len( e ) + Len( e ) + 3  // "   " indent
+
+   // Append METHOD implementation to code editor
+   CodeEditorAppendText( hCodeEditor, cCode, nCursorOfs )
+
+   // Also insert METHOD declaration in the CLASS block
+   // Find "// Event handlers" line and insert after it
+   cDecl := "   METHOD " + cHandler + "( oSender )" + e
+   CodeEditorInsertAfter( hCodeEditor, "// Event handlers", cDecl )
+
+return cHandler
 
 static function MsgInfo( cText )
 

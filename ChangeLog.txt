@@ -1,6 +1,46 @@
 hbcpp - C++ powered GUI for Harbour
 =====================================
 
+2026-04-02 (HbBuilder: TForm properties, events, inspector tabs, code generation)
+----------------------------------------------------------------------------------
+- Renamed IDE to "HbBuilder" (title bar, macOS app menu, executable name)
+- TForm: added 15 C++Builder properties with full backend support
+  * BorderStyle (bsNone/bsSingle/bsSizeable/bsDialog/bsToolWindow/bsSizeToolWin)
+  * BorderIcons (biSystemMenu/biMinimize/biMaximize/biHelp bitmask)
+  * Position (poDesigned/poScreenCenter/poDesktopCenter/poMainFormCenter)
+  * WindowState (wsNormal/wsMinimized/wsMaximized) - live get/set
+  * FormStyle (fsNormal/fsStayOnTop) - sets NSFloatingWindowLevel
+  * AlphaBlend + AlphaBlendValue (0-255) - window transparency
+  * KeyPreview, ShowHint, Hint, AutoScroll, DoubleBuffered
+  * BorderWidth, Cursor, ClientWidth/ClientHeight (read-only)
+- TForm: added 17 C++Builder events with NSWindowDelegate wiring
+  * Lifecycle: OnCreate, OnDestroy, OnShow, OnHide, OnCloseQuery,
+    OnActivate, OnDeactivate
+  * Layout: OnResize (windowDidResize), OnPaint
+  * Keyboard: OnKeyDown, OnKeyUp, OnKeyPress
+  * Mouse: OnMouseDown, OnMouseUp, OnMouseMove, OnDblClick, OnMouseWheel
+  * OnCloseQuery returns .T./.F. to allow/prevent close
+- Constants in commands.ch: bs*, bi*, po*, ws*, fs*, cr* (C++Builder names)
+- Inspector: Properties/Events tab selector (NSSegmentedControl)
+  * Events tab shows all events per control type grouped by category
+  * Column headers change: Property/Value vs Event/Handler
+- Inspector: double-click event generates METHOD handler (C++Builder pattern)
+  * Handler name: ComponentName + EventWithoutOn (e.g. Button1Click)
+  * Inserts METHOD declaration in CLASS block
+  * Appends METHOD implementation with separator lines
+  * If handler exists, jumps to it in code editor
+- Code editor: new functions CodeEditorAppendText, CodeEditorGotoFunction,
+  CodeEditorInsertAfter for IDE code generation support
+- UI_GetAllEvents: returns event list per control type (TForm 19 events,
+  TButton/TEdit/TCheckBox/TComboBox/TLabel/TGroupBox with appropriate events)
+- Code generation follows C++Builder OOP pattern:
+  * Project1.prg with TApplication that creates TForm1
+  * Form1.prg with CLASS TForm1 FROM TForm (DATAs + METHODs)
+  * Empty form designer on startup (like File > New > VCL Forms Application)
+- Palette icon indices: filled for all tabs (Additional 9-11, Data Access 12-13,
+  Data Controls 14-15) on macOS, Linux and Win32
+- build_mac.sh: executable renamed from hbcpp_macos to HbBuilder
+
 2026-04-01 (Icon images fix)
 ----------------------------
 - Fixed magenta transparency mask for BMP icon strips on macOS
