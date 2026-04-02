@@ -1,6 +1,29 @@
 hbcpp - C++ powered GUI for Harbour
 =====================================
 
+2026-04-02 (HbBuilder: save/load projects, inspector fixes, no-terminal Run)
+-----------------------------------------------------------------------------
+- Save/Load projects: .hbp project file + per-form .prg files
+  * TBSave: writes Project1.hbp index + Project1.prg + FormN.prg files
+  * TBOpen: reads .hbp, recreates all forms + editor tabs
+- No-terminal Run: gtgui.c + gt_dummy.c stub replaces gttrm dependency
+  * User app launches as .app bundle via open(1) — no Terminal window
+  * REQUEST HB_GT_GUI_DEFAULT in generated main.prg
+- Inspector inline editing fixed: dispatch_async for doubleAction conflict
+  * Double-click on Properties tab opens inline editor
+  * Double-click on Events tab generates METHOD handler
+- cText edit updates form title bar (CT_FORM check in UI_SETPROP)
+- nClrPane updates dot grid background color (HBDotGridView::bgColor)
+- Form move updates Left/Top: windowDidMove delegate + SyncDesignerToCode
+- Form move/resize refreshes inspector (OnResize callback)
+- nLeft/nTop via UI_SetProp sets FPosition=POS_DESIGNED (runtime positioning)
+- Initial form code reflects actual coordinates (SyncDesignerToCode after Show)
+- View > Code Editor menu item (CodeEditorBringToFront)
+- TForm: Color ACCESS/ASSIGN (alias for nClrPane)
+- Window background uses FBgColor if set (createWindowWithRunLoop)
+- WireDesignForm: centralized callback wiring (OnSelChange + OnComponentDrop + OnResize)
+- About dialog: "Harbour Builder 1.0"
+
 2026-04-02 (HbBuilder: Run, two-way tools, dot grid, TApplication)
 -------------------------------------------------------------------
 - Run button (F9): full compile+link+execute pipeline

@@ -466,12 +466,43 @@ static HBFontPickerTarget * s_fontTarget = nil;
    [[d->tableView headerView] setNeedsDisplay:YES];
 }
 
-/* Double-click on event row: generate handler */
+/* Double-click: Properties tab -> inline edit, Events tab -> generate handler */
 - (void)tableViewDoubleClicked:(id)sender
 {
-   if( !d || d->nTab != 1 ) return;  /* Only on Events tab */
+   if( !d ) return;
 
    NSInteger row = [d->tableView clickedRow];
+   NSInteger col = [d->tableView clickedColumn];
+
+   /* Properties tab: start inline editing on the value column */
+   if( d->nTab == 0 )
+   {
+      if( row < 0 || row >= d->nVisible ) return;
+      int nReal = d->map[row];
+      if( d->rows[nReal].bIsCat ) return;
+
+      /* Find value column index */
+      NSInteger valColIdx = -1;
+      for( NSInteger c = 0; c < (NSInteger)[[d->tableView tableColumns] count]; c++ )
+      {
+         NSTableColumn * tc = [[d->tableView tableColumns] objectAtIndex:c];
+         if( [[tc identifier] isEqualToString:@"value"] ) { valColIdx = c; break; }
+      }
+      if( valColIdx < 0 ) return;
+
+      /* Color/Font: open picker instead */
+      if( d->rows[nReal].cType == 'C' ) { [self openColorPickerForRow:nReal]; return; }
+      if( d->rows[nReal].cType == 'F' ) { [self openFontPickerForRow:nReal]; return; }
+
+      /* Defer edit to next runloop to avoid conflict with doubleAction */
+      dispatch_async( dispatch_get_main_queue(), ^{
+         [d->tableView selectRowIndexes:[NSIndexSet indexSetWithIndex:row] byExtendingSelection:NO];
+         [d->tableView editColumn:valColIdx row:row withEvent:nil select:YES];
+      });
+      return;
+   }
+
+   /* Events tab */
    if( row < 0 || row >= d->nVisible ) return;
 
    int nReal = d->map[row];

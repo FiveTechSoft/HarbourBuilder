@@ -116,14 +116,20 @@ static void EnsureNSApp( void )
 
 /* Dot grid view for design-time (drawn as first subview of content) */
 @interface HBDotGridView : NSView
+{
+@public
+   NSColor * bgColor;
+}
 @end
 @implementation HBDotGridView
 - (BOOL)isFlipped { return YES; }
 - (BOOL)isOpaque { return YES; }
 - (void)drawRect:(NSRect)dirtyRect
 {
-   /* Form background */
-   [[NSColor colorWithCalibratedRed:0.94 green:0.94 blue:0.94 alpha:1.0] setFill];
+   /* Form background color */
+   NSColor * bg = bgColor ? bgColor :
+      [NSColor colorWithCalibratedRed:0.94 green:0.94 blue:0.94 alpha:1.0];
+   [bg setFill];
    NSRectFill( dirtyRect );
 
    /* Classic C++Builder dot grid */
@@ -1468,7 +1474,10 @@ static HBPaletteTarget * s_palTarget = nil;
    /* Force light appearance to avoid dark mode white-on-dark text */
    if( [NSAppearance respondsToSelector:@selector(appearanceNamed:)] )
       [FWindow setAppearance:[NSAppearance appearanceNamed:NSAppearanceNameAqua]];
-   [FWindow setBackgroundColor:[NSColor colorWithCalibratedRed:0.94 green:0.94 blue:0.94 alpha:1.0]];
+   if( FBgColor )
+      [FWindow setBackgroundColor:FBgColor];
+   else
+      [FWindow setBackgroundColor:[NSColor colorWithCalibratedRed:0.94 green:0.94 blue:0.94 alpha:1.0]];
    [FWindow setContentView:FContentView];
 
    [self createAllChildren];
@@ -1749,6 +1758,18 @@ static HBPaletteTarget * s_palTarget = nil;
    if( FOnResize ) [self fireEvent:FOnResize];
 }
 
+- (void)windowDidMove:(NSNotification *)notification
+{
+   if( FWindow ) {
+      NSRect screenFrame = [[NSScreen mainScreen] frame];
+      NSRect fr = [FWindow frame];
+      FLeft = (int)fr.origin.x;
+      FTop  = (int)(screenFrame.size.height - fr.origin.y - fr.size.height);
+   }
+   /* Reuse OnResize callback for move too (syncs code) */
+   if( FOnResize ) [self fireEvent:FOnResize];
+}
+
 - (void)windowDidMiniaturize:(NSNotification *)notification
 {
    FWindowState = WS_MINIMIZED;
@@ -1896,13 +1917,23 @@ HB_FUNC( UI_SETPROP )
 
    if( strcasecmp( szProp, "cText" ) == 0 && HB_ISCHAR(3) ) {
       [p setText:hb_parc(3)];
-      if( p->FView && [p->FView respondsToSelector:@selector(setStringValue:)] )
+      if( p->FControlType == CT_FORM && ((HBForm *)p)->FWindow )
+         [((HBForm *)p)->FWindow setTitle:[NSString stringWithUTF8String:p->FText]];
+      else if( p->FView && [p->FView respondsToSelector:@selector(setStringValue:)] )
          [(id)p->FView setStringValue:[NSString stringWithUTF8String:p->FText]];
       else if( p->FView && [p->FView respondsToSelector:@selector(setTitle:)] )
          [(id)p->FView setTitle:[NSString stringWithUTF8String:p->FText]];
    }
-   else if( strcasecmp(szProp,"nLeft")==0 )   { p->FLeft = hb_parni(3); [p updateViewFrame]; }
-   else if( strcasecmp(szProp,"nTop")==0 )    { p->FTop = hb_parni(3); [p updateViewFrame]; }
+   else if( strcasecmp(szProp,"nLeft")==0 )   {
+      p->FLeft = hb_parni(3);
+      if( p->FControlType == CT_FORM ) { ((HBForm *)p)->FCenter = NO; ((HBForm *)p)->FPosition = POS_DESIGNED; }
+      [p updateViewFrame];
+   }
+   else if( strcasecmp(szProp,"nTop")==0 )    {
+      p->FTop = hb_parni(3);
+      if( p->FControlType == CT_FORM ) { ((HBForm *)p)->FCenter = NO; ((HBForm *)p)->FPosition = POS_DESIGNED; }
+      [p updateViewFrame];
+   }
    else if( strcasecmp(szProp,"nWidth")==0 )  { p->FWidth = hb_parni(3); [p updateViewFrame]; }
    else if( strcasecmp(szProp,"nHeight")==0 ) { p->FHeight = hb_parni(3); [p updateViewFrame]; }
    else if( strcasecmp(szProp,"lVisible")==0 ) {
@@ -1985,7 +2016,19 @@ HB_FUNC( UI_SETPROP )
       CGFloat b = ((p->FClrPane>>16)&0xFF)/255.0;
       p->FBgColor = [NSColor colorWithCalibratedRed:r green:g blue:b alpha:1.0];
       if( p->FControlType == CT_FORM && ((HBForm *)p)->FWindow )
+      {
          [((HBForm *)p)->FWindow setBackgroundColor:p->FBgColor];
+         /* Update dot grid view in design mode */
+         HBForm * f = (HBForm *)p;
+         if( f->FContentView ) {
+            for( NSView * sv in [f->FContentView subviews] )
+               if( [sv isKindOfClass:[HBDotGridView class]] ) {
+                  ((HBDotGridView *)sv)->bgColor = p->FBgColor;
+                  [sv setNeedsDisplay:YES];
+                  break;
+               }
+         }
+      }
    }
    else if( strcasecmp(szProp,"oFont")==0 && HB_ISCHAR(3) ) {
       char szFace[64]={0}; int nSize=12;
@@ -3868,6 +3911,16 @@ HB_FUNC( CODEEDITORONTABCHANGE )
    {
       if( ed->pOnTabChange ) hb_itemRelease( ed->pOnTabChange );
       ed->pOnTabChange = pBlock ? hb_itemNew( pBlock ) : NULL;
+   }
+}
+
+/* CodeEditorBringToFront( hEditor ) */
+HB_FUNC( CODEEDITORBRINGTOFRONT )
+{
+   CODEEDITOR * ed = (CODEEDITOR *)(HB_PTRUINT) hb_parnint(1);
+   if( ed && ed->window ) {
+      [ed->window makeKeyAndOrderFront:nil];
+      [NSApp activateIgnoringOtherApps:YES];
    }
 }
 

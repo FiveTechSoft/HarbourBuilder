@@ -95,6 +95,7 @@ function Main()
 
    DEFINE POPUP oView PROMPT "View" OF oIDE
    MENUITEM "Forms..."     OF oView ACTION MenuViewForms()
+   MENUITEM "Code Editor"  OF oView ACTION CodeEditorBringToFront( hCodeEditor )
    MENUITEM "Inspector"    OF oView ACTION InspectorOpen()
 
    DEFINE POPUP oProject PROMPT "Project" OF oIDE
@@ -152,6 +153,8 @@ function Main()
    // Set up editor tabs: Project1.prg (tab 1) + Form1.prg (tab 2)
    CodeEditorSetTabText( hCodeEditor, 1, GenerateProjectCode() )
    CodeEditorAddTab( hCodeEditor, "Form1.prg" )
+   // Sync form code AFTER Show() so Left/Top/Width/Height reflect actual position
+   SyncDesignerToCode()
    CodeEditorSetTabText( hCodeEditor, 2, aForms[1][3] )
    CodeEditorSelectTab( hCodeEditor, 2 )  // Show Form1.prg initially
 
@@ -169,13 +172,7 @@ function Main()
    INS_SetOnPropChanged( _InsGetData(), { || SyncDesignerToCode() } )
    INS_SetPos( _InsGetData(), 0, nInsTop, nInsW, nBottomY - nInsTop - 50 )
 
-   // Sync: selection change in design form -> refresh inspector
-   UI_OnSelChange( oDesignForm:hCpp, ;
-      { |hCtrl| OnDesignSelChange( hCtrl ) } )
-
-   // Component drop: palette click + draw on form -> create control
-   UI_FormOnComponentDrop( oDesignForm:hCpp, ;
-      { |hForm, nType, nL, nT, nW, nH| OnComponentDrop( hForm, nType, nL, nT, nW, nH ) } )
+   WireDesignForm()
 
    // When IDE closes, destroy all secondary windows
    oIDE:OnClose := { || DestroyAllForms(), InspectorClose(), ;
@@ -311,18 +308,22 @@ static function RegenerateFormCode( cName, hForm )
    local cSep := "//" + Replicate( "-", 68 ) + e
    local cClass := "T" + cName  // TForm1, TForm2...
    local i, nCount, hCtrl, cCtrlName, cCtrlClass, nType
-   local nW, nH, cTitle, nClr
+   local nW, nH, nFL, nFT, cTitle, nClr
    local nL, nT, nCW, nCH, cText
    local cDatas := "", cCreate := "", cEvents := ""
 
    // Form properties (read from live form or use defaults)
    if hForm != 0
       cTitle := UI_GetProp( hForm, "cText" )
+      nFL    := UI_GetProp( hForm, "nLeft" )
+      nFT    := UI_GetProp( hForm, "nTop" )
       nW     := UI_GetProp( hForm, "nWidth" )
       nH     := UI_GetProp( hForm, "nHeight" )
       nClr   := UI_GetProp( hForm, "nClrPane" )
    else
       cTitle := cName
+      nFL    := 0
+      nFT    := 0
       nW     := 400
       nH     := 300
       nClr   := 15790320  // 0x00F0F0F0
@@ -400,6 +401,8 @@ static function RegenerateFormCode( cName, hForm )
    cCode += "METHOD CreateForm() CLASS " + cClass + e
    cCode += e
    cCode += '   ::Title  := "' + cTitle + '"' + e
+   cCode += "   ::Left   := " + LTrim(Str(nFL)) + e
+   cCode += "   ::Top    := " + LTrim(Str(nFT)) + e
    cCode += "   ::Width  := " + LTrim(Str(nW)) + e
    cCode += "   ::Height := " + LTrim(Str(nH)) + e
    if nClr != 15790320  // non-default color
@@ -529,6 +532,23 @@ static function OnComponentDrop( hForm, nType, nL, nT, nW, nH )
 
 return nil
 
+// Wire all design-mode callbacks on the active form
+static function WireDesignForm()
+
+   UI_SetDesignForm( oDesignForm:hCpp )
+
+   UI_OnSelChange( oDesignForm:hCpp, ;
+      { |hCtrl| OnDesignSelChange( hCtrl ) } )
+
+   UI_FormOnComponentDrop( oDesignForm:hCpp, ;
+      { |hForm, nType, nL, nT, nW, nH| OnComponentDrop( hForm, nType, nL, nT, nW, nH ) } )
+
+   // Two-way: sync code + inspector when form is moved/resized
+   oDesignForm:OnResize := { || SyncDesignerToCode(), ;
+      InspectorRefresh( oDesignForm:hCpp ) }
+
+return nil
+
 // Two-way sync: regenerate code from designer state
 static function SyncDesignerToCode()
 
@@ -624,10 +644,7 @@ static function MenuNewForm()
    UI_SetDesignForm( oDesignForm:hCpp )
    oDesignForm:Show()
 
-   UI_OnSelChange( oDesignForm:hCpp, ;
-      { |hCtrl| OnDesignSelChange( hCtrl ) } )
-   UI_FormOnComponentDrop( oDesignForm:hCpp, ;
-      { |hForm, nType, nL, nT, nW, nH| OnComponentDrop( hForm, nType, nL, nT, nW, nH ) } )
+   WireDesignForm()
 
    // Add tab to editor and switch to it
    CodeEditorAddTab( hCodeEditor, aForms[ nActiveForm ][ 1 ] + ".prg" )
@@ -701,10 +718,7 @@ static function TBNew()
    UI_SetDesignForm( oDesignForm:hCpp )
    oDesignForm:Show()
 
-   UI_OnSelChange( oDesignForm:hCpp, ;
-      { |hCtrl| OnDesignSelChange( hCtrl ) } )
-   UI_FormOnComponentDrop( oDesignForm:hCpp, ;
-      { |hForm, nType, nL, nT, nW, nH| OnComponentDrop( hForm, nType, nL, nT, nW, nH ) } )
+   WireDesignForm()
 
    // Reset editor tabs
    CodeEditorClearTabs( hCodeEditor )
@@ -720,44 +734,134 @@ static function TBNew()
 
 return nil
 
-// Open: load a .prg file into the code editor
+// Open Project: load a .hbp project file
 static function TBOpen()
 
-   local cFile, cContent
+   local cFile, cContent, cDir, cLine, aLines, i
+   local cFormName, cFormCode, nFormX, nFormY
+   local nInsW, nInsTop, nEditorTop, nEditorX, nEditorW, nEditorH
 
-   cFile := MAC_OpenFileDialog( "Open Harbour Source", "prg" )
+   cFile := MAC_OpenFileDialog( "Open HbBuilder Project", "hbp" )
    if Empty( cFile )
       return nil
    endif
 
    cContent := MemoRead( cFile )
    if Empty( cContent )
-      MsgInfo( "Could not read file: " + cFile )
+      MsgInfo( "Could not read project: " + cFile )
       return nil
    endif
 
-   CodeEditorSetText( hCodeEditor, cContent )
+   // Project dir
+   cDir := Left( cFile, RAt( "/", cFile ) )
+
+   // Destroy current forms
+   for i := 1 to Len( aForms )
+      aForms[i][2]:Destroy()
+   next
+   aForms := {}
+   nActiveForm := 0
+
+   // Clear editor tabs
+   CodeEditorClearTabs( hCodeEditor )
+
+   // Calculate form positions
+   nInsW := Int( nScreenW * 0.18 )
+   nInsTop := MAC_GetWindowBottom( oIDE:hCpp )
+   nEditorTop := nInsTop + 80
+   nEditorX := nInsW
+   nEditorW := nScreenW - nEditorX
+   nEditorH := nScreenH - nEditorTop
+
+   // Read project file: each line is a form name (Form1, Form2...)
+   // First line is the project title, rest are form names
+   aLines := HB_ATokens( cContent, Chr(10) )
+
+   // Load Project1.prg
+   cFormCode := MemoRead( cDir + "Project1.prg" )
+   if ! Empty( cFormCode )
+      CodeEditorSetTabText( hCodeEditor, 1, cFormCode )
+   endif
+
+   // Load each form
+   for i := 2 to Len( aLines )
+      cFormName := AllTrim( aLines[i] )
+      if Empty( cFormName ); loop; endif
+
+      // Read form code
+      cFormCode := MemoRead( cDir + cFormName + ".prg" )
+      if Empty( cFormCode ); loop; endif
+
+      // Calculate position
+      nFormX := nEditorX + Int( ( nEditorW - 400 ) / 2 ) + ( Len(aForms) ) * 20
+      nFormY := nEditorTop + Int( ( nEditorH - 300 ) * 0.35 ) + ( Len(aForms) ) * 20
+
+      // Create design form
+      CreateDesignForm( nFormX, nFormY )
+      oDesignForm:SetDesign( .t. )
+      oDesignForm:Show()
+
+      // Store the loaded code
+      aForms[ Len(aForms) ][ 3 ] := cFormCode
+
+      // Add editor tab
+      CodeEditorAddTab( hCodeEditor, cFormName + ".prg" )
+      CodeEditorSetTabText( hCodeEditor, Len(aForms) + 1, cFormCode )
+
+      // Wire up
+      UI_OnSelChange( oDesignForm:hCpp, ;
+         { |hCtrl| OnDesignSelChange( hCtrl ) } )
+      UI_FormOnComponentDrop( oDesignForm:hCpp, ;
+         { |hForm, nType, nL, nT, nW, nH| OnComponentDrop( hForm, nType, nL, nT, nW, nH ) } )
+   next
+
+   // Activate first form
+   if Len( aForms ) > 0
+      nActiveForm := 1
+      oDesignForm := aForms[1][2]
+      UI_SetDesignForm( oDesignForm:hCpp )
+      CodeEditorSelectTab( hCodeEditor, 2 )
+      InspectorRefresh( oDesignForm:hCpp )
+      InspectorPopulateCombo( oDesignForm:hCpp )
+   endif
+
    cCurrentFile := cFile
 
 return nil
 
-// Save: save code editor to file
+// Save Project: write .hbp + all .prg files
 static function TBSave()
 
-   local cContent, cFile
+   local cDir, cFile, cHbp, i
 
-   cContent := CodeEditorGetText( hCodeEditor )
+   // Sync current form code
+   SaveActiveFormCode()
 
    if Empty( cCurrentFile )
-      // No file yet: show Save As dialog
-      cFile := MAC_SaveFileDialog( "Save Harbour Source", "Form1.prg", "prg" )
+      cFile := MAC_SaveFileDialog( "Save HbBuilder Project", "Project1.hbp", "hbp" )
       if Empty( cFile )
          return nil
       endif
       cCurrentFile := cFile
    endif
 
-   MemoWrit( cCurrentFile, cContent )
+   // Project directory = same as .hbp file
+   cDir := Left( cCurrentFile, RAt( "/", cCurrentFile ) )
+
+   // Write .hbp file (project index)
+   cHbp := "Project1" + Chr(10)
+   for i := 1 to Len( aForms )
+      cHbp += aForms[i][1] + Chr(10)
+   next
+   MemoWrit( cCurrentFile, cHbp )
+
+   // Write Project1.prg
+   MemoWrit( cDir + "Project1.prg", CodeEditorGetTabText( hCodeEditor, 1 ) )
+
+   // Write each form .prg
+   for i := 1 to Len( aForms )
+      MemoWrit( cDir + aForms[i][1] + ".prg", aForms[i][3] )
+   next
 
 return nil
 
@@ -793,7 +897,8 @@ static function TBRun()
 
    // Step 2: Assemble main.prg
    cLog += "[2] Building main.prg..." + Chr(10)
-   cAllPrg := '#include "hbbuilder.ch"' + Chr(10) + Chr(10)
+   cAllPrg := '#include "hbbuilder.ch"' + Chr(10)
+   cAllPrg += "REQUEST HB_GT_GUI_DEFAULT" + Chr(10) + Chr(10)
    cAllPrg += StrTran( MemoRead( cBuildDir + "/Project1.prg" ), ;
                        '#include "hbbuilder.ch"', "" ) + Chr(10)
    for i := 1 to Len( aForms )
@@ -842,12 +947,20 @@ static function TBRun()
       cLog += "    OK" + Chr(10)
    endif
 
-   // Step 6: Compile Cocoa backend
+   // Step 6: Compile Cocoa backend + GT dummy
    if ! lError
       cLog += "[6] Compiling Cocoa backend..." + Chr(10)
       cCmd := "clang -c -O2 -fobjc-arc -I" + cHbInc + ;
               " " + cProjDir + "/backends/cocoa/cocoa_core.m" + ;
               " -o " + cBuildDir + "/cocoa_core.o 2>&1"
+      MAC_ShellExec( cCmd )
+      cCmd := "clang -c -O2 -I" + cHbInc + ;
+              " " + cHbDir + "/src/rtl/gtgui/gtgui.c" + ;
+              " -o " + cBuildDir + "/gtgui.o 2>&1"
+      MAC_ShellExec( cCmd )
+      cCmd := "clang -c -O2 -I" + cHbInc + ;
+              " " + cProjDir + "/backends/cocoa/gt_dummy.c" + ;
+              " -o " + cBuildDir + "/gt_dummy.o 2>&1"
       MAC_ShellExec( cCmd )
       cLog += "    OK" + Chr(10)
    endif
@@ -859,13 +972,15 @@ static function TBRun()
               " " + cBuildDir + "/main.o" + ;
               " " + cBuildDir + "/classes.o" + ;
               " " + cBuildDir + "/cocoa_core.o" + ;
+              " " + cBuildDir + "/gtgui.o" + ;
+              " " + cBuildDir + "/gt_dummy.o" + ;
               " -L" + cHbLib + ;
               " -lhbvm -lhbrtl -lhbcommon -lhbcpage -lhblang" + ;
               " -lhbmacro -lhbpp -lhbrdd -lhbcplr -lhbdebug" + ;
               " -lhbct -lhbextern" + ;
               " -lrddntx -lrddnsx -lrddcdx -lrddfpt" + ;
               " -lhbhsx -lhbsix -lhbusrrdd" + ;
-              " -lgtcgi -lgttrm -lgtstd" + ;
+              " -lgtcgi -lgtstd" + ;
               " -framework Cocoa -framework UniformTypeIdentifiers" + ;
               " -lm -lpthread 2>&1"
       cOutput := MAC_ShellExec( cCmd )
@@ -882,10 +997,15 @@ static function TBRun()
       MsgInfo( "Build FAILED:" + Chr(10) + Chr(10) + cLog )
    else
       cLog += Chr(10) + "Build succeeded. Running..." + Chr(10)
-      // Launch in Terminal.app (Harbour needs a pty)
-      MAC_ShellExec( "osascript -e " + Chr(39) + "tell application " + Chr(34) + ;
-         "Terminal" + Chr(34) + " to do script " + Chr(34) + ;
-         cBuildDir + "/UserApp" + Chr(34) + Chr(39) )
+      // Create .app bundle and launch (macOS needs bundle for GUI app)
+      MAC_ShellExec( "mkdir -p " + cBuildDir + "/UserApp.app/Contents/MacOS" )
+      MAC_ShellExec( "cp " + cBuildDir + "/UserApp " + cBuildDir + "/UserApp.app/Contents/MacOS/" )
+      MemoWrit( cBuildDir + "/UserApp.app/Contents/Info.plist", ;
+         '<?xml version="1.0"?>' + Chr(10) + ;
+         '<plist version="1.0"><dict>' + Chr(10) + ;
+         '<key>CFBundleExecutable</key><string>UserApp</string>' + Chr(10) + ;
+         '</dict></plist>' + Chr(10) )
+      MAC_ShellExec( "open " + cBuildDir + "/UserApp.app" )
    endif
 
 return nil
@@ -898,7 +1018,7 @@ static function ShowAbout()
 
    local cMsg := ""
 
-   cMsg += "HbBuilder 1.0" + Chr(10)
+   cMsg += "Harbour Builder 1.0" + Chr(10)
    cMsg += "Visual development environment for Harbour" + Chr(10)
    cMsg += Chr(10)
    cMsg += "(c) 2025-2026 The Harbour Project" + Chr(10)
