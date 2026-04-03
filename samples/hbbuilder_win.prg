@@ -1431,9 +1431,9 @@ static function ShowEditorSettings()
    static nTextColor := 13948116   // RGB(212,212,212) light gray
    static nKeywordClr := 5668054   // RGB(86,156,214) blue
    static nCommandClr := 5098318   // RGB(78,201,176) teal
-   static nCommentClr := 6985578   // RGB(106,153,85) green
-   static nStringClr  := 13538510  // RGB(206,145,120) orange
-   static nPreProcClr := 14530758  // RGB(198,120,221) purple
+   static nCommentClr := 6985578   // RGB(80,220,80) green
+   static nStringClr  := 13538510  // RGB(255,180,100) orange
+   static nPreProcClr := 14530758  // RGB(220,130,255) purple
    static nNumberClr  := 15185578  // RGB(170,170,120) yellow-gray
    static nSelBgClr   := 4536632   // RGB(40,70,100) selection
 
@@ -3143,7 +3143,7 @@ static void HighlightCode( HWND hEdit )
       {
          int start = i;
          while( i < nLen && buf[i] != '\r' && buf[i] != '\n' ) i++;
-         SetRichColor( hEdit, start, i, RGB(106,153,85), FALSE );
+         SetRichColor( hEdit, start, i, RGB(80,220,80), FALSE );
          nComments++;
          continue;
       }
@@ -3155,7 +3155,7 @@ static void HighlightCode( HWND hEdit )
          i += 2;
          while( i + 1 < nLen && !( buf[i] == '*' && buf[i+1] == '/' ) ) i++;
          if( i + 1 < nLen ) i += 2;
-         SetRichColor( hEdit, start, i, RGB(106,153,85), FALSE );
+         SetRichColor( hEdit, start, i, RGB(80,220,80), FALSE );
          continue;
       }
 
@@ -3167,7 +3167,7 @@ static void HighlightCode( HWND hEdit )
          i++;
          while( i < nLen && buf[i] != q && buf[i] != '\r' && buf[i] != '\n' ) i++;
          if( i < nLen && buf[i] == q ) i++;
-         SetRichColor( hEdit, start, i, RGB(206,145,120), FALSE );
+         SetRichColor( hEdit, start, i, RGB(255,180,100), FALSE );
          nStrings++;
          continue;
       }
@@ -3178,7 +3178,7 @@ static void HighlightCode( HWND hEdit )
          int start = i;
          i++;
          while( i < nLen && IsWordChar(buf[i]) ) i++;
-         SetRichColor( hEdit, start, i, RGB(198,120,221), TRUE );
+         SetRichColor( hEdit, start, i, RGB(220,130,255), TRUE );
          continue;
       }
 
@@ -3188,7 +3188,7 @@ static void HighlightCode( HWND hEdit )
          int start = i;
          i++;
          while( i < nLen && buf[i] != '.' && IsWordChar(buf[i]) ) i++;
-         if( i < nLen && buf[i] == '.' ) { i++; SetRichColor( hEdit, start, i, RGB(198,120,221), FALSE ); }
+         if( i < nLen && buf[i] == '.' ) { i++; SetRichColor( hEdit, start, i, RGB(220,130,255), FALSE ); }
          continue;
       }
 
@@ -3197,7 +3197,7 @@ static void HighlightCode( HWND hEdit )
       {
          ws = i;
          while( i < nLen && ((buf[i]>='0'&&buf[i]<='9')||buf[i]=='.') ) i++;
-         SetRichColor( hEdit, ws, i, RGB(180,230,150), FALSE ); nNumbers++;
+         SetRichColor( hEdit, ws, i, RGB(200,255,130), FALSE ); nNumbers++;
             if(nNumbers<=3){FILE*f=fopen("c:\\HarbourBuilder\\syntax_detail.log","a");
               if(f){char w[64]={0};memcpy(w,buf+ws,i-ws>60?60:i-ws);
                 fprintf(f,"NUM[%d]: '%s' pos=%d-%d\n",nNumbers,w,ws,i);fclose(f);}}
@@ -3210,12 +3210,12 @@ static void HighlightCode( HWND hEdit )
          ws = i;
          while( i < nLen && IsWordChar(buf[i]) ) i++;
          if( IsKeyword( buf + ws, i - ws ) )
-         {  SetRichColor( hEdit, ws, i, RGB(100,180,255), TRUE ); nKeywords++;
+         {  SetRichColor( hEdit, ws, i, RGB(120,200,255), TRUE ); nKeywords++;
             if(nKeywords<=3){FILE*f=fopen("c:\\HarbourBuilder\\syntax_detail.log","a");
               if(f){char w[64]={0};memcpy(w,buf+ws,i-ws>60?60:i-ws);
                 fprintf(f,"KW[%d]: '%s' pos=%d-%d\n",nKeywords,w,ws,i);fclose(f);}} }
          else if( IsCommand( buf + ws, i - ws ) )
-         {  SetRichColor( hEdit, ws, i, RGB(80,220,190), FALSE ); nCommands++; }
+         {  SetRichColor( hEdit, ws, i, RGB(100,255,210), FALSE ); nCommands++; }
          continue;
       }
 
