@@ -584,16 +584,25 @@ static const char * s_cursor[]      = { "crDefault", "crArrow", "crCross", "crIB
 static const char * s_bevelStyle[]  = { "bsLowered", "bsRaised" };
 static const char * s_alignment[]   = { "taLeftJustify", "taCenter", "taRightJustify" };
 static const char * s_scrollBars[]  = { "ssNone", "ssVertical", "ssHorizontal", "ssBoth" };
+static const char * s_borderIcons[] = { "biNone", "biSystemMenu", "biMinimize", "biSystemMenu+biMinimize",
+                                        "biMaximize", "biSystemMenu+biMaximize", "biMinimize+biMaximize", "biAll" };
+static const char * s_shapeType[]   = { "stRectangle", "stCircle", "stRoundRect", "stEllipse" };
+static const char * s_viewStyle[]   = { "vsIcon", "vsList", "vsReport", "vsSmallIcon" };
+static const char * s_bevelOuter[]  = { "bvNone", "bvLowered", "bvRaised" };
 
 static ENUMDEF s_enums[] = {
    { "nBorderStyle",  s_borderStyle,  4 },
+   { "nBorderIcons",  s_borderIcons,  8 },
    { "nPosition",     s_position,     3 },
    { "nWindowState",  s_windowState,  3 },
    { "nFormStyle",    s_formStyle,    2 },
    { "nCursor",       s_cursor,       9 },
    { "nBevelStyle",   s_bevelStyle,   2 },
+   { "nBevelOuter",   s_bevelOuter,   3 },
    { "nAlignment",    s_alignment,    3 },
    { "nScrollBars",   s_scrollBars,   4 },
+   { "nShapeType",    s_shapeType,    4 },
+   { "nViewStyle",    s_viewStyle,    4 },
    { NULL, NULL, 0 }
 };
 
