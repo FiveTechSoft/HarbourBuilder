@@ -2293,9 +2293,8 @@ HB_FUNC( W32_EDITORSETTINGSDIALOG )
    }
 
    hOwner = GetActiveWindow();
-   GetWindowRect(hOwner,&rc);
-   x = rc.left+((rc.right-rc.left)-ES_DLG_W)/2;
-   y = rc.top+((rc.bottom-rc.top)-ES_DLG_H)/2;
+   x = ( GetSystemMetrics(SM_CXSCREEN) - ES_DLG_W ) / 2;
+   y = ( GetSystemMetrics(SM_CYSCREEN) - ES_DLG_H ) / 2;
 
    hDlg = CreateWindowExA(WS_EX_DLGMODALFRAME|WS_EX_TOPMOST,
       "HbEditorSettings","Editor Colors && Font",
