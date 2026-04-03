@@ -3066,7 +3066,9 @@ static const char * s_commands[] = {
    "CENTERED", "SAY", "GET", "BUTTON", "PROMPT", "CHECKBOX", "COMBOBOX", "GROUPBOX",
    "ITEMS", "CHECKED", "DEFAULT", "CANCEL", "OF", "VAR", "ACTION",
    "TOOLBAR", "SEPARATOR", "TOOLTIP", "MENUBAR", "POPUP", "MENUITEM", "MENUSEPARATOR",
-   "PALETTE", "REQUEST",
+   "PALETTE", "REQUEST", "ACCEL",
+   "CLASS", "ENDCLASS", "METHOD", "DATA", "FROM", "INHERIT",
+   "PROCEDURE", "FUNCTION",
    NULL
 };
 
@@ -3133,7 +3135,7 @@ static void HighlightCode( HWND hEdit )
    SendMessage( hEdit, WM_SETREDRAW, FALSE, 0 );
 
    /* Reset all to light gray (default text on dark bg) */
-   SetRichColor( hEdit, 0, nLen, RGB(212,212,212), FALSE );
+   SetRichColor( hEdit, 0, nLen, RGB(220,220,220), FALSE );
 
    i = 0;
    while( i < nLen )
