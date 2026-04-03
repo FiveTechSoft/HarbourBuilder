@@ -2259,11 +2259,24 @@ static LRESULT CALLBACK EditorSettingsProc( HWND hWnd, UINT msg, WPARAM wParam, 
 {
    switch(msg) {
       case WM_COMMAND:
-         if(LOWORD(wParam)==IDOK || LOWORD(wParam)==IDCANCEL) {
+      {
+         WORD wId = LOWORD(wParam);
+         if(wId==IDOK || wId==IDCANCEL) {
             EnableWindow(GetParent(hWnd)?GetParent(hWnd):GetDesktopWindow(),TRUE);
             DestroyWindow(hWnd); return 0;
          }
+         /* Color buttons: IDs 600-608 */
+         if(wId >= 600 && wId <= 608) {
+            COLORREF crInit = RGB(128,128,128);
+            COLORREF crNew = PickColor(hWnd, crInit);
+            /* Update button text with color name */
+            { char buf[32]; sprintf(buf, "#%02X%02X%02X",
+                GetRValue(crNew), GetGValue(crNew), GetBValue(crNew));
+              SetWindowTextA((HWND)lParam, buf); }
+            return 0;
+         }
          break;
+      }
       case WM_CLOSE:
          EnableWindow(GetParent(hWnd)?GetParent(hWnd):GetDesktopWindow(),TRUE);
          DestroyWindow(hWnd); return 0;
