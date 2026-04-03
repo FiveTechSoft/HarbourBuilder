@@ -1,147 +1,306 @@
-# Harbour Builder
+<div align="center">
 
-C++ powered cross-platform visual IDE for Harbour
+# ⚓ HarbourBuilder
 
-This entire framework has been **vibe coded from scratch using [Claude Code](https://claude.ai/claude-code)** -- from the C++ core and native backends (Win32, Cocoa, GTK3) to the Harbour OOP layer, the visual designer with live inspector, and the IDE layout with 4 independent windows.
+### The Most Powerful Cross-Platform Visual IDE for Harbour
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-green.svg)](#platforms)
+[![Controls](https://img.shields.io/badge/Controls-109-orange.svg)](#component-palette)
+[![Docs](https://img.shields.io/badge/Docs-20%20pages-purple.svg)](docs/en/index.html)
+[![Built with Claude Code](https://img.shields.io/badge/Built%20with-Claude%20Code-blueviolet.svg)](https://claude.ai/claude-code)
+
+**Design visually. Code in Harbour. Run natively on every platform.**
+
+[Quick Start](#-quick-start) · [Features](#-features) · [Screenshots](#-screenshots) · [Documentation](docs/en/index.html) · [Tutorials](#-tutorials) · [Contributing](#-contributing)
+
+</div>
+
+---
+
+## What is HarbourBuilder?
+
+HarbourBuilder is a **Borland C++Builder-style visual IDE** that generates Harbour/xBase code. Drop controls from the palette, set properties in the inspector, double-click to write event handlers — and your app runs natively on Windows, macOS, and Linux with zero code changes.
+
+```harbour
+#include "hbbuilder.ch"
+
+function Main()
+   local oForm, oBtn
+
+   DEFINE FORM oForm TITLE "Hello World" SIZE 400, 300 FONT "Segoe UI", 10
+
+   @ 120, 140 BUTTON oBtn PROMPT "Click Me!" OF oForm SIZE 120, 32
+   oBtn:OnClick := { || MsgInfo( "Hello from HarbourBuilder!" ) }
+
+   ACTIVATE FORM oForm CENTERED
+return nil
+```
+
+> This code runs **identically** on Windows, macOS, and Linux — with native controls on each platform.
+
+---
+
+## ✨ Features
+
+### 🎨 Visual Form Designer
+- WYSIWYG form designer with dot grid and snap
+- Drag & drop from component palette
+- Selection handles with rubber band multi-select
+- Real-time two-way tools: design ↔ code sync
+
+### 📦 109 Components in 14 Tabs
+
+| Tab | Controls | Description |
+|-----|----------|-------------|
+| **Standard** | 11 | Label, Edit, Memo, Button, CheckBox, RadioButton, ListBox, ComboBox, GroupBox, Panel, ScrollBar |
+| **Additional** | 10 | BitBtn, SpeedButton, Image, Shape, Bevel, MaskEdit, StringGrid, ScrollBox, StaticText, LabeledEdit |
+| **Native** | 9 | TabControl, TreeView, ListView, ProgressBar, RichEdit, TrackBar, UpDown, DateTimePicker, MonthCalendar |
+| **System** | 2 | Timer, PaintBox |
+| **Dialogs** | 6 | OpenDialog, SaveDialog, FontDialog, ColorDialog, FindDialog, ReplaceDialog |
+| **Data Access** | 9 | DBF, MySQL, MariaDB, PostgreSQL, SQLite, Firebird, SQLServer, Oracle, MongoDB |
+| **Data Controls** | 8 | TBrowse, DBGrid, DBNavigator, DBText, DBEdit, DBComboBox, DBCheckBox, DBImage |
+| **Printing** | 8 | Printer, Report, Labels, PrintPreview, PageSetup, PrintDialog, ReportViewer, BarcodePrinter |
+| **Internet** | 9 | WebView, WebServer, WebSocket, HttpClient, FtpClient, SmtpClient, TcpServer, TcpClient, UdpSocket |
+| **ERP** | 12 | Preprocessor, ScriptEngine, ReportDesigner, Barcode, PDFGenerator, ExcelExport, AuditLog, Permissions, Currency, TaxEngine, Dashboard, Scheduler |
+| **Threading** | 8 | Thread, Mutex, Semaphore, CriticalSection, ThreadPool, AtomicInt, CondVar, Channel |
+| **AI** | 7 | OpenAI, Gemini, Claude, DeepSeek, Grok, Ollama, **Transformer** |
+
+### 🔍 Object Inspector
+- Properties tab with categorized grid (Appearance, Position, Behavior, Data)
+- Events tab with **dynamic event list per control type** (UI_GETALLEVENTS)
+- Double-click event → auto-generate handler code
+- Color picker, font picker, inline editing
+- ComboBox selector for all form controls
+
+### 💻 Code Editor (VSCode-level)
+- Dark theme with syntax highlighting (keywords, commands, strings, comments, preprocessor)
+- **Ctrl+F** Find bar with match count, F3 next/prev
+- **Ctrl+H** Replace bar with Replace All
+- **Ctrl+Space** Auto-completion popup (Harbour keywords, 60+ functions, xBase commands)
+- **Ctrl+/** Toggle line comment
+- **Ctrl+Shift+D** Duplicate line
+- **Ctrl+G** Go to line
+- Tabbed editor (Project1.prg + Form tabs)
+- Line number gutter with synchronized scrolling
+
+### 🤖 Built-in AI Assistant
+- **Ollama integration** — local AI, no API keys, fully private
+- Model selector: codellama, llama3, deepseek-coder, mistral, phi3, gemma2
+- Chat interface with code suggestions
+- Also supports **LM Studio** (OpenAI-compatible API)
+- Future: inline code completion (Copilot-style)
+
+### 🐛 Integrated Debugger
+- Debugger panel with 5 tabs: Watch, Locals, Call Stack, Breakpoints, Output
+- Toggle/Clear breakpoints from Run menu
+- Variable inspection with Name, Value, Type columns
+
+### 🌙 Dark Mode
+- Windows 10/11 dark title bars (DwmSetWindowAttribute)
+- Dark code editor (already default)
+- Dark documentation theme
+
+### 📋 Project Management
+- New Application / Open / Save projects (.hbp files)
+- Multi-form support (Form1, Form2, Form3...)
+- Project Inspector tree view
+- Project Options dialog (Harbour / C Compiler / Linker / Directories)
+- Editor Colors dialog with presets (Dark, Light, Monokai, Solarized)
+- Build & Run with F9
+
+---
+
+## 📸 Screenshots
 
 ![macOS](images/macos_now.png)
 
 ![Linux](images/linux_now.png)
 
-## Architecture
+---
 
-Harbour Builder uses a layered architecture that achieves native performance on each platform while keeping application code 100% portable.
-
-```
-+------------------------------------------------------+
-|                  Application Code                     |
-|            (test_design.prg, user apps)               |
-+------------------------------------------------------+
-|              xBase Command Layer                      |
-|  DEFINE FORM, @ GET, BUTTON, CHECKBOX, COMBOBOX ...   |
-|                (hbbuilder.ch)                          |
-+------------------------------------------------------+
-|             Harbour OOP Layer                         |
-|    TForm, TControl, TToolBar, TMenuPopup ...          |
-|                (classes.prg)                          |
-+------------------------------------------------------+
-|              HB_FUNC Bridge                           |
-|   UI_FormNew, UI_SetProp, UI_GetProp, UI_OnEvent ...  |
-|     Identical function signatures on all platforms     |
-+------------------------------------------------------+
-|            Native C/C++ Backend                       |
-|  Win32 (C++)  |  Cocoa (Obj-C)  |  GTK3 (C)          |
-|  hbide.h      |  cocoa_core.m   |  gtk3_core.c        |
-|  tform.cpp    |                 |                     |
-|  tcontrol.cpp |                 |                     |
-|  tcontrols.cpp|                 |                     |
-|  hbbridge.cpp |                 |                     |
-+------------------------------------------------------+
-|          Operating System                             |
-|  Win32 API    |  AppKit/NSView  |  GTK3/Cairo         |
-+------------------------------------------------------+
-```
-
-### Why this model is efficient
-
-1. **C++ core for raw speed**: Controls are created with native API calls (`CreateWindowEx`, `NSView`, `GtkWidget`). No intermediate abstraction layers at runtime. Property access is a direct C struct field read/write.
-
-2. **HB_FUNC bridge is the only boundary**: Each platform reimplements the same set of `HB_FUNC` exports. The Harbour VM calls directly into native code with zero marshalling overhead.
-
-3. **Harbour OOP is a thin wrapper**: The `TForm`, `TButton`, etc. classes in `classes.prg` are simple ACCESS/ASSIGN wrappers that call `UI_GetProp`/`UI_SetProp`. No data duplication -- the C++ object is the single source of truth.
-
-4. **xBase commands compile away**: The `#xcommand` preprocessor rules in `hbbuilder.ch` translate to method calls at compile time. Zero runtime cost.
-
-### Performance vs FiveWin
-
-| Test | FiveWin | Harbour Builder | Factor |
-|------|---------|-----------|--------|
-| Create 500 buttons | 0.243s | 0.001s | **243x** |
-| Set property 100K times | 24.86s | 0.07s | **355x** |
-
-## IDE Layout
-
-The visual designer follows the C++Builder paradigm with 4 independent top-level windows:
+## 🏗️ Architecture
 
 ```
-+== IDE Bar (top strip, full screen width) =========================+
-| File Edit Search View Project Run Component Tools Help            |
-| [New][Open][Save]|[Cut][Copy][Paste]| Standard | Additional | ... |
-| 1:1              Modified                             470 x 380  |
-+===================================================================+
-
-+- Object Inspector -+    +---- Form1 (design) ----+
-| [Form1 AS TForm  v]|    | . . . . . . . . . . .  |
-| Properties | Events|    | . . +--General---+ . .  |
-|---------------------|    | . . | Name: [...] . .  |
-| Caption    Form1    |    | . . +-----------+ . .  |
-| Height       380    |    | . . . . . . . . . . .  |
-| Width        470    |    +-------------------------+
-+---------------------+
+Application Code (.prg)
+  → xBase Commands (hbbuilder.ch — compile-time, zero cost)
+    → Harbour OOP (classes.prg — thin ACCESS/ASSIGN wrappers)
+      → HB_FUNC Bridge (identical interface on all platforms)
+        → Native Backend
+           ├── Win32 API (C++ — CreateWindowEx, GDI)
+           ├── Cocoa/AppKit (Objective-C — NSView, NSButton)
+           └── GTK3 (C — GtkWidget, GtkFixed, Cairo)
 ```
 
-- **IDE Bar**: Menu + speedbar + component palette (TabControl)
-- **Object Inspector**: ComboBox (all controls) + Properties/Events tabs + property grid
-- **Code Editor**: Dark theme (Consolas 15pt), syntax highlighting, line number gutter
-- **Design Form**: Independent floating window with grid dots and selection handles
+### Performance
 
-All 4 share one message loop via `TForm:Show()` (no loop) + `TForm:Activate()` (enters loop).
+| Benchmark | FiveWin | HarbourBuilder | Speedup |
+|-----------|---------|----------------|---------|
+| Create 500 buttons | 0.243s | 0.001s | **243×** |
+| Set property 100K× | 24.86s | 0.07s | **355×** |
 
-## File Structure
+---
 
-```
-cpp/
-  include/hbide.h       - All class declarations (TForm, TControl, TToolBar, etc.)
-  src/tcontrol.cpp       - TObject, TControl base (WndProc, events, properties)
-  src/tform.cpp          - TForm (design mode, grid, overlay, menu, toolbar)
-  src/tcontrols.cpp      - TLabel, TEdit, TButton, TCheckBox, TComboBox, TGroupBox,
-                           TToolBar, TComponentPalette
-  src/hbbridge.cpp       - HB_FUNC exports (Win32 backend)
-
-harbour/
-  classes.prg            - Harbour OOP wrappers (TForm, TControl, TToolBar, TMenuPopup)
-  hbbuilder.ch            - xBase #xcommand syntax (DEFINE FORM, @ GET, BUTTON, etc.)
-  inspector.prg          - Object Inspector (Win32 implementation)
-
-backends/
-  cocoa/cocoa_core.m     - macOS Cocoa/AppKit backend (same HB_FUNC interface)
-  gtk3/gtk3_core.c       - Linux GTK3 backend (same HB_FUNC interface)
-  console/backend.prg    - TUI console backend
-  web/backend.prg        - HTML5 Canvas backend
-
-samples/
-  hbbuilder_win.prg      - Windows IDE
-  hbbuilder_macos.prg    - macOS IDE: save/build/run projects
-  hbbuilder_linux.prg    - Linux IDE: save/build/run projects
-  test_design.prg        - Windows IDE (legacy, hardcoded positions)
-  build_cpp.bat          - Windows build script (BCC77C + Harbour)
-```
-
-## Adding a New Control
-
-1. Add `CT_MYCONTROL` constant to `hbide.h`
-2. Create `TMyControl` class in `tcontrols.cpp` (constructor, `CreateParams`, `GetPropDescs`)
-3. Add `UI_MyControlNew` bridge function in `hbbridge.cpp`
-4. Add `TMyControl` Harbour class in `classes.prg`
-5. Add `#xcommand` in `hbbuilder.ch`
-6. Implement in `cocoa_core.m` and `gtk3_core.c` with matching `HB_FUNC`
-
-## Build
+## 🚀 Quick Start
 
 ### Windows
-```
+```bash
 cd samples
-build_cpp.bat test_design
+build_cpp.bat hbbuilder_win
 ```
 
 ### macOS
-```
+```bash
 cd samples
 ./build_mac.sh
 ```
 
 ### Linux
-```
+```bash
 cd samples
 ./build_gtk.sh
 ```
+
+### Requirements
+- [Harbour 3.2](https://harbour.github.io/) compiler
+- Windows: [BCC 7.7](https://www.embarcadero.com/) (free) or MSVC
+- macOS: Xcode Command Line Tools
+- Linux: GCC + GTK3 dev (`apt install libgtk-3-dev`)
+
+---
+
+## 📚 Documentation
+
+Professional HTML documentation with dark/light theme, Mermaid diagrams, and code examples:
+
+| Page | Description |
+|------|-------------|
+| [Overview](docs/en/index.html) | Introduction + architecture diagram |
+| [Quick Start](docs/en/quickstart.html) | 5-step getting started guide |
+| [Architecture](docs/en/architecture.html) | 5-layer arch + 7 Mermaid diagrams |
+| **Controls Reference** | |
+| [Standard](docs/en/controls-standard.html) | Label, Edit, Button, CheckBox... (11) |
+| [Additional](docs/en/controls-additional.html) | BitBtn, Image, Shape... (10) |
+| [Native](docs/en/controls-native.html) | TreeView, ListView, DatePicker... (9) |
+| [Data Access](docs/en/controls-database.html) | MySQL, PostgreSQL, SQLite... (9) |
+| [Data Controls](docs/en/controls-datacontrols.html) | TBrowse, DBGrid, DBNavigator... (8) |
+| [Internet](docs/en/controls-internet.html) | WebServer, WebSocket, TCP... (9) |
+| [Threading](docs/en/controls-threading.html) | Thread, Mutex, Channel... (8) |
+| [AI](docs/en/controls-ai.html) | OpenAI, Ollama, Transformer... (7) |
+| [ERP](docs/en/controls-erp.html) | Report, Barcode, PDF... (12) |
+
+---
+
+## 📖 Tutorials
+
+| Tutorial | What you'll build |
+|----------|-------------------|
+| [Hello World](docs/en/tutorial-hello.html) | Your first form with a button |
+| [Working with Forms](docs/en/tutorial-forms.html) | Multi-form app with ShowModal |
+| [Event Handling](docs/en/tutorial-events.html) | OnClick, OnChange, OnKeyDown |
+| [Database CRUD](docs/en/tutorial-database.html) | SQLite + TBrowse data browser |
+| [Web Server](docs/en/tutorial-webserver.html) | TODO app with TWebServer |
+| [AI Integration](docs/en/tutorial-ai.html) | Ollama chat + Transformer |
+
+### Transformer Examples
+
+7 didactic examples in `samples/projects/transformer/`:
+- **attention_visualizer.prg** — Attention weight heatmap
+- **text_generator.prg** — Autoregressive generation with temperature
+- **train_from_scratch.prg** — Training loop with loss curve
+- **tokenizer_explorer.prg** — Interactive BPE tokenization
+- **attention_is_all_you_need.prg** — Full paper walkthrough
+- **sentiment_analyzer.prg** — BERT-style classification
+- **translator_demo.prg** — Encoder-decoder translation
+
+---
+
+## 🖥️ Platforms
+
+| Platform | Backend | Status |
+|----------|---------|--------|
+| **Windows** | Win32 API (C++) | ✅ Full IDE |
+| **macOS** | Cocoa/AppKit (Objective-C) | ✅ Full IDE |
+| **Linux** | GTK3 (C) | ✅ Full IDE |
+| **Android** | NDK + JNI | 🔮 Planned |
+| **iOS** | UIKit (Objective-C) | 🔮 Planned |
+
+---
+
+## 📁 Project Structure
+
+```
+HarbourBuilder/
+├── cpp/                          # Windows C++ core
+│   ├── include/hbide.h           # 109 CT_ defines + class declarations
+│   └── src/                      # tcontrol, tform, tcontrols, hbbridge
+├── backends/
+│   ├── cocoa/cocoa_core.m        # macOS (137K, 4000+ lines)
+│   ├── gtk3/gtk3_core.c          # Linux (128K, 3500+ lines)
+│   ├── console/backend.prg       # TUI console backend
+│   └── web/backend.prg           # HTML5 Canvas backend
+├── harbour/
+│   ├── classes.prg               # TForm, TControl OOP wrappers
+│   ├── hbbuilder.ch              # xBase #xcommand syntax
+│   └── inspector.prg             # Object Inspector (Win32)
+├── samples/
+│   ├── hbbuilder_win.prg         # Windows IDE (full)
+│   ├── hbbuilder_macos.prg       # macOS IDE
+│   ├── hbbuilder_linux.prg       # Linux IDE
+│   ├── build_cpp.bat             # Windows build script
+│   └── projects/transformer/     # 7 AI examples
+├── docs/
+│   ├── assets/css/docs.css       # DeepWiki-style theme
+│   ├── assets/js/docs.js         # Search, theme, copy code
+│   └── en/                       # 20 HTML pages
+└── resources/
+    ├── toolbar.bmp               # Toolbar icons
+    ├── palette.bmp               # Palette icons
+    └── harbour_logo.png          # About dialog logo
+```
+
+---
+
+## 🤝 Contributing
+
+HarbourBuilder is open source and welcomes contributions:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-control`)
+3. Implement for **all 3 platforms** (Win32 + Cocoa + GTK3)
+4. Add documentation in `docs/en/`
+5. Submit a Pull Request
+
+### Adding a New Control
+
+1. Add `CT_MYCONTROL` to `hbide.h` (and both backends)
+2. Create class in `tcontrols.cpp` (constructor + `CreateParams`)
+3. Add `HB_FUNC(UI_MyControlNew)` in `hbbridge.cpp`
+4. Add widget creation in `cocoa_core.m` and `gtk3_core.c`
+5. Add to palette in all 3 IDE `.prg` files
+6. Add events in `UI_GETALLEVENTS`
+7. Document in `docs/en/`
+
+---
+
+## ⚡ Built with Claude Code
+
+This entire framework — from the C++ core and native backends to the Harbour OOP layer, visual designer, AI assistant, and 20-page documentation — was **vibe coded 100% using [Claude Code](https://claude.ai/claude-code)**.
+
+A new paradigm in software development.
+
+---
+
+## 📄 License
+
+MIT License — free for personal and commercial use.
+
+---
+
+<div align="center">
+
+**⭐ Star this repo if you believe in the future of Harbour development!**
+
+Made with ❤️ by [Antonio Linares](https://github.com/AntoninoLinares) and [Claude Code](https://claude.ai/claude-code)
+
+</div>
