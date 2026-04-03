@@ -2047,6 +2047,7 @@ HB_FUNC( W32_SAVEFILEDIALOG )
 /* Forms selection dialog - result stored here by WndProc */
 static int s_formsSel = 0;
 static HWND s_formsListBox = NULL;
+static BOOL s_formsDlgDone = FALSE;
 
 static LRESULT CALLBACK FormsDlgProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 {
@@ -2062,11 +2063,13 @@ static LRESULT CALLBACK FormsDlgProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                int sel = (int) SendMessage( s_formsListBox, LB_GETCURSEL, 0, 0 );
                s_formsSel = ( sel != LB_ERR ) ? sel + 1 : 0;
             }
+            s_formsDlgDone = TRUE;
             PostMessage( hWnd, WM_CLOSE, 0, 0 );
             return 0;
          }
          if( wId == IDCANCEL ) {
             s_formsSel = 0;
+            s_formsDlgDone = TRUE;
             PostMessage( hWnd, WM_CLOSE, 0, 0 );
             return 0;
          }
@@ -2079,9 +2082,7 @@ static LRESULT CALLBACK FormsDlgProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM
          DestroyWindow( hWnd );
          return 0;
       }
-      case WM_DESTROY:
-         PostQuitMessage( 0 );
-         return 0;
+      /* NO PostQuitMessage - that would kill the IDE's message loop! */
    }
    return DefWindowProc( hWnd, msg, wParam, lParam );
 }
@@ -2153,9 +2154,10 @@ HB_FUNC( W32_SELECTFROMLIST )
    }
    SendMessage( hList, LB_SETCURSEL, 0, 0 );
 
-   /* Modal loop */
+   /* Modal loop - uses flag instead of PostQuitMessage */
+   s_formsDlgDone = FALSE;
    EnableWindow( hOwner, FALSE );
-   while( GetMessage( &msg, NULL, 0, 0 ) > 0 )
+   while( !s_formsDlgDone && GetMessage( &msg, NULL, 0, 0 ) > 0 )
    {
       TranslateMessage( &msg );
       DispatchMessage( &msg );
