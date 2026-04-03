@@ -41,9 +41,12 @@ function Main()
    // Check if Harbour and BCC are installed
    CheckHarbourInstall()
 
-   // Auto-generate palette icons if they don't exist yet
+   // Auto-generate icons if they don't exist yet
    if ! File( HB_DirBase() + "..\resources\palette_new.bmp" )
-      W32_GeneratePaletteIcons( .T. )  // silent mode
+      W32_GeneratePaletteIcons( .T. )
+   endif
+   if ! File( HB_DirBase() + "..\resources\toolbar_new.bmp" )
+      W32_GenerateToolbarIcons( .T. )
    endif
 
    nScreenW := W32_GetScreenWidth()
@@ -133,7 +136,7 @@ function Main()
    MENUITEM "&Editor Colors..." OF oTools ACTION ShowEditorSettings()
    MENUITEM "&Environment Options..." OF oTools ACTION MsgInfo( "Options" )
    MENUSEPARATOR OF oTools
-   MENUITEM "&Generate Palette Icons" OF oTools ACTION W32_GeneratePaletteIcons( .F. )
+   MENUITEM "&Generate Palette Icons" OF oTools ACTION ( W32_GeneratePaletteIcons( .F. ), W32_GenerateToolbarIcons( .F. ) )
    MENUSEPARATOR OF oTools
    MENUITEM "&AI Assistant..."        OF oTools ACTION ShowAIAssistant()
 
@@ -2785,6 +2788,74 @@ HB_FUNC( W32_GENERATEPALETTEICONS )
    } else {
       if( !hb_parl(1) )
          MessageBoxA(NULL,"Error creating file!","Error",MB_OK|MB_ICONERROR);
+   }
+   SelectObject(hM,hO); DeleteObject(hB); DeleteDC(hM); ReleaseDC(NULL,hS);
+}
+
+/* ======================================================================
+ * Toolbar Icon Generator - generates toolbar_new.bmp from Lazarus PNGs
+ * ====================================================================== */
+
+HB_FUNC( W32_GENERATETOOLBARICONS )
+{
+   /* 9 toolbar buttons: New, Open, Save, Cut, Copy, Paste, Undo, Redo, Run */
+   static const char * tbPngs[] = {
+      "menu_new", "menu_project_open", "menu_project_save",
+      "laz_cut", "laz_copy", "laz_paste",
+      "menu_undo", "menu_redo", "menu_build_run_file"
+   };
+   int nBtns = 9, tw = nBtns * 32, i, rb, ds;
+   HDC hS, hM; HBITMAP hB, hO; void * pB;
+   BITMAPFILEHEADER bf; BITMAPINFOHEADER bi;
+   FILE * fp; char szPath[MAX_PATH], szBase[MAX_PATH];
+
+   EnsureGdiPlus();
+
+   hS = GetDC(NULL); hM = CreateCompatibleDC(hS);
+   memset(&bi,0,sizeof(bi)); bi.biSize=sizeof(bi); bi.biWidth=tw; bi.biHeight=32;
+   bi.biPlanes=1; bi.biBitCount=24;
+   hB = CreateDIBSection(hM,(BITMAPINFO*)&bi,DIB_RGB_COLORS,&pB,NULL,0);
+   hO = (HBITMAP)SelectObject(hM,hB);
+
+   /* Fill with magenta (transparency key) */
+   { RECT r={0,0,tw,32}; HBRUSH b=CreateSolidBrush(RGB(255,0,255));
+     FillRect(hM,&r,b); DeleteObject(b); }
+
+   /* Get base path */
+   GetModuleFileNameA(NULL, szBase, MAX_PATH);
+   { char*p=strrchr(szBase,'\\'); if(p)*p=0; }
+   { char*p=strrchr(szBase,'\\'); if(p)*p=0; }
+
+   for(i=0;i<nBtns;i++) {
+      WCHAR wPath[MAX_PATH]; GpImage * pImg = NULL;
+      sprintf(szPath,"%s\\resources\\lazarus_icons\\%s.png",szBase,tbPngs[i]);
+      MultiByteToWideChar(CP_ACP,0,szPath,-1,wPath,MAX_PATH);
+      if( GdipLoadImageFromFile(wPath,&pImg) == 0 && pImg ) {
+         GpGraphics * gfx = NULL;
+         GdipCreateFromHDC(hM, &gfx);
+         if( gfx ) {
+            /* Scale 16x16 PNG to 28x28, centered in 32x32 cell */
+            GdipDrawImageRectI(gfx, pImg, i*32+2, 2, 28, 28);
+            GdipDeleteGraphics(gfx);
+         }
+         GdipDisposeImage(pImg);
+      }
+   }
+
+   rb=((tw*3+3)&~3); ds=rb*32;
+   memset(&bf,0,sizeof(bf)); bf.bfType=0x4D42;
+   bf.bfSize=sizeof(bf)+sizeof(bi)+ds; bf.bfOffBits=sizeof(bf)+sizeof(bi);
+
+   sprintf(szPath,"%s\\resources\\toolbar_new.bmp",szBase);
+   fp=fopen(szPath,"wb");
+   if(fp) {
+      fwrite(&bf,sizeof(bf),1,fp); fwrite(&bi,sizeof(bi),1,fp);
+      fwrite(pB,ds,1,fp); fclose(fp);
+      { FILE*fl=fopen("c:\\HarbourBuilder\\toolbar_gen_trace.log","a");
+        if(fl){fprintf(fl,"Generated: %s (%d icons)\n",szPath,nBtns);fclose(fl);} }
+      if( !hb_parl(1) )
+      { char msg[300]; sprintf(msg,"Generated: %s\n9 toolbar icons",szPath);
+        MessageBoxA(NULL,msg,"Toolbar Icons",MB_OK|MB_ICONINFORMATION); }
    }
    SelectObject(hM,hO); DeleteObject(hB); DeleteDC(hM); ReleaseDC(NULL,hS);
 }

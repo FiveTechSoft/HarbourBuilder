@@ -76,7 +76,10 @@
       "Bash(gh api:*)",
       "Bash(curl -s \"https://api.github.com/repos/fpc/Lazarus/contents/components/ideintf/images\")",
       "Bash(curl -s \"https://api.github.com/repos/fpc/Lazarus/contents/lcl/images\")",
-      "Bash(curl -s \"https://api.github.com/repos/fpc/Lazarus/contents/images/components\")"
+      "Bash(curl -s \"https://api.github.com/repos/fpc/Lazarus/contents/images/components\")",
+      "Bash(curl -s \"https://api.github.com/repos/fpc/Lazarus/contents/images/menu\")",
+      "Bash(curl -s \"https://api.github.com/repos/fpc/Lazarus/contents/images/general\")",
+      "Bash(curl -s \"https://api.github.com/repos/fpc/Lazarus/contents/images\")"
     ]
   }
 }
