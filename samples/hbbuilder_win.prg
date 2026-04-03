@@ -2645,8 +2645,29 @@ HB_FUNC( W32_PROJECTOPTIONSDIALOG )
 
 HB_FUNC( W32_GENERATEPALETTEICONS )
 {
+   #undef IC
+   #undef IS
    #define IC 109
    #define IS 32
+   /* Map each palette slot to a Lazarus icon filename (or NULL for fallback) */
+   static const char * pngNames[] = {
+      "tlabel","tedit","tbutton","tmemo","tcheckbox","tradiobutton","tlistbox","tcombobox",
+      "tgroupbox","tpanel","tscrollbar",
+      "tbitbtn","tspeedbutton","timage","tshape","tbevel","tmaskededit","tstringgrid",
+      "tscrollbox","tstatusbar","tlabel",
+      "ttabcontrol","ttreeview","tlistview","tprogressbar","trichmemo","ttrackbar",
+      "tupdown","tdatetimepicker","tcalendar",
+      "ttimer","tpaintbox",
+      "topendialog","tsavedialog","tfontdialog","tcolordialog","tfinddialog","treplacedialog",
+      NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,
+      "tdbgrid","tdbgrid","tdbnavigator","tdbtext","tdbedit","tdbcombobox","tdbcheckbox","tdbimage",
+      NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,
+      NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,
+      NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,
+      NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,
+      NULL,NULL,NULL,NULL,NULL,NULL,NULL,
+      NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL
+   };
    static const char * ab[] = {
       "A","ab","Btn","M","Ck","Rd","Ls","Cb","Gp","Pn","SB",
       "BB","Sp","Im","Sh","Bv","Mk","SG","SB","ST","LE",
@@ -2696,16 +2717,49 @@ HB_FUNC( W32_GENERATEPALETTEICONS )
    hF=CreateFontIndirectA(&lf); hOF=(HFONT)SelectObject(hM,hF);
    SetBkMode(hM,TRANSPARENT); SetTextColor(hM,RGB(255,255,255));
 
+   EnsureGdiPlus();
+
    for(i=0;i<IC;i++) {
       int x=i*IS; RECT ri={x+1,1,x+IS-1,IS-1}, rt={x+2,7,x+IS-2,IS-4};
-      COLORREF bg=cl[i]; int r=GetRValue(bg),g=GetGValue(bg),b=GetBValue(bg);
-      HBRUSH hBr; HPEN hP;
-      r=r>40?r-40:0; g=g>40?g-40:0; b=b>40?b-40:0;
-      hBr=CreateSolidBrush(bg); hP=CreatePen(PS_SOLID,1,RGB(r,g,b));
-      SelectObject(hM,hBr); SelectObject(hM,hP);
-      RoundRect(hM,ri.left,ri.top,ri.right,ri.bottom,6,6);
-      DeleteObject(hBr); DeleteObject(hP);
-      DrawTextA(hM,ab[i],-1,&rt,DT_CENTER|DT_VCENTER|DT_SINGLELINE);
+      BOOL bDrawn = FALSE;
+
+      /* Try to load Lazarus PNG icon */
+      if( i < (int)(sizeof(pngNames)/sizeof(pngNames[0])) && pngNames[i] )
+      {
+         char pngPath[MAX_PATH]; WCHAR wPath[MAX_PATH];
+         GpImage * pImg = NULL;
+         GetModuleFileNameA(NULL, pngPath, MAX_PATH);
+         { char*p=strrchr(pngPath,'\\'); if(p)*p=0; }
+         { char*p=strrchr(pngPath,'\\'); if(p)*p=0; }
+         lstrcatA(pngPath,"\\resources\\lazarus_icons\\");
+         lstrcatA(pngPath,pngNames[i]); lstrcatA(pngPath,".png");
+         MultiByteToWideChar(CP_ACP,0,pngPath,-1,wPath,MAX_PATH);
+         if( GdipLoadImageFromFile(wPath,&pImg) == 0 && pImg )
+         {
+            GpGraphics * gfx = NULL;
+            GdipCreateFromHDC(hM, &gfx);
+            if( gfx ) {
+               /* Draw PNG centered in 32x32 cell (PNG is 24x24) */
+               GdipDrawImageRectI(gfx, pImg, x+4, 4, 24, 24);
+               GdipDeleteGraphics(gfx);
+               bDrawn = TRUE;
+            }
+            GdipDisposeImage(pImg);
+         }
+      }
+
+      /* Fallback: colored rectangle with text */
+      if( !bDrawn )
+      {
+         COLORREF bg=cl[i]; int r=GetRValue(bg),g=GetGValue(bg),b=GetBValue(bg);
+         HBRUSH hBr; HPEN hP;
+         r=r>40?r-40:0; g=g>40?g-40:0; b=b>40?b-40:0;
+         hBr=CreateSolidBrush(bg); hP=CreatePen(PS_SOLID,1,RGB(r,g,b));
+         SelectObject(hM,hBr); SelectObject(hM,hP);
+         RoundRect(hM,ri.left,ri.top,ri.right,ri.bottom,6,6);
+         DeleteObject(hBr); DeleteObject(hP);
+         DrawTextA(hM,ab[i],-1,&rt,DT_CENTER|DT_VCENTER|DT_SINGLELINE);
+      }
    }
    SelectObject(hM,hOF); DeleteObject(hF);
 

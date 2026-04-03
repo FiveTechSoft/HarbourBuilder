@@ -71,7 +71,12 @@
       "Bash(echo \"EXIT: $?\")",
       "Bash(powershell -ExecutionPolicy Bypass -File c:\\\\HarbourBuilder\\\\screenshot.ps1)",
       "Bash(tasklist)",
-      "WebSearch"
+      "WebSearch",
+      "WebFetch(domain:gitlab.com)",
+      "Bash(gh api:*)",
+      "Bash(curl -s \"https://api.github.com/repos/fpc/Lazarus/contents/components/ideintf/images\")",
+      "Bash(curl -s \"https://api.github.com/repos/fpc/Lazarus/contents/lcl/images\")",
+      "Bash(curl -s \"https://api.github.com/repos/fpc/Lazarus/contents/images/components\")"
     ]
   }
 }
