@@ -743,6 +743,10 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
                /* Create the control via factory */
                {
                   TControl * newCtrl = CreateControlByType( (BYTE) ctrlType );
+                  { FILE*f=fopen("c:\\HarbourBuilder\\drop_trace.log","a");
+                    if(f){fprintf(f,"CreateControlByType(%d) -> %p text='%s' class='%s'\n",
+                      ctrlType, newCtrl, newCtrl?newCtrl->FText:"(null)",
+                      newCtrl?newCtrl->FClassName:"(null)");fclose(f);} }
                   if( newCtrl )
                   {
                      newCtrl->FLeft = rx1;
@@ -758,6 +762,9 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
                         DWORD dwStyle, dwExStyle;
                         const char * szClass;
                         newCtrl->CreateParams( &dwStyle, &dwExStyle, &szClass );
+                        { FILE*f=fopen("c:\\HarbourBuilder\\drop_trace.log","a");
+                          if(f){fprintf(f,"  CreateWindowEx: class='%s' text='%s' style=0x%08X\n",
+                            szClass, newCtrl->FText, dwStyle);fclose(f);} }
                         newCtrl->FHandle = CreateWindowExA( dwExStyle, szClass,
                            newCtrl->FText, dwStyle,
                            newCtrl->FLeft, newCtrl->FTop + FClientTop,

@@ -698,9 +698,11 @@ static void InsEndEdit( INSDATA * d, BOOL bApply )
          lstrcpynA( d->rows[nReal].szValue, szVal, sizeof(d->rows[0].szValue) );
          InsApplyValue( d, nReal, szVal );
       }
-      InsLog( "  -> calling InsRebuild" );
-      InsRebuild( d );
-      InsLog( "  -> InsRebuild done" );
+      /* Note: InsRebuild is NOT called here because pOnPropChanged
+         already triggers SyncDesignerToCode -> InspectorRefresh
+         which rebuilds the property list. Calling InsRebuild again
+         would operate on stale/invalid data and crash. */
+      InsLog( "  -> skipping InsRebuild (pOnPropChanged handles refresh)" );
    }
    InsLog( "  -> destroying edit control" );
    if( d->hBtn ) { HWND hb = d->hBtn; d->hBtn = NULL; DestroyWindow( hb ); }
