@@ -445,11 +445,20 @@ static LRESULT CALLBACK InsWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                      SendMessage( d->hEventList, LVM_DELETEITEM, j, 0 );
                      nTotal--;
                   }
-                  /* Mark as collapsed */
-                  lviCheck.mask = LVIF_PARAM;
-                  lviCheck.iItem = pe->iItem;
-                  lviCheck.lParam = 2;
-                  SendMessageA( d->hEventList, LVM_SETITEMA, 0, (LPARAM) &lviCheck );
+                  /* Mark as collapsed + change - to + in text */
+                  { char catText[80] = {0};
+                    LVITEMA lviText = {0};
+                    lviText.iItem = pe->iItem;
+                    lviText.pszText = catText;
+                    lviText.cchTextMax = 80;
+                    SendMessageA( d->hEventList, LVM_GETITEMTEXTA, pe->iItem, (LPARAM) &lviText );
+                    if( catText[1] == '-' ) catText[1] = '+';
+                    lviCheck.mask = LVIF_TEXT | LVIF_PARAM;
+                    lviCheck.iItem = pe->iItem;
+                    lviCheck.pszText = catText;
+                    lviCheck.lParam = 2;
+                    SendMessageA( d->hEventList, LVM_SETITEMA, 0, (LPARAM) &lviCheck );
+                  }
                }
                else if( lviCheck.lParam == 2 )
                {
@@ -1145,7 +1154,7 @@ static void InsAddEventCat( INSDATA * d, int nRow, const char * szCat )
 {
    LVITEMA lvi = {0};
    char buf[80];
-   sprintf( buf, " %s", szCat );  /* space + category name */
+   sprintf( buf, " -  %s", szCat );  /* same format as properties: " -  Category" */
    lvi.mask = LVIF_TEXT | LVIF_PARAM;
    lvi.iItem = nRow;
    lvi.iSubItem = 0;
@@ -1159,7 +1168,7 @@ static void InsAddEvent( INSDATA * d, int nRow, const char * szEvent )
 {
    LVITEMA lvi = {0};
    char buf[80];
-   sprintf( buf, "  %s", szEvent );  /* indent with 2 spaces */
+   sprintf( buf, "      %s", szEvent );  /* indent 6 spaces, same as properties */
    lvi.mask = LVIF_TEXT | LVIF_PARAM;
    lvi.iItem = nRow;
    lvi.iSubItem = 0;
