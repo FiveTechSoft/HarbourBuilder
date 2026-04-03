@@ -61,7 +61,13 @@
       "Bash(killall -9 UserApp)",
       "Bash(sleep 3 echo \"PID $! - Ahora prueba: drop button, dbl-click OnClick, escribe MsgInfo en el body, Run, click boton\")",
       "Bash(echo \"PID $! - Prueba ahora\")",
-      "Bash(killall -9 hbbuilder_linux UserApp)"
+      "Bash(killall -9 hbbuilder_linux UserApp)",
+      "Bash(find /c/HarbourBuilder -type f \\\\\\( -name \"*.prg\" -o -name \"*.ch\" -o -name \"*.cpp\" -o -name \"*.h\" -o -name \"*.c\" -o -name \"*.m\" -o -name \"*Makefile*\" -o -name \"*.mk\" -o -name \"*.sh\" -o -name \"*.bat\" \\\\\\) -exec ls -lh {} \\\\;)",
+      "Bash(sort -k2)",
+      "Bash(cmd:*)",
+      "Bash(taskkill //f //im hbbuilder_win.exe)",
+      "Bash(sed:*)",
+      "Bash(grep -v \"^$\"o tan)"
     ]
   }
 }
