@@ -128,6 +128,8 @@ function Main()
    MENUITEM "&Editor Colors..." OF oTools ACTION ShowEditorSettings()
    MENUITEM "&Environment Options..." OF oTools ACTION MsgInfo( "Options" )
    MENUSEPARATOR OF oTools
+   MENUITEM "&Generate Palette Icons" OF oTools ACTION W32_GeneratePaletteIcons()
+   MENUSEPARATOR OF oTools
    MENUITEM "&AI Assistant..."        OF oTools ACTION ShowAIAssistant()
 
    DEFINE POPUP oHelp PROMPT "&Help" OF oIDE
@@ -2628,6 +2630,98 @@ HB_FUNC( W32_PROJECTOPTIONSDIALOG )
          SendMessage(d.hDlg,WM_CLOSE,0,0); break; }
       TranslateMessage(&msg); DispatchMessage(&msg);
    }
+}
+
+/* ======================================================================
+ * Palette Icon Generator - generates palette_new.bmp from within IDE
+ * ====================================================================== */
+
+HB_FUNC( W32_GENERATEPALETTEICONS )
+{
+   #define IC 109
+   #define IS 32
+   static const char * ab[] = {
+      "A","ab","Btn","M","Ck","Rd","Ls","Cb","Gp","Pn","SB",
+      "BB","Sp","Im","Sh","Bv","Mk","SG","SB","ST","LE",
+      "Tb","TV","LV","PB","RE","TK","UD","DT","MC",
+      "Tm","Px","Op","Sv","Ft","Cl","Fn","Rp",
+      "DB","My","Mr","Pg","SL","Fb","MS","Or","Mg",
+      "Bw","DG","DN","DT","DE","DC","DK","DI",
+      "Pr","Rp","Lb","PP","PS","PD","RV","BP",
+      "Wb","WS","Wk","HT","FT","SM","TS","TC","UD",
+      "PP","Sc","Rp","BC","PD","XL","Au","Pm","Cu","Tx","Ds","Sh",
+      "Th","Mx","Se","CS","TP","At","CV","Ch",
+      "OA","Gm","Cl","DS","Gk","Ol","Tf",
+      "x","x","x","x","x","x","x","x","x","x","x","x"
+   };
+   static COLORREF cl[] = {
+      0xDB9834,0xDB9834,0xDB9834,0xDB9834,0xDB9834,0xDB9834,0xDB9834,0xDB9834,0xDB9834,0xDB9834,0xDB9834,
+      0xB6599B,0xB6599B,0xB6599B,0xB6599B,0xB6599B,0xB6599B,0xB6599B,0xB6599B,0xB6599B,0xB6599B,
+      0x71CC2E,0x71CC2E,0x71CC2E,0x71CC2E,0x71CC2E,0x71CC2E,0x71CC2E,0x71CC2E,0x71CC2E,
+      0x0FC4F1,0x0FC4F1,0x227EE6,0x227EE6,0x227EE6,0x227EE6,0x227EE6,0x227EE6,
+      0x3C4CE7,0x3C4CE7,0x3C4CE7,0x3C4CE7,0x3C4CE7,0x3C4CE7,0x3C4CE7,0x3C4CE7,0x3C4CE7,
+      0x2B39C0,0x2B39C0,0x2B39C0,0x2B39C0,0x2B39C0,0x2B39C0,0x2B39C0,0x2B39C0,
+      0x8D8C7F,0x8D8C7F,0x8D8C7F,0x8D8C7F,0x8D8C7F,0x8D8C7F,0x8D8C7F,0x8D8C7F,
+      0x9CBC1A,0x9CBC1A,0x9CBC1A,0x9CBC1A,0x9CBC1A,0x9CBC1A,0x9CBC1A,0x9CBC1A,0x9CBC1A,
+      0xAD448E,0xAD448E,0xAD448E,0xAD448E,0xAD448E,0xAD448E,0xAD448E,0xAD448E,0xAD448E,0xAD448E,0xAD448E,0xAD448E,
+      0x503E2C,0x503E2C,0x503E2C,0x503E2C,0x503E2C,0x503E2C,0x503E2C,0x503E2C,
+      0x129CF3,0x129CF3,0x129CF3,0x129CF3,0x129CF3,0x129CF3,0x129CF3,
+      0,0,0,0,0,0,0,0,0,0,0,0
+   };
+
+   int tw = IC * IS, i, rb, ds;
+   HDC hS, hM; HBITMAP hB, hO; void * pB;
+   BITMAPFILEHEADER bf; BITMAPINFOHEADER bi;
+   HFONT hF, hOF; LOGFONTA lf; FILE * fp;
+   char szPath[MAX_PATH];
+
+   hS = GetDC(NULL); hM = CreateCompatibleDC(hS);
+   memset(&bi,0,sizeof(bi)); bi.biSize=sizeof(bi); bi.biWidth=tw; bi.biHeight=IS;
+   bi.biPlanes=1; bi.biBitCount=24;
+   hB = CreateDIBSection(hM,(BITMAPINFO*)&bi,DIB_RGB_COLORS,&pB,NULL,0);
+   hO = (HBITMAP)SelectObject(hM,hB);
+
+   { RECT r={0,0,tw,IS}; HBRUSH b=CreateSolidBrush(RGB(255,0,255));
+     FillRect(hM,&r,b); DeleteObject(b); }
+
+   memset(&lf,0,sizeof(lf)); lf.lfHeight=-11; lf.lfWeight=FW_BOLD;
+   lf.lfCharSet=DEFAULT_CHARSET; lstrcpyA(lf.lfFaceName,"Segoe UI");
+   hF=CreateFontIndirectA(&lf); hOF=(HFONT)SelectObject(hM,hF);
+   SetBkMode(hM,TRANSPARENT); SetTextColor(hM,RGB(255,255,255));
+
+   for(i=0;i<IC;i++) {
+      int x=i*IS; RECT ri={x+1,1,x+IS-1,IS-1}, rt={x+2,7,x+IS-2,IS-4};
+      COLORREF bg=cl[i]; int r=GetRValue(bg),g=GetGValue(bg),b=GetBValue(bg);
+      HBRUSH hBr; HPEN hP;
+      r=r>40?r-40:0; g=g>40?g-40:0; b=b>40?b-40:0;
+      hBr=CreateSolidBrush(bg); hP=CreatePen(PS_SOLID,1,RGB(r,g,b));
+      SelectObject(hM,hBr); SelectObject(hM,hP);
+      RoundRect(hM,ri.left,ri.top,ri.right,ri.bottom,6,6);
+      DeleteObject(hBr); DeleteObject(hP);
+      DrawTextA(hM,ab[i],-1,&rt,DT_CENTER|DT_VCENTER|DT_SINGLELINE);
+   }
+   SelectObject(hM,hOF); DeleteObject(hF);
+
+   rb=((tw*3+3)&~3); ds=rb*IS;
+   memset(&bf,0,sizeof(bf)); bf.bfType=0x4D42;
+   bf.bfSize=sizeof(bf)+sizeof(bi)+ds; bf.bfOffBits=sizeof(bf)+sizeof(bi);
+
+   GetModuleFileNameA(NULL,szPath,MAX_PATH);
+   { char*p=strrchr(szPath,'\\'); if(p)*p=0; }
+   { char*p=strrchr(szPath,'\\'); if(p)*p=0; } /* up to project root */
+   lstrcatA(szPath,"\\resources\\palette_new.bmp");
+
+   fp=fopen(szPath,"wb");
+   if(fp) {
+      fwrite(&bf,sizeof(bf),1,fp); fwrite(&bi,sizeof(bi),1,fp);
+      fwrite(pB,ds,1,fp); fclose(fp);
+      { char msg[300]; sprintf(msg,"Generated: %s\n\n%d icons, %dx%d pixels\n\nRename to palette.bmp to use.",
+         szPath,IC,IS,IS);
+        MessageBoxA(NULL,msg,"Palette Icons Generated",MB_OK|MB_ICONINFORMATION); }
+   } else {
+      MessageBoxA(NULL,"Error creating file!","Error",MB_OK|MB_ICONERROR);
+   }
+   SelectObject(hM,hO); DeleteObject(hB); DeleteDC(hM); ReleaseDC(NULL,hS);
 }
 
 /* ======================================================================
