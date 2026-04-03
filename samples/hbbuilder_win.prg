@@ -1038,7 +1038,7 @@ static function MenuViewForms()
       AAdd( aNames, aForms[i][1] )
    next
 
-   nSel := W32_SelectFromList( "View Forms", aNames )
+   nSel := W32_SelectFromList( "Select a form", aNames )
    if nSel > 0
       SwitchToForm( nSel )
    endif
@@ -2026,13 +2026,57 @@ HB_FUNC( W32_SAVEFILEDIALOG )
 }
 
 /* W32_SelectFromList( cTitle, aItems ) --> nSelection (1-based) or 0 */
+/* Forms selection dialog - result stored here by WndProc */
+static int s_formsSel = 0;
+static HWND s_formsListBox = NULL;
+
+static LRESULT CALLBACK FormsDlgProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
+{
+   switch( msg )
+   {
+      case WM_COMMAND:
+      {
+         WORD wId = LOWORD(wParam);
+         WORD wNotify = HIWORD(wParam);
+         if( wId == IDOK || ( wId == 100 && wNotify == LBN_DBLCLK ) )
+         {
+            if( s_formsListBox ) {
+               int sel = (int) SendMessage( s_formsListBox, LB_GETCURSEL, 0, 0 );
+               s_formsSel = ( sel != LB_ERR ) ? sel + 1 : 0;
+            }
+            PostMessage( hWnd, WM_CLOSE, 0, 0 );
+            return 0;
+         }
+         if( wId == IDCANCEL ) {
+            s_formsSel = 0;
+            PostMessage( hWnd, WM_CLOSE, 0, 0 );
+            return 0;
+         }
+         break;
+      }
+      case WM_CLOSE:
+      {
+         HWND hOwner = GetWindow( hWnd, GW_OWNER );
+         if( hOwner ) EnableWindow( hOwner, TRUE );
+         DestroyWindow( hWnd );
+         return 0;
+      }
+      case WM_DESTROY:
+         PostQuitMessage( 0 );
+         return 0;
+   }
+   return DefWindowProc( hWnd, msg, wParam, lParam );
+}
+
 HB_FUNC( W32_SELECTFROMLIST )
 {
+   static BOOL bReg = FALSE;
+   WNDCLASSA wc = {0};
    PHB_ITEM pArray = hb_param( 2, HB_IT_ARRAY );
-   int nCount, i, nSel = 0;
-   HWND hDlg, hList;
+   int nCount, i;
+   HWND hDlg, hList, hBtnOK, hBtnCancel, hOwner;
+   HFONT hFont;
    MSG msg;
-   RECT rcOwner;
    int dlgW = 300, dlgH = 350;
    int x, y;
 
@@ -2040,38 +2084,49 @@ HB_FUNC( W32_SELECTFROMLIST )
    nCount = (int) hb_arrayLen( pArray );
    if( nCount == 0 ) { hb_retni(0); return; }
 
-   /* Center dialog on screen */
+   s_formsSel = 0;
+
+   if( !bReg ) {
+      wc.lpfnWndProc = FormsDlgProc;
+      wc.hInstance = GetModuleHandle(NULL);
+      wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+      wc.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
+      wc.lpszClassName = "HbFormsDlg";
+      RegisterClassA( &wc );
+      bReg = TRUE;
+   }
+
+   hOwner = GetActiveWindow();
    x = ( GetSystemMetrics(SM_CXSCREEN) - dlgW ) / 2;
    y = ( GetSystemMetrics(SM_CYSCREEN) - dlgH ) / 2;
 
    hDlg = CreateWindowExA( WS_EX_DLGMODALFRAME | WS_EX_TOPMOST,
-      "STATIC", hb_parc(1),
+      "HbFormsDlg", HB_ISCHAR(1) ? hb_parc(1) : "Select",
       WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
       x, y, dlgW, dlgH,
-      GetActiveWindow(), NULL, GetModuleHandle(NULL), NULL );
+      hOwner, NULL, GetModuleHandle(NULL), NULL );
+
+   hFont = (HFONT) GetStockObject( DEFAULT_GUI_FONT );
 
    hList = CreateWindowExA( WS_EX_CLIENTEDGE, "LISTBOX", NULL,
       WS_CHILD | WS_VISIBLE | WS_VSCROLL | LBS_NOTIFY,
       10, 10, dlgW - 30, dlgH - 90,
       hDlg, (HMENU)100, GetModuleHandle(NULL), NULL );
+   SendMessage( hList, WM_SETFONT, (WPARAM) hFont, TRUE );
+   s_formsListBox = hList;
 
-   CreateWindowExA( 0, "BUTTON", "OK",
+   hBtnOK = CreateWindowExA( 0, "BUTTON", "OK",
       WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
       dlgW/2 - 90, dlgH - 70, 80, 28,
       hDlg, (HMENU)IDOK, GetModuleHandle(NULL), NULL );
+   SendMessage( hBtnOK, WM_SETFONT, (WPARAM) hFont, TRUE );
 
-   CreateWindowExA( 0, "BUTTON", "Cancel",
+   hBtnCancel = CreateWindowExA( 0, "BUTTON", "Cancel",
       WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
       dlgW/2, dlgH - 70, 80, 28,
       hDlg, (HMENU)IDCANCEL, GetModuleHandle(NULL), NULL );
+   SendMessage( hBtnCancel, WM_SETFONT, (WPARAM) hFont, TRUE );
 
-   /* Set font */
-   {
-      HFONT hFont = (HFONT) GetStockObject( DEFAULT_GUI_FONT );
-      SendMessage( hList, WM_SETFONT, (WPARAM) hFont, TRUE );
-   }
-
-   /* Populate list */
    for( i = 0; i < nCount; i++ )
    {
       PHB_ITEM pItem = hb_arrayGetItemPtr( pArray, i + 1 );
@@ -2080,42 +2135,17 @@ HB_FUNC( W32_SELECTFROMLIST )
    }
    SendMessage( hList, LB_SETCURSEL, 0, 0 );
 
-   /* Simple modal loop */
-   { HWND hOwner = GetWindow(hDlg, GW_OWNER);
-     if( hOwner ) EnableWindow( hOwner, FALSE );
-
-     while( IsWindow(hDlg) && GetMessage( &msg, NULL, 0, 0 ) )
-     {
-        if( msg.message == WM_KEYDOWN && msg.wParam == VK_ESCAPE )
-           break;
-
-        /* WM_SYSCOMMAND SC_CLOSE = user clicked X button */
-        if( msg.message == WM_SYSCOMMAND && (msg.wParam & 0xFFF0) == SC_CLOSE )
-           break;
-
-        if( msg.message == WM_COMMAND )
-        {
-           WORD wId = LOWORD(msg.wParam);
-           WORD wNotify = HIWORD(msg.wParam);
-
-           if( wId == IDOK || ( wId == 100 && wNotify == LBN_DBLCLK ) )
-           {
-              nSel = (int) SendMessage( hList, LB_GETCURSEL, 0, 0 );
-              nSel = ( nSel != LB_ERR ) ? nSel + 1 : 0;
-              break;
-           }
-           if( wId == IDCANCEL )
-              break;
-        }
-
-        TranslateMessage( &msg );
-        DispatchMessage( &msg );
-     }
-     if( hOwner ) EnableWindow( hOwner, TRUE );
-     if( IsWindow(hDlg) ) DestroyWindow( hDlg );
+   /* Modal loop */
+   EnableWindow( hOwner, FALSE );
+   while( GetMessage( &msg, NULL, 0, 0 ) > 0 )
+   {
+      TranslateMessage( &msg );
+      DispatchMessage( &msg );
    }
+   /* hOwner re-enabled by WM_CLOSE handler */
 
-   hb_retni( nSel );
+   s_formsListBox = NULL;
+   hb_retni( s_formsSel );
 }
 
 /* W32_ShellExec( cCommand ) --> cOutput */
