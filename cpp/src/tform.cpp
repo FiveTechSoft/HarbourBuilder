@@ -415,8 +415,21 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
             SendMessage( FStatusBar, WM_SIZE, 0, 0 );
          if( FDesignMode )
             UpdateOverlay();
-         /* Fire OnResize for both design and runtime mode */
-         FireEvent( FOnResize );
+         /* Debounce: use a timer to avoid flashing during continuous move/resize */
+         if( FDesignMode )
+            SetTimer( FHandle, 9999, 100, NULL );  /* 100ms debounce */
+         else
+            FireEvent( FOnResize );
+         break;
+      }
+
+      case WM_TIMER:
+      {
+         if( wParam == 9999 )
+         {
+            KillTimer( FHandle, 9999 );
+            FireEvent( FOnResize );
+         }
          break;
       }
 
