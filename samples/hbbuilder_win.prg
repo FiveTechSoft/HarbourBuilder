@@ -76,7 +76,7 @@ function Main()
    nEditorX := nInsW - 5
    nEditorW := nScreenW - nEditorX
    // Both inspector and editor end at same bottom position
-   nBottomY := nScreenH                        // no bottom margin
+   nBottomY := W32_GetWorkAreaHeight()           // screen minus taskbar
    nEditorH := nBottomY - nEditorTop
 
    // Form Designer: centered in editor area, slightly above center
@@ -201,7 +201,7 @@ function Main()
    INS_SetOnEventDblClick( _InsGetData(), ;
       { |hCtrl, cEvent| OnEventDblClick( hCtrl, cEvent ) } )
    INS_SetOnPropChanged( _InsGetData(), { || SyncDesignerToCode() } )
-   INS_SetPos( _InsGetData(), 0, nInsTop, nInsW, nBottomY - nInsTop - 50 )
+   INS_SetPos( _InsGetData(), 0, nInsTop, nInsW, nBottomY - nInsTop )
 
    WireDesignForm()
 
@@ -1013,7 +1013,7 @@ static function MenuNewForm()
    nEditorTop := nInsTop
    nEditorX := nInsW - 5
    nEditorW := nScreenW - nEditorX
-   nEditorH := nScreenH - nEditorTop
+   nEditorH := W32_GetWorkAreaHeight() - nEditorTop
    nFormX := nEditorX + Int( ( nEditorW - 400 ) / 2 ) + Len(aForms) * 20
    nFormY := nEditorTop + Int( ( nEditorH - 300 ) * 0.35 ) + Len(aForms) * 20
 
@@ -1970,6 +1970,13 @@ HB_FUNC( W32_GETSCREENHEIGHT )
    hb_retni( GetSystemMetrics( SM_CYSCREEN ) );
 }
 
+HB_FUNC( W32_GETWORKAREAHEIGHT )
+{
+   RECT rc;
+   SystemParametersInfoA( SPI_GETWORKAREA, 0, &rc, 0 );
+   hb_retni( rc.bottom );
+}
+
 HB_FUNC( W32_GETWINDOWBOTTOM )
 {
    HWND hWnd = (HWND)(LONG_PTR) hb_parnint(1);
@@ -2477,11 +2484,12 @@ static HWND PO_AddCheck( HWND hParent, const char * text, int x, int y, BOOL che
 
 static void PO_HideAll( PROJOPTDATA * d )
 {
-   HWND all[] = { d->hHbDir, d->hHbFlags, d->hChkWarn, d->hChkDebug,
-      d->hCDir, d->hCFlags, d->hChkOpt,
-      d->hLinkFlags, d->hLibs,
-      d->hProjDir, d->hOutDir, d->hIncPaths, d->hLibPaths };
+   HWND all[13];
    int i;
+   all[0]=d->hHbDir; all[1]=d->hHbFlags; all[2]=d->hChkWarn; all[3]=d->hChkDebug;
+   all[4]=d->hCDir; all[5]=d->hCFlags; all[6]=d->hChkOpt;
+   all[7]=d->hLinkFlags; all[8]=d->hLibs;
+   all[9]=d->hProjDir; all[10]=d->hOutDir; all[11]=d->hIncPaths; all[12]=d->hLibPaths;
    for(i=0;i<13;i++) if(all[i]) ShowWindow(all[i],SW_HIDE);
    /* Hide all labels too */
    EnumChildWindows(d->hDlg, (WNDENUMPROC)NULL, 0); /* handled by ShowTab */
@@ -2712,7 +2720,9 @@ HB_FUNC( W32_GENERATEPALETTEICONS )
    hB = CreateDIBSection(hM,(BITMAPINFO*)&bi,DIB_RGB_COLORS,&pB,NULL,0);
    hO = (HBITMAP)SelectObject(hM,hB);
 
-   { RECT r={0,0,tw,IS}; HBRUSH b=CreateSolidBrush(RGB(255,0,255));
+   { RECT r; HBRUSH b;
+     r.left=0; r.top=0; r.right=tw; r.bottom=IS;
+     b=CreateSolidBrush(RGB(255,0,255));
      FillRect(hM,&r,b); DeleteObject(b); }
 
    memset(&lf,0,sizeof(lf)); lf.lfHeight=-11; lf.lfWeight=FW_BOLD;
@@ -2723,8 +2733,11 @@ HB_FUNC( W32_GENERATEPALETTEICONS )
    EnsureGdiPlus();
 
    for(i=0;i<IC;i++) {
-      int x=i*IS; RECT ri={x+1,1,x+IS-1,IS-1}, rt={x+2,7,x+IS-2,IS-4};
+      int x=i*IS;
+      RECT ri, rt;
       BOOL bDrawn = FALSE;
+      ri.left=x+1; ri.top=1; ri.right=x+IS-1; ri.bottom=IS-1;
+      rt.left=x+2; rt.top=7; rt.right=x+IS-2; rt.bottom=IS-4;
 
       /* Try to load Lazarus PNG icon */
       if( i < (int)(sizeof(pngNames)/sizeof(pngNames[0])) && pngNames[i] )
@@ -2818,7 +2831,9 @@ HB_FUNC( W32_GENERATETOOLBARICONS )
    hO = (HBITMAP)SelectObject(hM,hB);
 
    /* Fill with magenta (transparency key) */
-   { RECT r={0,0,tw,32}; HBRUSH b=CreateSolidBrush(RGB(255,0,255));
+   { RECT r; HBRUSH b;
+     r.left=0; r.top=0; r.right=tw; r.bottom=32;
+     b=CreateSolidBrush(RGB(255,0,255));
      FillRect(hM,&r,b); DeleteObject(b); }
 
    /* Get base path */
@@ -3017,20 +3032,144 @@ HB_FUNC( W32_ABOUTDIALOG )
 }
 
 /* ======================================================================
- * Code Editor - RichEdit with syntax highlighting and TABS
+ * Code Editor - Scintilla with syntax highlighting and TABS
  * ====================================================================== */
 
-#define GUTTER_WIDTH 45
-#define MAX_TABS     32
-#define TAB_HEIGHT   24
+#define MAX_TABS         32
+#define TAB_HEIGHT       24
+#define STATUSBAR_HEIGHT 22
+
+/* Scintilla message defines */
+#define SCI_SETTEXT        2181
+#define SCI_GETTEXT        2182
+#define SCI_GETTEXTLENGTH  2183
+#define SCI_ADDTEXT        2001
+#define SCI_CLEARALL       2004
+#define SCI_GETLENGTH      2006
+#define SCI_GETCURRENTPOS  2008
+#define SCI_SETSEL         2160
+#define SCI_GOTOPOS        2025
+#define SCI_GOTOLINE       2024
+#define SCI_SCROLLCARET    2169
+#define SCI_SETREADONLY     2171
+#define SCI_GETREADONLY     2173
+#define SCI_REPLACESEL     2170
+#define SCI_SEARCHNEXT     2367
+#define SCI_SEARCHPREV     2368
+#define SCI_SETTARGETSTART 2190
+#define SCI_SETTARGETEND   2192
+#define SCI_SEARCHINTARGET 2197
+#define SCI_REPLACETARGET  2194
+#define SCI_GETSELECTIONSTART 2143
+#define SCI_GETSELECTIONEND   2145
+#define SCI_SETSELECTIONSTART 2142
+#define SCI_SETSELECTIONEND   2144
+#define SCI_FINDTEXT       2150
+
+/* Lexer + Styles */
+#define SCI_SETILEXER      4033
+#define SCI_SETKEYWORDS    4005
+#define SCI_SETPROPERTY    4004
+#define SCI_STYLESETFORE   2051
+#define SCI_STYLESETBACK   2052
+#define SCI_STYLESETBOLD   2053
+#define SCI_STYLESETITALIC 2054
+#define SCI_STYLESETSIZE   2055
+#define SCI_STYLESETFONT   2056
+#define SCI_STYLECLEARALL  2050
+
+/* Margin */
+#define SCI_SETMARGINTYPEN   2240
+#define SCI_SETMARGINWIDTHN  2242
+#define SCI_SETMARGINSENSITIVEN 2246
+#define SC_MARGIN_NUMBER     1
+#define SC_MARGIN_SYMBOL     0
+
+/* Folding */
+#define SCI_SETFOLDFLAGS       2233
+#define SCI_SETMARGINMASKN     2244
+#define SCI_MARKERDEFINE       2040
+#define SCI_SETAUTOMATICFOLD   2663
+#define SC_AUTOMATICFOLD_SHOW  0x01
+#define SC_AUTOMATICFOLD_CLICK 0x02
+#define SC_AUTOMATICFOLD_CHANGE 0x04
+#define SC_FOLDLEVELBASE       0x400
+#define SC_FOLDLEVELHEADERFLAG 0x2000
+#define SC_MARKNUM_FOLDEROPEN  31
+#define SC_MARKNUM_FOLDER      30
+#define SC_MARKNUM_FOLDERSUB   29
+#define SC_MARKNUM_FOLDERTAIL  28
+#define SC_MARKNUM_FOLDEREND   25
+#define SC_MARKNUM_FOLDEROPENMID 26
+#define SC_MARKNUM_FOLDERMIDTAIL 27
+#define SC_MARK_BOXPLUS         12
+#define SC_MARK_BOXMINUS        14
+#define SC_MARK_VLINE           9
+#define SC_MARK_LCORNER         10
+#define SC_MARK_BOXPLUSCONNECTED  13
+#define SC_MARK_BOXMINUSCONNECTED 15
+#define SC_MARK_TCORNER         11
+#define SC_MASK_FOLDERS          0xFE000000
+
+/* Misc */
+#define SCI_SETTABWIDTH        2036
+#define SCI_SETINDENTATIONGUIDES 2132
+#define SC_IV_LOOKBOTH           3
+#define SCI_SETVIEWEOL         2356
+#define SCI_SETWRAPMODE        2268
+#define SCI_SETSELEOLFILLED    2477
+#define SCI_SETCARETFORE       2069
+#define SCI_SETSELBACK         2068
+#define SCI_SETWHITESPACEFORE  2084
+#define SCI_SETWHITESPACEBACK  2085
+#define SCI_SETEXTRAASCENT     2525
+#define SCI_SETEXTRADESCENT    2527
+#define SCI_EMPTYUNDOBUFFER    2175
+#define SCI_SETUNDOCOLLECTION  2012
+#define SCI_SETSAVEPOINT       2014
+#define SCI_SETFOCUS           2380
+#define SCI_GETCURLINE         2027
+#define SCI_LINEFROMPOSITION   2166
+#define SCI_POSITIONFROMLINE   2167
+#define SCI_GETLINECOUNT       2154
+#define SCI_GETLINE            2153
+#define SCI_LINELENGTH         2350
+#define SCI_SETCODEPAGE        2037
+#define SC_CP_UTF8             65001
+#define STYLE_DEFAULT          32
+#define STYLE_LINENUMBER       33
+
+/* C/C++ lexer style IDs (used for Harbour too) */
+#define SCE_C_DEFAULT          0
+#define SCE_C_COMMENT          1
+#define SCE_C_COMMENTLINE      2
+#define SCE_C_COMMENTDOC       3
+#define SCE_C_NUMBER           4
+#define SCE_C_WORD             5
+#define SCE_C_STRING           6
+#define SCE_C_CHARACTER        7
+#define SCE_C_PREPROCESSOR     9
+#define SCE_C_OPERATOR         10
+#define SCE_C_IDENTIFIER       11
+#define SCE_C_WORD2            16
+#define SCE_C_GLOBALCLASS      19
+#define SCE_C_PREPROCESSORCOMMENT 23
+
+/* Scintilla DLL function types */
+typedef void * ILexer5;
+typedef ILexer5 * (__stdcall * CreateLexerFn)(const char * name);
+
+static HMODULE s_hScintilla = NULL;
+static HMODULE s_hLexilla   = NULL;
+static CreateLexerFn s_pCreateLexer = NULL;
+
+/* Send message to Scintilla */
+#define SciMsg(hwnd, msg, wp, lp) SendMessage((hwnd), (msg), (WPARAM)(wp), (LPARAM)(lp))
 
 typedef struct {
    HWND hWnd;       /* Tool window */
-   HWND hEdit;      /* RichEdit control */
-   HWND hGutter;    /* Line number gutter */
+   HWND hEdit;      /* Scintilla control */
    HWND hTab;       /* Tab control */
-   HFONT hFont;     /* Monospace font */
-   WNDPROC oldEditProc;  /* Original RichEdit WndProc */
    /* Tab management */
    int nTabs;
    int nActiveTab;  /* 0-based */
@@ -3044,202 +3183,342 @@ typedef struct {
    HWND hReplaceEdit; /* Replace text input */
    BOOL bFindVisible;
    BOOL bReplaceVisible;
+   /* Status bar */
+   HWND hStatusBar;   /* Status bar at bottom */
 } CODEEDITOR;
 
-static void GutterPaint( CODEEDITOR * ed );
-static void GutterSync( CODEEDITOR * ed );
 static void SwitchTab( CODEEDITOR * ed, int nNewTab );
 
-/* Harbour/xBase keywords for syntax highlighting */
-static const char * s_keywords[] = {
-   "function", "procedure", "return", "local", "static", "private", "public",
-   "if", "else", "elseif", "endif", "do", "while", "enddo", "for", "next", "to", "step",
-   "switch", "case", "otherwise", "endswitch", "endcase",
-   "class", "endclass", "method", "data", "access", "assign", "inherit", "inline",
-   "nil", "self", "begin", "end", "exit", "loop", "with",
-   NULL
-};
-
-/* xBase commands (uppercase) */
-static const char * s_commands[] = {
-   "DEFINE", "ACTIVATE", "FORM", "TITLE", "SIZE", "FONT", "SIZABLE", "APPBAR", "TOOLWINDOW",
-   "CENTERED", "SAY", "GET", "BUTTON", "PROMPT", "CHECKBOX", "COMBOBOX", "GROUPBOX",
-   "ITEMS", "CHECKED", "DEFAULT", "CANCEL", "OF", "VAR", "ACTION",
-   "TOOLBAR", "SEPARATOR", "TOOLTIP", "MENUBAR", "POPUP", "MENUITEM", "MENUSEPARATOR",
-   "PALETTE", "REQUEST", "ACCEL",
-   NULL
-};
-
-static int IsWordChar( char c )
+/* Initialize Scintilla DLLs */
+static BOOL InitScintilla( void )
 {
-   return ( c >= 'A' && c <= 'Z' ) || ( c >= 'a' && c <= 'z' ) ||
-          ( c >= '0' && c <= '9' ) || c == '_';
-}
+   char szPath[MAX_PATH];
+   FILE * fLog;
 
-static int IsKeyword( const char * word, int len )
-{
-   int i;
-   char buf[64];
-   if( len <= 0 || len >= 63 ) return 0;
-   for( i = 0; i < len; i++ ) buf[i] = (char)tolower( (unsigned char)word[i] );
-   buf[len] = 0;
-   for( i = 0; s_keywords[i]; i++ )
-      if( lstrcmpA( buf, s_keywords[i] ) == 0 ) return 1;
-   return 0;
-}
+   if( s_hScintilla ) return TRUE;  /* already loaded */
 
-static int IsCommand( const char * word, int len )
-{
-   int i;
-   char buf[64];
-   if( len <= 0 || len >= 63 ) return 0;
-   for( i = 0; i < len; i++ ) buf[i] = (char)toupper( (unsigned char)word[i] );
-   buf[len] = 0;
-   for( i = 0; s_commands[i]; i++ )
-      if( lstrcmpA( buf, s_commands[i] ) == 0 ) return 1;
-   return 0;
-}
+   fLog = fopen( "c:\\HarbourBuilder\\scintilla_trace.log", "a" );
 
-/* Apply color to a range in RichEdit */
-static void SetRichColor( HWND hEdit, int nStart, int nEnd, COLORREF clr, BOOL bBold )
-{
-   CHARRANGE cr;
-   CHARFORMATA cf = {0};
-   cr.cpMin = nStart; cr.cpMax = nEnd;
-   SendMessage( hEdit, EM_EXSETSEL, 0, (LPARAM) &cr );
-   cf.cbSize = sizeof(cf);
-   cf.dwMask = CFM_COLOR | CFM_BOLD;
-   cf.crTextColor = clr;
-   if( bBold ) cf.dwEffects = CFE_BOLD;
-   SendMessageA( hEdit, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM) &cf );
-}
+   /* Try loading from resources/ first */
+   GetModuleFileNameA( NULL, szPath, MAX_PATH );
+   { char * p = strrchr( szPath, '\\' );
+     if( p ) { *p = 0; }
+   }
+   strcat( szPath, "\\..\\resources\\Scintilla.dll" );
 
-/* Full syntax highlight pass */
-static void HighlightCode( HWND hEdit )
-{
-   int nLen, i, ws;
-   char * buf;
-   CHARRANGE crSave;
-   int nKeywords = 0, nComments = 0, nStrings = 0, nCommands = 0, nNumbers = 0;
+   s_hScintilla = LoadLibraryA( szPath );
+   if( fLog ) fprintf( fLog, "LoadLibrary Scintilla '%s' => %p\n", szPath, s_hScintilla );
 
-   nLen = GetWindowTextLengthA( hEdit );
-   if( nLen <= 0 ) return;
-
-   buf = (char *) malloc( nLen + 1 );
-   GetWindowTextA( hEdit, buf, nLen + 1 );
-
-   /* Save selection, disable redraw */
-   SendMessage( hEdit, EM_EXGETSEL, 0, (LPARAM) &crSave );
-   SendMessage( hEdit, WM_SETREDRAW, FALSE, 0 );
-
-   /* Reset all to light gray (default text on dark bg) */
-   SetRichColor( hEdit, 0, nLen, RGB(220,220,220), FALSE );
-
-   i = 0;
-   while( i < nLen )
-   {
-      /* Line comments: // */
-      if( buf[i] == '/' && i + 1 < nLen && buf[i+1] == '/' )
-      {
-         int start = i;
-         while( i < nLen && buf[i] != '\r' && buf[i] != '\n' ) i++;
-         SetRichColor( hEdit, start, i, RGB(0,200,0), FALSE );
-         nComments++;
-         continue;
-      }
-
-      /* Block comments */
-      if( buf[i] == '/' && i + 1 < nLen && buf[i+1] == '*' )
-      {
-         int start = i;
-         i += 2;
-         while( i + 1 < nLen && !( buf[i] == '*' && buf[i+1] == '/' ) ) i++;
-         if( i + 1 < nLen ) i += 2;
-         SetRichColor( hEdit, start, i, RGB(0,200,0), FALSE );
-         continue;
-      }
-
-      /* Strings: "..." or '...' */
-      if( buf[i] == '"' || buf[i] == '\'' )
-      {
-         char q = buf[i];
-         int start = i;
-         i++;
-         while( i < nLen && buf[i] != q && buf[i] != '\r' && buf[i] != '\n' ) i++;
-         if( i < nLen && buf[i] == q ) i++;
-         SetRichColor( hEdit, start, i, RGB(255,150,50), FALSE );
-         nStrings++;
-         continue;
-      }
-
-      /* Preprocessor: #include, #define, #xcommand */
-      if( buf[i] == '#' )
-      {
-         int start = i;
-         i++;
-         while( i < nLen && IsWordChar(buf[i]) ) i++;
-         SetRichColor( hEdit, start, i, RGB(255,100,255), TRUE );
-         continue;
-      }
-
-      /* Logical literals: .T. .F. .AND. .OR. .NOT. */
-      if( buf[i] == '.' && i + 2 < nLen )
-      {
-         int start = i;
-         i++;
-         while( i < nLen && buf[i] != '.' && IsWordChar(buf[i]) ) i++;
-         if( i < nLen && buf[i] == '.' ) { i++; SetRichColor( hEdit, start, i, RGB(255,100,255), FALSE ); }
-         continue;
-      }
-
-      /* Numbers: 123, 0x1A, etc. */
-      if( buf[i] >= '0' && buf[i] <= '9' )
-      {
-         ws = i;
-         while( i < nLen && ((buf[i]>='0'&&buf[i]<='9')||buf[i]=='.') ) i++;
-         SetRichColor( hEdit, ws, i, RGB(255,255,0), FALSE ); nNumbers++;
-            if(nNumbers<=3){FILE*f=fopen("c:\\HarbourBuilder\\syntax_detail.log","a");
-              if(f){char w[64]={0};memcpy(w,buf+ws,i-ws>60?60:i-ws);
-                fprintf(f,"NUM[%d]: '%s' pos=%d-%d\n",nNumbers,w,ws,i);fclose(f);}}
-         continue;
-      }
-
-      /* Words: keywords and commands */
-      if( IsWordChar(buf[i]) )
-      {
-         ws = i;
-         while( i < nLen && IsWordChar(buf[i]) ) i++;
-         if( IsKeyword( buf + ws, i - ws ) )
-         {  SetRichColor( hEdit, ws, i, RGB(100,160,255), TRUE ); nKeywords++;
-            if(nKeywords<=3){FILE*f=fopen("c:\\HarbourBuilder\\syntax_detail.log","a");
-              if(f){char w[64]={0};memcpy(w,buf+ws,i-ws>60?60:i-ws);
-                fprintf(f,"KW[%d]: '%s' pos=%d-%d\n",nKeywords,w,ws,i);fclose(f);}} }
-         else if( IsCommand( buf + ws, i - ws ) )
-         {  SetRichColor( hEdit, ws, i, RGB(0,255,180), FALSE ); nCommands++; }
-         continue;
-      }
-
-      i++;
+   if( !s_hScintilla ) {
+      /* Try current directory */
+      s_hScintilla = LoadLibraryA( "Scintilla.dll" );
+      if( fLog ) fprintf( fLog, "LoadLibrary Scintilla.dll (cwd) => %p\n", s_hScintilla );
    }
 
-   /* Log trace to file */
-   { FILE * fLog = fopen( "c:\\HarbourBuilder\\syntax_trace.log", "a" );
-     if( fLog ) {
-        fprintf( fLog, "HighlightCode: len=%d kw=%d cmd=%d cmt=%d str=%d num=%d\n",
-           nLen, nKeywords, nCommands, nComments, nStrings, nNumbers );
-        fclose( fLog );
+   if( !s_hScintilla ) {
+      if( fLog ) { fprintf( fLog, "FAILED to load Scintilla.dll\n" ); fclose( fLog ); }
+      return FALSE;
+   }
+
+   /* Load Lexilla */
+   { char * p = strrchr( szPath, '\\' );
+     if( p ) { *p = 0; strcat( szPath, "\\Lexilla.dll" ); }
+   }
+   s_hLexilla = LoadLibraryA( szPath );
+   if( fLog ) fprintf( fLog, "LoadLibrary Lexilla '%s' => %p\n", szPath, s_hLexilla );
+
+   if( !s_hLexilla ) {
+      s_hLexilla = LoadLibraryA( "Lexilla.dll" );
+      if( fLog ) fprintf( fLog, "LoadLibrary Lexilla.dll (cwd) => %p\n", s_hLexilla );
+   }
+
+   if( s_hLexilla ) {
+      s_pCreateLexer = (CreateLexerFn) GetProcAddress( s_hLexilla, "CreateLexer" );
+      if( fLog ) fprintf( fLog, "CreateLexer proc => %p\n", s_pCreateLexer );
+   }
+
+   if( fLog ) { fprintf( fLog, "InitScintilla OK\n" ); fclose( fLog ); }
+   return TRUE;
+}
+
+/* Configure Scintilla with Harbour syntax highlighting */
+static void ConfigureScintilla( HWND hSci )
+{
+   ILexer5 * pLexer;
+
+   /* UTF-8 code page */
+   SciMsg( hSci, SCI_SETCODEPAGE, SC_CP_UTF8, 0 );
+
+   /* Tab width */
+   SciMsg( hSci, SCI_SETTABWIDTH, 3, 0 );
+
+   /* Set C/C++ lexer via Lexilla (works for Harbour too) */
+   if( s_pCreateLexer ) {
+      pLexer = s_pCreateLexer( "cpp" );
+      if( pLexer ) {
+         SciMsg( hSci, SCI_SETILEXER, 0, (LPARAM) pLexer );
+      }
+   }
+
+   /* Default style: Consolas 11pt, light gray on dark */
+   SciMsg( hSci, SCI_STYLESETFONT, STYLE_DEFAULT, (LPARAM) "Consolas" );
+   SciMsg( hSci, SCI_STYLESETSIZE, STYLE_DEFAULT, 14 );
+   SciMsg( hSci, SCI_STYLESETFORE, STYLE_DEFAULT, RGB(212,212,212) );
+   SciMsg( hSci, SCI_STYLESETBACK, STYLE_DEFAULT, RGB(30,30,30) );
+   SciMsg( hSci, SCI_STYLECLEARALL, 0, 0 );  /* Apply default to all styles */
+
+   /* Line number margin */
+   SciMsg( hSci, SCI_SETMARGINTYPEN, 0, SC_MARGIN_NUMBER );
+   SciMsg( hSci, SCI_SETMARGINWIDTHN, 0, 48 );
+   SciMsg( hSci, SCI_STYLESETFORE, STYLE_LINENUMBER, RGB(133,133,133) );
+   SciMsg( hSci, SCI_STYLESETBACK, STYLE_LINENUMBER, RGB(37,37,38) );
+
+   /* Folding margin */
+   SciMsg( hSci, SCI_SETMARGINTYPEN, 2, SC_MARGIN_SYMBOL );
+   SciMsg( hSci, SCI_SETMARGINMASKN, 2, SC_MASK_FOLDERS );
+   SciMsg( hSci, SCI_SETMARGINWIDTHN, 2, 16 );
+   SciMsg( hSci, SCI_SETMARGINSENSITIVEN, 2, 1 );
+   SciMsg( hSci, SCI_SETAUTOMATICFOLD, SC_AUTOMATICFOLD_SHOW | SC_AUTOMATICFOLD_CLICK | SC_AUTOMATICFOLD_CHANGE, 0 );
+
+   /* Fold markers - box style */
+   SciMsg( hSci, SCI_MARKERDEFINE, SC_MARKNUM_FOLDER,        SC_MARK_BOXPLUS );
+   SciMsg( hSci, SCI_MARKERDEFINE, SC_MARKNUM_FOLDEROPEN,    SC_MARK_BOXMINUS );
+   SciMsg( hSci, SCI_MARKERDEFINE, SC_MARKNUM_FOLDERSUB,     SC_MARK_VLINE );
+   SciMsg( hSci, SCI_MARKERDEFINE, SC_MARKNUM_FOLDERTAIL,    SC_MARK_LCORNER );
+   SciMsg( hSci, SCI_MARKERDEFINE, SC_MARKNUM_FOLDEREND,     SC_MARK_BOXPLUSCONNECTED );
+   SciMsg( hSci, SCI_MARKERDEFINE, SC_MARKNUM_FOLDEROPENMID, SC_MARK_BOXMINUSCONNECTED );
+   SciMsg( hSci, SCI_MARKERDEFINE, SC_MARKNUM_FOLDERMIDTAIL, SC_MARK_TCORNER );
+
+   { int m;
+     for( m = 25; m <= 31; m++ ) {
+        SciMsg( hSci, 2041, m, RGB(160,160,160) );  /* SCI_MARKERSETFORE */
+        SciMsg( hSci, 2042, m, RGB(37,37,38) );     /* SCI_MARKERSETBACK */
      }
    }
 
-   /* Restore selection and redraw */
-   SendMessage( hEdit, EM_EXSETSEL, 0, (LPARAM) &crSave );
-   SendMessage( hEdit, WM_SETREDRAW, TRUE, 0 );
-   InvalidateRect( hEdit, NULL, TRUE );
+   /* Enable folding property */
+   SciMsg( hSci, SCI_SETPROPERTY, (WPARAM) "fold", (LPARAM) "1" );
+   SciMsg( hSci, SCI_SETPROPERTY, (WPARAM) "fold.compact", (LPARAM) "0" );
+   SciMsg( hSci, SCI_SETPROPERTY, (WPARAM) "fold.comment", (LPARAM) "1" );
+   SciMsg( hSci, SCI_SETPROPERTY, (WPARAM) "fold.preprocessor", (LPARAM) "1" );
 
-   free( buf );
+   /* ===== Harbour keyword lists ===== */
+   /* Keywords set 0: Harbour language keywords (lowercase) */
+   SciMsg( hSci, SCI_SETKEYWORDS, 0, (LPARAM)
+      "function procedure return local static private public "
+      "if else elseif endif do while enddo for next to step in "
+      "switch case otherwise endswitch endcase default "
+      "class endclass method data access assign inherit inline "
+      "nil self super begin end exit loop with sequence recover "
+      "try catch finally true false and or not "
+      "init announce request external memvar field parameters "
+      "break continue optional redefine " );
+
+   /* Keywords set 1: xBase commands + FiveWin (uppercase mapped to WORD2) */
+   SciMsg( hSci, SCI_SETKEYWORDS, 1, (LPARAM)
+      "DEFINE ACTIVATE FORM TITLE SIZE FONT SIZABLE APPBAR TOOLWINDOW "
+      "CENTERED SAY GET BUTTON PROMPT CHECKBOX COMBOBOX GROUPBOX "
+      "ITEMS CHECKED DEFAULT CANCEL OF VAR ACTION ON VALID WHEN "
+      "TOOLBAR SEPARATOR TOOLTIP MENUBAR POPUP MENUITEM MENUSEPARATOR "
+      "PALETTE REQUEST ACCEL BITMAP ICON BROWSE DIALOG "
+      "LISTBOX RADIOBUTTON SCROLLBAR PANEL IMAGE SHAPE BEVEL "
+      "TREEVIEW LISTVIEW PROGRESSBAR RICHEDIT STATUSBAR SPLITTER "
+      "TABS TAB MEMO DATEPICKER SPINNER GAUGE HEADER "
+      "REPORT BAND COLUMN PRINTER PREVIEW "
+      "WEBVIEW WEBSERVER SOCKET WEBSOCKET HTTPGET HTTPPOST "
+      "THREAD MUTEX SEMAPHORE CRITICALSECTION ATOMICOP "
+      "OLLAMA OPENAI GEMINI CLAUDE DEEPSEEK TRANSFORMER " );
+
+   /* ===== Syntax highlighting colors (VS Code Dark+ inspired) ===== */
+   /* Keywords: bright blue, bold */
+   SciMsg( hSci, SCI_STYLESETFORE, SCE_C_WORD, RGB(86,156,214) );
+   SciMsg( hSci, SCI_STYLESETBOLD, SCE_C_WORD, 1 );
+
+   /* Commands (WORD2): teal/cyan */
+   SciMsg( hSci, SCI_STYLESETFORE, SCE_C_WORD2, RGB(78,201,176) );
+
+   /* Comments: green */
+   SciMsg( hSci, SCI_STYLESETFORE, SCE_C_COMMENT,     RGB(106,153,85) );
+   SciMsg( hSci, SCI_STYLESETFORE, SCE_C_COMMENTLINE,  RGB(106,153,85) );
+   SciMsg( hSci, SCI_STYLESETFORE, SCE_C_COMMENTDOC,   RGB(106,153,85) );
+   SciMsg( hSci, SCI_STYLESETITALIC, SCE_C_COMMENT, 1 );
+   SciMsg( hSci, SCI_STYLESETITALIC, SCE_C_COMMENTLINE, 1 );
+
+   /* Strings: orange */
+   SciMsg( hSci, SCI_STYLESETFORE, SCE_C_STRING,    RGB(206,145,120) );
+   SciMsg( hSci, SCI_STYLESETFORE, SCE_C_CHARACTER,  RGB(206,145,120) );
+
+   /* Numbers: light green */
+   SciMsg( hSci, SCI_STYLESETFORE, SCE_C_NUMBER, RGB(181,206,168) );
+
+   /* Preprocessor: magenta */
+   SciMsg( hSci, SCI_STYLESETFORE, SCE_C_PREPROCESSOR, RGB(197,134,192) );
+
+   /* Operators: light gray */
+   SciMsg( hSci, SCI_STYLESETFORE, SCE_C_OPERATOR, RGB(212,212,212) );
+
+   /* Identifiers: default light gray */
+   SciMsg( hSci, SCI_STYLESETFORE, SCE_C_IDENTIFIER, RGB(220,220,220) );
+
+   /* Global classes: yellow-ish */
+   SciMsg( hSci, SCI_STYLESETFORE, SCE_C_GLOBALCLASS, RGB(78,201,176) );
+
+   /* Caret and selection */
+   SciMsg( hSci, SCI_SETCARETFORE, RGB(255,255,255), 0 );
+   SciMsg( hSci, SCI_SETSELBACK, 1, RGB(38,79,120) );
+
+   /* Extra line spacing for readability */
+   SciMsg( hSci, SCI_SETEXTRAASCENT, 1, 0 );
+   SciMsg( hSci, SCI_SETEXTRADESCENT, 1, 0 );
+
+   /* Indentation guides */
+   SciMsg( hSci, SCI_SETINDENTATIONGUIDES, SC_IV_LOOKBOTH, 0 );
+
+   { FILE * fLog = fopen( "c:\\HarbourBuilder\\scintilla_trace.log", "a" );
+     if( fLog ) { fprintf( fLog, "ConfigureScintilla done for hwnd=%p\n", hSci ); fclose( fLog ); }
+   }
 }
 
-/* Save current RichEdit text to the active tab's buffer */
+/* ======================================================================
+ * Harbour-aware code folding
+ * Scans all lines and sets fold levels based on Harbour keywords:
+ *   Open:  function, procedure, class, if, do while, for, switch, begin
+ *   Close: return (top-level), endclass, endif, enddo, next, endswitch, end
+ * ====================================================================== */
+
+#define SCI_SETFOLDLEVEL   2222
+#define SCI_GETFOLDLEVEL   2223
+#define SCI_SETFOLDFLAGS2  2233
+
+/* Check if a line starts with a word (case-insensitive), skipping leading spaces */
+static int LineStartsWithCI( const char * line, int lineLen, const char * word )
+{
+   int i = 0, wLen = lstrlenA(word);
+   /* Skip leading whitespace */
+   while( i < lineLen && (line[i] == ' ' || line[i] == '\t') ) i++;
+   if( i + wLen > lineLen ) return 0;
+   if( _strnicmp( line + i, word, wLen ) != 0 ) return 0;
+   /* Must be followed by space, (, EOL, or nothing */
+   if( i + wLen < lineLen ) {
+      char c = line[i + wLen];
+      if( (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_' || (c >= '0' && c <= '9') )
+         return 0;  /* Part of a longer word */
+   }
+   return 1;
+}
+
+static void UpdateHarbourFolding( HWND hSci )
+{
+   int lineCount, i;
+   int level;
+
+   if( !hSci ) return;
+
+   lineCount = (int) SciMsg( hSci, SCI_GETLINECOUNT, 0, 0 );
+   level = SC_FOLDLEVELBASE;
+
+   for( i = 0; i < lineCount; i++ )
+   {
+      int lineLen = (int) SciMsg( hSci, SCI_LINELENGTH, i, 0 );
+      int curLevel = level;
+      int nextLevel = level;
+      int isHeader = 0;
+
+      if( lineLen > 0 && lineLen < 4096 )
+      {
+         char * buf = (char *) malloc( lineLen + 1 );
+         SciMsg( hSci, SCI_GETLINE, i, (LPARAM) buf );
+         buf[lineLen] = 0;
+
+         /* Remove trailing CR/LF for matching */
+         while( lineLen > 0 && (buf[lineLen-1] == '\r' || buf[lineLen-1] == '\n') )
+            buf[--lineLen] = 0;
+
+         /* === Fold openers === */
+         if( LineStartsWithCI(buf, lineLen, "function") ||
+             LineStartsWithCI(buf, lineLen, "procedure") ||
+             LineStartsWithCI(buf, lineLen, "method") )
+         {
+            isHeader = 1;
+            nextLevel = level + 1;
+         }
+         else if( LineStartsWithCI(buf, lineLen, "class") &&
+                  !LineStartsWithCI(buf, lineLen, "endclass") )
+         {
+            isHeader = 1;
+            nextLevel = level + 1;
+         }
+         else if( LineStartsWithCI(buf, lineLen, "if") &&
+                  !LineStartsWithCI(buf, lineLen, "endif") )
+         {
+            isHeader = 1;
+            nextLevel = level + 1;
+         }
+         else if( LineStartsWithCI(buf, lineLen, "do") )
+         {
+            isHeader = 1;
+            nextLevel = level + 1;
+         }
+         else if( LineStartsWithCI(buf, lineLen, "for") )
+         {
+            isHeader = 1;
+            nextLevel = level + 1;
+         }
+         else if( LineStartsWithCI(buf, lineLen, "switch") &&
+                  !LineStartsWithCI(buf, lineLen, "endswitch") )
+         {
+            isHeader = 1;
+            nextLevel = level + 1;
+         }
+         else if( LineStartsWithCI(buf, lineLen, "begin") )
+         {
+            isHeader = 1;
+            nextLevel = level + 1;
+         }
+         else if( LineStartsWithCI(buf, lineLen, "while") &&
+                  !LineStartsWithCI(buf, lineLen, "enddo") )
+         {
+            isHeader = 1;
+            nextLevel = level + 1;
+         }
+         else if( LineStartsWithCI(buf, lineLen, "#pragma BEGINDUMP") ||
+                  LineStartsWithCI(buf, lineLen, "#pragma begindump") )
+         {
+            isHeader = 1;
+            nextLevel = level + 1;
+         }
+
+         /* === Fold closers === */
+         else if( LineStartsWithCI(buf, lineLen, "return") ||
+                  LineStartsWithCI(buf, lineLen, "endclass") ||
+                  LineStartsWithCI(buf, lineLen, "endif") ||
+                  LineStartsWithCI(buf, lineLen, "enddo") ||
+                  LineStartsWithCI(buf, lineLen, "next") ||
+                  LineStartsWithCI(buf, lineLen, "endswitch") ||
+                  LineStartsWithCI(buf, lineLen, "endcase") ||
+                  LineStartsWithCI(buf, lineLen, "end") ||
+                  LineStartsWithCI(buf, lineLen, "#pragma ENDDUMP") ||
+                  LineStartsWithCI(buf, lineLen, "#pragma enddump") )
+         {
+            if( level > SC_FOLDLEVELBASE )
+            {
+               curLevel = level - 1;
+               nextLevel = level - 1;
+            }
+         }
+
+         free( buf );
+      }
+
+      /* Set fold level for this line */
+      SciMsg( hSci, SCI_SETFOLDLEVEL, i,
+         curLevel | (isHeader ? SC_FOLDLEVELHEADERFLAG : 0) );
+
+      level = nextLevel;
+   }
+}
+
+/* Save current Scintilla text to the active tab's buffer */
 static void SaveCurrentTabText( CODEEDITOR * ed )
 {
    int nLen;
@@ -3249,16 +3528,14 @@ static void SaveCurrentTabText( CODEEDITOR * ed )
    if( ed->aTexts[ed->nActiveTab] )
       free( ed->aTexts[ed->nActiveTab] );
 
-   nLen = GetWindowTextLengthA( ed->hEdit );
+   nLen = (int) SciMsg( ed->hEdit, SCI_GETLENGTH, 0, 0 );
    ed->aTexts[ed->nActiveTab] = (char *) malloc( nLen + 1 );
-   GetWindowTextA( ed->hEdit, ed->aTexts[ed->nActiveTab], nLen + 1 );
+   SciMsg( ed->hEdit, SCI_GETTEXT, nLen + 1, (LPARAM) ed->aTexts[ed->nActiveTab] );
 }
 
 /* Switch to a different tab */
 static void SwitchTab( CODEEDITOR * ed, int nNewTab )
 {
-   CHARFORMATA cf = {0};
-
    if( !ed || nNewTab < 0 || nNewTab >= ed->nTabs || nNewTab == ed->nActiveTab )
       return;
 
@@ -3267,21 +3544,14 @@ static void SwitchTab( CODEEDITOR * ed, int nNewTab )
 
    /* Load new tab text */
    ed->nActiveTab = nNewTab;
-   if( ed->aTexts[nNewTab] )
-      SetWindowTextA( ed->hEdit, ed->aTexts[nNewTab] );
-   else
-      SetWindowTextA( ed->hEdit, "" );
+   SciMsg( ed->hEdit, SCI_SETTEXT, 0,
+      (LPARAM)( ed->aTexts[nNewTab] ? ed->aTexts[nNewTab] : "" ) );
 
-   /* Re-apply font formatting after SetWindowText */
-   cf.cbSize = sizeof(cf);
-   cf.dwMask = CFM_FACE | CFM_SIZE | CFM_COLOR;
-   cf.yHeight = 15 * 20;
-   cf.crTextColor = RGB(212,212,212);
-   lstrcpyA( cf.szFaceName, "Consolas" );
-   SendMessageA( ed->hEdit, EM_SETCHARFORMAT, SCF_ALL, (LPARAM) &cf );
+   /* Reset undo buffer for new tab */
+   SciMsg( ed->hEdit, SCI_EMPTYUNDOBUFFER, 0, 0 );
 
-   HighlightCode( ed->hEdit );
-   GutterSync( ed );
+   /* Update Harbour folding for the new tab */
+   UpdateHarbourFolding( ed->hEdit );
 
    /* Update tab selection */
    SendMessage( ed->hTab, TCM_SETCURSEL, nNewTab, 0 );
@@ -3297,236 +3567,85 @@ static void SwitchTab( CODEEDITOR * ed, int nNewTab )
    }
 }
 
-/* Gutter: paint line numbers */
-static void GutterPaint( CODEEDITOR * ed )
-{
-   PAINTSTRUCT ps;
-   HDC hDC, hMemDC;
-   HBITMAP hBmp, hOldBmp;
-   RECT rcGutter;
-   int firstLine, lineCount, lineH, y, i, w, h;
-   HFONT hOld;
-   char szNum[16];
+/* Scintilla handles line numbers and gutter natively - no manual gutter needed */
 
-   if( !ed || !ed->hGutter || !ed->hEdit ) return;
-
-   hDC = BeginPaint( ed->hGutter, &ps );
-   GetClientRect( ed->hGutter, &rcGutter );
-   w = rcGutter.right; h = rcGutter.bottom;
-
-   /* Double buffer: paint to memory DC then BitBlt */
-   hMemDC = CreateCompatibleDC( hDC );
-   hBmp = CreateCompatibleBitmap( hDC, w, h );
-   hOldBmp = (HBITMAP) SelectObject( hMemDC, hBmp );
-
-   /* Dark fill background */
-   {
-      HBRUSH hBr = CreateSolidBrush( RGB(37, 37, 38) );
-      FillRect( hMemDC, &rcGutter, hBr );
-      DeleteObject( hBr );
-   }
-
-   /* Right border line */
-   {
-      HPEN hPen = CreatePen( PS_SOLID, 1, RGB(60, 60, 60) );
-      HPEN hOldPen = (HPEN) SelectObject( hMemDC, hPen );
-      MoveToEx( hMemDC, w - 1, 0, NULL );
-      LineTo( hMemDC, w - 1, h );
-      SelectObject( hMemDC, hOldPen );
-      DeleteObject( hPen );
-   }
-
-   hOld = (HFONT) SelectObject( hMemDC, ed->hFont );
-   SetBkMode( hMemDC, TRANSPARENT );
-   SetTextColor( hMemDC, RGB(133, 133, 133) );
-
-   /* Get first visible line and line height */
-   firstLine = (int) SendMessage( ed->hEdit, EM_GETFIRSTVISIBLELINE, 0, 0 );
-   lineCount = (int) SendMessage( ed->hEdit, EM_GETLINECOUNT, 0, 0 );
-
-   /* Get line height from first char position */
-   {
-      POINTL pt1, pt2;
-      int charIdx1, charIdx2;
-      charIdx1 = (int) SendMessage( ed->hEdit, EM_LINEINDEX, firstLine, 0 );
-      charIdx2 = (int) SendMessage( ed->hEdit, EM_LINEINDEX, firstLine + 1, 0 );
-      SendMessage( ed->hEdit, EM_POSFROMCHAR, (WPARAM) &pt1, charIdx1 );
-      if( charIdx2 > charIdx1 )
-      {
-         SendMessage( ed->hEdit, EM_POSFROMCHAR, (WPARAM) &pt2, charIdx2 );
-         lineH = pt2.y - pt1.y;
-      }
-      else
-         lineH = 18;  /* fallback */
-      if( lineH < 8 ) lineH = 18;
-      y = pt1.y;  /* starting Y from RichEdit's first visible line */
-   }
-
-   /* Draw line numbers */
-   for( i = firstLine; i < lineCount && y < h; i++ )
-   {
-      RECT rcNum;
-      sprintf( szNum, "%d", i + 1 );
-      rcNum.left = 2;
-      rcNum.top = y;
-      rcNum.right = GUTTER_WIDTH - 6;
-      rcNum.bottom = y + lineH;
-      DrawTextA( hMemDC, szNum, -1, &rcNum, DT_RIGHT | DT_SINGLELINE | DT_VCENTER );
-      y += lineH;
-   }
-
-   SelectObject( hMemDC, hOld );
-
-   /* BitBlt from memory DC to screen - no flicker */
-   BitBlt( hDC, 0, 0, w, h, hMemDC, 0, 0, SRCCOPY );
-
-   SelectObject( hMemDC, hOldBmp );
-   DeleteObject( hBmp );
-   DeleteDC( hMemDC );
-   EndPaint( ed->hGutter, &ps );
-}
-
-/* Sync gutter with RichEdit scroll position */
-static void GutterSync( CODEEDITOR * ed )
-{
-   if( ed && ed->hGutter )
-      InvalidateRect( ed->hGutter, NULL, TRUE );
-}
-
-/* Gutter WndProc */
-static LRESULT CALLBACK GutterWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
-{
-   CODEEDITOR * ed = (CODEEDITOR *) GetWindowLongPtr( hWnd, GWLP_USERDATA );
-
-   if( msg == WM_PAINT && ed )
-   {
-      GutterPaint( ed );
-      return 0;
-   }
-
-   return DefWindowProc( hWnd, msg, wParam, lParam );
-}
-
-/* Subclassed RichEdit: intercept scroll/changes to sync gutter */
-/* RichEdit Find Text - define if not available */
-#ifndef EM_FINDTEXT
-#define EM_FINDTEXT  (WM_USER + 56)
-#endif
-
+/* Scintilla find text helper struct */
 typedef struct {
-   CHARRANGE chrg;
+   int cpMin;
+   int cpMax;
    const char * lpstrText;
-} FINDTEXTINFO;
+   int flags;
+} SCI_FINDINFO;
 
 /* ======================================================================
- * Auto-completion popup
+ * Auto-completion - uses Scintilla's built-in autocomplete
  * ====================================================================== */
 
-static const char * s_hbKeywords[] = {
-   "function", "procedure", "return", "local", "static", "private", "public",
-   "if", "else", "elseif", "endif", "do", "while", "enddo", "for", "next",
-   "class", "endclass", "method", "data", "access", "assign",
-   "switch", "case", "otherwise", "endswitch", "endcase",
-   "begin", "end", "exit", "loop", "nil", "self", "with",
-   NULL
-};
+#define SCI_AUTOCSHOW    2100
+#define SCI_AUTOCCANCEL  2101
+#define SCI_AUTOCACTIVE  2102
+#define SCI_AUTOCSETSEPARATOR 2106
+#define SCI_AUTOCSETIGNORECASE 2115
 
-static const char * s_hbFunctions[] = {
-   "MsgInfo(", "MsgYesNo(", "MsgStop(", "MemoRead(", "MemoWrit(",
-   "AllTrim(", "LTrim(", "RTrim(", "Upper(", "Lower(", "Len(",
-   "SubStr(", "At(", "RAt(", "StrTran(", "Replicate(", "Space(",
-   "Val(", "Str(", "HB_ValToStr(", "ValType(", "Type(",
-   "AAdd(", "ASize(", "ADel(", "AIns(", "ASort(", "AScan(", "AEval(",
-   "Array(", "AFill(", "AClone(", "HB_ATokens(",
-   "Date(", "Time(", "Seconds(", "DToC(", "CToD(",
-   "File(", "FOpen(", "FClose(", "FRead(", "FWrite(",
-   "GetEnv(", "HB_DirCreate(", "HB_FNameDir(",
-   "Empty(", "Iif(", "If(", "Max(", "Min(", "Abs(", "Int(", "Round(",
-   "Chr(", "Asc(", "HB_UTF8ToStr(", "HB_StrToUTF8(",
-   "Eval(", "HB_Random(", "HB_CRC32(",
-   NULL
-};
+/* All Harbour keywords + functions for auto-complete (space-separated) */
+static const char * s_acList =
+   "AAdd AClone ADel AEval AFill AIns ASize AScan ASort "
+   "Abs AllTrim Array Asc At "
+   "begin break "
+   "CToD Chr class "
+   "DToC Date data default do "
+   "Empty Eval "
+   "FClose FOpen FRead FWrite File "
+   "GetEnv "
+   "HB_ATokens HB_CRC32 HB_DirCreate HB_FNameDir HB_Random HB_StrToUTF8 HB_UTF8ToStr HB_ValToStr "
+   "Iif If Int "
+   "LTrim Len Lower "
+   "Max MemoRead MemoWrit Min MsgInfo MsgStop MsgYesNo "
+   "RTrim RAt Replicate Round "
+   "Space Str StrTran SubStr "
+   "Time Type "
+   "Upper "
+   "Val ValType "
+   "access assign "
+   "case class "
+   "else elseif end endcase endclass enddo endif endswitch exit "
+   "for function "
+   "if in inherit inline "
+   "local loop "
+   "method "
+   "next nil not "
+   "or otherwise "
+   "private procedure public "
+   "recover request return "
+   "self sequence static step super switch "
+   "to try "
+   "while with";
 
-static const char * s_xbaseCommands[] = {
-   "DEFINE FORM", "ACTIVATE FORM", "DEFINE TOOLBAR", "DEFINE PALETTE",
-   "DEFINE MENUBAR", "DEFINE POPUP", "MENUITEM", "MENUSEPARATOR",
-   "BUTTON", "CHECKBOX", "COMBOBOX", "GROUPBOX",
-   "SAY", "GET", "PROMPT", "OF", "SIZE", "FONT", "ACTION",
-   "TITLE", "APPBAR", "CENTERED", "SIZABLE", "TOOLWINDOW",
-   "ITEMS", "CHECKED", "DEFAULT", "CANCEL", "VAR",
-   "TOOLBAR", "SEPARATOR", "TOOLTIP",
-   NULL
-};
-
-static void CE_ShowAutoComplete( CODEEDITOR * ed, const char * prefix )
+static void CE_ShowAutoComplete( CODEEDITOR * ed )
 {
-   static HWND s_hPopup = NULL;
-   HWND hList;
-   HFONT hFont;
-   RECT rc;
-   POINTL pt;
-   CHARRANGE cr;
-   int i, nMatches = 0, prefLen;
+   int nPos, nStart;
+   char wordBuf[64] = {0};
 
-   if( !ed || !ed->hEdit || !prefix || !prefix[0] ) {
-      if( s_hPopup && IsWindow(s_hPopup) ) { DestroyWindow(s_hPopup); s_hPopup = NULL; }
-      return;
+   if( !ed || !ed->hEdit ) return;
+
+   nPos = (int) SciMsg( ed->hEdit, SCI_GETCURRENTPOS, 0, 0 );
+   nStart = nPos;
+
+   /* Scan backward for word start */
+   while( nStart > 0 ) {
+      int ch = (int) SciMsg( ed->hEdit, 2007, nStart - 1, 0 ); /* SCI_GETCHARAT */
+      if( (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') ||
+          (ch >= '0' && ch <= '9') || ch == '_' )
+         nStart--;
+      else
+         break;
    }
 
-   prefLen = lstrlenA(prefix);
-
-   /* Get cursor position on screen */
-   SendMessage(ed->hEdit, EM_EXGETSEL, 0, (LPARAM)&cr);
-   SendMessage(ed->hEdit, EM_POSFROMCHAR, (WPARAM)&pt, cr.cpMin);
-   { POINT sp; sp.x = pt.x; sp.y = pt.y + 20;
-     ClientToScreen(ed->hEdit, &sp);
-
-     if( s_hPopup && IsWindow(s_hPopup) ) DestroyWindow(s_hPopup);
-
-     s_hPopup = CreateWindowExA(WS_EX_TOOLWINDOW|WS_EX_TOPMOST,
-        "STATIC", NULL, WS_POPUP|WS_VISIBLE|WS_BORDER,
-        sp.x, sp.y, 280, 180,
-        NULL, NULL, GetModuleHandle(NULL), NULL);
-
-     hList = CreateWindowExA(0, "LISTBOX", NULL,
-        WS_CHILD|WS_VISIBLE|WS_VSCROLL|LBS_NOTIFY,
-        0, 0, 280, 180,
-        s_hPopup, (HMENU)950, GetModuleHandle(NULL), NULL);
-
-     hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
-     SendMessage(hList, WM_SETFONT, (WPARAM)hFont, TRUE);
-
-     /* Add matching keywords */
-     for( i = 0; s_hbKeywords[i]; i++ )
-        if( _strnicmp(s_hbKeywords[i], prefix, prefLen) == 0 ) {
-           SendMessageA(hList, LB_ADDSTRING, 0, (LPARAM)s_hbKeywords[i]);
-           nMatches++;
-        }
-     /* Add matching functions */
-     for( i = 0; s_hbFunctions[i]; i++ )
-        if( _strnicmp(s_hbFunctions[i], prefix, prefLen) == 0 ) {
-           SendMessageA(hList, LB_ADDSTRING, 0, (LPARAM)s_hbFunctions[i]);
-           nMatches++;
-        }
-     /* Add matching commands */
-     for( i = 0; s_xbaseCommands[i]; i++ )
-        if( _strnicmp(s_xbaseCommands[i], prefix, prefLen) == 0 ) {
-           SendMessageA(hList, LB_ADDSTRING, 0, (LPARAM)s_xbaseCommands[i]);
-           nMatches++;
-        }
-
-     if( nMatches == 0 ) {
-        DestroyWindow(s_hPopup); s_hPopup = NULL;
-     } else {
-        SendMessage(hList, LB_SETCURSEL, 0, 0);
-     }
+   if( nPos - nStart >= 2 ) {
+      SciMsg( ed->hEdit, SCI_AUTOCSETIGNORECASE, 1, 0 );
+      SciMsg( ed->hEdit, SCI_AUTOCSETSEPARATOR, ' ', 0 );
+      SciMsg( ed->hEdit, SCI_AUTOCSHOW, nPos - nStart, (LPARAM) s_acList );
    }
-}
-
-static void CE_CloseAutoComplete( void )
-{
-   HWND hPop = FindWindowA(NULL, NULL); /* handled by static var in ShowAutoComplete */
-   /* The popup is managed by s_hPopup static in CE_ShowAutoComplete */
 }
 
 /* Show/hide the find bar */
@@ -3559,22 +3678,18 @@ static void CE_ShowFindBar( CODEEDITOR * ed, BOOL bShow, BOOL bReplace )
            8,5,55,18,ed->hFindBar,NULL,GetModuleHandle(NULL),NULL);
         SendMessage(h,WM_SETFONT,(WPARAM)hFont,TRUE);
 
-        /* Find Next button */
         h = CreateWindowExA(0,"BUTTON","Next",WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,
            278,2,50,22,ed->hFindBar,(HMENU)901,GetModuleHandle(NULL),NULL);
         SendMessage(h,WM_SETFONT,(WPARAM)hFont,TRUE);
 
-        /* Find Prev button */
         h = CreateWindowExA(0,"BUTTON","Prev",WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,
            332,2,50,22,ed->hFindBar,(HMENU)902,GetModuleHandle(NULL),NULL);
         SendMessage(h,WM_SETFONT,(WPARAM)hFont,TRUE);
 
-        /* Close button */
         h = CreateWindowExA(0,"BUTTON","X",WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,
            rc.right-32,2,26,22,ed->hFindBar,(HMENU)903,GetModuleHandle(NULL),NULL);
         SendMessage(h,WM_SETFONT,(WPARAM)hFont,TRUE);
 
-        /* Match count label */
         ed->hFindLabel = CreateWindowExA(0,"STATIC","",WS_CHILD|WS_VISIBLE,
            390,5,120,18,ed->hFindBar,NULL,GetModuleHandle(NULL),NULL);
         SendMessage(ed->hFindLabel,WM_SETFONT,(WPARAM)hFont,TRUE);
@@ -3597,10 +3712,9 @@ static void CE_ShowFindBar( CODEEDITOR * ed, BOOL bShow, BOOL bReplace )
          SendMessage(h,WM_SETFONT,(WPARAM)hFont,TRUE);
       }
 
-      /* Resize editor to make room */
-      MoveWindow(ed->hEdit, GUTTER_WIDTH, TAB_HEIGHT,
-         rc.right-GUTTER_WIDTH, rc.bottom-TAB_HEIGHT-barH, TRUE);
-      MoveWindow(ed->hGutter, 0, TAB_HEIGHT, GUTTER_WIDTH, rc.bottom-TAB_HEIGHT-barH, TRUE);
+      /* Resize Scintilla editor to make room */
+      MoveWindow(ed->hEdit, 0, TAB_HEIGHT,
+         rc.right, rc.bottom-TAB_HEIGHT-barH-STATUSBAR_HEIGHT, TRUE);
 
       SetFocus( ed->hFindEdit );
    }
@@ -3609,58 +3723,66 @@ static void CE_ShowFindBar( CODEEDITOR * ed, BOOL bShow, BOOL bReplace )
       ed->hFindBar = NULL; ed->hFindEdit = NULL; ed->hFindLabel = NULL; ed->hReplaceEdit = NULL;
 
       GetClientRect( ed->hWnd, &rc );
-      MoveWindow(ed->hEdit, GUTTER_WIDTH, TAB_HEIGHT,
-         rc.right-GUTTER_WIDTH, rc.bottom-TAB_HEIGHT, TRUE);
-      MoveWindow(ed->hGutter, 0, TAB_HEIGHT, GUTTER_WIDTH, rc.bottom-TAB_HEIGHT, TRUE);
+      MoveWindow(ed->hEdit, 0, TAB_HEIGHT,
+         rc.right, rc.bottom-TAB_HEIGHT-STATUSBAR_HEIGHT, TRUE);
 
       SetFocus( ed->hEdit );
    }
 }
 
-/* Find text in RichEdit */
+/* Find text in Scintilla */
 static void CE_FindNext( CODEEDITOR * ed, BOOL bForward )
 {
-   FINDTEXTINFO ft;
-   CHARRANGE cr;
    char szFind[256];
-   int nPos, nCount = 0, nLen;
+   int nPos, nCount = 0, nLen, nFindLen;
+   int nCurPos;
 
    if( !ed || !ed->hEdit || !ed->hFindEdit ) return;
 
    GetWindowTextA( ed->hFindEdit, szFind, sizeof(szFind) );
    if( !szFind[0] ) return;
 
-   /* Get current cursor position */
-   SendMessage(ed->hEdit, EM_EXGETSEL, 0, (LPARAM)&cr);
+   nLen = (int) SciMsg( ed->hEdit, SCI_GETLENGTH, 0, 0 );
+   nFindLen = lstrlenA( szFind );
+   nCurPos = (int) SciMsg( ed->hEdit, bForward ? SCI_GETSELECTIONEND : SCI_GETSELECTIONSTART, 0, 0 );
 
-   ft.chrg.cpMin = bForward ? cr.cpMax : cr.cpMin - 1;
-   nLen = GetWindowTextLengthA(ed->hEdit);
-   ft.chrg.cpMax = bForward ? nLen : 0;
-   ft.lpstrText = szFind;
+   /* Search forward or backward */
+   if( bForward ) {
+      SciMsg( ed->hEdit, SCI_SETTARGETSTART, nCurPos, 0 );
+      SciMsg( ed->hEdit, SCI_SETTARGETEND, nLen, 0 );
+   } else {
+      SciMsg( ed->hEdit, SCI_SETTARGETSTART, nCurPos - 1, 0 );
+      SciMsg( ed->hEdit, SCI_SETTARGETEND, 0, 0 );
+   }
 
-   nPos = (int) SendMessageA(ed->hEdit, EM_FINDTEXT,
-      (bForward ? FR_DOWN : 0) | FR_MATCHCASE, (LPARAM)&ft);
+   nPos = (int) SciMsg( ed->hEdit, SCI_SEARCHINTARGET, nFindLen, (LPARAM) szFind );
 
    /* Wrap around if not found */
    if( nPos < 0 ) {
-      ft.chrg.cpMin = bForward ? 0 : nLen;
-      ft.chrg.cpMax = bForward ? nLen : 0;
-      nPos = (int) SendMessageA(ed->hEdit, EM_FINDTEXT,
-         (bForward ? FR_DOWN : 0) | FR_MATCHCASE, (LPARAM)&ft);
+      if( bForward ) {
+         SciMsg( ed->hEdit, SCI_SETTARGETSTART, 0, 0 );
+         SciMsg( ed->hEdit, SCI_SETTARGETEND, nLen, 0 );
+      } else {
+         SciMsg( ed->hEdit, SCI_SETTARGETSTART, nLen, 0 );
+         SciMsg( ed->hEdit, SCI_SETTARGETEND, 0, 0 );
+      }
+      nPos = (int) SciMsg( ed->hEdit, SCI_SEARCHINTARGET, nFindLen, (LPARAM) szFind );
    }
 
    if( nPos >= 0 ) {
-      cr.cpMin = nPos; cr.cpMax = nPos + lstrlenA(szFind);
-      SendMessage(ed->hEdit, EM_EXSETSEL, 0, (LPARAM)&cr);
-      SendMessage(ed->hEdit, EM_SCROLLCARET, 0, 0);
+      SciMsg( ed->hEdit, SCI_SETSEL, nPos, nPos + nFindLen );
+      SciMsg( ed->hEdit, SCI_SCROLLCARET, 0, 0 );
    }
 
    /* Count total matches */
-   { FINDTEXTINFO fc; int p;
-     fc.chrg.cpMin = 0; fc.chrg.cpMax = nLen; fc.lpstrText = szFind;
-     nCount = 0;
-     while( (p = (int)SendMessageA(ed->hEdit, EM_FINDTEXT, FR_DOWN|FR_MATCHCASE, (LPARAM)&fc)) >= 0 ) {
-        nCount++; fc.chrg.cpMin = p + 1;
+   { int p, s = 0;
+     while( s < nLen ) {
+        SciMsg( ed->hEdit, SCI_SETTARGETSTART, s, 0 );
+        SciMsg( ed->hEdit, SCI_SETTARGETEND, nLen, 0 );
+        p = (int) SciMsg( ed->hEdit, SCI_SEARCHINTARGET, nFindLen, (LPARAM) szFind );
+        if( p < 0 ) break;
+        nCount++;
+        s = p + 1;
      }
    }
 
@@ -3671,187 +3793,69 @@ static void CE_FindNext( CODEEDITOR * ed, BOOL bForward )
    }
 }
 
-static LRESULT CALLBACK CodeEditSubProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
+/* Scintilla parent WndProc handles keyboard shortcuts via WM_COMMAND/WM_NOTIFY
+   Scintilla manages its own WndProc - no subclass needed */
+
+/* Scintilla notification codes */
+#define SCN_CHARADDED     2001
+#define SCN_UPDATEUI      2007
+#define SCN_MODIFIED      2008
+#define SCN_MARGINCLICK   2010
+#define SCI_TOGGLEFOLD    2231
+#define SCI_GETCOLUMN     2129
+#define SCI_GETOVERTYPE   2187
+
+/* NMHDR-compatible Scintilla notification header */
+typedef struct {
+   HWND hwndFrom;
+   unsigned int idFrom;
+   unsigned int code;
+   int position;
+   int ch;
+   int modifiers;
+   int modificationType;
+   const char * text;
+   int length;
+   int linesAdded;
+   int message;
+   uintptr_t wParam;
+   intptr_t lParam;
+   int line;
+   int foldLevelNow;
+   int foldLevelPrev;
+   int margin;
+   int listType;
+   int x;
+   int y;
+   int token;
+   int annotationLinesAdded;
+   int updated;
+   int listCompletionMethod;
+   int characterSource;
+} SCNotification;
+
+/* Update status bar: Ln X, Col Y | INS/OVR | lines | chars */
+static void UpdateStatusBar( CODEEDITOR * ed )
 {
-   CODEEDITOR * ed = (CODEEDITOR *) GetPropA( hWnd, "CodeEd" );
-   LRESULT r;
+   int pos, line, col, lineCount, nLen, ovr;
+   char szStatus[256];
 
-   if( !ed ) return DefWindowProc( hWnd, msg, wParam, lParam );
+   if( !ed || !ed->hEdit || !ed->hStatusBar ) return;
 
-   /* Intercept Ctrl+F (Find) and Ctrl+H (Replace) BEFORE RichEdit */
-   if( msg == WM_KEYDOWN ) {
-      BOOL ctrl = GetKeyState(VK_CONTROL) & 0x8000;
-      if( ctrl && wParam == 'F' ) {
-         CE_ShowFindBar(ed, !ed->bFindVisible, FALSE);
-         return 0;
-      }
-      if( ctrl && wParam == 'H' ) {
-         CE_ShowFindBar(ed, TRUE, TRUE);
-         return 0;
-      }
-      if( wParam == VK_ESCAPE && ed->bFindVisible ) {
-         CE_ShowFindBar(ed, FALSE, FALSE);
-         return 0;
-      }
-      if( wParam == VK_F3 ) {
-         CE_FindNext(ed, !(GetKeyState(VK_SHIFT) & 0x8000));
-         return 0;
-      }
+   pos = (int) SciMsg( ed->hEdit, SCI_GETCURRENTPOS, 0, 0 );
+   line = (int) SciMsg( ed->hEdit, SCI_LINEFROMPOSITION, pos, 0 );
+   col = (int) SciMsg( ed->hEdit, SCI_GETCOLUMN, pos, 0 );
+   lineCount = (int) SciMsg( ed->hEdit, SCI_GETLINECOUNT, 0, 0 );
+   nLen = (int) SciMsg( ed->hEdit, SCI_GETLENGTH, 0, 0 );
+   ovr = (int) SciMsg( ed->hEdit, SCI_GETOVERTYPE, 0, 0 );
 
-      /* Ctrl+Space = auto-complete */
-      if( ctrl && wParam == VK_SPACE ) {
-         /* Get word before cursor */
-         CHARRANGE cra;
-         int nPos, nStart;
-         char wordBuf[64] = {0};
-         SendMessage(hWnd, EM_EXGETSEL, 0, (LPARAM)&cra);
-         nPos = cra.cpMin;
-         /* Scan backward for word start */
-         if( nPos > 0 ) {
-            int nLen = GetWindowTextLengthA(hWnd);
-            char * allText = (char*)malloc(nLen+1);
-            GetWindowTextA(hWnd, allText, nLen+1);
-            nStart = nPos - 1;
-            while( nStart > 0 && (IsWordChar(allText[nStart-1])) ) nStart--;
-            if( nPos - nStart > 0 && nPos - nStart < 60 ) {
-               memcpy(wordBuf, allText+nStart, nPos-nStart);
-               wordBuf[nPos-nStart] = 0;
-               CE_ShowAutoComplete(ed, wordBuf);
-            }
-            free(allText);
-         }
-         return 0;
-      }
+   sprintf( szStatus, "  Ln %d, Col %d      %s      %d lines      %d chars      UTF-8",
+      line + 1, col + 1,
+      ovr ? "OVR" : "INS",
+      lineCount, nLen );
 
-      /* Ctrl+Shift+[ = fold current block, Ctrl+Shift+] = unfold */
-      if( ctrl && (GetKeyState(VK_SHIFT) & 0x8000) ) {
-         if( wParam == VK_OEM_4 ) { /* [ key */
-            /* Simple fold: hide lines from current to matching end */
-            /* For now, just show a message - full folding needs custom line tracking */
-            return 0;
-         }
-         if( wParam == VK_OEM_6 ) { /* ] key */
-            return 0;
-         }
-      }
-
-      /* Ctrl+G = Go to line */
-      if( ctrl && wParam == 'G' ) {
-         char buf[16] = "";
-         CHARRANGE crg;
-         int nLine;
-         /* Simple input box via a prompt */
-         /* For now, scroll to top as placeholder */
-         crg.cpMin = 0; crg.cpMax = 0;
-         SendMessage(hWnd, EM_EXSETSEL, 0, (LPARAM)&crg);
-         SendMessage(hWnd, EM_SCROLLCARET, 0, 0);
-         return 0;
-      }
-
-      /* Ctrl+/ = toggle line comment */
-      if( ctrl && wParam == VK_OEM_2 ) { /* / key */
-         CHARRANGE crc;
-         int nLine;
-         SendMessage(hWnd, EM_EXGETSEL, 0, (LPARAM)&crc);
-         nLine = (int) SendMessage(hWnd, EM_LINEFROMCHAR, crc.cpMin, 0);
-         /* Get line start */
-         { int lineStart = (int) SendMessage(hWnd, EM_LINEINDEX, nLine, 0);
-           int lineLen = (int) SendMessage(hWnd, EM_LINELENGTH, lineStart, 0);
-           char lineBuf[512] = {0};
-           CHARRANGE sel;
-           if( lineLen > 0 && lineLen < 510 ) {
-              *(WORD*)lineBuf = 510;
-              SendMessageA(hWnd, EM_GETLINE, nLine, (LPARAM)lineBuf);
-              lineBuf[lineLen] = 0;
-              sel.cpMin = lineStart; sel.cpMax = lineStart;
-              SendMessage(hWnd, EM_EXSETSEL, 0, (LPARAM)&sel);
-              if( lineBuf[0] == '/' && lineBuf[1] == '/' ) {
-                 /* Remove comment: select first 3 chars (// + space) */
-                 int rmLen = (lineLen > 2 && lineBuf[2] == ' ') ? 3 : 2;
-                 sel.cpMax = lineStart + rmLen;
-                 SendMessage(hWnd, EM_EXSETSEL, 0, (LPARAM)&sel);
-                 SendMessageA(hWnd, EM_REPLACESEL, TRUE, (LPARAM)"");
-              } else {
-                 /* Add comment */
-                 SendMessageA(hWnd, EM_REPLACESEL, TRUE, (LPARAM)"// ");
-              }
-           }
-         }
-         return 0;
-      }
-
-      /* Ctrl+Shift+D = duplicate line */
-      if( ctrl && (GetKeyState(VK_SHIFT) & 0x8000) && wParam == 'D' ) {
-         CHARRANGE crd;
-         int nLine, lineStart, lineLen;
-         char dupBuf[1024] = {0};
-         SendMessage(hWnd, EM_EXGETSEL, 0, (LPARAM)&crd);
-         nLine = (int) SendMessage(hWnd, EM_LINEFROMCHAR, crd.cpMin, 0);
-         lineStart = (int) SendMessage(hWnd, EM_LINEINDEX, nLine, 0);
-         lineLen = (int) SendMessage(hWnd, EM_LINELENGTH, lineStart, 0);
-         if( lineLen > 0 && lineLen < 1020 ) {
-            *(WORD*)dupBuf = 1020;
-            SendMessageA(hWnd, EM_GETLINE, nLine, (LPARAM)dupBuf);
-            dupBuf[lineLen] = 0;
-            /* Position at end of line */
-            crd.cpMin = lineStart + lineLen;
-            crd.cpMax = lineStart + lineLen;
-            SendMessage(hWnd, EM_EXSETSEL, 0, (LPARAM)&crd);
-            /* Insert newline + duplicate */
-            { char ins[1030];
-              ins[0] = '\r'; ins[1] = '\n';
-              memcpy(ins+2, dupBuf, lineLen);
-              ins[lineLen+2] = 0;
-              SendMessageA(hWnd, EM_REPLACESEL, TRUE, (LPARAM)ins);
-            }
-         }
-         return 0;
-      }
-
-      /* Ctrl+Shift+K = delete entire line */
-      if( ctrl && (GetKeyState(VK_SHIFT) & 0x8000) && wParam == 'K' ) {
-         CHARRANGE crk;
-         int nLine, lineStart, lineEnd;
-         SendMessage(hWnd, EM_EXGETSEL, 0, (LPARAM)&crk);
-         nLine = (int) SendMessage(hWnd, EM_LINEFROMCHAR, crk.cpMin, 0);
-         lineStart = (int) SendMessage(hWnd, EM_LINEINDEX, nLine, 0);
-         lineEnd = (int) SendMessage(hWnd, EM_LINEINDEX, nLine + 1, 0);
-         if( lineEnd <= lineStart ) lineEnd = lineStart + (int)SendMessage(hWnd, EM_LINELENGTH, lineStart, 0);
-         crk.cpMin = lineStart; crk.cpMax = lineEnd;
-         SendMessage(hWnd, EM_EXSETSEL, 0, (LPARAM)&crk);
-         SendMessageA(hWnd, EM_REPLACESEL, TRUE, (LPARAM)"");
-         return 0;
-      }
-
-      /* Ctrl+L = select entire line */
-      if( ctrl && wParam == 'L' && !(GetKeyState(VK_SHIFT) & 0x8000) ) {
-         CHARRANGE crl;
-         int nLine, lineStart, lineEnd;
-         SendMessage(hWnd, EM_EXGETSEL, 0, (LPARAM)&crl);
-         nLine = (int) SendMessage(hWnd, EM_LINEFROMCHAR, crl.cpMin, 0);
-         lineStart = (int) SendMessage(hWnd, EM_LINEINDEX, nLine, 0);
-         lineEnd = (int) SendMessage(hWnd, EM_LINEINDEX, nLine + 1, 0);
-         if( lineEnd <= lineStart ) lineEnd = lineStart + (int)SendMessage(hWnd, EM_LINELENGTH, lineStart, 0);
-         crl.cpMin = lineStart; crl.cpMax = lineEnd;
-         SendMessage(hWnd, EM_EXSETSEL, 0, (LPARAM)&crl);
-         return 0;
-      }
-   }
-
-   r = CallWindowProc( ed->oldEditProc, hWnd, msg, wParam, lParam );
-
-   /* After scroll, key, or size: sync gutter */
-   if( msg == WM_VSCROLL || msg == WM_MOUSEWHEEL ||
-       msg == WM_KEYUP || msg == WM_SIZE ||
-       msg == WM_CHAR || msg == WM_PASTE )
-   {
-      GutterSync( ed );
-   }
-
-   return r;
+   SetWindowTextA( ed->hStatusBar, szStatus );
 }
-
-static BOOL s_gutterClassReg = FALSE;
 
 static LRESULT CALLBACK CodeEdWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 {
@@ -3866,10 +3870,11 @@ static LRESULT CALLBACK CodeEdWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARA
          {
             if( ed->hTab )
                MoveWindow( ed->hTab, 0, 0, w, TAB_HEIGHT, TRUE );
-            if( ed->hGutter )
-               MoveWindow( ed->hGutter, 0, TAB_HEIGHT, GUTTER_WIDTH, h - TAB_HEIGHT, TRUE );
+            if( ed->hStatusBar )
+               MoveWindow( ed->hStatusBar, 0, h - STATUSBAR_HEIGHT, w, STATUSBAR_HEIGHT, TRUE );
             if( ed->hEdit )
-               MoveWindow( ed->hEdit, GUTTER_WIDTH, TAB_HEIGHT, w - GUTTER_WIDTH, h - TAB_HEIGHT, TRUE );
+               MoveWindow( ed->hEdit, 0, TAB_HEIGHT, w,
+                  h - TAB_HEIGHT - (ed->hStatusBar ? STATUSBAR_HEIGHT : 0), TRUE );
          }
          return 0;
       }
@@ -3877,11 +3882,60 @@ static LRESULT CALLBACK CodeEdWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARA
       case WM_NOTIFY:
       {
          NMHDR * pnm = (NMHDR *) lParam;
+
+         /* Tab change */
          if( ed && pnm->hwndFrom == ed->hTab && pnm->code == TCN_SELCHANGE )
          {
             int nSel = (int) SendMessage( ed->hTab, TCM_GETCURSEL, 0, 0 );
             if( nSel >= 0 && nSel < ed->nTabs && nSel != ed->nActiveTab )
                SwitchTab( ed, nSel );
+         }
+
+         /* Scintilla notifications */
+         if( ed && pnm->hwndFrom == ed->hEdit )
+         {
+            SCNotification * scn = (SCNotification *) lParam;
+
+            if( scn->code == SCN_MARGINCLICK ) {
+               /* Fold/unfold on margin click */
+               int line = (int) SciMsg( ed->hEdit, SCI_LINEFROMPOSITION, scn->position, 0 );
+               SciMsg( ed->hEdit, SCI_TOGGLEFOLD, line, 0 );
+            }
+
+            if( scn->code == SCN_CHARADDED ) {
+               /* Auto-indent on Enter */
+               if( scn->ch == '\n' || scn->ch == '\r' ) {
+                  int curLine = (int) SciMsg( ed->hEdit, SCI_LINEFROMPOSITION,
+                     SciMsg( ed->hEdit, SCI_GETCURRENTPOS, 0, 0 ), 0 );
+                  if( curLine > 0 ) {
+                     int prevLine = curLine - 1;
+                     int indent, pos;
+                     indent = (int) SciMsg( ed->hEdit, 2127, prevLine, 0 ); /* SCI_GETLINEINDENTATION */
+                     SciMsg( ed->hEdit, 2126, curLine, indent ); /* SCI_SETLINEINDENTATION */
+                     pos = (int) SciMsg( ed->hEdit, 2128, curLine, 0 ); /* SCI_GETLINEINDENTPOSITION */
+                     SciMsg( ed->hEdit, SCI_GOTOPOS, pos, 0 );
+                  }
+               }
+            }
+
+            /* Update status bar on cursor/selection change */
+            if( scn->code == SCN_UPDATEUI ) {
+               UpdateStatusBar( ed );
+            }
+
+            /* Update Harbour folding when text is inserted/deleted (not fold changes) */
+            if( scn->code == SCN_MODIFIED ) {
+               /* Only update folding on actual text insert (0x01) or delete (0x02) with line changes */
+               if( scn->linesAdded != 0 && (scn->modificationType & (0x01|0x02)) ) {
+                  static int s_inFoldUpdate = 0;
+                  if( !s_inFoldUpdate ) {
+                     s_inFoldUpdate = 1;
+                     UpdateHarbourFolding( ed->hEdit );
+                     s_inFoldUpdate = 0;
+                  }
+               }
+               UpdateStatusBar( ed );
+            }
          }
          break;
       }
@@ -3889,9 +3943,98 @@ static LRESULT CALLBACK CodeEdWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARA
       case WM_COMMAND:
          if( ed ) {
             WORD id = LOWORD(wParam);
-            if( id == 901 ) CE_FindNext(ed, TRUE);        /* Next */
-            if( id == 902 ) CE_FindNext(ed, FALSE);       /* Prev */
-            if( id == 903 ) CE_ShowFindBar(ed, FALSE, FALSE); /* Close */
+            if( id == 901 ) CE_FindNext(ed, TRUE);
+            if( id == 902 ) CE_FindNext(ed, FALSE);
+            if( id == 903 ) CE_ShowFindBar(ed, FALSE, FALSE);
+         }
+         break;
+
+      /* Forward keyboard shortcuts from parent to Scintilla actions */
+      case WM_KEYDOWN:
+         if( ed && ed->hEdit ) {
+            BOOL ctrl = GetKeyState(VK_CONTROL) & 0x8000;
+            BOOL shift = GetKeyState(VK_SHIFT) & 0x8000;
+
+            if( ctrl && wParam == 'F' ) {
+               CE_ShowFindBar(ed, !ed->bFindVisible, FALSE);
+               return 0;
+            }
+            if( ctrl && wParam == 'H' ) {
+               CE_ShowFindBar(ed, TRUE, TRUE);
+               return 0;
+            }
+            if( wParam == VK_ESCAPE && ed->bFindVisible ) {
+               CE_ShowFindBar(ed, FALSE, FALSE);
+               return 0;
+            }
+            if( wParam == VK_F3 ) {
+               CE_FindNext(ed, !shift);
+               return 0;
+            }
+            if( ctrl && wParam == VK_SPACE ) {
+               CE_ShowAutoComplete(ed);
+               return 0;
+            }
+            if( ctrl && wParam == 'G' ) {
+               /* Go to beginning for now */
+               SciMsg( ed->hEdit, SCI_GOTOPOS, 0, 0 );
+               return 0;
+            }
+            if( ctrl && wParam == VK_OEM_2 ) {
+               /* Toggle line comment */
+               int pos = (int) SciMsg( ed->hEdit, SCI_GETCURRENTPOS, 0, 0 );
+               int line = (int) SciMsg( ed->hEdit, SCI_LINEFROMPOSITION, pos, 0 );
+               int lineStart = (int) SciMsg( ed->hEdit, SCI_POSITIONFROMLINE, line, 0 );
+               int lineLen = (int) SciMsg( ed->hEdit, SCI_LINELENGTH, line, 0 );
+               if( lineLen > 0 && lineLen < 1000 ) {
+                  char * lineBuf = (char *) malloc( lineLen + 1 );
+                  SciMsg( ed->hEdit, SCI_GETLINE, line, (LPARAM) lineBuf );
+                  lineBuf[lineLen] = 0;
+                  if( lineBuf[0] == '/' && lineBuf[1] == '/' ) {
+                     int rmLen = (lineLen > 2 && lineBuf[2] == ' ') ? 3 : 2;
+                     SciMsg( ed->hEdit, SCI_SETSEL, lineStart, lineStart + rmLen );
+                     SciMsg( ed->hEdit, SCI_REPLACESEL, 0, (LPARAM) "" );
+                  } else {
+                     SciMsg( ed->hEdit, SCI_SETSEL, lineStart, lineStart );
+                     SciMsg( ed->hEdit, SCI_REPLACESEL, 0, (LPARAM) "// " );
+                  }
+                  free( lineBuf );
+               }
+               return 0;
+            }
+            if( ctrl && shift && wParam == 'D' ) {
+               /* Duplicate line */
+               SciMsg( ed->hEdit, 2469, 0, 0 ); /* SCI_LINEDUPLICATE */
+               return 0;
+            }
+            if( ctrl && shift && wParam == 'K' ) {
+               /* Delete line */
+               SciMsg( ed->hEdit, 2338, 0, 0 ); /* SCI_LINEDELETE */
+               return 0;
+            }
+            if( ctrl && wParam == 'L' && !shift ) {
+               /* Select line */
+               int pos2 = (int) SciMsg( ed->hEdit, SCI_GETCURRENTPOS, 0, 0 );
+               int ln2 = (int) SciMsg( ed->hEdit, SCI_LINEFROMPOSITION, pos2, 0 );
+               int ls2 = (int) SciMsg( ed->hEdit, SCI_POSITIONFROMLINE, ln2, 0 );
+               int le2 = (int) SciMsg( ed->hEdit, SCI_POSITIONFROMLINE, ln2 + 1, 0 );
+               if( le2 <= ls2 ) le2 = ls2 + (int)SciMsg( ed->hEdit, SCI_LINELENGTH, ln2, 0 );
+               SciMsg( ed->hEdit, SCI_SETSEL, ls2, le2 );
+               return 0;
+            }
+         }
+         break;
+
+      /* Dark status bar background */
+      case WM_CTLCOLORSTATIC:
+         if( ed && ed->hStatusBar && (HWND) lParam == ed->hStatusBar )
+         {
+            static HBRUSH s_hSbBrush = NULL;
+            HDC hdc = (HDC) wParam;
+            SetTextColor( hdc, RGB(180,180,180) );
+            SetBkColor( hdc, RGB(37,37,38) );
+            if( !s_hSbBrush ) s_hSbBrush = CreateSolidBrush( RGB(37,37,38) );
+            return (LRESULT) s_hSbBrush;
          }
          break;
 
@@ -3909,14 +4052,22 @@ HB_FUNC( CODEEDITORCREATE )
    CODEEDITOR * ed;
    WNDCLASSA wc = {0};
    static BOOL bReg = FALSE;
-   CHARFORMATA cf = {0};
-   HDC hDC;
    TCITEMA tci;
    int nLeft = hb_parni(1), nTop = hb_parni(2);
    int nWidth = hb_parni(3), nHeight = hb_parni(4);
+   FILE * fLog;
 
-   /* Load RichEdit library */
-   LoadLibraryA( "Msftedit.dll" );
+   fLog = fopen( "c:\\HarbourBuilder\\scintilla_trace.log", "a" );
+   if( fLog ) fprintf( fLog, "CodeEditorCreate: %d,%d %dx%d\n", nLeft, nTop, nWidth, nHeight );
+
+   /* Load Scintilla + Lexilla DLLs */
+   if( !InitScintilla() ) {
+      if( fLog ) { fprintf( fLog, "FATAL: Cannot load Scintilla DLLs!\n" ); fclose( fLog ); }
+      MessageBoxA( NULL, "Cannot load Scintilla.dll / Lexilla.dll\nCheck resources/ folder.",
+         "HbBuilder Error", MB_OK | MB_ICONERROR );
+      hb_retnint( 0 );
+      return;
+   }
 
    /* Init common controls for Tab */
    {
@@ -3926,18 +4077,6 @@ HB_FUNC( CODEEDITORCREATE )
 
    ed = (CODEEDITOR *) malloc( sizeof(CODEEDITOR) );
    memset( ed, 0, sizeof(CODEEDITOR) );
-
-   /* Monospace font - 15pt Consolas */
-   {
-      LOGFONTA lf = {0};
-      hDC = GetDC( NULL );
-      lf.lfHeight = -MulDiv( 15, GetDeviceCaps( hDC, LOGPIXELSY ), 72 );
-      ReleaseDC( NULL, hDC );
-      lf.lfCharSet = DEFAULT_CHARSET;
-      lf.lfPitchAndFamily = FIXED_PITCH | FF_MODERN;
-      lstrcpyA( lf.lfFaceName, "Consolas" );
-      ed->hFont = CreateFontIndirectA( &lf );
-   }
 
    if( !bReg ) {
       wc.lpfnWndProc = CodeEdWndProc;
@@ -3976,67 +4115,49 @@ HB_FUNC( CODEEDITORCREATE )
    ed->nActiveTab = 0;
    ed->aTexts[0] = NULL;
 
-   /* Register gutter class */
-   if( !s_gutterClassReg )
-   {
-      WNDCLASSA gc = {0};
-      gc.lpfnWndProc = GutterWndProc;
-      gc.hInstance = GetModuleHandle(NULL);
-      gc.hCursor = LoadCursor(NULL, IDC_ARROW);
-      gc.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
-      gc.lpszClassName = "HbIdeGutter";
-      RegisterClassA( &gc );
-      s_gutterClassReg = TRUE;
-   }
-
-   /* Gutter (line numbers) */
-   ed->hGutter = CreateWindowExA( 0, "HbIdeGutter", NULL,
-      WS_CHILD | WS_VISIBLE,
-      0, TAB_HEIGHT, GUTTER_WIDTH, nHeight - TAB_HEIGHT,
-      ed->hWnd, NULL, GetModuleHandle(NULL), NULL );
-   SetWindowLongPtr( ed->hGutter, GWLP_USERDATA, (LONG_PTR) ed );
-
-   /* RichEdit control (to the right of gutter, below tabs) */
-   ed->hEdit = CreateWindowExA( 0, "RICHEDIT50W", "",
-      WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL |
-      ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | ES_NOHIDESEL,
-      GUTTER_WIDTH, TAB_HEIGHT, nWidth - GUTTER_WIDTH, nHeight - TAB_HEIGHT,
+   /* Create Scintilla editor (full width, no separate gutter needed) */
+   ed->hEdit = CreateWindowExA( 0, "Scintilla", "",
+      WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL,
+      0, TAB_HEIGHT, nWidth, nHeight - TAB_HEIGHT,
       ed->hWnd, NULL, GetModuleHandle(NULL), NULL );
 
-   /* If RICHEDIT50W fails, try RICHEDIT20A */
-   if( !ed->hEdit )
-   {
-      LoadLibraryA( "Riched20.dll" );
-      ed->hEdit = CreateWindowExA( 0, "RichEdit20A", "",
-         WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL |
-         ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | ES_NOHIDESEL,
-         GUTTER_WIDTH, TAB_HEIGHT, nWidth - GUTTER_WIDTH, nHeight - TAB_HEIGHT,
-         ed->hWnd, NULL, GetModuleHandle(NULL), NULL );
-   }
+   if( fLog ) fprintf( fLog, "Scintilla hwnd => %p\n", ed->hEdit );
 
    if( ed->hEdit )
    {
-      /* Set default font via CHARFORMAT - 15pt Consolas */
-      cf.cbSize = sizeof(cf);
-      cf.dwMask = CFM_FACE | CFM_SIZE | CFM_COLOR;
-      cf.yHeight = 15 * 20;  /* 15pt in twips */
-      cf.crTextColor = RGB(212,212,212);  /* light gray text on dark bg */
-      lstrcpyA( cf.szFaceName, "Consolas" );
-      SendMessageA( ed->hEdit, EM_SETCHARFORMAT, SCF_ALL, (LPARAM) &cf );
+      /* Configure syntax highlighting, colors, margins */
+      ConfigureScintilla( ed->hEdit );
 
-      /* Dark background */
-      SendMessage( ed->hEdit, EM_SETBKGNDCOLOR, 0, (LPARAM) RGB(30,30,30) );
+      if( fLog ) fprintf( fLog, "Scintilla configured OK\n" );
+   }
+   else
+   {
+      if( fLog ) fprintf( fLog, "FAILED to create Scintilla window!\n" );
+      MessageBoxA( NULL, "Failed to create Scintilla editor window.",
+         "HbBuilder Error", MB_OK | MB_ICONERROR );
+   }
 
-      /* Enable ENM_CHANGE for future auto-highlight */
-      SendMessage( ed->hEdit, EM_SETEVENTMASK, 0, ENM_CHANGE );
-
-      /* Subclass RichEdit to catch scroll events for gutter sync */
-      SetPropA( ed->hEdit, "CodeEd", (HANDLE) ed );
-      ed->oldEditProc = (WNDPROC) SetWindowLongPtr( ed->hEdit,
-         GWLP_WNDPROC, (LONG_PTR) CodeEditSubProc );
+   /* Status bar at bottom (position will be corrected by WM_SIZE) */
+   ed->hStatusBar = CreateWindowExA( 0, "STATIC",
+      "  Ln 1, Col 1      INS      0 lines      0 chars      UTF-8",
+      WS_CHILD | WS_VISIBLE | SS_LEFT | SS_CENTERIMAGE,
+      0, 0, nWidth, STATUSBAR_HEIGHT,
+      ed->hWnd, NULL, GetModuleHandle(NULL), NULL );
+   {
+      HFONT hSbFont = (HFONT) GetStockObject( DEFAULT_GUI_FONT );
+      SendMessage( ed->hStatusBar, WM_SETFONT, (WPARAM) hSbFont, TRUE );
    }
 
    ShowWindow( ed->hWnd, SW_SHOW );
+
+   /* Force layout: send WM_SIZE with current client rect to position all children */
+   { RECT rcClient;
+     GetClientRect( ed->hWnd, &rcClient );
+     SendMessage( ed->hWnd, WM_SIZE, SIZE_RESTORED,
+        MAKELPARAM( rcClient.right, rcClient.bottom ) );
+   }
+
+   if( fLog ) fclose( fLog );
 
    hb_retnint( (HB_PTRUINT) ed );
 }
@@ -4046,7 +4167,6 @@ HB_FUNC( CODEEDITORSETTABTEXT )
 {
    CODEEDITOR * ed = (CODEEDITOR *) (HB_PTRUINT) hb_parnint(1);
    int nTab = hb_parni(2) - 1;  /* Convert to 0-based */
-   CHARFORMATA cf = {0};
 
    if( !ed || nTab < 0 || nTab >= ed->nTabs || !HB_ISCHAR(3) ) return;
 
@@ -4062,36 +4182,27 @@ HB_FUNC( CODEEDITORSETTABTEXT )
       ed->aTexts[nTab][nLen] = 0;
    }
 
-   /* If this is the active tab, update RichEdit - only if text changed */
+   /* If this is the active tab, update Scintilla */
    if( nTab == ed->nActiveTab && ed->hEdit )
    {
-      /* Check if text actually changed to avoid unnecessary re-highlight */
-      int nCurLen = GetWindowTextLengthA( ed->hEdit );
+      int nCurLen = (int) SciMsg( ed->hEdit, SCI_GETLENGTH, 0, 0 );
       int nNewLen = (int) hb_parclen(3);
       BOOL bChanged = ( nCurLen != nNewLen );
 
       if( !bChanged && nCurLen > 0 )
       {
          char * cur = (char *) malloc( nCurLen + 1 );
-         GetWindowTextA( ed->hEdit, cur, nCurLen + 1 );
+         SciMsg( ed->hEdit, SCI_GETTEXT, nCurLen + 1, (LPARAM) cur );
          bChanged = ( memcmp( cur, hb_parc(3), nNewLen ) != 0 );
          free( cur );
       }
 
       if( bChanged )
       {
-         SetWindowTextA( ed->hEdit, ed->aTexts[nTab] );
-
-         /* Re-apply font formatting */
-         cf.cbSize = sizeof(cf);
-         cf.dwMask = CFM_FACE | CFM_SIZE | CFM_COLOR;
-         cf.yHeight = 15 * 20;
-         cf.crTextColor = RGB(212,212,212);
-         lstrcpyA( cf.szFaceName, "Consolas" );
-         SendMessageA( ed->hEdit, EM_SETCHARFORMAT, SCF_ALL, (LPARAM) &cf );
-
-         HighlightCode( ed->hEdit );
-         GutterSync( ed );
+         SciMsg( ed->hEdit, SCI_SETTEXT, 0, (LPARAM) ed->aTexts[nTab] );
+         SciMsg( ed->hEdit, SCI_EMPTYUNDOBUFFER, 0, 0 );
+         /* Scintilla handles syntax highlighting automatically via lexer */
+         UpdateHarbourFolding( ed->hEdit );
       }
    }
 }
@@ -4108,12 +4219,12 @@ HB_FUNC( CODEEDITORGETTABTEXT )
       return;
    }
 
-   /* If active tab, read from RichEdit (may have been edited) */
+   /* If active tab, read from Scintilla (may have been edited) */
    if( nTab == ed->nActiveTab && ed->hEdit )
    {
-      int nLen = GetWindowTextLengthA( ed->hEdit );
+      int nLen = (int) SciMsg( ed->hEdit, SCI_GETLENGTH, 0, 0 );
       char * buf = (char *) malloc( nLen + 1 );
-      GetWindowTextA( ed->hEdit, buf, nLen + 1 );
+      SciMsg( ed->hEdit, SCI_GETTEXT, nLen + 1, (LPARAM) buf );
       hb_retclen( buf, nLen );
       free( buf );
    }
@@ -4184,7 +4295,7 @@ HB_FUNC( CODEEDITORCLEARTABS )
    ed->nTabs = 1;
    ed->nActiveTab = 0;
 
-   SetWindowTextA( ed->hEdit, "" );
+   SciMsg( ed->hEdit, SCI_SETTEXT, 0, (LPARAM) "" );
 }
 
 /* CodeEditorOnTabChange( hEditor, bBlock ) - set tab change callback */
@@ -4217,42 +4328,24 @@ HB_FUNC( CODEEDITORBRINGTOFRONT )
 HB_FUNC( CODEEDITORAPPENDTEXT )
 {
    CODEEDITOR * ed = (CODEEDITOR *) (HB_PTRUINT) hb_parnint(1);
-   CHARFORMATA cf = {0};
 
    if( !ed || !ed->hEdit || !HB_ISCHAR(2) ) return;
 
    {
-      int nLen = GetWindowTextLengthA( ed->hEdit );
+      int nLen = (int) SciMsg( ed->hEdit, SCI_GETLENGTH, 0, 0 );
       int nAppend = (int) hb_parclen(2);
-      char * buf = (char *) malloc( nLen + nAppend + 1 );
-      CHARRANGE cr;
 
-      GetWindowTextA( ed->hEdit, buf, nLen + 1 );
-      memcpy( buf + nLen, hb_parc(2), nAppend );
-      buf[nLen + nAppend] = 0;
-
-      SetWindowTextA( ed->hEdit, buf );
-
-      /* Re-apply font formatting */
-      cf.cbSize = sizeof(cf);
-      cf.dwMask = CFM_FACE | CFM_SIZE | CFM_COLOR;
-      cf.yHeight = 15 * 20;
-      cf.crTextColor = RGB(212,212,212);
-      lstrcpyA( cf.szFaceName, "Consolas" );
-      SendMessageA( ed->hEdit, EM_SETCHARFORMAT, SCF_ALL, (LPARAM) &cf );
-
-      HighlightCode( ed->hEdit );
+      /* Append at end */
+      SciMsg( ed->hEdit, SCI_GOTOPOS, nLen, 0 );
+      SciMsg( ed->hEdit, SCI_ADDTEXT, nAppend, (LPARAM) hb_parc(2) );
 
       /* Set cursor position */
       if( HB_ISNUM(3) )
       {
          int nOfs = nLen + hb_parni(3);
-         cr.cpMin = nOfs; cr.cpMax = nOfs;
-         SendMessage( ed->hEdit, EM_EXSETSEL, 0, (LPARAM) &cr );
-         SendMessage( ed->hEdit, EM_SCROLLCARET, 0, 0 );
+         SciMsg( ed->hEdit, SCI_GOTOPOS, nOfs, 0 );
+         SciMsg( ed->hEdit, SCI_SCROLLCARET, 0, 0 );
       }
-
-      free( buf );
    }
 }
 
@@ -4265,7 +4358,6 @@ HB_FUNC( CODEEDITORGOTOFUNCTION )
    char * buf;
    char * pos;
    char szSearch[256];
-   CHARRANGE cr;
 
    if( !ed || !ed->hEdit || !cFunc )
    {
@@ -4273,11 +4365,11 @@ HB_FUNC( CODEEDITORGOTOFUNCTION )
       return;
    }
 
-   nLen = GetWindowTextLengthA( ed->hEdit );
+   nLen = (int) SciMsg( ed->hEdit, SCI_GETLENGTH, 0, 0 );
    if( nLen <= 0 ) { hb_retl( FALSE ); return; }
 
    buf = (char *) malloc( nLen + 1 );
-   GetWindowTextA( ed->hEdit, buf, nLen + 1 );
+   SciMsg( ed->hEdit, SCI_GETTEXT, nLen + 1, (LPARAM) buf );
 
    sprintf( szSearch, "function %s", cFunc );
    nFuncLen = (int) strlen( szSearch );
@@ -4286,9 +4378,8 @@ HB_FUNC( CODEEDITORGOTOFUNCTION )
    if( pos )
    {
       int nOfs = (int)(pos - buf) + nFuncLen;
-      cr.cpMin = nOfs; cr.cpMax = nOfs;
-      SendMessage( ed->hEdit, EM_EXSETSEL, 0, (LPARAM) &cr );
-      SendMessage( ed->hEdit, EM_SCROLLCARET, 0, 0 );
+      SciMsg( ed->hEdit, SCI_GOTOPOS, nOfs, 0 );
+      SciMsg( ed->hEdit, SCI_SCROLLCARET, 0, 0 );
       SetFocus( ed->hEdit );
       free( buf );
       hb_retl( TRUE );
@@ -4311,7 +4402,6 @@ HB_FUNC( CODEEDITORDESTROY )
       for( i = 0; i < ed->nTabs; i++ )
          if( ed->aTexts[i] ) free( ed->aTexts[i] );
       if( ed->hWnd ) DestroyWindow( ed->hWnd );
-      if( ed->hFont ) DeleteObject( ed->hFont );
       free( ed );
    }
 }

@@ -1,6 +1,90 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-03 (Session 3: Scintilla Code Editor)
+----------------------------------------------
+
+MAJOR: Replaced RichEdit with Scintilla 5.6.1 + Lexilla 5.4.8
+
+  Code editor completely rewritten to use Scintilla — the same editing
+  component used by Notepad++, SciTE, Code::Blocks, and many professional IDEs.
+  This replaces the RichEdit-based editor which had unreliable syntax coloring.
+
+  SYNTAX HIGHLIGHTING (automatic via C/C++ lexer + Harbour keywords):
+  - Keywords ......... bright blue, bold (function, local, if, return, class...)
+  - Commands ......... teal/cyan (DEFINE, FORM, BUTTON, ACTIVATE...)
+  - Comments ......... green, italic (// and /* */)
+  - Strings .......... orange ("..." and '...')
+  - Numbers .......... light green (123, 0xFF)
+  - Preprocessor ..... magenta (#include, #define, #xcommand)
+  - Operators ........ light gray
+  - Default text ..... light gray on dark background (RGB 30,30,30)
+
+  BUILT-IN FEATURES (no manual code needed):
+  - Line numbers with dark gutter (replaced manual GutterPaint/double-buffer)
+  - Code folding with box-style markers (click margin to fold/unfold)
+  - Indentation guides (visual vertical lines)
+  - UTF-8 support (SCI_SETCODEPAGE SC_CP_UTF8)
+  - Auto-indent on Enter (preserves previous line indentation)
+  - Native auto-complete popup (Ctrl+Space) with all Harbour keywords + functions
+
+  KEYBOARD SHORTCUTS (all preserved from RichEdit version):
+  - Ctrl+F ........... Find bar
+  - Ctrl+H ........... Find & Replace bar
+  - Ctrl+Space ....... Auto-complete
+  - Ctrl+/ ........... Toggle line comment (//)
+  - Ctrl+Shift+D ..... Duplicate line (SCI_LINEDUPLICATE)
+  - Ctrl+Shift+K ..... Delete line (SCI_LINEDELETE)
+  - Ctrl+L ........... Select entire line
+  - Ctrl+G ........... Go to position
+  - F3 / Shift+F3 .... Find Next / Previous
+  - Esc .............. Close find bar
+
+  FIND/REPLACE (rewritten for Scintilla API):
+  - Uses SCI_SEARCHINTARGET instead of EM_FINDTEXT
+  - Forward and backward search with wrap-around
+  - Total match count displayed in status label
+
+  REMOVED (~300 lines of manual code):
+  - HighlightCode() .... manual token-by-token highlighting
+  - SetRichColor() ..... EM_SETCHARFORMAT per range
+  - GutterPaint() ...... manual line number painting with double-buffer
+  - GutterSync() ....... gutter invalidation on scroll
+  - GutterWndProc() .... separate gutter window class
+  - CodeEditSubProc() .. RichEdit subclass for keyboard interception
+  - IsKeyword() ........ manual keyword lookup
+  - IsCommand() ........ manual command lookup
+  - s_keywords[] ....... static keyword array (now in SCI_SETKEYWORDS)
+  - s_commands[] ....... static command array (now in SCI_SETKEYWORDS)
+
+  NEW FUNCTIONS:
+  - InitScintilla() ........ loads Scintilla.dll + Lexilla.dll from resources/
+  - ConfigureScintilla() ... sets lexer, keywords, colors, margins, folding
+
+  FILES ADDED:
+  - resources/Scintilla.dll .... Scintilla 5.6.1 (32-bit PE32, 824 KB)
+  - resources/Lexilla.dll ...... Lexilla 5.4.8 (32-bit PE32, 1100 KB)
+  - resources/scintilla/ ....... Full source code for all platforms
+      scintilla_src/scintilla/win32/ ... Windows build files
+      scintilla_src/scintilla/cocoa/ ... macOS framework + Xcode project
+      scintilla_src/scintilla/gtk/ ..... Linux GTK3 build files
+      lexilla_src/lexilla/ ............ Lexer library source
+  - build_win.bat .............. Windows build script
+
+  FIXED (BCC32 C-mode compatibility):
+  - Non-const RECT initializers in W32_GeneratePaletteIcons
+  - Non-const RECT initializers in W32_GenerateToolbarIcons
+  - Declaration-after-statement in SCN_CHARADDED handler
+  - Non-const array initializer in PO_HideAll
+
+  TRACE LOGGING:
+  - scintilla_trace.log: DLL loading, window creation, configuration
+
+  PENDING:
+  - macOS: compile ScintillaView framework, replace NSTextView in cocoa_core.m
+  - Linux: compile libscintilla, replace GtkTextView in gtk3_core.c
+
+
 2026-04-03 (Session 2: Debugger, AI Assistant, ERP, Printing, Search, Dark Mode, Docs)
 --------------------------------------------------------------------------------------
 

@@ -113,6 +113,8 @@ return nil
 
 ## 📸 Screenshots
 
+![Windows](images/windows_scintilla.png)
+
 ![macOS](images/macos_now.png)
 
 ![Linux](images/linux_now.png)
