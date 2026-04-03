@@ -643,11 +643,18 @@ static void InsStartEdit( INSDATA * d, int nLVRow )
    }
 }
 
+static void InsLog( const char * msg )
+{
+   FILE * f = fopen( "c:\\HarbourBuilder\\inspector_trace.log", "a" );
+   if( f ) { fprintf( f, "%s\n", msg ); fclose( f ); }
+}
+
 static void InsEndEdit( INSDATA * d, BOOL bApply )
 {
    char szVal[256];
    int nReal;
-   if( !d || !d->hEdit || d->nEditRow < 0 || d->nEditRow >= d->nVisible ) return;
+   InsLog( "InsEndEdit called" );
+   if( !d || !d->hEdit || d->nEditRow < 0 || d->nEditRow >= d->nVisible ) { InsLog("  -> guard exit"); return; }
    nReal = d->map[d->nEditRow];
    if( nReal < 0 || nReal >= d->nRows ) {
       if( d->hBtn ) { DestroyWindow(d->hBtn); d->hBtn=NULL; }
@@ -683,8 +690,16 @@ static void InsEndEdit( INSDATA * d, BOOL bApply )
 
 static void InsApplyValue( INSDATA * d, int nReal, const char * szVal )
 {
-   PHB_DYNS pDyn = hb_dynsymFindName( "UI_SETPROP" );
-   if( !pDyn ) return;
+   PHB_DYNS pDyn;
+   char logBuf[256];
+   sprintf( logBuf, "InsApplyValue: nReal=%d name='%s' type='%c' val='%s' hCtrl=%p",
+      nReal, d->rows[nReal].szName, d->rows[nReal].cType, szVal, (void*)(size_t)d->hCtrl );
+   InsLog( logBuf );
+
+   pDyn = hb_dynsymFindName( "UI_SETPROP" );
+   if( !pDyn ) { InsLog("  -> UI_SETPROP not found!"); return; }
+
+   InsLog( "  -> calling hb_vmDo(3)" );
    hb_vmPushDynSym( pDyn ); hb_vmPushNil();
    hb_vmPushNumInt( d->hCtrl );
    hb_vmPushString( d->rows[nReal].szName, lstrlenA(d->rows[nReal].szName) );
@@ -701,10 +716,12 @@ static void InsApplyValue( INSDATA * d, int nReal, const char * szVal )
    else
       hb_vmPushNil();
    hb_vmDo( 3 );
+   InsLog( "  -> hb_vmDo(3) returned OK" );
 
    /* Notify IDE that a property changed */
    if( d->pOnPropChanged && HB_IS_BLOCK( d->pOnPropChanged ) )
    {
+      InsLog( "  -> firing pOnPropChanged" );
       hb_vmPush( d->pOnPropChanged );
       hb_vmPushNil();
       hb_vmDo( 0 );
