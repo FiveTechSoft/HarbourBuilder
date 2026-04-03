@@ -3120,7 +3120,7 @@ static void HighlightCode( HWND hEdit )
    int nLen, i, ws;
    char * buf;
    CHARRANGE crSave;
-   int nKeywords = 0, nComments = 0, nStrings = 0, nCommands = 0;
+   int nKeywords = 0, nComments = 0, nStrings = 0, nCommands = 0, nNumbers = 0;
 
    nLen = GetWindowTextLengthA( hEdit );
    if( nLen <= 0 ) return;
@@ -3197,7 +3197,10 @@ static void HighlightCode( HWND hEdit )
       {
          ws = i;
          while( i < nLen && ((buf[i]>='0'&&buf[i]<='9')||buf[i]=='.') ) i++;
-         SetRichColor( hEdit, ws, i, RGB(181,206,168), FALSE ); /* light green for numbers */
+         SetRichColor( hEdit, ws, i, RGB(180,230,150), FALSE ); nNumbers++;
+            if(nNumbers<=3){FILE*f=fopen("c:\\HarbourBuilder\\syntax_detail.log","a");
+              if(f){char w[64]={0};memcpy(w,buf+ws,i-ws>60?60:i-ws);
+                fprintf(f,"NUM[%d]: '%s' pos=%d-%d\n",nNumbers,w,ws,i);fclose(f);}}
          continue;
       }
 
@@ -3207,9 +3210,12 @@ static void HighlightCode( HWND hEdit )
          ws = i;
          while( i < nLen && IsWordChar(buf[i]) ) i++;
          if( IsKeyword( buf + ws, i - ws ) )
-         {  SetRichColor( hEdit, ws, i, RGB(86,156,214), TRUE ); nKeywords++; }
+         {  SetRichColor( hEdit, ws, i, RGB(100,180,255), TRUE ); nKeywords++;
+            if(nKeywords<=3){FILE*f=fopen("c:\\HarbourBuilder\\syntax_detail.log","a");
+              if(f){char w[64]={0};memcpy(w,buf+ws,i-ws>60?60:i-ws);
+                fprintf(f,"KW[%d]: '%s' pos=%d-%d\n",nKeywords,w,ws,i);fclose(f);}} }
          else if( IsCommand( buf + ws, i - ws ) )
-         {  SetRichColor( hEdit, ws, i, RGB(78,201,176), FALSE ); nCommands++; }
+         {  SetRichColor( hEdit, ws, i, RGB(80,220,190), FALSE ); nCommands++; }
          continue;
       }
 
@@ -3219,8 +3225,8 @@ static void HighlightCode( HWND hEdit )
    /* Log trace to file */
    { FILE * fLog = fopen( "c:\\HarbourBuilder\\syntax_trace.log", "a" );
      if( fLog ) {
-        fprintf( fLog, "HighlightCode: len=%d keywords=%d commands=%d comments=%d strings=%d\n",
-           nLen, nKeywords, nCommands, nComments, nStrings );
+        fprintf( fLog, "HighlightCode: len=%d kw=%d cmd=%d cmt=%d str=%d num=%d\n",
+           nLen, nKeywords, nCommands, nComments, nStrings, nNumbers );
         fclose( fLog );
      }
    }
