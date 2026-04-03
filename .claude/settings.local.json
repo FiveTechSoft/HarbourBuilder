@@ -68,7 +68,8 @@
       "Bash(taskkill //f //im hbbuilder_win.exe)",
       "Bash(sed:*)",
       "Bash(grep -v \"^$\"o tan)",
-      "Bash(echo \"EXIT: $?\")"
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(powershell -ExecutionPolicy Bypass -File c:\\\\HarbourBuilder\\\\screenshot.ps1)"
     ]
   }
 }

@@ -153,7 +153,7 @@ function Main()
    BUTTON "Run"   OF oTB TOOLTIP "Run project (F9)"       ACTION TBRun()
 
    // Load toolbar icons (Silk icon set by famfamfam, CC BY 2.5)
-   UI_ToolBarLoadImages( oTB:hCpp, "../resources/toolbar.bmp" )
+   UI_ToolBarLoadImages( oTB:hCpp, HB_DirBase() + "..\resources\toolbar.bmp" )
 
    // Component Palette (icon grid, tabbed, right of splitter)
    CreatePalette()
@@ -349,7 +349,7 @@ static function CreatePalette()
    oPal:AddComp( nTab, "Tfm",  "Transformer",  52 )
 
    // Load palette icons (Silk icon set by famfamfam, CC BY 2.5)
-   UI_PaletteLoadImages( oPal:hCpp, "../resources/palette.bmp" )
+   UI_PaletteLoadImages( oPal:hCpp, HB_DirBase() + "..\resources\palette.bmp" )
 
 return nil
 
@@ -1571,7 +1571,7 @@ static function ShowAbout()
    cMsg += Chr(10)
    cMsg += "Vibe coded 100% using Claude Code" + Chr(10)
 
-   W32_AboutDialog( "About HbBuilder", cMsg, "../resources/harbour_logo.png" )
+   W32_AboutDialog( "About HbBuilder", cMsg, HB_DirBase() + "..\resources\harbour_logo.png" )
 
 return nil
 
