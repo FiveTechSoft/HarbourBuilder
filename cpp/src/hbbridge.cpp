@@ -822,6 +822,297 @@ HB_FUNC( UI_GETALLEVENTS )
          ADD_E("OnClick",    p->FOnClick != NULL,  "Action");
          ADD_E("OnMouseDown",0,                    "Mouse");
          break;
+      case CT_LISTBOX:
+         ADD_E("OnClick",    p->FOnClick != NULL,  "Action");
+         ADD_E("OnDblClick", 0,                    "Action");
+         ADD_E("OnChange",   p->FOnChange != NULL, "Action");
+         ADD_E("OnEnter",    0,                    "Focus");
+         ADD_E("OnExit",     0,                    "Focus");
+         ADD_E("OnKeyDown",  0,                    "Keyboard");
+         break;
+      case CT_RADIO:
+         ADD_E("OnClick",    p->FOnClick != NULL,  "Action");
+         ADD_E("OnEnter",    0,                    "Focus");
+         ADD_E("OnExit",     0,                    "Focus");
+         break;
+      case CT_MEMO: case CT_RICHEDIT:
+         ADD_E("OnChange",   p->FOnChange != NULL, "Action");
+         ADD_E("OnClick",    p->FOnClick != NULL,  "Action");
+         ADD_E("OnDblClick", 0,                    "Action");
+         ADD_E("OnEnter",    0,                    "Focus");
+         ADD_E("OnExit",     0,                    "Focus");
+         ADD_E("OnKeyDown",  0,                    "Keyboard");
+         ADD_E("OnKeyUp",    0,                    "Keyboard");
+         ADD_E("OnKeyPress", 0,                    "Keyboard");
+         ADD_E("OnMouseDown",0,                    "Mouse");
+         ADD_E("OnMouseUp",  0,                    "Mouse");
+         break;
+      case CT_PANEL: case CT_SCROLLBOX:
+         ADD_E("OnClick",    p->FOnClick != NULL,  "Action");
+         ADD_E("OnDblClick", 0,                    "Action");
+         ADD_E("OnResize",   0,                    "Layout");
+         ADD_E("OnMouseDown",0,                    "Mouse");
+         ADD_E("OnMouseMove",0,                    "Mouse");
+         break;
+      case CT_SCROLLBAR: case CT_TRACKBAR:
+         ADD_E("OnChange",   p->FOnChange != NULL, "Action");
+         ADD_E("OnScroll",   0,                    "Action");
+         ADD_E("OnEnter",    0,                    "Focus");
+         ADD_E("OnKeyDown",  0,                    "Keyboard");
+         break;
+      case CT_BITBTN: case CT_SPEEDBTN:
+         ADD_E("OnClick",    p->FOnClick != NULL,  "Action");
+         ADD_E("OnEnter",    0,                    "Focus");
+         ADD_E("OnExit",     0,                    "Focus");
+         ADD_E("OnMouseDown",0,                    "Mouse");
+         break;
+      case CT_IMAGE:
+         ADD_E("OnClick",    p->FOnClick != NULL,  "Action");
+         ADD_E("OnDblClick", 0,                    "Action");
+         ADD_E("OnMouseDown",0,                    "Mouse");
+         ADD_E("OnMouseUp",  0,                    "Mouse");
+         ADD_E("OnMouseMove",0,                    "Mouse");
+         break;
+      case CT_SHAPE: case CT_BEVEL:
+         ADD_E("OnClick",    p->FOnClick != NULL,  "Action");
+         ADD_E("OnMouseDown",0,                    "Mouse");
+         break;
+      case CT_TREEVIEW:
+         ADD_E("OnClick",    p->FOnClick != NULL,  "Action");
+         ADD_E("OnDblClick", 0,                    "Action");
+         ADD_E("OnChange",   p->FOnChange != NULL, "Action");
+         ADD_E("OnExpand",   0,                    "Action");
+         ADD_E("OnCollapse", 0,                    "Action");
+         ADD_E("OnEnter",    0,                    "Focus");
+         ADD_E("OnKeyDown",  0,                    "Keyboard");
+         ADD_E("OnMouseDown",0,                    "Mouse");
+         break;
+      case CT_LISTVIEW:
+         ADD_E("OnClick",    p->FOnClick != NULL,  "Action");
+         ADD_E("OnDblClick", 0,                    "Action");
+         ADD_E("OnChange",   p->FOnChange != NULL, "Action");
+         ADD_E("OnColumnClick",0,                  "Action");
+         ADD_E("OnInsert",   0,                    "Action");
+         ADD_E("OnDelete",   0,                    "Action");
+         ADD_E("OnEnter",    0,                    "Focus");
+         ADD_E("OnKeyDown",  0,                    "Keyboard");
+         ADD_E("OnMouseDown",0,                    "Mouse");
+         break;
+      case CT_PROGRESSBAR:
+         /* No user events - data-driven control */
+         break;
+      case CT_TABCONTROL2:
+         ADD_E("OnChange",   p->FOnChange != NULL, "Action");
+         ADD_E("OnClick",    p->FOnClick != NULL,  "Action");
+         break;
+      case CT_UPDOWN:
+         ADD_E("OnChange",   p->FOnChange != NULL, "Action");
+         ADD_E("OnClick",    p->FOnClick != NULL,  "Action");
+         break;
+      case CT_DATETIMEPICKER:
+         ADD_E("OnChange",   p->FOnChange != NULL, "Action");
+         ADD_E("OnCloseUp",  0,                    "Action");
+         ADD_E("OnDropDown", 0,                    "Action");
+         break;
+      case CT_MONTHCALENDAR:
+         ADD_E("OnChange",   p->FOnChange != NULL, "Action");
+         ADD_E("OnClick",    p->FOnClick != NULL,  "Action");
+         break;
+      case CT_PAINTBOX:
+         ADD_E("OnPaint",    0,                    "Action");
+         ADD_E("OnClick",    p->FOnClick != NULL,  "Action");
+         ADD_E("OnDblClick", 0,                    "Action");
+         ADD_E("OnMouseDown",0,                    "Mouse");
+         ADD_E("OnMouseUp",  0,                    "Mouse");
+         ADD_E("OnMouseMove",0,                    "Mouse");
+         ADD_E("OnResize",   0,                    "Layout");
+         break;
+      case CT_BROWSE: case CT_DBGRID: {
+         TBrowse * b = (TBrowse *) p;
+         ADD_E("OnCellClick",    b->FOnCellClick != NULL,    "Action");
+         ADD_E("OnCellDblClick", b->FOnCellDblClick != NULL, "Action");
+         ADD_E("OnHeaderClick",  b->FOnHeaderClick != NULL,  "Action");
+         ADD_E("OnSort",         b->FOnSort != NULL,         "Action");
+         ADD_E("OnScroll",       b->FOnScroll != NULL,       "Action");
+         ADD_E("OnCellEdit",     b->FOnCellEdit != NULL,     "Data");
+         ADD_E("OnCellPaint",    b->FOnCellPaint != NULL,    "Layout");
+         ADD_E("OnRowSelect",    b->FOnRowSelect != NULL,    "Action");
+         ADD_E("OnKeyDown",      b->FOnKeyDown != NULL,      "Keyboard");
+         ADD_E("OnColumnResize", b->FOnColumnResize != NULL, "Layout");
+         break;
+      }
+      case CT_TIMER:
+         ADD_E("OnTimer",    0,                    "Action");
+         break;
+      case CT_MASKEDIT2: case CT_LABELEDEDIT:
+         ADD_E("OnChange",   p->FOnChange != NULL, "Action");
+         ADD_E("OnClick",    p->FOnClick != NULL,  "Action");
+         ADD_E("OnEnter",    0,                    "Focus");
+         ADD_E("OnExit",     0,                    "Focus");
+         ADD_E("OnKeyDown",  0,                    "Keyboard");
+         break;
+      case CT_STRINGGRID:
+         ADD_E("OnCellClick",    0,                "Action");
+         ADD_E("OnCellDblClick", 0,                "Action");
+         ADD_E("OnChange",   p->FOnChange != NULL, "Action");
+         ADD_E("OnColumnResize", 0,                "Layout");
+         ADD_E("OnKeyDown",  0,                    "Keyboard");
+         break;
+      case CT_STATICTEXT:
+         ADD_E("OnClick",    p->FOnClick != NULL,  "Action");
+         ADD_E("OnDblClick", 0,                    "Action");
+         break;
+      /* Database components (non-visual) */
+      case CT_DBFTABLE: case CT_MYSQL: case CT_MARIADB:
+      case CT_POSTGRESQL: case CT_SQLITE: case CT_FIREBIRD:
+      case CT_SQLSERVER: case CT_ORACLE: case CT_MONGODB:
+         ADD_E("OnConnect",     0,  "Connection");
+         ADD_E("OnDisconnect",  0,  "Connection");
+         ADD_E("OnError",       0,  "Error");
+         ADD_E("OnBeforeQuery", 0,  "Data");
+         ADD_E("OnAfterQuery",  0,  "Data");
+         break;
+      /* Internet components */
+      case CT_WEBVIEW:
+         ADD_E("OnNavigate",    0,  "Navigation");
+         ADD_E("OnLoad",        0,  "Navigation");
+         ADD_E("OnError",       0,  "Error");
+         ADD_E("OnTitleChange",  0,  "Navigation");
+         break;
+      case CT_WEBSERVER:
+         ADD_E("OnRequest",     0,  "Server");
+         ADD_E("OnConnect",     0,  "Server");
+         ADD_E("OnDisconnect",  0,  "Server");
+         ADD_E("OnStart",       0,  "Server");
+         ADD_E("OnStop",        0,  "Server");
+         ADD_E("OnError",       0,  "Error");
+         break;
+      case CT_WEBSOCKET:
+         ADD_E("OnOpen",        0,  "Connection");
+         ADD_E("OnMessage",     0,  "Data");
+         ADD_E("OnClose",       0,  "Connection");
+         ADD_E("OnError",       0,  "Error");
+         break;
+      case CT_HTTPCLIENT:
+         ADD_E("OnResponse",    0,  "Data");
+         ADD_E("OnProgress",    0,  "Data");
+         ADD_E("OnError",       0,  "Error");
+         break;
+      case CT_TCPSERVER:
+         ADD_E("OnAccept",      0,  "Connection");
+         ADD_E("OnReceive",     0,  "Data");
+         ADD_E("OnDisconnect",  0,  "Connection");
+         ADD_E("OnError",       0,  "Error");
+         break;
+      case CT_TCPCLIENT:
+         ADD_E("OnConnect",     0,  "Connection");
+         ADD_E("OnReceive",     0,  "Data");
+         ADD_E("OnDisconnect",  0,  "Connection");
+         ADD_E("OnError",       0,  "Error");
+         break;
+      case CT_UDPSOCKET:
+         ADD_E("OnReceive",     0,  "Data");
+         ADD_E("OnError",       0,  "Error");
+         break;
+      /* Threading */
+      case CT_THREAD:
+         ADD_E("OnExecute",     0,  "Thread");
+         ADD_E("OnTerminate",   0,  "Thread");
+         ADD_E("OnError",       0,  "Error");
+         break;
+      case CT_THREADPOOL:
+         ADD_E("OnTaskComplete", 0,  "Thread");
+         ADD_E("OnError",       0,  "Error");
+         break;
+      case CT_CHANNEL:
+         ADD_E("OnReceive",     0,  "Data");
+         break;
+      /* AI */
+      case CT_OPENAI: case CT_GEMINI: case CT_CLAUDE:
+      case CT_DEEPSEEK: case CT_GROK: case CT_OLLAMA:
+         ADD_E("OnResponse",    0,  "AI");
+         ADD_E("OnStream",      0,  "AI");
+         ADD_E("OnError",       0,  "Error");
+         ADD_E("OnTokenCount",  0,  "AI");
+         break;
+      case CT_TRANSFORMER:
+         ADD_E("OnAttention",   0,  "AI");
+         ADD_E("OnGenerate",    0,  "AI");
+         ADD_E("OnTrainStep",   0,  "Training");
+         ADD_E("OnLoss",        0,  "Training");
+         break;
+      /* ERP */
+      case CT_REPORTDESIGNER:
+         ADD_E("OnBeforePrint", 0,  "Report");
+         ADD_E("OnAfterPrint",  0,  "Report");
+         ADD_E("OnPreview",     0,  "Report");
+         break;
+      case CT_BARCODE: case CT_BARCODEPRINTER:
+         ADD_E("OnGenerate",    0,  "Action");
+         ADD_E("OnError",       0,  "Error");
+         break;
+      case CT_PDFGENERATOR: case CT_EXCELEXPORT:
+         ADD_E("OnBeforeExport", 0,  "Export");
+         ADD_E("OnAfterExport",  0,  "Export");
+         ADD_E("OnError",       0,  "Error");
+         break;
+      case CT_AUDITLOG:
+         ADD_E("OnLog",         0,  "Data");
+         break;
+      case CT_SCHEDULER:
+         ADD_E("OnEvent",       0,  "Action");
+         ADD_E("OnReminder",    0,  "Action");
+         ADD_E("OnChange",     p->FOnChange != NULL, "Action");
+         break;
+      case CT_DASHBOARD:
+         ADD_E("OnRefresh",     0,  "Action");
+         ADD_E("OnClick",      p->FOnClick != NULL, "Action");
+         break;
+      /* Printing */
+      case CT_PRINTER:
+         ADD_E("OnStartDoc",    0,  "Print");
+         ADD_E("OnEndDoc",      0,  "Print");
+         ADD_E("OnStartPage",   0,  "Print");
+         ADD_E("OnEndPage",     0,  "Print");
+         ADD_E("OnError",       0,  "Error");
+         break;
+      case CT_REPORT:
+         ADD_E("OnBeforePrint", 0,  "Report");
+         ADD_E("OnAfterPrint",  0,  "Report");
+         ADD_E("OnData",        0,  "Data");
+         ADD_E("OnPreview",     0,  "Report");
+         break;
+      case CT_LABELS:
+         ADD_E("OnBeforePrint", 0,  "Print");
+         ADD_E("OnAfterPrint",  0,  "Print");
+         break;
+      case CT_REPORTVIEWER: case CT_PRINTPREVIEW:
+         ADD_E("OnPageChange",  0,  "Navigation");
+         ADD_E("OnZoom",        0,  "Navigation");
+         ADD_E("OnPrint",       0,  "Action");
+         ADD_E("OnExport",      0,  "Action");
+         break;
+      /* DB Navigator */
+      case CT_DBNAVIGATOR:
+         ADD_E("OnFirst",       0,  "Navigation");
+         ADD_E("OnPrior",       0,  "Navigation");
+         ADD_E("OnNext",        0,  "Navigation");
+         ADD_E("OnLast",        0,  "Navigation");
+         ADD_E("OnInsert",      0,  "Data");
+         ADD_E("OnDelete",      0,  "Data");
+         ADD_E("OnEdit",        0,  "Data");
+         ADD_E("OnPost",        0,  "Data");
+         ADD_E("OnCancel",      0,  "Data");
+         ADD_E("OnRefresh",     0,  "Data");
+         break;
+      /* Data-aware controls */
+      case CT_DBTEXT: case CT_DBEDIT: case CT_DBCOMBOBOX:
+      case CT_DBCHECKBOX: case CT_DBIMAGE:
+         ADD_E("OnChange",   p->FOnChange != NULL, "Data");
+         ADD_E("OnClick",    p->FOnClick != NULL,  "Action");
+         ADD_E("OnEnter",    0,                    "Focus");
+         ADD_E("OnExit",     0,                    "Focus");
+         break;
       default:
          ADD_E("OnClick",    p->FOnClick != NULL,  "Action");
          ADD_E("OnChange",   p->FOnChange != NULL, "Action");

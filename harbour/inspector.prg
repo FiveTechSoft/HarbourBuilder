@@ -880,24 +880,60 @@ HB_FUNC( INS_SETONPROPCHANGED )
 static void InsPopulateEvents( INSDATA * d )
 {
    LVITEMA lvi = {0};
-   static const char * aEvents[] = { "OnClick", "OnChange", "OnInit", "OnClose" };
-   int i, nEvents = 4;
+   PHB_DYNS pDyn;
+   PHB_ITEM pResult;
+   HB_SIZE nLen, i;
 
    if( !d || !d->hEventList ) return;
 
    SendMessage( d->hEventList, LVM_DELETEALLITEMS, 0, 0 );
 
-   for( i = 0; i < nEvents; i++ )
+   if( d->hCtrl == 0 ) return;
+
+   /* Call UI_GetAllEvents( hCtrl ) to get dynamic event list */
+   pDyn = hb_dynsymFindName( "UI_GETALLEVENTS" );
+   if( !pDyn ) return;
+   hb_vmPushDynSym( pDyn ); hb_vmPushNil();
+   hb_vmPushNumInt( d->hCtrl );
+   hb_vmDo( 1 );
+   pResult = hb_stackReturnItem();
+   if( !pResult || !HB_IS_ARRAY(pResult) ) return;
+   nLen = hb_arrayLen( pResult );
+
+   for( i = 1; i <= nLen; i++ )
    {
+      PHB_ITEM pRow = hb_arrayGetItemPtr( pResult, i );
+      const char * cEvent = hb_arrayGetCPtr( pRow, 1 );
+      int lAssigned = hb_arrayGetL( pRow, 2 );
+      const char * cCategory = hb_arrayGetCPtr( pRow, 3 );
+      char szHandler[128] = "";
+
+      /* If event is assigned, try to find handler name from editor code */
+      if( lAssigned )
+      {
+         /* Look for handler name in code: ControlName + EventSuffix */
+         /* e.g. Button1Click for OnClick on Button1 */
+         PHB_DYNS pEdDyn = hb_dynsymFindName( "_INSGETEDITORCODE" );
+         if( pEdDyn )
+         {
+            hb_vmPushDynSym( pEdDyn ); hb_vmPushNil();
+            hb_vmDo( 0 );
+            /* Result is the editor code string - we could scan it */
+         }
+         lstrcpynA( szHandler, "(assigned)", 128 );
+      }
+
+      /* Category header (only for first event of each category) */
+      /* Skip for now - just list all events flat */
+
       lvi.mask = LVIF_TEXT;
-      lvi.iItem = i;
+      lvi.iItem = (int)(i - 1);
       lvi.iSubItem = 0;
-      lvi.pszText = (char *) aEvents[i];
+      lvi.pszText = (char *) cEvent;
       SendMessageA( d->hEventList, LVM_INSERTITEMA, 0, (LPARAM) &lvi );
 
-      /* Show handler name if set (placeholder for now) */
       lvi.iSubItem = 1;
-      lvi.pszText = "";
+      lvi.pszText = szHandler;
       SendMessageA( d->hEventList, LVM_SETITEMA, 0, (LPARAM) &lvi );
    }
 }
