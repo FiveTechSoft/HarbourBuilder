@@ -225,10 +225,17 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
          {
             int btnIdx = wId - 200;
             int nTab = FPalette->FCurrentTab;
+            { FILE*f=fopen("c:\\HarbourBuilder\\palette_trace.log","a");
+              if(f){fprintf(f,"Form WM_COMMAND: id=%d btnIdx=%d tab=%d tabCount=%d btnCount=%d g_design=%p\n",
+                wId,btnIdx,nTab,FPalette->FTabCount,
+                nTab>=0&&nTab<FPalette->FTabCount?FPalette->FTabs[nTab].nBtnCount:0,
+                g_designForm);fclose(f);} }
             if( nTab >= 0 && nTab < FPalette->FTabCount &&
                 btnIdx >= 0 && btnIdx < FPalette->FTabs[nTab].nBtnCount )
             {
                int ctrlType = FPalette->FTabs[nTab].btns[btnIdx].nControlType;
+               { FILE*f=fopen("c:\\HarbourBuilder\\palette_trace.log","a");
+                 if(f){fprintf(f,"  -> ctrlType=%d, setting PendingControlType\n",ctrlType);fclose(f);} }
 
                /* Fire FOnSelect callback with the control type */
                if( FPalette->FOnSelect && HB_IS_BLOCK( FPalette->FOnSelect ) )

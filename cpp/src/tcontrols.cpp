@@ -1188,12 +1188,20 @@ const PROPDESC * TBrowse::GetPropDescs( int * pnCount )
 /* Subclass TabControl to forward WM_COMMAND (button clicks) to the form */
 static WNDPROC s_oldTabProc = NULL;
 
+static void PalLog( const char * fmt, ... )
+{
+   FILE * f = fopen( "c:\\HarbourBuilder\\palette_trace.log", "a" );
+   if( f ) { va_list ap; va_start(ap,fmt); vfprintf(f,fmt,ap); va_end(ap); fprintf(f,"\n"); fclose(f); }
+}
+
 static LRESULT CALLBACK PaletteTabSubProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 {
    if( msg == WM_COMMAND )
    {
-      /* Forward button clicks to the form (grandparent) */
+      WORD wId = LOWORD(wParam);
+      WORD wNotify = HIWORD(wParam);
       HWND hForm = GetParent( hWnd );
+      PalLog( "TabSubProc WM_COMMAND: id=%d notify=%d hForm=%p", wId, wNotify, hForm );
       if( hForm )
          return SendMessage( hForm, WM_COMMAND, wParam, lParam );
    }
