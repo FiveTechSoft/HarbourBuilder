@@ -349,6 +349,31 @@ static LRESULT CALLBACK InsWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             }
             return 0;
          }
+         /* Custom draw for Events ListView: bold category rows */
+         if( pnm->code == NM_CUSTOMDRAW && pnm->idFrom == 103 )
+         {
+            NMLVCUSTOMDRAW * pcd = (NMLVCUSTOMDRAW *) lParam;
+            switch( pcd->nmcd.dwDrawStage )
+            {
+               case CDDS_PREPAINT: return CDRF_NOTIFYITEMDRAW;
+               case CDDS_ITEMPREPAINT:
+               {
+                  /* Check lParam: 1=category, 0=event */
+                  if( pcd->nmcd.lItemlParam == 1 )
+                  {
+                     pcd->clrTextBk = GetSysColor( COLOR_BTNFACE );
+                     pcd->clrText = GetSysColor( COLOR_BTNTEXT );
+                     SelectObject( pcd->nmcd.hdc, d->hBold );
+                     return CDRF_NEWFONT;
+                  }
+                  pcd->clrTextBk = ( pcd->nmcd.dwItemSpec % 2 )
+                     ? RGB(248,248,248) : RGB(255,255,255);
+                  return CDRF_DODEFAULT;
+               }
+            }
+            return CDRF_DODEFAULT;
+         }
+
          /* Double-click on Events list -> fire OnEventDblClick callback */
          if( pnm->code == NM_DBLCLK && pnm->idFrom == 103 )
          {
@@ -911,14 +936,27 @@ HB_FUNC( INS_SETONPROPCHANGED )
 
 /* INS_BringToFront( hInsData ) */
 /* Populate the Events tab with available events for the current control */
+/* Add a category header row (bold, gray background) to Events ListView */
+static void InsAddEventCat( INSDATA * d, int nRow, const char * szCat )
+{
+   LVITEMA lvi = {0};
+   lvi.mask = LVIF_TEXT | LVIF_PARAM;
+   lvi.iItem = nRow;
+   lvi.iSubItem = 0;
+   lvi.pszText = (char *) szCat;
+   lvi.lParam = 1;  /* 1 = category row */
+   SendMessageA( d->hEventList, LVM_INSERTITEMA, 0, (LPARAM) &lvi );
+}
+
 /* Add one event row to the Events ListView */
 static void InsAddEvent( INSDATA * d, int nRow, const char * szEvent )
 {
    LVITEMA lvi = {0};
-   lvi.mask = LVIF_TEXT;
+   lvi.mask = LVIF_TEXT | LVIF_PARAM;
    lvi.iItem = nRow;
    lvi.iSubItem = 0;
    lvi.pszText = (char *) szEvent;
+   lvi.lParam = 0;  /* 0 = event row */
    SendMessageA( d->hEventList, LVM_INSERTITEMA, 0, (LPARAM) &lvi );
    lvi.iSubItem = 1;
    lvi.pszText = "";
@@ -954,8 +992,10 @@ static void InsPopulateEvents( INSDATA * d )
    switch( nType )
    {
       case 0: /* CT_FORM */
+         InsAddEventCat(d, n++, "Action");
          InsAddEvent(d, n++, "OnClick");
          InsAddEvent(d, n++, "OnDblClick");
+         InsAddEventCat(d, n++, "Lifecycle");
          InsAddEvent(d, n++, "OnCreate");
          InsAddEvent(d, n++, "OnDestroy");
          InsAddEvent(d, n++, "OnShow");
@@ -964,11 +1004,14 @@ static void InsPopulateEvents( INSDATA * d )
          InsAddEvent(d, n++, "OnCloseQuery");
          InsAddEvent(d, n++, "OnActivate");
          InsAddEvent(d, n++, "OnDeactivate");
+         InsAddEventCat(d, n++, "Layout");
          InsAddEvent(d, n++, "OnResize");
          InsAddEvent(d, n++, "OnPaint");
+         InsAddEventCat(d, n++, "Keyboard");
          InsAddEvent(d, n++, "OnKeyDown");
          InsAddEvent(d, n++, "OnKeyUp");
          InsAddEvent(d, n++, "OnKeyPress");
+         InsAddEventCat(d, n++, "Mouse");
          InsAddEvent(d, n++, "OnMouseDown");
          InsAddEvent(d, n++, "OnMouseUp");
          InsAddEvent(d, n++, "OnMouseMove");
@@ -976,10 +1019,14 @@ static void InsPopulateEvents( INSDATA * d )
          break;
       case 3: /* CT_BUTTON */
       case 12: /* CT_BITBTN */
+         InsAddEventCat(d, n++, "Action");
          InsAddEvent(d, n++, "OnClick");
+         InsAddEventCat(d, n++, "Focus");
          InsAddEvent(d, n++, "OnEnter");
          InsAddEvent(d, n++, "OnExit");
+         InsAddEventCat(d, n++, "Keyboard");
          InsAddEvent(d, n++, "OnKeyDown");
+         InsAddEventCat(d, n++, "Mouse");
          InsAddEvent(d, n++, "OnMouseDown");
          break;
       case 2: /* CT_EDIT */
@@ -987,89 +1034,119 @@ static void InsPopulateEvents( INSDATA * d )
       case 23: /* CT_RICHEDIT */
       case 28: /* CT_MASKEDIT */
       case 32: /* CT_LABELEDEDIT */
+         InsAddEventCat(d, n++, "Action");
          InsAddEvent(d, n++, "OnChange");
          InsAddEvent(d, n++, "OnClick");
+         InsAddEventCat(d, n++, "Focus");
          InsAddEvent(d, n++, "OnEnter");
          InsAddEvent(d, n++, "OnExit");
+         InsAddEventCat(d, n++, "Keyboard");
          InsAddEvent(d, n++, "OnKeyDown");
          InsAddEvent(d, n++, "OnKeyUp");
+         InsAddEventCat(d, n++, "Mouse");
          InsAddEvent(d, n++, "OnMouseDown");
          break;
       case 4: /* CT_CHECKBOX */
       case 8: /* CT_RADIO */
+         InsAddEventCat(d, n++, "Action");
          InsAddEvent(d, n++, "OnClick");
+         InsAddEventCat(d, n++, "Focus");
          InsAddEvent(d, n++, "OnEnter");
          InsAddEvent(d, n++, "OnExit");
          break;
       case 5: /* CT_COMBOBOX */
+         InsAddEventCat(d, n++, "Action");
          InsAddEvent(d, n++, "OnChange");
          InsAddEvent(d, n++, "OnClick");
+         InsAddEventCat(d, n++, "Focus");
          InsAddEvent(d, n++, "OnEnter");
          InsAddEvent(d, n++, "OnExit");
+         InsAddEventCat(d, n++, "Keyboard");
          InsAddEvent(d, n++, "OnKeyDown");
          break;
       case 1: /* CT_LABEL */
       case 31: /* CT_STATICTEXT */
+         InsAddEventCat(d, n++, "Action");
          InsAddEvent(d, n++, "OnClick");
          InsAddEvent(d, n++, "OnDblClick");
+         InsAddEventCat(d, n++, "Mouse");
          InsAddEvent(d, n++, "OnMouseDown");
          break;
       case 6: /* CT_GROUPBOX */
       case 25: /* CT_PANEL */
+         InsAddEventCat(d, n++, "Action");
          InsAddEvent(d, n++, "OnClick");
          InsAddEvent(d, n++, "OnDblClick");
+         InsAddEventCat(d, n++, "Layout");
          InsAddEvent(d, n++, "OnResize");
+         InsAddEventCat(d, n++, "Mouse");
          InsAddEvent(d, n++, "OnMouseDown");
          break;
       case 7: /* CT_LISTBOX */
+         InsAddEventCat(d, n++, "Action");
          InsAddEvent(d, n++, "OnClick");
          InsAddEvent(d, n++, "OnDblClick");
          InsAddEvent(d, n++, "OnChange");
+         InsAddEventCat(d, n++, "Focus");
          InsAddEvent(d, n++, "OnEnter");
          InsAddEvent(d, n++, "OnExit");
+         InsAddEventCat(d, n++, "Keyboard");
          InsAddEvent(d, n++, "OnKeyDown");
          break;
       case 20: /* CT_TREEVIEW */
+         InsAddEventCat(d, n++, "Action");
          InsAddEvent(d, n++, "OnClick");
          InsAddEvent(d, n++, "OnDblClick");
          InsAddEvent(d, n++, "OnChange");
          InsAddEvent(d, n++, "OnExpand");
          InsAddEvent(d, n++, "OnCollapse");
+         InsAddEventCat(d, n++, "Keyboard");
          InsAddEvent(d, n++, "OnKeyDown");
          break;
       case 21: /* CT_LISTVIEW */
+         InsAddEventCat(d, n++, "Action");
          InsAddEvent(d, n++, "OnClick");
          InsAddEvent(d, n++, "OnDblClick");
          InsAddEvent(d, n++, "OnChange");
          InsAddEvent(d, n++, "OnColumnClick");
+         InsAddEventCat(d, n++, "Keyboard");
          InsAddEvent(d, n++, "OnKeyDown");
          break;
       case 79: case 80: /* CT_BROWSE, CT_DBGRID */
+         InsAddEventCat(d, n++, "Action");
          InsAddEvent(d, n++, "OnCellClick");
          InsAddEvent(d, n++, "OnCellDblClick");
          InsAddEvent(d, n++, "OnHeaderClick");
          InsAddEvent(d, n++, "OnSort");
          InsAddEvent(d, n++, "OnScroll");
-         InsAddEvent(d, n++, "OnCellEdit");
          InsAddEvent(d, n++, "OnRowSelect");
-         InsAddEvent(d, n++, "OnKeyDown");
+         InsAddEventCat(d, n++, "Data");
+         InsAddEvent(d, n++, "OnCellEdit");
+         InsAddEventCat(d, n++, "Layout");
          InsAddEvent(d, n++, "OnColumnResize");
+         InsAddEventCat(d, n++, "Keyboard");
+         InsAddEvent(d, n++, "OnKeyDown");
          break;
       case 39: /* CT_PAINTBOX */
+         InsAddEventCat(d, n++, "Action");
          InsAddEvent(d, n++, "OnPaint");
          InsAddEvent(d, n++, "OnClick");
+         InsAddEventCat(d, n++, "Mouse");
          InsAddEvent(d, n++, "OnMouseDown");
          InsAddEvent(d, n++, "OnMouseUp");
          InsAddEvent(d, n++, "OnMouseMove");
+         InsAddEventCat(d, n++, "Layout");
          InsAddEvent(d, n++, "OnResize");
          break;
       case 38: /* CT_TIMER */
+         InsAddEventCat(d, n++, "Action");
          InsAddEvent(d, n++, "OnTimer");
          break;
       case 22: /* CT_PROGRESSBAR */
          break; /* no user events */
       case 34: /* CT_TRACKBAR */
       case 26: /* CT_SCROLLBAR */
+         InsAddEventCat(d, n++, "Action");
          InsAddEvent(d, n++, "OnChange");
          InsAddEvent(d, n++, "OnScroll");
          break;
@@ -1077,19 +1154,25 @@ static void InsPopulateEvents( INSDATA * d )
       case 35: /* CT_UPDOWN */
       case 36: /* CT_DATETIMEPICKER */
       case 37: /* CT_MONTHCALENDAR */
+         InsAddEventCat(d, n++, "Action");
          InsAddEvent(d, n++, "OnChange");
          InsAddEvent(d, n++, "OnClick");
          break;
       case 14: /* CT_IMAGE */
+         InsAddEventCat(d, n++, "Action");
          InsAddEvent(d, n++, "OnClick");
          InsAddEvent(d, n++, "OnDblClick");
+         InsAddEventCat(d, n++, "Mouse");
          InsAddEvent(d, n++, "OnMouseDown");
          break;
       default:
          /* Generic events for all other controls */
+         InsAddEventCat(d, n++, "Action");
          InsAddEvent(d, n++, "OnClick");
          InsAddEvent(d, n++, "OnChange");
+         InsAddEventCat(d, n++, "Keyboard");
          InsAddEvent(d, n++, "OnKeyDown");
+         InsAddEventCat(d, n++, "Mouse");
          InsAddEvent(d, n++, "OnMouseDown");
          break;
    }
