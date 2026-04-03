@@ -1172,14 +1172,15 @@ static void InsPopulateEvents( INSDATA * d )
    int nType, n = 0;
    PHB_DYNS pDyn;
 
-   if( !d || !d->hEventList ) return;
+   InsLog( "InsPopulateEvents called" );
+   if( !d || !d->hEventList ) { InsLog("  -> guard exit (no d or no hEventList)"); return; }
    SendMessage( d->hEventList, LVM_DELETEALLITEMS, 0, 0 );
    if( d->hCtrl == 0 ) return;
 
-   /* Get control type via UI_GetType */
+   /* Get control type via UI_GetType - use reenter for VM safety */
    pDyn = hb_dynsymFindName( "UI_GETTYPE" );
    if( !pDyn ) {
-      /* Fallback: show basic events */
+      InsLog("  -> UI_GETTYPE not found, using fallback");
       InsAddEvent( d, 0, "OnClick" );
       InsAddEvent( d, 1, "OnChange" );
       InsAddEvent( d, 2, "OnInit" );
@@ -1187,10 +1188,15 @@ static void InsPopulateEvents( INSDATA * d )
       return;
    }
 
-   hb_vmPushDynSym( pDyn ); hb_vmPushNil();
-   hb_vmPushNumInt( d->hCtrl );
-   hb_vmDo( 1 );
-   nType = hb_itemGetNI( hb_stackReturnItem() );
+   if( hb_vmRequestReenter() )
+   {
+      hb_vmPushDynSym( pDyn ); hb_vmPushNil();
+      hb_vmPushNumInt( d->hCtrl );
+      hb_vmDo( 1 );
+      nType = hb_itemGetNI( hb_stackReturnItem() );
+      hb_vmRequestRestore();
+   }
+   InsLog("  -> nType = %d" );
 
    /* Show events based on control type */
    switch( nType )
