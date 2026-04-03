@@ -5,6 +5,9 @@
 #include "hbide.h"
 #include <string.h>
 
+/* Global pointer to the current design form (set by UI_SetDesignForm) */
+extern TForm * g_designForm;
+
 static PROPDESC aFormProps[] = {
    { "cFontName", PT_STRING,  0, "Appearance" },
    { "nFontSize", PT_NUMBER,  0, "Appearance" },
@@ -214,6 +217,35 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
              wId < TOOLBAR_BTN_ID_BASE + FToolBar->FBtnCount )
          {
             FToolBar->DoCommand( wId - TOOLBAR_BTN_ID_BASE );
+            return 0;
+         }
+
+         /* Palette component button clicks (IDs 200+) */
+         if( FPalette && wId >= 200 && wId < 200 + MAX_PALETTE_BTNS )
+         {
+            int btnIdx = wId - 200;
+            int nTab = FPalette->FCurrentTab;
+            if( nTab >= 0 && nTab < FPalette->FTabCount &&
+                btnIdx >= 0 && btnIdx < FPalette->FTabs[nTab].nBtnCount )
+            {
+               int ctrlType = FPalette->FTabs[nTab].btns[btnIdx].nControlType;
+
+               /* Fire FOnSelect callback with the control type */
+               if( FPalette->FOnSelect && HB_IS_BLOCK( FPalette->FOnSelect ) )
+               {
+                  hb_vmPushEvalSym();
+                  hb_vmPush( FPalette->FOnSelect );
+                  hb_vmPushInteger( ctrlType );
+                  hb_vmSend( 1 );
+               }
+
+               /* Set pending control on the design form */
+               if( g_designForm )
+               {
+                  g_designForm->FPendingControlType = ctrlType;
+                  SetCursor( LoadCursor(NULL, IDC_CROSS) );
+               }
+            }
             return 0;
          }
 

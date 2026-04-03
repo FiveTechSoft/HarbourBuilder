@@ -1868,12 +1868,12 @@ HB_FUNC( UI_FORMSETPENDING )
 }
 
 /* UI_SetDesignForm( hForm ) - set active design form (used by palette drop) */
-static TForm * s_designForm = NULL;
+TForm * g_designForm = NULL;
 
 HB_FUNC( UI_SETDESIGNFORM )
 {
    TForm * p = GetForm(1);
-   s_designForm = p;
+   g_designForm = p;
 }
 
 /* UI_FormBringToFront( hForm ) */
