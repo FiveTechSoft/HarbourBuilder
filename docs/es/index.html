@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HarbourBuilder Documentacion</title>
+  <title>Documentacion de HarbourBuilder</title>
   <link rel="stylesheet" href="../assets/css/docs.css">
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <script>mermaid.initialize({startOnLoad:true, theme:'dark'});</script>
@@ -16,9 +16,9 @@
     <span>HB</span> HarbourBuilder Docs
   </a>
   <nav>
-    <input class="search-box" type="text" placeholder="Search docs..." oninput="doSearch(this.value)">
-    <button class="lang-btn">EN</button>
-    <a class="lang-btn active" href="../es/index.html">ES</a>
+    <input class="search-box" type="text" placeholder="Buscar en la documentacion..." oninput="doSearch(this.value)">
+    <a class="lang-btn" href="../en/index.html">EN</a>
+    <button class="lang-btn active">ES</button>
     <a class="lang-btn" href="../pt/index.html">PT</a>
     <button class="theme-toggle" onclick="toggleTheme()">&#9788;</button>
   </nav>
@@ -27,54 +27,55 @@
 <!-- Sidebar -->
 <div class="sidebar">
   <div class="nav-section">
-    <h3>Getting Started</h3>
-    <a href="index.html" class="active">Overview</a>
-    <a href="quickstart.html">Quick Start</a>
-    <a href="installation.html">Installation</a>
-    <a href="architecture.html">Architecture</a>
+    <h3>Primeros pasos</h3>
+    <a href="index.html" class="active">Vision general</a>
+    <a href="quickstart.html">Inicio rapido</a>
+    <a href="installation.html">Instalacion</a>
+    <a href="architecture.html">Arquitectura</a>
   </div>
   <div class="nav-section">
-    <h3>Component Palette</h3>
-    <a href="controls-standard.html">Standard (11)</a>
-    <a href="controls-additional.html">Additional (10)</a>
+    <h3>Paleta de componentes</h3>
+    <a href="controls-standard.html">Estandar (11)</a>
+    <a href="controls-additional.html">Adicional (10)</a>
     <a href="controls-native.html">Win32 / Cocoa / GTK3 (9)</a>
-    <a href="controls-system.html">System (2)</a>
-    <a href="controls-dialogs.html">Dialogs (6)</a>
-    <a href="controls-database.html">Data Access (9)</a>
+    <a href="controls-system.html">Sistema (2)</a>
+    <a href="controls-dialogs.html">Dialogos (6)</a>
+    <a href="controls-database.html">Acceso a datos (9)</a>
     <a href="controls-internet.html">Internet (9)</a>
-    <a href="controls-threading.html">Threading (8)</a>
-    <a href="controls-ai.html">AI (7)</a>
+    <a href="controls-threading.html">Hilos (8)</a>
+    <a href="controls-ai.html">IA (7)</a>
+    <a href="controls-erp.html">ERP / Negocios (12)</a>
   </div>
   <div class="nav-section">
-    <h3>IDE Features</h3>
-    <a href="form-designer.html">Form Designer</a>
-    <a href="object-inspector.html">Object Inspector</a>
-    <a href="code-editor.html">Code Editor</a>
-    <a href="two-way-tools.html">Two-Way Tools</a>
-    <a href="debugger.html">Debugger</a>
-    <a href="ai-assistant.html">AI Assistant</a>
-    <a href="build-run.html">Build &amp; Run</a>
+    <h3>Funciones del IDE</h3>
+    <a href="form-designer.html">Disenador de formularios</a>
+    <a href="object-inspector.html">Inspector de objetos</a>
+    <a href="code-editor.html">Editor de codigo</a>
+    <a href="two-way-tools.html">Herramientas bidireccionales</a>
+    <a href="debugger.html">Depurador</a>
+    <a href="ai-assistant.html">Asistente IA</a>
+    <a href="build-run.html">Compilar y ejecutar</a>
   </div>
   <div class="nav-section">
-    <h3>Tutorials</h3>
-    <a href="tutorial-hello.html">Hello World</a>
-    <a href="tutorial-forms.html">Working with Forms</a>
-    <a href="tutorial-events.html">Event Handling</a>
-    <a href="tutorial-database.html">Database CRUD</a>
-    <a href="tutorial-webserver.html">Web Server</a>
-    <a href="tutorial-ai.html">AI Integration</a>
+    <h3>Tutoriales</h3>
+    <a href="tutorial-hello.html">Hola Mundo</a>
+    <a href="tutorial-forms.html">Trabajar con formularios</a>
+    <a href="tutorial-events.html">Manejo de eventos</a>
+    <a href="tutorial-database.html">CRUD de base de datos</a>
+    <a href="tutorial-webserver.html">Servidor web</a>
+    <a href="tutorial-ai.html">Integracion con IA</a>
     <a href="tutorial-transformer.html">Transformer</a>
   </div>
   <div class="nav-section">
-    <h3>Reference</h3>
-    <a href="ref-properties.html">Properties A-Z</a>
-    <a href="ref-events.html">Events A-Z</a>
-    <a href="ref-methods.html">Methods A-Z</a>
-    <a href="ref-commands.html">xBase Commands</a>
-    <a href="ref-functions.html">HB_FUNC Bridge</a>
+    <h3>Referencia</h3>
+    <a href="ref-properties.html">Propiedades A-Z</a>
+    <a href="ref-events.html">Eventos A-Z</a>
+    <a href="ref-methods.html">Metodos A-Z</a>
+    <a href="ref-commands.html">Comandos xBase</a>
+    <a href="ref-functions.html">Puente HB_FUNC</a>
   </div>
   <div class="nav-section">
-    <h3>Platforms</h3>
+    <h3>Plataformas</h3>
     <a href="platform-windows.html">Windows</a>
     <a href="platform-macos.html">macOS</a>
     <a href="platform-linux.html">Linux</a>
@@ -87,24 +88,24 @@
 <div class="content">
 
 <div class="breadcrumbs">
-  <a href="index.html">Docs</a> <span>/</span> Overview
+  <a href="index.html">Docs</a> <span>/</span> Vision general
 </div>
 
-<h1>HarbourBuilder Documentation</h1>
-<p>The most powerful cross-platform visual IDE for Harbour. Build native applications for
+<h1>Documentacion de HarbourBuilder</h1>
+<p>El IDE visual multiplataforma mas potente para Harbour. Construye aplicaciones nativas para
 <span class="badge win">Windows</span>
 <span class="badge mac">macOS</span>
 <span class="badge linux">Linux</span>
-with a single codebase.</p>
+con un unico codigo fuente.</p>
 
 <div class="info-box tip">
-  <strong>What is HarbourBuilder?</strong>
-  A Borland C++Builder-style visual IDE that generates Harbour code. Design forms visually,
-  drop components from the palette, set properties in the inspector, and run — with native
-  performance on every platform.
+  <strong>Que es HarbourBuilder?</strong>
+  Un IDE visual al estilo de Borland C++Builder que genera codigo Harbour. Disena formularios visualmente,
+  arrastra componentes desde la paleta, configura propiedades en el inspector y ejecuta — con rendimiento
+  nativo en cada plataforma.
 </div>
 
-<h2>Architecture</h2>
+<h2>Arquitectura</h2>
 <div class="mermaid">
 graph TB
     A["Application Code (.prg)"] --> B["xBase Commands<br/>#xcommand (compile-time)"]
@@ -120,58 +121,58 @@ graph TB
     style E3 fill:#e95420,stroke:#c34113,color:#fff
 </div>
 
-<h2>Component Palette</h2>
-<p>78 controls across 10 tabs — the most complete component palette of any Harbour IDE:</p>
+<h2>Paleta de componentes</h2>
+<p>78 controles en 10 pestanas — la paleta de componentes mas completa de cualquier IDE Harbour:</p>
 
 <table>
-  <tr><th>Tab</th><th>Controls</th><th>Count</th></tr>
-  <tr><td><strong>Standard</strong></td><td>Label, Edit, Memo, Button, CheckBox, RadioButton, ListBox, ComboBox, GroupBox, Panel, ScrollBar</td><td>11</td></tr>
-  <tr><td><strong>Additional</strong></td><td>BitBtn, SpeedButton, Image, Shape, Bevel, MaskEdit, StringGrid, ScrollBox, StaticText, LabeledEdit</td><td>10</td></tr>
-  <tr><td><strong>Native</strong></td><td>TabControl, TreeView, ListView, ProgressBar, RichEdit, TrackBar, UpDown, DateTimePicker, MonthCalendar</td><td>9</td></tr>
-  <tr><td><strong>System</strong></td><td>Timer, PaintBox</td><td>2</td></tr>
-  <tr><td><strong>Dialogs</strong></td><td>OpenDialog, SaveDialog, FontDialog, ColorDialog, FindDialog, ReplaceDialog</td><td>6</td></tr>
-  <tr><td><strong>Data Access</strong></td><td>DBFTable, MySQL, MariaDB, PostgreSQL, SQLite, Firebird, SQLServer, Oracle, MongoDB</td><td>9</td></tr>
+  <tr><th>Pestana</th><th>Controles</th><th>Cantidad</th></tr>
+  <tr><td><strong>Estandar</strong></td><td>Label, Edit, Memo, Button, CheckBox, RadioButton, ListBox, ComboBox, GroupBox, Panel, ScrollBar</td><td>11</td></tr>
+  <tr><td><strong>Adicional</strong></td><td>BitBtn, SpeedButton, Image, Shape, Bevel, MaskEdit, StringGrid, ScrollBox, StaticText, LabeledEdit</td><td>10</td></tr>
+  <tr><td><strong>Nativo</strong></td><td>TabControl, TreeView, ListView, ProgressBar, RichEdit, TrackBar, UpDown, DateTimePicker, MonthCalendar</td><td>9</td></tr>
+  <tr><td><strong>Sistema</strong></td><td>Timer, PaintBox</td><td>2</td></tr>
+  <tr><td><strong>Dialogos</strong></td><td>OpenDialog, SaveDialog, FontDialog, ColorDialog, FindDialog, ReplaceDialog</td><td>6</td></tr>
+  <tr><td><strong>Acceso a datos</strong></td><td>DBFTable, MySQL, MariaDB, PostgreSQL, SQLite, Firebird, SQLServer, Oracle, MongoDB</td><td>9</td></tr>
   <tr><td><strong>Internet</strong></td><td>WebView, WebServer, WebSocket, HttpClient, FtpClient, SmtpClient, TcpServer, TcpClient, UdpSocket</td><td>9</td></tr>
-  <tr><td><strong>Threading</strong></td><td>Thread, Mutex, Semaphore, CriticalSection, ThreadPool, AtomicInt, CondVar, Channel</td><td>8</td></tr>
-  <tr><td><strong>AI</strong></td><td>OpenAI, Gemini, Claude, DeepSeek, Grok, Ollama, Transformer</td><td>7</td></tr>
+  <tr><td><strong>Hilos</strong></td><td>Thread, Mutex, Semaphore, CriticalSection, ThreadPool, AtomicInt, CondVar, Channel</td><td>8</td></tr>
+  <tr><td><strong>IA</strong></td><td>OpenAI, Gemini, Claude, DeepSeek, Grok, Ollama, Transformer</td><td>7</td></tr>
 </table>
-<p><strong>Total: 78 controls</strong> — all available on Windows, macOS, and Linux.</p>
+<p><strong>Total: 78 controles</strong> — todos disponibles en Windows, macOS y Linux.</p>
 
-<h2>Key Features</h2>
+<h2>Funciones principales</h2>
 
 <details>
-  <summary>Visual Form Designer</summary>
+  <summary>Disenador visual de formularios</summary>
   <div>
-    <p>WYSIWYG form designer with dot grid, selection handles, rubber band selection,
-    drag &amp; drop from component palette, and real-time code generation.</p>
+    <p>Disenador de formularios WYSIWYG con cuadricula de puntos, controles de seleccion, seleccion
+    con rectangulo elastico, arrastrar y soltar desde la paleta de componentes y generacion de codigo en tiempo real.</p>
   </div>
 </details>
 
 <details>
-  <summary>Two-Way Tools</summary>
+  <summary>Herramientas bidireccionales</summary>
   <div>
-    <p>Changes in the designer instantly update the code editor, and vice versa.
-    Your METHOD implementations are always preserved during code regeneration.</p>
+    <p>Los cambios en el disenador actualizan instantaneamente el editor de codigo, y viceversa.
+    Tus implementaciones de METHOD siempre se preservan durante la regeneracion de codigo.</p>
   </div>
 </details>
 
 <details>
-  <summary>Built-in AI Assistant</summary>
+  <summary>Asistente IA integrado</summary>
   <div>
-    <p>Local AI coding assistant powered by Ollama. Ask questions about Harbour,
-    get code suggestions, refactor code, and fix errors — all without an internet connection.</p>
+    <p>Asistente de programacion con IA local impulsado por Ollama. Haz preguntas sobre Harbour,
+    obtiene sugerencias de codigo, refactoriza codigo y corrige errores — todo sin conexion a internet.</p>
   </div>
 </details>
 
 <details>
-  <summary>Integrated Debugger</summary>
+  <summary>Depurador integrado</summary>
   <div>
-    <p>Step-by-step execution (F7/F8), breakpoints (F9), variable inspection,
-    call stack, and watch window — all integrated into the code editor.</p>
+    <p>Ejecucion paso a paso (F7/F8), puntos de interrupcion (F9), inspeccion de variables,
+    pila de llamadas y ventana de observacion — todo integrado en el editor de codigo.</p>
   </div>
 </details>
 
-<h2>Quick Example</h2>
+<h2>Ejemplo rapido</h2>
 
 <pre><span class="pp">#include</span> <span class="st">"hbbuilder.ch"</span>
 
@@ -190,12 +191,12 @@ graph TB
 
 <span class="kw">return</span> <span class="kw">nil</span></pre>
 
-<p>This code runs <strong>identically</strong> on Windows, macOS, and Linux — with native controls on each platform.</p>
+<p>Este codigo se ejecuta <strong>de forma identica</strong> en Windows, macOS y Linux — con controles nativos en cada plataforma.</p>
 
 <div class="info-box info">
-  <strong>Vibe coded 100% using Claude Code</strong>
-  <p>HarbourBuilder was built entirely with AI assistance — from the C++ core and native backends
-  to the Harbour OOP layer and the visual designer. A new paradigm in software development.</p>
+  <strong>Vibe coded 100% usando Claude Code</strong>
+  <p>HarbourBuilder fue construido enteramente con asistencia de IA — desde el nucleo en C++ y los backends nativos
+  hasta la capa OOP de Harbour y el disenador visual. Un nuevo paradigma en el desarrollo de software.</p>
 </div>
 
 </div>
