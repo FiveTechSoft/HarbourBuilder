@@ -349,6 +349,40 @@ static LRESULT CALLBACK InsWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             }
             return 0;
          }
+         /* Double-click on Events list -> fire OnEventDblClick callback */
+         if( pnm->code == NM_DBLCLK && pnm->idFrom == 103 )
+         {
+            NMITEMACTIVATE * pe = (NMITEMACTIVATE *) lParam;
+            if( d && pe->iItem >= 0 && d->pOnEventDblClick && HB_IS_BLOCK(d->pOnEventDblClick) )
+            {
+               char szEvName[64] = {0};
+               LVITEMA evi = {0};
+               evi.iItem = pe->iItem;
+               evi.iSubItem = 0;
+               evi.pszText = szEvName;
+               evi.cchTextMax = 64;
+               SendMessageA( d->hEventList, LVM_GETITEMTEXTA, pe->iItem, (LPARAM) &evi );
+
+               if( szEvName[0] && hb_vmRequestReenter() )
+               {
+                  PHB_ITEM pCtrl = hb_itemPutNInt( NULL, d->hCtrl );
+                  PHB_ITEM pEvt  = hb_itemPutC( NULL, szEvName );
+                  hb_vmPushEvalSym();
+                  hb_vmPush( d->pOnEventDblClick );
+                  hb_vmPush( pCtrl );
+                  hb_vmPush( pEvt );
+                  hb_vmSend( 2 );
+                  hb_itemRelease( pCtrl );
+                  hb_itemRelease( pEvt );
+                  hb_vmRequestRestore();
+
+                  /* Refresh events to show the new handler name */
+                  InsPopulateEvents( d );
+               }
+            }
+            return 0;
+         }
+
          /* Tab change: Properties / Events */
          if( pnm->code == TCN_SELCHANGE && pnm->idFrom == 102 )
          {
@@ -881,7 +915,7 @@ static void InsPopulateEvents( INSDATA * d )
 {
    LVITEMA lvi = {0};
    PHB_DYNS pDyn;
-   PHB_ITEM pResult;
+   PHB_ITEM pResult, pCopy;
    HB_SIZE nLen, i;
 
    if( !d || !d->hEventList ) return;
@@ -893,48 +927,57 @@ static void InsPopulateEvents( INSDATA * d )
    /* Call UI_GetAllEvents( hCtrl ) to get dynamic event list */
    pDyn = hb_dynsymFindName( "UI_GETALLEVENTS" );
    if( !pDyn ) return;
-   hb_vmPushDynSym( pDyn ); hb_vmPushNil();
-   hb_vmPushNumInt( d->hCtrl );
-   hb_vmDo( 1 );
-   pResult = hb_stackReturnItem();
-   if( !pResult || !HB_IS_ARRAY(pResult) ) return;
-   nLen = hb_arrayLen( pResult );
 
-   for( i = 1; i <= nLen; i++ )
+   if( hb_vmRequestReenter() )
    {
-      PHB_ITEM pRow = hb_arrayGetItemPtr( pResult, i );
-      const char * cEvent = hb_arrayGetCPtr( pRow, 1 );
-      int lAssigned = hb_arrayGetL( pRow, 2 );
-      const char * cCategory = hb_arrayGetCPtr( pRow, 3 );
-      char szHandler[128] = "";
+      hb_vmPushDynSym( pDyn );
+      hb_vmPushNil();
+      hb_vmPushNumInt( d->hCtrl );
+      hb_vmDo( 1 );
 
-      /* If event is assigned, try to find handler name from editor code */
-      if( lAssigned )
+      pResult = hb_stackReturnItem();
+      if( !pResult || !HB_IS_ARRAY(pResult) )
       {
-         /* Look for handler name in code: ControlName + EventSuffix */
-         /* e.g. Button1Click for OnClick on Button1 */
-         PHB_DYNS pEdDyn = hb_dynsymFindName( "_INSGETEDITORCODE" );
-         if( pEdDyn )
-         {
-            hb_vmPushDynSym( pEdDyn ); hb_vmPushNil();
-            hb_vmDo( 0 );
-            /* Result is the editor code string - we could scan it */
-         }
-         lstrcpynA( szHandler, "(assigned)", 128 );
+         hb_vmRequestRestore();
+         return;
       }
 
-      /* Category header (only for first event of each category) */
-      /* Skip for now - just list all events flat */
+      /* IMPORTANT: copy the result array because the HB stack item
+         will be overwritten by subsequent VM operations */
+      pCopy = hb_itemNew( pResult );
+      hb_vmRequestRestore();
 
-      lvi.mask = LVIF_TEXT;
-      lvi.iItem = (int)(i - 1);
-      lvi.iSubItem = 0;
-      lvi.pszText = (char *) cEvent;
-      SendMessageA( d->hEventList, LVM_INSERTITEMA, 0, (LPARAM) &lvi );
+      nLen = hb_arrayLen( pCopy );
 
-      lvi.iSubItem = 1;
-      lvi.pszText = szHandler;
-      SendMessageA( d->hEventList, LVM_SETITEMA, 0, (LPARAM) &lvi );
+      for( i = 1; i <= nLen; i++ )
+      {
+         PHB_ITEM pRow = hb_arrayGetItemPtr( pCopy, i );
+         char szEvent[64] = "";
+         char szHandler[128] = "";
+
+         /* Get event name safely */
+         {
+            const char * c = hb_arrayGetCPtr( pRow, 1 );
+            if( c ) lstrcpynA( szEvent, c, 64 );
+         }
+
+         /* Get assigned status - column 2 is logical */
+         if( hb_arrayGetL( pRow, 2 ) )
+            lstrcpynA( szHandler, "(assigned)", 128 );
+
+         /* Insert event row */
+         lvi.mask = LVIF_TEXT;
+         lvi.iItem = (int)(i - 1);
+         lvi.iSubItem = 0;
+         lvi.pszText = szEvent;
+         SendMessageA( d->hEventList, LVM_INSERTITEMA, 0, (LPARAM) &lvi );
+
+         lvi.iSubItem = 1;
+         lvi.pszText = szHandler;
+         SendMessageA( d->hEventList, LVM_SETITEMA, 0, (LPARAM) &lvi );
+      }
+
+      hb_itemRelease( pCopy );
    }
 }
 
