@@ -12,6 +12,14 @@
 #include "hbide.h"
 #include <string.h>
 
+/* UI_MsgBox - cross-platform message box */
+HB_FUNC( UI_MSGBOX )
+{
+   MessageBoxA( GetActiveWindow(), hb_parc(1),
+      HB_ISCHAR(2) ? hb_parc(2) : "HbBuilder",
+      MB_OK | MB_ICONINFORMATION );
+}
+
 /* Helper: get TControl pointer from Harbour handle */
 static TControl * GetCtrl( int nParam )
 {

@@ -1284,7 +1284,7 @@ static function TBRun()
    // Step 3: Compile user code with Harbour
    if ! lError
       cLog += "[3] Compiling main.prg..." + Chr(10)
-      cCmd := '"' + cHbBin + '\harbour.exe" "' + cBuildDir + '\main.prg" /n /w /q' + ;
+      cCmd := cHbBin + '\harbour.exe ' + cBuildDir + '\main.prg /n /w /q' + ;
               " /i" + cHbInc + " /i" + cBuildDir + ;
               " /o" + cBuildDir + "\main.c"
       cOutput := W32_ShellExec( cCmd )
@@ -1299,7 +1299,7 @@ static function TBRun()
    // Step 4: Compile framework
    if ! lError
       cLog += "[4] Compiling framework..." + Chr(10)
-      cCmd := '"' + cHbBin + '\harbour.exe" "' + cBuildDir + '\classes.prg" /n /w /q' + ;
+      cCmd := cHbBin + '\harbour.exe ' + cBuildDir + '\classes.prg /n /w /q' + ;
               " /i" + cHbInc + " /i" + cBuildDir + ;
               " /o" + cBuildDir + "\classes.c"
       W32_ShellExec( cCmd )
@@ -1309,20 +1309,20 @@ static function TBRun()
    // Step 5: Compile C sources
    if ! lError
       cLog += "[5] Compiling C sources..." + Chr(10)
-      cCmd := '"' + cCC + '" -c -O2 -tW -I' + cHbInc + ;
+      cCmd := cCC + ' -c -O2 -tW -I' + cHbInc + ;
               " -I" + cCDir + "\include" + ;
               " -I" + cProjDir + "\cpp\include" + ;
-              ' "' + cBuildDir + '\main.c"' + ;
+              " " + cBuildDir + "\main.c" + ;
               " -o" + cBuildDir + "\main.obj"
       cOutput := W32_ShellExec( cCmd )
       if "Error" $ cOutput
          cLog += "    FAILED:" + Chr(10) + cOutput + Chr(10)
          lError := .T.
       endif
-      cCmd := '"' + cCC + '" -c -O2 -tW -I' + cHbInc + ;
+      cCmd := cCC + ' -c -O2 -tW -I' + cHbInc + ;
               " -I" + cCDir + "\include" + ;
               " -I" + cProjDir + "\cpp\include" + ;
-              ' "' + cBuildDir + '\classes.c"' + ;
+              " " + cBuildDir + "\classes.c" + ;
               " -o" + cBuildDir + "\classes.obj"
       W32_ShellExec( cCmd )
       cLog += "    OK" + Chr(10)
@@ -1331,13 +1331,13 @@ static function TBRun()
    // Step 6: Compile C++ core
    if ! lError
       cLog += "[6] Compiling C++ core..." + Chr(10)
-      cCmd := '"' + cCC + '" -c -O2 -tW -I' + cHbInc + ;
+      cCmd := cCC + ' -c -O2 -tW -I' + cHbInc + ;
               " -I" + cCDir + "\include" + ;
               " -I" + cProjDir + "\cpp\include" + ;
-              ' "' + cProjDir + '\cpp\src\tcontrol.cpp"' + ;
-              ' "' + cProjDir + '\cpp\src\tform.cpp"' + ;
-              ' "' + cProjDir + '\cpp\src\tcontrols.cpp"' + ;
-              ' "' + cProjDir + '\cpp\src\hbbridge.cpp"' + ;
+              " " + cProjDir + "\cpp\src\tcontrol.cpp" + ;
+              " " + cProjDir + "\cpp\src\tform.cpp" + ;
+              " " + cProjDir + "\cpp\src\tcontrols.cpp" + ;
+              " " + cProjDir + "\cpp\src\hbbridge.cpp" + ;
               " -o" + cBuildDir + "\"
       cOutput := W32_ShellExec( cCmd )
       if "Error" $ cOutput
@@ -1358,7 +1358,7 @@ static function TBRun()
                cBuildDir + "\tform.obj " + ;
                cBuildDir + "\tcontrols.obj " + ;
                cBuildDir + "\hbbridge.obj"
-      cCmd := '"' + cILink + '" -Gn -aa -Tpe' + ;
+      cCmd := cILink + ' -Gn -aa -Tpe' + ;
               " -L" + cCDir + "\lib" + ;
               " -L" + cCDir + "\lib\psdk" + ;
               " -L" + cHbLib + ;
