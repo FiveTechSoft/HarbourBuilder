@@ -1238,7 +1238,7 @@ static function TBRun()
 
    SaveActiveFormCode()
 
-   cBuildDir := GetEnv( "TEMP" ) + "\hbbuilder_build"
+   cBuildDir := "c:\hbbuilder_build"
    cHbDir   := "c:\harbour"
    cHbBin   := cHbDir + "\bin\win\bcc"
    cHbInc   := cHbDir + "\include"
@@ -1251,6 +1251,14 @@ static function TBRun()
    lError   := .F.
 
    W32_ShellExec( 'cmd /c mkdir "' + cBuildDir + '" 2>nul' )
+
+   // Trace log
+   MemoWrit( cBuildDir + "\build_trace.log", "=== TBRun started ===" + Chr(10) + ;
+      "BuildDir: " + cBuildDir + Chr(10) + ;
+      "HbDir: " + cHbDir + Chr(10) + ;
+      "CDir: " + cCDir + Chr(10) + ;
+      "ProjDir: " + cProjDir + Chr(10) + ;
+      "Forms: " + LTrim(Str(Len(aForms))) + Chr(10) )
 
    // Step 1: Save files
    cLog += "[1] Saving project files..." + Chr(10)
@@ -1372,6 +1380,9 @@ static function TBRun()
          cLog += "    OK" + Chr(10)
       endif
    endif
+
+   // Write full build log to trace file
+   MemoWrit( cBuildDir + "\build_trace.log", cLog )
 
    // Result
    if lError
