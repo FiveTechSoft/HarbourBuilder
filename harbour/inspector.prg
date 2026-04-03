@@ -911,73 +911,187 @@ HB_FUNC( INS_SETONPROPCHANGED )
 
 /* INS_BringToFront( hInsData ) */
 /* Populate the Events tab with available events for the current control */
-static void InsPopulateEvents( INSDATA * d )
+/* Add one event row to the Events ListView */
+static void InsAddEvent( INSDATA * d, int nRow, const char * szEvent )
 {
    LVITEMA lvi = {0};
+   lvi.mask = LVIF_TEXT;
+   lvi.iItem = nRow;
+   lvi.iSubItem = 0;
+   lvi.pszText = (char *) szEvent;
+   SendMessageA( d->hEventList, LVM_INSERTITEMA, 0, (LPARAM) &lvi );
+   lvi.iSubItem = 1;
+   lvi.pszText = "";
+   SendMessageA( d->hEventList, LVM_SETITEMA, 0, (LPARAM) &lvi );
+}
+
+static void InsPopulateEvents( INSDATA * d )
+{
+   int nType, n = 0;
    PHB_DYNS pDyn;
-   PHB_ITEM pResult, pCopy;
-   HB_SIZE nLen, i;
 
    if( !d || !d->hEventList ) return;
-
    SendMessage( d->hEventList, LVM_DELETEALLITEMS, 0, 0 );
-
    if( d->hCtrl == 0 ) return;
 
-   /* Call UI_GetAllEvents( hCtrl ) to get dynamic event list */
-   pDyn = hb_dynsymFindName( "UI_GETALLEVENTS" );
-   if( !pDyn ) return;
+   /* Get control type via UI_GetType */
+   pDyn = hb_dynsymFindName( "UI_GETTYPE" );
+   if( !pDyn ) {
+      /* Fallback: show basic events */
+      InsAddEvent( d, 0, "OnClick" );
+      InsAddEvent( d, 1, "OnChange" );
+      InsAddEvent( d, 2, "OnInit" );
+      InsAddEvent( d, 3, "OnClose" );
+      return;
+   }
 
-   if( hb_vmRequestReenter() )
+   hb_vmPushDynSym( pDyn ); hb_vmPushNil();
+   hb_vmPushNumInt( d->hCtrl );
+   hb_vmDo( 1 );
+   nType = hb_itemGetNI( hb_stackReturnItem() );
+
+   /* Show events based on control type */
+   switch( nType )
    {
-      hb_vmPushDynSym( pDyn );
-      hb_vmPushNil();
-      hb_vmPushNumInt( d->hCtrl );
-      hb_vmDo( 1 );
-
-      pResult = hb_stackReturnItem();
-      if( !pResult || !HB_IS_ARRAY(pResult) )
-      {
-         hb_vmRequestRestore();
-         return;
-      }
-
-      /* IMPORTANT: copy the result array because the HB stack item
-         will be overwritten by subsequent VM operations */
-      pCopy = hb_itemNew( pResult );
-      hb_vmRequestRestore();
-
-      nLen = hb_arrayLen( pCopy );
-
-      for( i = 1; i <= nLen; i++ )
-      {
-         PHB_ITEM pRow = hb_arrayGetItemPtr( pCopy, i );
-         char szEvent[64] = "";
-         char szHandler[128] = "";
-
-         /* Get event name safely */
-         {
-            const char * c = hb_arrayGetCPtr( pRow, 1 );
-            if( c ) lstrcpynA( szEvent, c, 64 );
-         }
-
-         /* Get assigned status - column 2 is logical */
-         if( hb_arrayGetL( pRow, 2 ) )
-            lstrcpynA( szHandler, "(assigned)", 128 );
-
-         /* Insert event row */
-         lvi.mask = LVIF_TEXT;
-         lvi.iItem = (int)(i - 1);
-         lvi.iSubItem = 0;
-         lvi.pszText = szEvent;
-         SendMessageA( d->hEventList, LVM_INSERTITEMA, 0, (LPARAM) &lvi );
-
-         lvi.iSubItem = 1;
-         lvi.pszText = szHandler;
-         SendMessageA( d->hEventList, LVM_SETITEMA, 0, (LPARAM) &lvi );
-      }
-
-      hb_itemRelease( pCopy );
+      case 0: /* CT_FORM */
+         InsAddEvent(d, n++, "OnClick");
+         InsAddEvent(d, n++, "OnDblClick");
+         InsAddEvent(d, n++, "OnCreate");
+         InsAddEvent(d, n++, "OnDestroy");
+         InsAddEvent(d, n++, "OnShow");
+         InsAddEvent(d, n++, "OnHide");
+         InsAddEvent(d, n++, "OnClose");
+         InsAddEvent(d, n++, "OnCloseQuery");
+         InsAddEvent(d, n++, "OnActivate");
+         InsAddEvent(d, n++, "OnDeactivate");
+         InsAddEvent(d, n++, "OnResize");
+         InsAddEvent(d, n++, "OnPaint");
+         InsAddEvent(d, n++, "OnKeyDown");
+         InsAddEvent(d, n++, "OnKeyUp");
+         InsAddEvent(d, n++, "OnKeyPress");
+         InsAddEvent(d, n++, "OnMouseDown");
+         InsAddEvent(d, n++, "OnMouseUp");
+         InsAddEvent(d, n++, "OnMouseMove");
+         InsAddEvent(d, n++, "OnMouseWheel");
+         break;
+      case 3: /* CT_BUTTON */
+      case 12: /* CT_BITBTN */
+         InsAddEvent(d, n++, "OnClick");
+         InsAddEvent(d, n++, "OnEnter");
+         InsAddEvent(d, n++, "OnExit");
+         InsAddEvent(d, n++, "OnKeyDown");
+         InsAddEvent(d, n++, "OnMouseDown");
+         break;
+      case 2: /* CT_EDIT */
+      case 24: /* CT_MEMO */
+      case 23: /* CT_RICHEDIT */
+      case 28: /* CT_MASKEDIT */
+      case 32: /* CT_LABELEDEDIT */
+         InsAddEvent(d, n++, "OnChange");
+         InsAddEvent(d, n++, "OnClick");
+         InsAddEvent(d, n++, "OnEnter");
+         InsAddEvent(d, n++, "OnExit");
+         InsAddEvent(d, n++, "OnKeyDown");
+         InsAddEvent(d, n++, "OnKeyUp");
+         InsAddEvent(d, n++, "OnMouseDown");
+         break;
+      case 4: /* CT_CHECKBOX */
+      case 8: /* CT_RADIO */
+         InsAddEvent(d, n++, "OnClick");
+         InsAddEvent(d, n++, "OnEnter");
+         InsAddEvent(d, n++, "OnExit");
+         break;
+      case 5: /* CT_COMBOBOX */
+         InsAddEvent(d, n++, "OnChange");
+         InsAddEvent(d, n++, "OnClick");
+         InsAddEvent(d, n++, "OnEnter");
+         InsAddEvent(d, n++, "OnExit");
+         InsAddEvent(d, n++, "OnKeyDown");
+         break;
+      case 1: /* CT_LABEL */
+      case 31: /* CT_STATICTEXT */
+         InsAddEvent(d, n++, "OnClick");
+         InsAddEvent(d, n++, "OnDblClick");
+         InsAddEvent(d, n++, "OnMouseDown");
+         break;
+      case 6: /* CT_GROUPBOX */
+      case 25: /* CT_PANEL */
+         InsAddEvent(d, n++, "OnClick");
+         InsAddEvent(d, n++, "OnDblClick");
+         InsAddEvent(d, n++, "OnResize");
+         InsAddEvent(d, n++, "OnMouseDown");
+         break;
+      case 7: /* CT_LISTBOX */
+         InsAddEvent(d, n++, "OnClick");
+         InsAddEvent(d, n++, "OnDblClick");
+         InsAddEvent(d, n++, "OnChange");
+         InsAddEvent(d, n++, "OnEnter");
+         InsAddEvent(d, n++, "OnExit");
+         InsAddEvent(d, n++, "OnKeyDown");
+         break;
+      case 20: /* CT_TREEVIEW */
+         InsAddEvent(d, n++, "OnClick");
+         InsAddEvent(d, n++, "OnDblClick");
+         InsAddEvent(d, n++, "OnChange");
+         InsAddEvent(d, n++, "OnExpand");
+         InsAddEvent(d, n++, "OnCollapse");
+         InsAddEvent(d, n++, "OnKeyDown");
+         break;
+      case 21: /* CT_LISTVIEW */
+         InsAddEvent(d, n++, "OnClick");
+         InsAddEvent(d, n++, "OnDblClick");
+         InsAddEvent(d, n++, "OnChange");
+         InsAddEvent(d, n++, "OnColumnClick");
+         InsAddEvent(d, n++, "OnKeyDown");
+         break;
+      case 79: case 80: /* CT_BROWSE, CT_DBGRID */
+         InsAddEvent(d, n++, "OnCellClick");
+         InsAddEvent(d, n++, "OnCellDblClick");
+         InsAddEvent(d, n++, "OnHeaderClick");
+         InsAddEvent(d, n++, "OnSort");
+         InsAddEvent(d, n++, "OnScroll");
+         InsAddEvent(d, n++, "OnCellEdit");
+         InsAddEvent(d, n++, "OnRowSelect");
+         InsAddEvent(d, n++, "OnKeyDown");
+         InsAddEvent(d, n++, "OnColumnResize");
+         break;
+      case 39: /* CT_PAINTBOX */
+         InsAddEvent(d, n++, "OnPaint");
+         InsAddEvent(d, n++, "OnClick");
+         InsAddEvent(d, n++, "OnMouseDown");
+         InsAddEvent(d, n++, "OnMouseUp");
+         InsAddEvent(d, n++, "OnMouseMove");
+         InsAddEvent(d, n++, "OnResize");
+         break;
+      case 38: /* CT_TIMER */
+         InsAddEvent(d, n++, "OnTimer");
+         break;
+      case 22: /* CT_PROGRESSBAR */
+         break; /* no user events */
+      case 34: /* CT_TRACKBAR */
+      case 26: /* CT_SCROLLBAR */
+         InsAddEvent(d, n++, "OnChange");
+         InsAddEvent(d, n++, "OnScroll");
+         break;
+      case 33: /* CT_TABCONTROL */
+      case 35: /* CT_UPDOWN */
+      case 36: /* CT_DATETIMEPICKER */
+      case 37: /* CT_MONTHCALENDAR */
+         InsAddEvent(d, n++, "OnChange");
+         InsAddEvent(d, n++, "OnClick");
+         break;
+      case 14: /* CT_IMAGE */
+         InsAddEvent(d, n++, "OnClick");
+         InsAddEvent(d, n++, "OnDblClick");
+         InsAddEvent(d, n++, "OnMouseDown");
+         break;
+      default:
+         /* Generic events for all other controls */
+         InsAddEvent(d, n++, "OnClick");
+         InsAddEvent(d, n++, "OnChange");
+         InsAddEvent(d, n++, "OnKeyDown");
+         InsAddEvent(d, n++, "OnMouseDown");
+         break;
    }
 }
 
