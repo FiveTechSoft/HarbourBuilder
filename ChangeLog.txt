@@ -1,6 +1,94 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-04 (Session 8: Windows Parity - Full IDE feature parity across 3 platforms)
+
+  DEBUGGER ENGINE (hbbridge.cpp, +12 HB_FUNC):
+  IDE_DebugStart() ...... launch .hrb with VM debug hook + pause callback
+  IDE_DebugGo() ......... continue execution (DBG_RUNNING)
+  IDE_DebugStep() ....... step into next line (DBG_STEPPING)
+  IDE_DebugStepOver() ... step over (tracks call depth via hb_dbg_ProcLevel)
+  IDE_DebugStop() ....... stop debug session (DBG_STOPPED)
+  IDE_DebugAddBreakpoint()  add module:line breakpoint (max 64)
+  IDE_DebugClearBreakpoints() clear all breakpoints
+  IDE_DebugGetState() ... return current state (0-5)
+  IDE_DebugGetLine() .... return current source line
+  IDE_DebugGetModule() .. return current module name
+  IDE_DebugGetLocals() .. inspect local variables (up to 30, with type)
+  - State machine: IDLE → RUNNING/STEPPING/STEPOVER → PAUSED → STOPPED
+  - Win32 message pump during pause (PeekMessage loop, keeps UI responsive)
+  - Harbour VM hook via hb_dbg_SetEntry() + hbapidbg.h
+
+  DEBUG PANEL UI (hbbridge.cpp, +4 HB_FUNC):
+  W32_DebugPanel() ...... dark-themed window with 5-tab notebook
+  W32_DebugUpdateLocals() populate Locals ListView from Harbour array
+  W32_DebugUpdateStack()  populate Call Stack ListView
+  W32_DebugSetStatus() .. update status label text
+  - Tabs: Watch, Locals (Name/Value/Type), Call Stack (#/Function/Module/Line),
+    Breakpoints (File/Line/Enabled), Output (monospace Consolas edit)
+  - Toolbar: ▶ Run, ↓ Step, → Over, ■ Stop + status label
+  - Dark theme: RGB(37,37,38) background, RGB(212,212,212) text
+  - Dark title bar via DwmSetWindowAttribute DWMWA_USE_IMMERSIVE_DARK_MODE
+
+  FORM CLIPBOARD & UNDO (hbbridge.cpp, +7 HB_FUNC):
+  UI_FormCopySelected() . copy selected controls to clipboard (max 32)
+  UI_FormPasteControls()  paste with 16px offset, auto-select pasted controls
+  UI_FormGetClipCount() . return clipboard item count
+  UI_FormUndoPush() ..... save snapshot to 50-step circular undo stack
+  UI_FormUndo() ......... restore positions/sizes from previous snapshot
+  UI_FormClearChildren()  remove all child controls from form
+  UI_FormTabOrderDialog() display tab order list dialog
+
+  REPORT DESIGNER (hbbridge.cpp, +10 HB_FUNC):
+  RPT_DesignerOpen() .... dark-themed window with GDI band/field rendering
+  RPT_DesignerClose() ... hide designer window
+  RPT_SetReport() ....... reserved for Harbour object binding
+  RPT_AddBand() ......... add band with auto-color by type (7 types)
+  RPT_AddField() ........ add field to band with position/size
+  RPT_GetSelected() ..... return {nBandIdx, nFieldIdx, cBandName, cFieldName}
+  RPT_GetBandProps() .... return inspector-compatible property array (5 props)
+  RPT_GetFieldProps() ... return inspector-compatible property array (8 props)
+  RPT_SetBandProp() ..... update band property + trigger redraw
+  RPT_SetFieldProp() .... update field property + trigger redraw
+  - Toolbar: Add Band (popup menu, 7 types), Add Field, Delete, Preview
+  - GDI rendering: ruler, colored band strips, field rectangles, selection handles
+  - Mouse: click margin → select band, click field → select, drag → move,
+    drag separator → resize band height
+  - Band colors: Header=#4A90D9, Detail=#808080, Footer=#4A90D9,
+    GroupHeader=#6BBF6B, PageHeader=#D4A843, Summary=#B464B4
+
+  REPORT PREVIEW (hbbridge.cpp, +7 HB_FUNC):
+  RPT_PreviewOpen() ..... dark window with white page rendering
+  RPT_PreviewClose() .... hide preview window
+  RPT_PreviewAddPage() .. start new page
+  RPT_PreviewDrawText().. add text with font/color/bold/italic
+  RPT_PreviewDrawRect().. add rectangle (filled or outline)
+  RPT_PreviewDrawLine().. add line with color/width
+  RPT_PreviewRender() ... trigger GDI rendering of all draw commands
+  - Zoom: 25% to 400% in 25% steps
+  - Page navigation: |< First, < Prev, > Next, >| Last
+  - White page with drop shadow, dashed margin lines
+  - Dark title bar, page label "Page N / M (zoom%)"
+
+  IDE MENUS & TOOLBAR (hbbuilder_win.prg):
+  - View > Debugger menu item
+  - Run > Debug, Continue, Stop menu items (was only Run/Step)
+  - Edit > Undo Design, Copy Controls, Paste Controls
+  - Format > Tab Order dialog
+  - Tools > Dark Mode toggle, Report Designer
+  - Second toolbar row: Run, Debug, Step, Over, Go, Stop
+  - TBDebugRun(): compile .hrb + launch IDE_DebugStart with callback
+  - OnDebugPause(): update locals display on breakpoint hit
+  - OpenReportDesigner(): opens designer with 3 default bands
+  - ToggleDarkMode(): toggle DwmSetWindowAttribute dark mode
+
+  BUILD SYSTEM (build_win.bat):
+  - Added tcontrol.cpp and tcontrols.cpp compilation steps
+  - Added libs: gtwin.lib, hbsqlit3.lib, sqlite3.lib, hbdebug.lib
+  - Changed cw32.lib → cw32mt.lib (multithreaded CRT for sqlite3)
+  - Result: BUILD SUCCESS, 0 compile errors, 0 link errors
+  - Output: bin/hbbuilder_win.exe (1.9 MB)
+
 2026-04-04 (Session 7: Visual Report Designer - Tasks 1-5 COMPLETE)
 
   REPORT PREVIEW WINDOW (gtk3_core.c, +520 lines):

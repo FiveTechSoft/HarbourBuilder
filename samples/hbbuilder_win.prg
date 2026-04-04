@@ -31,10 +31,11 @@ static cCurrentFile  // Current file path (empty = untitled)
 // Each entry: { cName, oForm, cCode, nFormX, nFormY }
 static aForms        // Array of form entries
 static nActiveForm   // Index of active form (1-based)
+static lDarkMode := .T.   // Dark mode state for toggle
 
 function Main()
 
-   local oTB, oFile, oEdit, oSearch, oView, oProject, oRun, oFormat, oComp, oTools, oHelp
+   local oTB, oTB2, oFile, oEdit, oSearch, oView, oProject, oRun, oFormat, oComp, oTools, oHelp
    local nBarH, nInsW, nEditorX, nEditorW, nEditorH
    local nFormX, nFormY, nInsTop, nEditorTop, nBottomY
 
@@ -103,6 +104,10 @@ function Main()
    MENUITEM "Cu&t"   OF oEdit ACTION CodeEditorCut( hCodeEditor )
    MENUITEM "&Copy"  OF oEdit ACTION CodeEditorCopy( hCodeEditor )
    MENUITEM "&Paste" OF oEdit ACTION CodeEditorPaste( hCodeEditor )
+   MENUSEPARATOR OF oEdit
+   MENUITEM "Undo &Design"     OF oEdit ACTION UndoDesign()
+   MENUITEM "Cop&y Controls"   OF oEdit ACTION CopyControls()
+   MENUITEM "Past&e Controls"  OF oEdit ACTION PasteControls()
 
    DEFINE POPUP oSearch PROMPT "&Search" OF oIDE
    MENUITEM "&Find..."        OF oSearch ACTION CodeEditorFind( hCodeEditor )
@@ -118,6 +123,7 @@ function Main()
    MENUITEM "&Code Editor"  OF oView ACTION CodeEditorBringToFront( hCodeEditor )
    MENUITEM "&Inspector"       OF oView ACTION InspectorOpen()
    MENUITEM "&Project Inspector" OF oView ACTION ShowProjectInspector()
+   MENUITEM "&Debugger"          OF oView ACTION W32_DebugPanel()
 
    DEFINE POPUP oProject PROMPT "&Project" OF oIDE
    MENUITEM "&Add to Project..."    OF oProject ACTION AddToProject()
@@ -127,11 +133,15 @@ function Main()
 
    DEFINE POPUP oRun PROMPT "&Run" OF oIDE
    MENUITEM "&Run"           OF oRun ACTION TBRun()
+   MENUITEM "&Debug"         OF oRun ACTION TBDebugRun()
+   MENUSEPARATOR OF oRun
+   MENUITEM "&Continue"      OF oRun ACTION IDE_DebugGo()
    MENUITEM "&Step Over"     OF oRun ACTION DebugStepOver()
    MENUITEM "Step &Into"     OF oRun ACTION DebugStepInto()
+   MENUITEM "S&top"          OF oRun ACTION IDE_DebugStop()
    MENUSEPARATOR OF oRun
    MENUITEM "&Toggle Breakpoint"  OF oRun ACTION ToggleBreakpoint()
-   MENUITEM "&Clear Breakpoints"  OF oRun ACTION ClearBreakpoints()
+   MENUITEM "C&lear Breakpoints"  OF oRun ACTION ClearBreakpoints()
 
    DEFINE POPUP oFormat PROMPT "F&ormat" OF oIDE
    MENUITEM "Align &Left"              OF oFormat ACTION AlignControls( 1 )
@@ -144,6 +154,8 @@ function Main()
    MENUSEPARATOR OF oFormat
    MENUITEM "Space Evenly Hori&zontal" OF oFormat ACTION AlignControls( 7 )
    MENUITEM "Space Evenly Ve&rtical"   OF oFormat ACTION AlignControls( 8 )
+   MENUSEPARATOR OF oFormat
+   MENUITEM "&Tab Order..."            OF oFormat ACTION TabOrderDialog()
 
    DEFINE POPUP oComp PROMPT "&Component" OF oIDE
    MENUITEM "&Install Component..." OF oComp ACTION InstallComponent()
@@ -152,10 +164,12 @@ function Main()
    DEFINE POPUP oTools PROMPT "&Tools" OF oIDE
    MENUITEM "&Editor Colors..." OF oTools ACTION ShowEditorSettings()
    MENUITEM "&Environment Options..." OF oTools ACTION ShowProjectOptions()
-   MENUSEPARATOR OF oTools
-   MENUITEM "&Generate Palette Icons" OF oTools ACTION ( W32_GeneratePaletteIcons( .F. ), W32_GenerateToolbarIcons( .F. ) )
+   MENUITEM "&Dark Mode"              OF oTools ACTION ToggleDarkMode()
    MENUSEPARATOR OF oTools
    MENUITEM "&AI Assistant..."        OF oTools ACTION ShowAIAssistant()
+   MENUITEM "&Report Designer"        OF oTools ACTION OpenReportDesigner()
+   MENUSEPARATOR OF oTools
+   MENUITEM "&Generate Palette Icons" OF oTools ACTION ( W32_GeneratePaletteIcons( .F. ), W32_GenerateToolbarIcons( .F. ) )
 
    DEFINE POPUP oHelp PROMPT "&Help" OF oIDE
    MENUITEM "&Documentation"        OF oHelp ACTION W32_OpenDocs( "en" )
@@ -181,6 +195,16 @@ function Main()
 
    // Load toolbar icons (Silk icon set by famfamfam, CC BY 2.5)
    UI_ToolBarLoadImages( oTB:hCpp, HB_DirBase() + "..\resources\toolbar.bmp" )
+
+   // Row 2: Run & Debug speedbar
+   DEFINE TOOLBAR oTB2 OF oIDE
+   BUTTON "Run"   OF oTB2 TOOLTIP "Run (F9)"               ACTION TBRun()
+   BUTTON "Debug" OF oTB2 TOOLTIP "Debug (F8)"              ACTION TBDebugRun()
+   SEPARATOR OF oTB2
+   BUTTON "Step"  OF oTB2 TOOLTIP "Step Into (F7)"          ACTION DebugStepInto()
+   BUTTON "Over"  OF oTB2 TOOLTIP "Step Over (F8)"          ACTION DebugStepOver()
+   BUTTON "Go"    OF oTB2 TOOLTIP "Continue (F5)"           ACTION IDE_DebugGo()
+   BUTTON "Stop"  OF oTB2 TOOLTIP "Stop Debugging"          ACTION IDE_DebugStop()
 
    // Component Palette (icon grid, tabbed, right of splitter)
    CreatePalette()
@@ -1508,27 +1532,92 @@ static function ToggleBreakpoint()
 
    if ! lFound
       AAdd( aBreakpoints, { cFile, nLine } )
+      IDE_DebugAddBreakpoint( cFile, nLine )
    endif
 
-   MsgInfo( "Breakpoints: " + LTrim(Str(Len(aBreakpoints))) )
 return nil
 
 static function ClearBreakpoints()
-   MsgInfo( "All breakpoints cleared" )
+   IDE_DebugClearBreakpoints()
 return nil
 
 static function DebugStepOver()
-   W32_DebugPanel()
-   MsgInfo( "Step Over: start a debug session with Run > Run first" )
+   local nState := IDE_DebugGetState()
+   if nState == 2  // DBG_PAUSED
+      IDE_DebugStepOver()
+   else
+      W32_DebugPanel()
+   endif
 return nil
 
 static function DebugStepInto()
-   W32_DebugPanel()
-   MsgInfo( "Step Into: start a debug session with Run > Run first" )
+   local nState := IDE_DebugGetState()
+   if nState == 2  // DBG_PAUSED
+      IDE_DebugStep()
+   else
+      W32_DebugPanel()
+   endif
 return nil
 
 static function ShowDebugPanel()
    W32_DebugPanel()
+return nil
+
+// === Debug Run (compile .hrb and launch debugger) ===
+
+static function TBDebugRun()
+
+   local cProjDir, cBuildDir, cCmd, cOutput
+
+   cProjDir  := SubStr( HB_DirBase(), 1, Len(HB_DirBase()) - 5 )  // strip "bin\"
+   cBuildDir := cProjDir + "build"
+
+   W32_DebugPanel()
+   W32_DebugSetStatus( "Compiling..." )
+
+   // Save current code
+   MemoWrit( cBuildDir + "\Project1.prg", CodeEditorGetTabText( hCodeEditor, 1 ) )
+   if Len( aForms ) > 0
+      MemoWrit( cBuildDir + "\" + aForms[1][1] + ".prg", ;
+         CodeEditorGetTabText( hCodeEditor, 2 ) )
+   endif
+
+   // Copy support files
+   W32_ShellExec( 'cmd /c mkdir "' + cBuildDir + '" 2>nul' )
+   W32_ShellExec( 'cmd /c copy "' + cProjDir + 'harbour\classes.prg" "' + cBuildDir + '\" >nul 2>&1' )
+   W32_ShellExec( 'cmd /c copy "' + cProjDir + 'harbour\hbbuilder.ch" "' + cBuildDir + '\" >nul 2>&1' )
+
+   // Compile to .hrb (portable bytecode for in-process execution)
+   cCmd := 'cmd /c "c:\harbour\bin\win\bcc\harbour.exe -gh -n -q -I"' + ;
+           cBuildDir + '" "' + cBuildDir + '\Project1.prg" 2>&1"'
+   cOutput := W32_ShellExec( cCmd )
+
+   if ! File( cBuildDir + "\Project1.hrb" )
+      W32_DebugSetStatus( "Compile FAILED" )
+      MsgInfo( "Debug compile failed:" + Chr(10) + cOutput )
+      return nil
+   endif
+
+   W32_DebugSetStatus( "Running (debugger active)..." )
+
+   // Start debug session with pause callback
+   IDE_DebugStart( cBuildDir + "\Project1.hrb", ;
+      { |cModule, nLine| OnDebugPause( cModule, nLine ) } )
+
+   W32_DebugSetStatus( "Ready" )
+
+return nil
+
+static function OnDebugPause( cModule, nLine )
+
+   local aLocals
+
+   W32_DebugSetStatus( "Paused at " + cModule + ":" + LTrim(Str(nLine)) )
+
+   // Update locals display
+   aLocals := IDE_DebugGetLocals( 1 )
+   W32_DebugUpdateLocals( aLocals )
+
 return nil
 
 // === AI Assistant (Ollama / LM Studio) ===
@@ -1612,10 +1701,66 @@ static function ShowAbout()
 
 return nil
 
+// === Report Designer ===
+
+static function OpenReportDesigner()
+
+   RPT_DesignerOpen()
+
+   // Add default bands if empty
+   if RPT_GetSelected()[1] < 0
+      RPT_AddBand( "Header", 60 )
+      RPT_AddField( 0, "Title", "Report Title", 10, 10, 180, 20 )
+      RPT_AddBand( "Detail", 80 )
+      RPT_AddField( 1, "Field1", "", 10, 10, 80, 16 )
+      RPT_AddField( 1, "Field2", "", 100, 10, 80, 16 )
+      RPT_AddBand( "Footer", 40 )
+   endif
+
+return nil
+
+// === Dark Mode Toggle ===
+
+static function ToggleDarkMode()
+   lDarkMode := ! lDarkMode
+   W32_SetDarkMode( UI_FormGetHwnd( oIDE:hCpp ), lDarkMode )
+return nil
+
+// === Form Designer: Undo, Copy, Paste, Tab Order ===
+
+static function UndoDesign()
+   if oDesignForm != nil
+      UI_FormUndo( oDesignForm:hCpp )
+      SyncDesignerToCode()
+   endif
+return nil
+
+static function CopyControls()
+   if oDesignForm != nil
+      UI_FormUndoPush( oDesignForm:hCpp )
+      UI_FormCopySelected( oDesignForm:hCpp )
+   endif
+return nil
+
+static function PasteControls()
+   if oDesignForm != nil
+      UI_FormUndoPush( oDesignForm:hCpp )
+      UI_FormPasteControls( oDesignForm:hCpp )
+      SyncDesignerToCode()
+   endif
+return nil
+
+static function TabOrderDialog()
+   if oDesignForm != nil
+      UI_FormTabOrderDialog( oDesignForm:hCpp )
+   endif
+return nil
+
 // === Format > Align Controls ===
 
 static function AlignControls( nMode )
    if oDesignForm != nil
+      UI_FormUndoPush( oDesignForm:hCpp )
       UI_FormAlignSelected( oDesignForm:hCpp, nMode )
       SyncDesignerToCode()
    endif

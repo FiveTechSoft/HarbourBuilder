@@ -1980,3 +1980,1936 @@ HB_FUNC( UI_FORMALIGNSELECTED )
 
    if( form->FHandle ) InvalidateRect( form->FHandle, NULL, TRUE );
 }
+
+/* ================================================================
+ * DEBUGGER ENGINE - IDE_Debug* functions
+ * Port of the GTK3/Cocoa debugger to WinAPI.
+ * Uses Harbour VM debug hooks (hbapidbg.h).
+ * ================================================================ */
+
+#include <hbapidbg.h>
+
+/* Debugger states */
+#define DBG_IDLE      0
+#define DBG_RUNNING   1
+#define DBG_PAUSED    2
+#define DBG_STEPPING  3
+#define DBG_STEPOVER  4
+#define DBG_STOPPED   5
+
+static int           s_dbgState = DBG_IDLE;
+static int           s_dbgLine = 0;
+static int           s_dbgStepDepth = 0;
+static char          s_dbgModule[256] = "";
+static PHB_ITEM      s_dbgOnPause = NULL;
+
+/* Breakpoints */
+#define DBG_MAX_BP 64
+typedef struct { char module[256]; int line; } DBGBP;
+static DBGBP s_breakpoints[DBG_MAX_BP];
+static int   s_nBreakpoints = 0;
+
+/* Debug panel UI handles */
+static HWND s_hDbgWnd = NULL;
+static HWND s_dbgTabCtrl = NULL;
+static HWND s_dbgLocalsLV = NULL;
+static HWND s_dbgStackLV = NULL;
+static HWND s_dbgBpLV = NULL;
+static HWND s_dbgWatchLV = NULL;
+static HWND s_dbgOutputEdit = NULL;
+static HWND s_dbgStatusLbl = NULL;
+static HWND s_dbgToolbar = NULL;
+
+static int DbgIsBreakpoint( const char * module, int line )
+{
+   int i;
+   for( i = 0; i < s_nBreakpoints; i++ )
+      if( s_breakpoints[i].line == line &&
+          ( s_breakpoints[i].module[0] == 0 ||
+            strstr( module, s_breakpoints[i].module ) != NULL ) )
+         return 1;
+   return 0;
+}
+
+static void DbgOutput( const char * text )
+{
+   if( !s_dbgOutputEdit ) return;
+   int len = GetWindowTextLengthA( s_dbgOutputEdit );
+   SendMessageA( s_dbgOutputEdit, EM_SETSEL, (WPARAM)len, (LPARAM)len );
+   SendMessageA( s_dbgOutputEdit, EM_REPLACESEL, FALSE, (LPARAM)text );
+}
+
+/* Debug hook - called by Harbour VM on every line */
+static void IDE_DebugHook( int nMode, int nLine, const char * szName,
+                            int nIndex, PHB_ITEM pFrame )
+{
+   (void)nIndex; (void)pFrame;
+
+   if( nMode == 1 && szName ) /* HB_DBG_MODULENAME */
+      strncpy( s_dbgModule, szName, sizeof(s_dbgModule) - 1 );
+
+   if( nMode != 5 ) return; /* Only process HB_DBG_SHOWLINE */
+
+   s_dbgLine = nLine;
+   if( s_dbgState == DBG_STOPPED ) return;
+
+   if( s_dbgState == DBG_RUNNING && !DbgIsBreakpoint( s_dbgModule, nLine ) )
+      return;
+
+   if( s_dbgState == DBG_STEPOVER )
+   {
+      HB_ULONG curDepth = hb_dbg_ProcLevel();
+      if( (int)curDepth > s_dbgStepDepth ) return;
+   }
+
+   /* === PAUSE === */
+   s_dbgState = DBG_PAUSED;
+
+   /* Notify Harbour callback */
+   if( s_dbgOnPause && HB_IS_BLOCK( s_dbgOnPause ) )
+   {
+      PHB_ITEM pMod  = hb_itemPutC( NULL, s_dbgModule );
+      PHB_ITEM pLine = hb_itemPutNI( NULL, nLine );
+      hb_itemDo( s_dbgOnPause, 2, pMod, pLine );
+      hb_itemRelease( pMod );
+      hb_itemRelease( pLine );
+   }
+
+   { char msg[512];
+     snprintf( msg, sizeof(msg), "Paused at %s:%d\r\n", s_dbgModule, nLine );
+     DbgOutput( msg );
+   }
+
+   /* Process Win32 messages while paused (keeps UI responsive) */
+   {  MSG winMsg;
+      while( s_dbgState == DBG_PAUSED )
+      {
+         if( PeekMessage( &winMsg, NULL, 0, 0, PM_REMOVE ) )
+         {
+            TranslateMessage( &winMsg );
+            DispatchMessage( &winMsg );
+         }
+         else
+            Sleep( 10 );
+      }
+   }
+
+   if( s_dbgState == DBG_STOPPED )
+      DbgOutput( "Debug session stopped.\r\n" );
+}
+
+/* IDE_DebugStart( cHrbFile, bOnPause ) */
+HB_FUNC( IDE_DEBUGSTART )
+{
+   const char * cHrbFile = hb_parc(1);
+   PHB_ITEM pOnPause = hb_param(2, HB_IT_BLOCK);
+
+   if( !cHrbFile || s_dbgState != DBG_IDLE ) { hb_retl( HB_FALSE ); return; }
+
+   if( s_dbgOnPause ) { hb_itemRelease( s_dbgOnPause ); s_dbgOnPause = NULL; }
+   if( pOnPause ) s_dbgOnPause = hb_itemNew( pOnPause );
+
+   /* Install debug hook */
+   hb_dbg_SetEntry( IDE_DebugHook );
+   s_dbgState = DBG_STEPPING;
+   s_nBreakpoints = 0;
+
+   DbgOutput( "=== Debug session started ===\r\n" );
+   { char msg[512]; snprintf( msg, sizeof(msg), "Loading: %s\r\n", cHrbFile ); DbgOutput( msg ); }
+
+   /* Execute .hrb via Harbour's HB_HRBRUN */
+   {
+      PHB_DYNS pDyn = hb_dynsymFind( "HB_HRBRUN" );
+      if( pDyn )
+      {
+         PHB_ITEM pFile = hb_itemPutC( NULL, cHrbFile );
+         hb_vmPushDynSym( pDyn );
+         hb_vmPushNil();
+         hb_vmPush( pFile );
+         hb_vmDo( 1 );
+         hb_itemRelease( pFile );
+      }
+      else
+         DbgOutput( "ERROR: HB_HRBRUN symbol not found.\r\n" );
+   }
+
+   hb_dbg_SetEntry( NULL );
+   s_dbgState = DBG_IDLE;
+   DbgOutput( "=== Debug session ended ===\r\n" );
+   hb_retl( HB_TRUE );
+}
+
+/* IDE_DebugGo() - continue execution */
+HB_FUNC( IDE_DEBUGGO )
+{
+   if( s_dbgState == DBG_PAUSED ) s_dbgState = DBG_RUNNING;
+}
+
+/* IDE_DebugStep() - step into */
+HB_FUNC( IDE_DEBUGSTEP )
+{
+   if( s_dbgState == DBG_PAUSED ) s_dbgState = DBG_STEPPING;
+}
+
+/* IDE_DebugStepOver() */
+HB_FUNC( IDE_DEBUGSTEPOVER )
+{
+   if( s_dbgState == DBG_PAUSED ) {
+      s_dbgStepDepth = (int) hb_dbg_ProcLevel();
+      s_dbgState = DBG_STEPOVER;
+   }
+}
+
+/* IDE_DebugStop() */
+HB_FUNC( IDE_DEBUGSTOP )
+{
+   if( s_dbgState != DBG_IDLE ) s_dbgState = DBG_STOPPED;
+}
+
+/* IDE_DebugAddBreakpoint( cModule, nLine ) */
+HB_FUNC( IDE_DEBUGADDBREAKPOINT )
+{
+   if( s_nBreakpoints >= DBG_MAX_BP ) return;
+   const char * mod = HB_ISCHAR(1) ? hb_parc(1) : "";
+   strncpy( s_breakpoints[s_nBreakpoints].module, mod, 255 );
+   s_breakpoints[s_nBreakpoints].line = hb_parni(2);
+   s_nBreakpoints++;
+}
+
+/* IDE_DebugClearBreakpoints() */
+HB_FUNC( IDE_DEBUGCLEARBREAKPOINTS )
+{
+   s_nBreakpoints = 0;
+}
+
+/* IDE_DebugGetState() -> nState */
+HB_FUNC( IDE_DEBUGGETSTATE )
+{
+   hb_retni( s_dbgState );
+}
+
+/* IDE_DebugGetLine() -> nLine */
+HB_FUNC( IDE_DEBUGGETLINE )
+{
+   hb_retni( s_dbgLine );
+}
+
+/* IDE_DebugGetModule() -> cModule */
+HB_FUNC( IDE_DEBUGGETMODULE )
+{
+   hb_retc( s_dbgModule );
+}
+
+/* IDE_DebugGetLocals( nLevel ) -> { { cName, cValue, cType }, ... } */
+HB_FUNC( IDE_DEBUGGETLOCALS )
+{
+   int nLevel = HB_ISNUM(1) ? hb_parni(1) : 1;
+   PHB_ITEM pArray = hb_itemArrayNew( 0 );
+   int i;
+
+   for( i = 1; i <= 30; i++ )
+   {
+      PHB_ITEM pVal = hb_dbg_vmVarLGet( nLevel, i );
+      if( !pVal ) break;
+
+      PHB_ITEM pEntry = hb_itemArrayNew( 3 );
+      char szName[32], szValue[256], szType[32];
+      snprintf( szName, sizeof(szName), "Local_%d", i );
+
+      switch( hb_itemType( pVal ) )
+      {
+         case HB_IT_STRING:
+            snprintf( szValue, sizeof(szValue), "\"%.*s\"",
+               (int)(hb_itemGetCLen(pVal) > 200 ? 200 : hb_itemGetCLen(pVal)),
+               hb_itemGetCPtr(pVal) );
+            strcpy( szType, "String" ); break;
+         case HB_IT_INTEGER: case HB_IT_LONG: case HB_IT_NUMERIC:
+            snprintf( szValue, sizeof(szValue), "%g", hb_itemGetND(pVal) );
+            strcpy( szType, "Numeric" ); break;
+         case HB_IT_LOGICAL:
+            strcpy( szValue, hb_itemGetL(pVal) ? ".T." : ".F." );
+            strcpy( szType, "Logical" ); break;
+         case HB_IT_NIL:
+            strcpy( szValue, "NIL" ); strcpy( szType, "NIL" ); break;
+         case HB_IT_ARRAY:
+            snprintf( szValue, sizeof(szValue), "Array(%lu)", (unsigned long)hb_arrayLen(pVal) );
+            strcpy( szType, "Array" ); break;
+         case HB_IT_BLOCK:
+            strcpy( szValue, "{||}" ); strcpy( szType, "Block" ); break;
+         default:
+            if( hb_itemType(pVal) & HB_IT_OBJECT )
+               { strcpy( szValue, "(object)" ); strcpy( szType, "Object" ); }
+            else
+               { strcpy( szValue, "(?)" ); strcpy( szType, "?" ); }
+            break;
+      }
+      hb_arraySetC( pEntry, 1, szName );
+      hb_arraySetC( pEntry, 2, szValue );
+      hb_arraySetC( pEntry, 3, szType );
+      hb_arrayAdd( pArray, pEntry );
+      hb_itemRelease( pEntry );
+   }
+   hb_itemReturnRelease( pArray );
+}
+
+/* ================================================================
+ * DEBUG PANEL UI - W32_DebugPanel with WinAPI
+ * Dark-themed window with 5 tabs: Watch, Locals, Call Stack,
+ * Breakpoints, Output. Matches GTK3/Cocoa debug panel.
+ * ================================================================ */
+
+#define DBG_PANEL_CLASS "HbDbgPanel"
+#define DBG_WND_ID_TAB     200
+#define DBG_WND_ID_TOOLBAR 201
+
+/* Helper: create a ListView with columns */
+static HWND DbgCreateListView( HWND hParent, int x, int y, int w, int h, int nCols, ... )
+{
+   HWND hLV = CreateWindowExA( 0, WC_LISTVIEWA, "",
+      WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_SINGLESEL | LVS_NOSORTHEADER,
+      x, y, w, h, hParent, NULL, GetModuleHandle(NULL), NULL );
+
+   ListView_SetExtendedListViewStyle( hLV,
+      LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_DOUBLEBUFFER );
+
+   /* Dark colors */
+   ListView_SetBkColor( hLV, RGB(30,30,30) );
+   ListView_SetTextBkColor( hLV, RGB(30,30,30) );
+   ListView_SetTextColor( hLV, RGB(212,212,212) );
+
+   va_list args;
+   va_start( args, nCols );
+   for( int i = 0; i < nCols; i++ )
+   {
+      const char * title = va_arg( args, const char * );
+      int colW = va_arg( args, int );
+      LVCOLUMNA col = { 0 };
+      col.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_FMT;
+      col.pszText = (LPSTR)title;
+      col.cx = colW;
+      col.fmt = LVCFMT_LEFT;
+      ListView_InsertColumn( hLV, i, &col );
+   }
+   va_end( args );
+
+   return hLV;
+}
+
+/* Debug panel WndProc */
+static LRESULT CALLBACK DbgPanelProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
+{
+   switch( msg )
+   {
+      case WM_SIZE:
+      {
+         int w = LOWORD(lParam), h = HIWORD(lParam);
+         int tbH = 32;
+
+         if( s_dbgToolbar ) MoveWindow( s_dbgToolbar, 0, 0, w, tbH, TRUE );
+         if( s_dbgTabCtrl ) MoveWindow( s_dbgTabCtrl, 0, tbH, w, h - tbH, TRUE );
+
+         /* Resize active list/edit to fill tab body */
+         int lvY = 24 + 4, lvH = h - tbH - 24 - 8;
+         if( s_dbgWatchLV )   MoveWindow( s_dbgWatchLV,   4, lvY, w - 8, lvH, TRUE );
+         if( s_dbgLocalsLV )  MoveWindow( s_dbgLocalsLV,  4, lvY, w - 8, lvH, TRUE );
+         if( s_dbgStackLV )   MoveWindow( s_dbgStackLV,   4, lvY, w - 8, lvH, TRUE );
+         if( s_dbgBpLV )      MoveWindow( s_dbgBpLV,      4, lvY, w - 8, lvH, TRUE );
+         if( s_dbgOutputEdit) MoveWindow( s_dbgOutputEdit, 4, lvY, w - 8, lvH, TRUE );
+         return 0;
+      }
+
+      case WM_NOTIFY:
+      {
+         NMHDR * pNM = (NMHDR *)lParam;
+         if( pNM->idFrom == DBG_WND_ID_TAB && pNM->code == TCN_SELCHANGE )
+         {
+            int sel = TabCtrl_GetCurSel( s_dbgTabCtrl );
+            ShowWindow( s_dbgWatchLV,   sel == 0 ? SW_SHOW : SW_HIDE );
+            ShowWindow( s_dbgLocalsLV,  sel == 1 ? SW_SHOW : SW_HIDE );
+            ShowWindow( s_dbgStackLV,   sel == 2 ? SW_SHOW : SW_HIDE );
+            ShowWindow( s_dbgBpLV,      sel == 3 ? SW_SHOW : SW_HIDE );
+            ShowWindow( s_dbgOutputEdit,sel == 4 ? SW_SHOW : SW_HIDE );
+         }
+         return 0;
+      }
+
+      case WM_COMMAND:
+      {
+         int id = LOWORD(wParam);
+         switch( id )
+         {
+            case 1001: /* Run/Continue */
+               if( s_dbgState == DBG_PAUSED ) s_dbgState = DBG_RUNNING;
+               break;
+            case 1002: /* Step Into */
+               if( s_dbgState == DBG_PAUSED ) s_dbgState = DBG_STEPPING;
+               break;
+            case 1003: /* Step Over */
+               if( s_dbgState == DBG_PAUSED ) {
+                  s_dbgStepDepth = (int) hb_dbg_ProcLevel();
+                  s_dbgState = DBG_STEPOVER;
+               }
+               break;
+            case 1004: /* Stop */
+               if( s_dbgState != DBG_IDLE ) s_dbgState = DBG_STOPPED;
+               break;
+         }
+         return 0;
+      }
+
+      case WM_CTLCOLORSTATIC:
+      case WM_CTLCOLOREDIT:
+      {
+         HDC hdc = (HDC)wParam;
+         SetTextColor( hdc, RGB(212,212,212) );
+         SetBkColor( hdc, RGB(30,30,30) );
+         static HBRUSH hBrDark = CreateSolidBrush( RGB(30,30,30) );
+         return (LRESULT)hBrDark;
+      }
+
+      case WM_CLOSE:
+         ShowWindow( hWnd, SW_HIDE );
+         return 0;
+
+      case WM_ERASEBKGND:
+      {
+         HDC hdc = (HDC)wParam;
+         RECT rc; GetClientRect( hWnd, &rc );
+         HBRUSH hBr = CreateSolidBrush( RGB(37,37,38) );
+         FillRect( hdc, &rc, hBr );
+         DeleteObject( hBr );
+         return 1;
+      }
+   }
+   return DefWindowProc( hWnd, msg, wParam, lParam );
+}
+
+/* W32_DebugPanel() - create/show the debug panel window */
+HB_FUNC( W32_DEBUGPANEL )
+{
+   if( s_hDbgWnd ) {
+      ShowWindow( s_hDbgWnd, SW_SHOW );
+      SetForegroundWindow( s_hDbgWnd );
+      return;
+   }
+
+   /* Register window class */
+   {  WNDCLASSEXA wc = { sizeof(WNDCLASSEXA) };
+      wc.lpfnWndProc = DbgPanelProc;
+      wc.hInstance = GetModuleHandle(NULL);
+      wc.lpszClassName = DBG_PANEL_CLASS;
+      wc.hCursor = LoadCursor( NULL, IDC_ARROW );
+      wc.hbrBackground = CreateSolidBrush( RGB(37,37,38) );
+      RegisterClassExA( &wc );
+   }
+
+   s_hDbgWnd = CreateWindowExA( WS_EX_TOOLWINDOW, DBG_PANEL_CLASS, "Debugger",
+      WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+      100, 300, 700, 420, NULL, NULL, GetModuleHandle(NULL), NULL );
+
+   /* Dark mode title bar (Windows 10/11) */
+   {  typedef HRESULT (WINAPI *PFN_DwmSetWindowAttribute)(HWND, DWORD, LPCVOID, DWORD);
+      HMODULE hDwm = LoadLibraryA("dwmapi.dll");
+      if( hDwm ) {
+         PFN_DwmSetWindowAttribute pFn = (PFN_DwmSetWindowAttribute)GetProcAddress(hDwm, "DwmSetWindowAttribute");
+         if( pFn ) { BOOL val = TRUE; pFn( s_hDbgWnd, 20, &val, sizeof(val) ); }
+         FreeLibrary( hDwm );
+      }
+   }
+
+   int w = 700, h = 420, tbH = 32;
+
+   /* === Toolbar with buttons === */
+   s_dbgToolbar = CreateWindowExA( 0, "STATIC", "", WS_CHILD | WS_VISIBLE,
+      0, 0, w, tbH, s_hDbgWnd, (HMENU)DBG_WND_ID_TOOLBAR, GetModuleHandle(NULL), NULL );
+
+   { const char * labels[] = { "\xE2\x96\xB6 Run", "\xE2\x86\x93 Step", "\xE2\x86\x92 Over", "\xE2\x96\xA0 Stop" };
+     int ids[] = { 1001, 1002, 1003, 1004 };
+     int bx = 4;
+     for( int i = 0; i < 4; i++ )
+     {
+        HWND hBtn = CreateWindowExA( 0, "BUTTON", labels[i],
+           WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+           bx, 2, 72, 26, s_hDbgWnd, (HMENU)(LONG_PTR)ids[i],
+           GetModuleHandle(NULL), NULL );
+        SendMessageA( hBtn, WM_SETFONT, (WPARAM)GetStockObject(DEFAULT_GUI_FONT), TRUE );
+        bx += 76;
+     }
+
+     /* Status label */
+     s_dbgStatusLbl = CreateWindowExA( 0, "STATIC", "Ready",
+        WS_CHILD | WS_VISIBLE | SS_LEFT,
+        bx + 12, 6, 300, 20, s_hDbgWnd, NULL, GetModuleHandle(NULL), NULL );
+     SendMessageA( s_dbgStatusLbl, WM_SETFONT, (WPARAM)GetStockObject(DEFAULT_GUI_FONT), TRUE );
+   }
+
+   /* === Tab control === */
+   s_dbgTabCtrl = CreateWindowExA( 0, WC_TABCONTROLA, "",
+      WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
+      0, tbH, w, h - tbH, s_hDbgWnd, (HMENU)DBG_WND_ID_TAB,
+      GetModuleHandle(NULL), NULL );
+   SendMessageA( s_dbgTabCtrl, WM_SETFONT, (WPARAM)GetStockObject(DEFAULT_GUI_FONT), TRUE );
+
+   { const char * tabs[] = { "Watch", "Locals", "Call Stack", "Breakpoints", "Output" };
+     for( int i = 0; i < 5; i++ ) {
+        TCITEMA ti = { 0 };
+        ti.mask = TCIF_TEXT;
+        ti.pszText = (LPSTR)tabs[i];
+        TabCtrl_InsertItem( s_dbgTabCtrl, i, &ti );
+     }
+   }
+
+   int lvY = 24 + 4, lvW = w - 8, lvH = h - tbH - 24 - 8;
+
+   /* Tab 0: Watch */
+   s_dbgWatchLV = DbgCreateListView( s_dbgTabCtrl, 4, lvY, lvW, lvH,
+      3, "Expression", 180, "Value", 200, "Type", 100 );
+
+   /* Tab 1: Locals */
+   s_dbgLocalsLV = DbgCreateListView( s_dbgTabCtrl, 4, lvY, lvW, lvH,
+      3, "Name", 140, "Value", 280, "Type", 100 );
+   ShowWindow( s_dbgLocalsLV, SW_HIDE );
+
+   /* Tab 2: Call Stack */
+   s_dbgStackLV = DbgCreateListView( s_dbgTabCtrl, 4, lvY, lvW, lvH,
+      4, "#", 40, "Function", 180, "Module", 180, "Line", 60 );
+   ShowWindow( s_dbgStackLV, SW_HIDE );
+
+   /* Tab 3: Breakpoints */
+   s_dbgBpLV = DbgCreateListView( s_dbgTabCtrl, 4, lvY, lvW, lvH,
+      3, "File", 250, "Line", 80, "Enabled", 80 );
+   ShowWindow( s_dbgBpLV, SW_HIDE );
+
+   /* Tab 4: Output */
+   s_dbgOutputEdit = CreateWindowExA( WS_EX_CLIENTEDGE, "EDIT", "",
+      WS_CHILD | ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL,
+      4, lvY, lvW, lvH, s_dbgTabCtrl, NULL, GetModuleHandle(NULL), NULL );
+   {  HFONT hMonoFont = CreateFontA( -13, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+         DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, FIXED_PITCH | FF_MODERN, "Consolas" );
+      SendMessageA( s_dbgOutputEdit, WM_SETFONT, (WPARAM)hMonoFont, TRUE );
+   }
+   ShowWindow( s_dbgOutputEdit, SW_HIDE );
+
+   /* Default: show Watch tab */
+   TabCtrl_SetCurSel( s_dbgTabCtrl, 0 );
+   ShowWindow( s_dbgWatchLV, SW_SHOW );
+}
+
+/* W32_DebugUpdateLocals( aLocals ) - populate Locals ListView */
+HB_FUNC( W32_DEBUGUPDATELOCALS )
+{
+   PHB_ITEM pArray = hb_param( 1, HB_IT_ARRAY );
+   if( !s_dbgLocalsLV || !pArray ) return;
+
+   ListView_DeleteAllItems( s_dbgLocalsLV );
+
+   int n = (int) hb_arrayLen( pArray );
+   for( int i = 1; i <= n; i++ )
+   {
+      PHB_ITEM pEntry = hb_arrayGetItemPtr( pArray, i );
+      if( !pEntry || hb_arrayLen(pEntry) < 3 ) continue;
+
+      LVITEMA item = { 0 };
+      item.mask = LVIF_TEXT;
+      item.iItem = i - 1;
+      item.pszText = (LPSTR)hb_arrayGetCPtr( pEntry, 1 );
+      ListView_InsertItem( s_dbgLocalsLV, &item );
+      ListView_SetItemText( s_dbgLocalsLV, i - 1, 1, (LPSTR)hb_arrayGetCPtr( pEntry, 2 ) );
+      ListView_SetItemText( s_dbgLocalsLV, i - 1, 2, (LPSTR)hb_arrayGetCPtr( pEntry, 3 ) );
+   }
+}
+
+/* W32_DebugUpdateStack( aStack ) - populate Call Stack ListView */
+HB_FUNC( W32_DEBUGUPDATESTACK )
+{
+   PHB_ITEM pArray = hb_param( 1, HB_IT_ARRAY );
+   if( !s_dbgStackLV || !pArray ) return;
+
+   ListView_DeleteAllItems( s_dbgStackLV );
+
+   int n = (int) hb_arrayLen( pArray );
+   for( int i = 1; i <= n; i++ )
+   {
+      PHB_ITEM pEntry = hb_arrayGetItemPtr( pArray, i );
+      if( !pEntry || hb_arrayLen(pEntry) < 4 ) continue;
+
+      LVITEMA item = { 0 };
+      item.mask = LVIF_TEXT;
+      item.iItem = i - 1;
+      item.pszText = (LPSTR)hb_arrayGetCPtr( pEntry, 1 );
+      ListView_InsertItem( s_dbgStackLV, &item );
+      ListView_SetItemText( s_dbgStackLV, i - 1, 1, (LPSTR)hb_arrayGetCPtr( pEntry, 2 ) );
+      ListView_SetItemText( s_dbgStackLV, i - 1, 2, (LPSTR)hb_arrayGetCPtr( pEntry, 3 ) );
+      ListView_SetItemText( s_dbgStackLV, i - 1, 3, (LPSTR)hb_arrayGetCPtr( pEntry, 4 ) );
+   }
+}
+
+/* W32_DebugSetStatus( cText ) - update status label */
+HB_FUNC( W32_DEBUGSETSTATUS )
+{
+   if( s_dbgStatusLbl && HB_ISCHAR(1) )
+      SetWindowTextA( s_dbgStatusLbl, hb_parc(1) );
+}
+
+/* ================================================================
+ * FORM CLIPBOARD & UNDO
+ * Copy/Paste controls, 50-step undo, ClearChildren, TabOrder dialog
+ * ================================================================ */
+
+/* Clipboard for copied controls */
+#define CLIP_MAX 32
+typedef struct {
+   BYTE  bType;
+   int   nLeft, nTop, nWidth, nHeight;
+   char  szText[256];
+   char  szName[64];
+} ClipCtrl;
+
+static ClipCtrl s_clipboard[CLIP_MAX];
+static int      s_clipCount = 0;
+
+/* Undo stack */
+#define UNDO_MAX_STEPS 50
+#define UNDO_MAX_CTRLS 256
+typedef struct {
+   int nCount;
+   struct {
+      BYTE bType;
+      int  nLeft, nTop, nWidth, nHeight;
+      char szName[64];
+      char szText[256];
+   } ctrls[UNDO_MAX_CTRLS];
+} UndoSnapshot;
+
+static UndoSnapshot s_undoStack[UNDO_MAX_STEPS];
+static int s_undoPos   = 0;
+static int s_undoCount = 0;
+
+/* UI_FormCopySelected( hForm ) - copy selected controls to clipboard */
+HB_FUNC( UI_FORMCOPYSELECTED )
+{
+   TForm * form = GetForm(1);
+   if( !form ) return;
+
+   s_clipCount = 0;
+   for( int i = 0; i < form->FSelCount && s_clipCount < CLIP_MAX; i++ )
+   {
+      TControl * c = form->FSelected[i];
+      ClipCtrl * cc = &s_clipboard[s_clipCount++];
+      cc->bType  = c->FControlType;
+      cc->nLeft  = c->FLeft;
+      cc->nTop   = c->FTop;
+      cc->nWidth = c->FWidth;
+      cc->nHeight= c->FHeight;
+      strncpy( cc->szText, c->FText, 255 );
+      strncpy( cc->szName, c->FName, 63 );
+   }
+   hb_retni( s_clipCount );
+}
+
+/* UI_FormPasteControls( hForm ) - paste clipboard controls with 16px offset */
+HB_FUNC( UI_FORMPASTECONTROLS )
+{
+   TForm * form = GetForm(1);
+   if( !form || s_clipCount == 0 ) return;
+
+   form->ClearSelection();
+
+   for( int i = 0; i < s_clipCount; i++ )
+   {
+      ClipCtrl * cc = &s_clipboard[i];
+      TControl * ctrl = CreateControlByType( cc->bType );
+      if( !ctrl ) continue;
+
+      ctrl->FLeft   = cc->nLeft + 16;
+      ctrl->FTop    = cc->nTop + 16;
+      ctrl->FWidth  = cc->nWidth;
+      ctrl->FHeight = cc->nHeight;
+      ctrl->SetText( cc->szText );
+
+      form->AddChild( ctrl );
+      ctrl->CreateHandle( form->FHandle );
+      ctrl->Show();
+
+      form->SelectControl( ctrl, TRUE );
+   }
+
+   form->UpdateOverlay();
+   hb_retni( s_clipCount );
+}
+
+/* UI_FormGetClipCount() -> nCount */
+HB_FUNC( UI_FORMGETCLIPCOUNT )
+{
+   hb_retni( s_clipCount );
+}
+
+/* UI_FormUndoPush( hForm ) - save current state to undo stack */
+HB_FUNC( UI_FORMUNDOPUSH )
+{
+   TForm * form = GetForm(1);
+   if( !form ) return;
+
+   UndoSnapshot * snap = &s_undoStack[ s_undoPos % UNDO_MAX_STEPS ];
+   snap->nCount = 0;
+
+   for( int i = 0; i < form->FChildCount && snap->nCount < UNDO_MAX_CTRLS; i++ )
+   {
+      TControl * c = form->FChildren[i];
+      int idx = snap->nCount++;
+      snap->ctrls[idx].bType  = c->FControlType;
+      snap->ctrls[idx].nLeft  = c->FLeft;
+      snap->ctrls[idx].nTop   = c->FTop;
+      snap->ctrls[idx].nWidth = c->FWidth;
+      snap->ctrls[idx].nHeight= c->FHeight;
+      strncpy( snap->ctrls[idx].szName, c->FName, 63 );
+      strncpy( snap->ctrls[idx].szText, c->FText, 255 );
+   }
+
+   s_undoPos++;
+   if( s_undoCount < UNDO_MAX_STEPS ) s_undoCount++;
+}
+
+/* UI_FormUndo( hForm ) - restore previous state */
+HB_FUNC( UI_FORMUNDO )
+{
+   TForm * form = GetForm(1);
+   if( !form || s_undoCount == 0 ) return;
+
+   s_undoPos--;
+   s_undoCount--;
+
+   UndoSnapshot * snap = &s_undoStack[ s_undoPos % UNDO_MAX_STEPS ];
+
+   /* Restore positions and sizes of existing controls */
+   for( int i = 0; i < snap->nCount && i < form->FChildCount; i++ )
+   {
+      TControl * c = form->FChildren[i];
+      c->FLeft   = snap->ctrls[i].nLeft;
+      c->FTop    = snap->ctrls[i].nTop;
+      c->FWidth  = snap->ctrls[i].nWidth;
+      c->FHeight = snap->ctrls[i].nHeight;
+      if( c->FHandle )
+         SetWindowPos( c->FHandle, NULL, c->FLeft, c->FTop,
+            c->FWidth, c->FHeight, SWP_NOZORDER );
+   }
+
+   if( form->FHandle ) InvalidateRect( form->FHandle, NULL, TRUE );
+   form->UpdateOverlay();
+   hb_retl( HB_TRUE );
+}
+
+/* UI_FormClearChildren( hForm ) - remove all child controls */
+HB_FUNC( UI_FORMCLEARCHILDREN )
+{
+   TForm * form = GetForm(1);
+   if( !form ) return;
+
+   form->ClearSelection();
+
+   for( int i = form->FChildCount - 1; i >= 0; i-- )
+   {
+      TControl * c = form->FChildren[i];
+      if( c->FHandle ) DestroyWindow( c->FHandle );
+      delete c;
+   }
+   form->FChildCount = 0;
+
+   if( form->FHandle ) InvalidateRect( form->FHandle, NULL, TRUE );
+   form->UpdateOverlay();
+}
+
+/* UI_FormTabOrderDialog( hForm ) - show tab order dialog */
+HB_FUNC( UI_FORMTABORDERDIALOG )
+{
+   TForm * form = GetForm(1);
+   if( !form || form->FChildCount == 0 ) return;
+
+   /* Build list of control names with current tab order */
+   char buf[4096] = "Tab Order:\r\n\r\n";
+   for( int i = 0; i < form->FChildCount; i++ )
+   {
+      TControl * c = form->FChildren[i];
+      char line[128];
+      snprintf( line, sizeof(line), "%d. %s (%s)\r\n",
+         i + 1, c->FName, c->FClassName );
+      strcat( buf, line );
+   }
+
+   MessageBoxA( form->FHandle, buf, "Tab Order", MB_OK | MB_ICONINFORMATION );
+}
+
+/* ================================================================
+ * REPORT DESIGNER - RPT_Designer* functions
+ * Visual band/field editor using GDI rendering (WinAPI port of Cairo)
+ * ================================================================ */
+
+#include <math.h>
+
+/* Forward declarations for Preview (used by Designer's Preview button) */
+#define RPT_PRV_MAX_PAGES 100
+#define RPT_PRV_MAX_CMDS  500
+
+typedef struct {
+   int  type;         /* 1=text, 2=rect, 3=line */
+   int  x, y, w, h;
+   int  x2, y2;
+   char text[256];
+   char fontName[64];
+   int  fontSize;
+   int  bold, italic;
+   int  color;
+   int  filled;
+   int  lineWidth;
+} RptDrawCmd;
+
+typedef struct {
+   int        nCmds;
+   RptDrawCmd cmds[RPT_PRV_MAX_CMDS];
+} RptPrvPage;
+
+static HWND        s_rptPreview = NULL;
+static RptPrvPage  s_rptPrvPages[RPT_PRV_MAX_PAGES];
+static int         s_rptPrvPageCount = 0;
+static int         s_rptPrvCurPage = 0;
+static int         s_rptPrvPgW = 210, s_rptPrvPgH = 297;
+static int         s_rptPrvMgL = 15, s_rptPrvMgR = 15;
+static int         s_rptPrvMgT = 15, s_rptPrvMgB = 15;
+static int         s_rptPreviewZoom = 100;
+static HWND        s_rptPrvPageLabel = NULL;
+
+static void RptShowAddBandMenu( HWND hWnd );
+static void RptPrvUpdateLabel(void);
+
+#define RPT_MAX_BANDS  20
+#define RPT_MAX_FIELDS 50
+#define RPT_MARGIN_W   24
+#define RPT_RULER_H    24
+#define RPT_HANDLE_SZ  6
+
+typedef struct {
+   char cName[32];
+   char cText[128];
+   char cFieldName[64];
+   int  nLeft, nTop, nWidth, nHeight;
+   int  nAlignment;   /* 0=Left, 1=Center, 2=Right */
+} RptField;
+
+typedef struct {
+   char     cName[32];
+   int      nHeight;
+   int      nFieldCount;
+   RptField fields[RPT_MAX_FIELDS];
+   COLORREF color;
+   int      lPrintOnEveryPage;
+   int      lKeepTogether;
+   int      lVisible;
+} RptBand;
+
+static HWND    s_rptDesigner = NULL;
+static RptBand s_rptBands[RPT_MAX_BANDS];
+static int     s_rptBandCount = 0;
+static int     s_rptSelBand  = -1;
+static int     s_rptSelField = -1;
+static int     s_rptPageWidth  = 210;
+static int     s_rptPageHeight = 297;
+static int     s_rptScale = 3;
+
+/* Drag state */
+static int     s_rptDragging = 0;   /* 0=none, 1=move field, 2=resize band */
+static int     s_rptDragStartX, s_rptDragStartY;
+static int     s_rptDragOrigX, s_rptDragOrigY;
+
+/* Band color from name */
+static COLORREF rpt_band_color( const char * name )
+{
+   if( strstr(name,"Header") && !strstr(name,"Page") && !strstr(name,"Group") )
+      return RGB(74,144,217);
+   if( strstr(name,"Detail") )  return RGB(128,128,128);
+   if( strstr(name,"Footer") )  return RGB(74,144,217);
+   if( strstr(name,"Group") )   return RGB(107,191,107);
+   if( strstr(name,"Page") )    return RGB(212,168,67);
+   if( strstr(name,"Summary") ) return RGB(180,100,180);
+   if( strstr(name,"Title") )   return RGB(200,100,100);
+   return RGB(128,128,128);
+}
+
+/* Paint the designer surface */
+static void RptDesignerPaint( HWND hWnd )
+{
+   PAINTSTRUCT ps;
+   HDC hdc = BeginPaint( hWnd, &ps );
+   RECT rc; GetClientRect( hWnd, &rc );
+
+   /* Double buffer */
+   HDC memDC = CreateCompatibleDC( hdc );
+   HBITMAP memBmp = CreateCompatibleBitmap( hdc, rc.right, rc.bottom );
+   SelectObject( memDC, memBmp );
+
+   /* Dark background */
+   HBRUSH hBrBg = CreateSolidBrush( RGB(37,37,38) );
+   FillRect( memDC, &rc, hBrBg );
+   DeleteObject( hBrBg );
+
+   int pageW = s_rptPageWidth * s_rptScale;
+   int pageX = 40;
+
+   /* Ruler */
+   HPEN hPenGray = CreatePen( PS_SOLID, 1, RGB(80,80,80) );
+   SelectObject( memDC, hPenGray );
+   SetTextColor( memDC, RGB(180,180,180) );
+   SetBkMode( memDC, TRANSPARENT );
+   HFONT hSmallFont = CreateFontA( -10, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+      DEFAULT_CHARSET, 0, 0, DEFAULT_QUALITY, DEFAULT_PITCH, "Segoe UI" );
+   SelectObject( memDC, hSmallFont );
+   for( int mm = 0; mm <= s_rptPageWidth; mm += 10 )
+   {
+      int x = pageX + RPT_MARGIN_W + mm * s_rptScale;
+      MoveToEx( memDC, x, 0, NULL );
+      LineTo( memDC, x, mm % 50 == 0 ? RPT_RULER_H : RPT_RULER_H / 2 );
+      if( mm % 50 == 0 )
+      {
+         char buf[8]; snprintf( buf, sizeof(buf), "%d", mm );
+         TextOutA( memDC, x + 2, 1, buf, (int)strlen(buf) );
+      }
+   }
+
+   /* Bands */
+   HFONT hFieldFont = CreateFontA( -12, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+      DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, DEFAULT_PITCH, "Segoe UI" );
+
+   int bandY = RPT_RULER_H;
+   for( int i = 0; i < s_rptBandCount; i++ )
+   {
+      RptBand * b = &s_rptBands[i];
+      int bH = b->nHeight;
+
+      /* Left margin strip with band color */
+      HBRUSH hBrBand = CreateSolidBrush( b->color );
+      RECT rcMargin = { pageX, bandY, pageX + RPT_MARGIN_W, bandY + bH };
+      FillRect( memDC, &rcMargin, hBrBand );
+      DeleteObject( hBrBand );
+
+      /* Band name in margin (vertical) */
+      SetTextColor( memDC, RGB(255,255,255) );
+      HFONT hVFont = CreateFontA( -11, 0, 900, 900, FW_BOLD, FALSE, FALSE, FALSE,
+         DEFAULT_CHARSET, 0, 0, DEFAULT_QUALITY, DEFAULT_PITCH, "Segoe UI" );
+      SelectObject( memDC, hVFont );
+      TextOutA( memDC, pageX + 4, bandY + bH - 4, b->cName, (int)strlen(b->cName) );
+      DeleteObject( hVFont );
+
+      /* Band body - light background if selected */
+      if( s_rptSelBand == i && s_rptSelField < 0 )
+      {
+         HBRUSH hBrSel = CreateSolidBrush( RGB(50,55,65) );
+         RECT rcBody = { pageX + RPT_MARGIN_W, bandY, pageX + RPT_MARGIN_W + pageW, bandY + bH };
+         FillRect( memDC, &rcBody, hBrSel );
+         DeleteObject( hBrSel );
+      }
+      else
+      {
+         HBRUSH hBrBody = CreateSolidBrush( RGB(45,45,46) );
+         RECT rcBody = { pageX + RPT_MARGIN_W, bandY, pageX + RPT_MARGIN_W + pageW, bandY + bH };
+         FillRect( memDC, &rcBody, hBrBody );
+         DeleteObject( hBrBody );
+      }
+
+      /* Band separator line */
+      HPEN hPenSep = CreatePen( PS_DOT, 1, RGB(100,100,100) );
+      SelectObject( memDC, hPenSep );
+      MoveToEx( memDC, pageX, bandY + bH, NULL );
+      LineTo( memDC, pageX + RPT_MARGIN_W + pageW, bandY + bH );
+      DeleteObject( hPenSep );
+
+      /* Fields */
+      SelectObject( memDC, hFieldFont );
+      for( int f = 0; f < b->nFieldCount; f++ )
+      {
+         RptField * fld = &b->fields[f];
+         int fx = pageX + RPT_MARGIN_W + fld->nLeft;
+         int fy = bandY + fld->nTop;
+         int fw = fld->nWidth;
+         int fh = fld->nHeight;
+
+         /* Field rectangle */
+         HBRUSH hBrFld = CreateSolidBrush( RGB(242,242,247) );
+         RECT rcFld = { fx, fy, fx + fw, fy + fh };
+         FillRect( memDC, &rcFld, hBrFld );
+         DeleteObject( hBrFld );
+
+         /* Field border */
+         HPEN hPenFld = CreatePen( PS_SOLID, 1, RGB(160,160,170) );
+         SelectObject( memDC, hPenFld );
+         SelectObject( memDC, GetStockObject(NULL_BRUSH) );
+         Rectangle( memDC, fx, fy, fx + fw, fy + fh );
+         DeleteObject( hPenFld );
+
+         /* Field text */
+         SetTextColor( memDC, RGB(30,30,30) );
+         RECT rcText = { fx + 2, fy + 1, fx + fw - 2, fy + fh - 1 };
+         if( fld->cText[0] )
+            DrawTextA( memDC, fld->cText, -1, &rcText, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX );
+         else if( fld->cFieldName[0] )
+         {
+            char buf[80]; snprintf( buf, sizeof(buf), "[%s]", fld->cFieldName );
+            DrawTextA( memDC, buf, -1, &rcText, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX );
+         }
+         else
+            DrawTextA( memDC, fld->cName, -1, &rcText, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX );
+
+         /* Selection handles */
+         if( s_rptSelBand == i && s_rptSelField == f )
+         {
+            HPEN hPenSel = CreatePen( PS_SOLID, 2, RGB(0,122,204) );
+            SelectObject( memDC, hPenSel );
+            SelectObject( memDC, GetStockObject(NULL_BRUSH) );
+            Rectangle( memDC, fx - 1, fy - 1, fx + fw + 1, fy + fh + 1 );
+            DeleteObject( hPenSel );
+
+            /* 4 corner handles */
+            HBRUSH hBrHandle = CreateSolidBrush( RGB(0,122,204) );
+            int hs = RPT_HANDLE_SZ;
+            RECT h1 = { fx-hs, fy-hs, fx, fy }; FillRect( memDC, &h1, hBrHandle );
+            RECT h2 = { fx+fw, fy-hs, fx+fw+hs, fy }; FillRect( memDC, &h2, hBrHandle );
+            RECT h3 = { fx-hs, fy+fh, fx, fy+fh+hs }; FillRect( memDC, &h3, hBrHandle );
+            RECT h4 = { fx+fw, fy+fh, fx+fw+hs, fy+fh+hs }; FillRect( memDC, &h4, hBrHandle );
+            DeleteObject( hBrHandle );
+         }
+      }
+
+      bandY += bH;
+   }
+
+   DeleteObject( hFieldFont );
+   DeleteObject( hSmallFont );
+   DeleteObject( hPenGray );
+
+   /* Blit to screen */
+   BitBlt( hdc, 0, 0, rc.right, rc.bottom, memDC, 0, 0, SRCCOPY );
+   DeleteObject( memBmp );
+   DeleteDC( memDC );
+
+   EndPaint( hWnd, &ps );
+}
+
+/* Designer WndProc */
+#define RPT_DESIGNER_CLASS "HbRptDesigner"
+#define RPT_ID_ADD_BAND  2001
+#define RPT_ID_ADD_FIELD 2002
+#define RPT_ID_DELETE    2003
+#define RPT_ID_PREVIEW   2004
+
+static LRESULT CALLBACK RptDesignerProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
+{
+   switch( msg )
+   {
+      case WM_PAINT:
+         RptDesignerPaint( hWnd );
+         return 0;
+
+      case WM_LBUTTONDOWN:
+      {
+         int mx = LOWORD(lParam), my = HIWORD(lParam);
+         int pageX = 40, pageW = s_rptPageWidth * s_rptScale;
+
+         s_rptSelBand = -1;
+         s_rptSelField = -1;
+         s_rptDragging = 0;
+
+         int bandY = RPT_RULER_H;
+         for( int i = 0; i < s_rptBandCount; i++ )
+         {
+            RptBand * b = &s_rptBands[i];
+            int bH = b->nHeight;
+
+            if( my >= bandY && my < bandY + bH + 2 )
+            {
+               /* Band separator drag? */
+               if( my >= bandY + bH - 8 && mx >= pageX && mx < pageX + RPT_MARGIN_W )
+               {
+                  s_rptSelBand = i;
+                  s_rptDragging = 2;
+                  s_rptDragStartY = my;
+                  s_rptDragOrigY = bH;
+                  SetCapture( hWnd );
+                  goto done;
+               }
+
+               /* Margin click = select band */
+               if( mx >= pageX && mx < pageX + RPT_MARGIN_W )
+               {
+                  s_rptSelBand = i;
+                  goto done;
+               }
+
+               /* Field hit test */
+               for( int f = b->nFieldCount - 1; f >= 0; f-- )
+               {
+                  RptField * fld = &b->fields[f];
+                  int fx = pageX + RPT_MARGIN_W + fld->nLeft;
+                  int fy = bandY + fld->nTop;
+                  if( mx >= fx && mx < fx + fld->nWidth &&
+                      my >= fy && my < fy + fld->nHeight )
+                  {
+                     s_rptSelBand  = i;
+                     s_rptSelField = f;
+                     s_rptDragging = 1;
+                     s_rptDragStartX = mx;
+                     s_rptDragStartY = my;
+                     s_rptDragOrigX = fld->nLeft;
+                     s_rptDragOrigY = fld->nTop;
+                     SetCapture( hWnd );
+                     goto done;
+                  }
+               }
+
+               s_rptSelBand = i;
+               goto done;
+            }
+            bandY += bH;
+         }
+done:
+         InvalidateRect( hWnd, NULL, FALSE );
+         return 0;
+      }
+
+      case WM_MOUSEMOVE:
+      {
+         if( !s_rptDragging ) return 0;
+         int mx = LOWORD(lParam), my = HIWORD(lParam);
+
+         if( s_rptDragging == 1 && s_rptSelBand >= 0 && s_rptSelField >= 0 )
+         {
+            /* Move field */
+            RptField * fld = &s_rptBands[s_rptSelBand].fields[s_rptSelField];
+            int dx = mx - s_rptDragStartX;
+            int dy = my - s_rptDragStartY;
+            int newLeft = s_rptDragOrigX + dx;
+            int newTop  = s_rptDragOrigY + dy;
+            if( newLeft < 0 ) newLeft = 0;
+            if( newTop  < 0 ) newTop  = 0;
+            fld->nLeft = newLeft;
+            fld->nTop  = newTop;
+            InvalidateRect( hWnd, NULL, FALSE );
+         }
+         else if( s_rptDragging == 2 && s_rptSelBand >= 0 )
+         {
+            /* Resize band */
+            int dy = my - s_rptDragStartY;
+            int newH = s_rptDragOrigY + dy;
+            if( newH < 20 ) newH = 20;
+            if( newH > 400 ) newH = 400;
+            s_rptBands[s_rptSelBand].nHeight = newH;
+            InvalidateRect( hWnd, NULL, FALSE );
+         }
+         return 0;
+      }
+
+      case WM_LBUTTONUP:
+         if( s_rptDragging ) { s_rptDragging = 0; ReleaseCapture(); }
+         return 0;
+
+      case WM_COMMAND:
+      {
+         int id = LOWORD(wParam);
+         if( id == RPT_ID_ADD_BAND )
+         {
+            RptShowAddBandMenu( hWnd );
+            return 0;
+         }
+         else if( id == RPT_ID_PREVIEW )
+         {
+            /* Build preview from designer bands */
+            s_rptPrvPageCount = 0;
+            s_rptPrvCurPage = 0;
+            memset( s_rptPrvPages, 0, sizeof(s_rptPrvPages) );
+            s_rptPrvPgW = s_rptPageWidth;
+            s_rptPrvPgH = s_rptPageHeight;
+            s_rptPreviewZoom = 100;
+
+            if( s_rptBandCount > 0 )
+            {
+               RptPrvPage * pg = &s_rptPrvPages[0];
+               pg->nCmds = 0;
+               s_rptPrvPageCount = 1;
+               int nY = s_rptPrvMgT;
+               for( int bi = 0; bi < s_rptBandCount; bi++ )
+               {
+                  RptBand * band = &s_rptBands[bi];
+                  if( !band->lVisible ) continue;
+                  for( int fi = 0; fi < band->nFieldCount; fi++ )
+                  {
+                     if( pg->nCmds >= RPT_PRV_MAX_CMDS ) break;
+                     RptField * fld = &band->fields[fi];
+                     RptDrawCmd * cmd = &pg->cmds[pg->nCmds];
+                     memset( cmd, 0, sizeof(RptDrawCmd) );
+                     cmd->type = 1;
+                     cmd->x = s_rptPrvMgL + fld->nLeft;
+                     cmd->y = nY + fld->nTop;
+                     if( fld->cText[0] )
+                        strncpy( cmd->text, fld->cText, sizeof(cmd->text)-1 );
+                     else
+                        snprintf( cmd->text, sizeof(cmd->text), "[%s]", fld->cFieldName );
+                     strncpy( cmd->fontName, "Segoe UI", sizeof(cmd->fontName)-1 );
+                     cmd->fontSize = 10;
+                     cmd->color = 0x000000;
+                     pg->nCmds++;
+                  }
+                  nY += band->nHeight;
+               }
+            }
+
+            /* Show preview window */
+            if( !s_rptPreview )
+            {
+               PHB_DYNS pSym = hb_dynsymFind( "RPT_PREVIEWOPEN" );
+               if( pSym ) { hb_vmPushDynSym(pSym); hb_vmPushNil(); hb_vmDo(0); }
+            }
+            else
+            {
+               ShowWindow( s_rptPreview, SW_SHOW );
+               SetForegroundWindow( s_rptPreview );
+            }
+            RptPrvUpdateLabel();
+            if( s_rptPreview ) InvalidateRect( s_rptPreview, NULL, FALSE );
+            return 0;
+         }
+         else if( id >= 2010 && id <= 2020 )
+         {
+            /* Add band by type */
+            const char * types[] = { "Header", "Detail", "Footer",
+               "GroupHeader", "GroupFooter", "PageHeader", "PageFooter" };
+            int idx = id - 2010;
+            if( idx >= 0 && idx < 7 && s_rptBandCount < RPT_MAX_BANDS )
+            {
+               RptBand * b = &s_rptBands[s_rptBandCount];
+               memset( b, 0, sizeof(RptBand) );
+               strncpy( b->cName, types[idx], sizeof(b->cName) - 1 );
+               b->nHeight = 80;
+               b->lVisible = 1;
+               b->color = rpt_band_color( types[idx] );
+               s_rptBandCount++;
+               InvalidateRect( hWnd, NULL, FALSE );
+            }
+         }
+         else if( id == RPT_ID_ADD_FIELD )
+         {
+            int bi = s_rptSelBand >= 0 ? s_rptSelBand : 0;
+            if( bi < s_rptBandCount )
+            {
+               RptBand * b = &s_rptBands[bi];
+               if( b->nFieldCount < RPT_MAX_FIELDS )
+               {
+                  RptField * f = &b->fields[b->nFieldCount];
+                  memset( f, 0, sizeof(RptField) );
+                  snprintf( f->cName, sizeof(f->cName), "Field%d", b->nFieldCount + 1 );
+                  snprintf( f->cText, sizeof(f->cText), "Field%d", b->nFieldCount + 1 );
+                  f->nLeft   = 10 + (b->nFieldCount % 4) * 80;
+                  f->nTop    = 10;
+                  f->nWidth  = 70;
+                  f->nHeight = 20;
+                  s_rptSelBand  = bi;
+                  s_rptSelField = b->nFieldCount;
+                  b->nFieldCount++;
+                  InvalidateRect( hWnd, NULL, FALSE );
+               }
+            }
+         }
+         else if( id == RPT_ID_DELETE )
+         {
+            if( s_rptSelBand >= 0 )
+            {
+               if( s_rptSelField >= 0 )
+               {
+                  /* Delete field */
+                  RptBand * b = &s_rptBands[s_rptSelBand];
+                  int f = s_rptSelField;
+                  if( f < b->nFieldCount - 1 )
+                     memmove( &b->fields[f], &b->fields[f + 1],
+                              sizeof(RptField) * (b->nFieldCount - f - 1) );
+                  b->nFieldCount--;
+                  s_rptSelField = -1;
+               }
+               else
+               {
+                  /* Delete band */
+                  int i = s_rptSelBand;
+                  if( i < s_rptBandCount - 1 )
+                     memmove( &s_rptBands[i], &s_rptBands[i + 1],
+                              sizeof(RptBand) * (s_rptBandCount - i - 1) );
+                  s_rptBandCount--;
+                  s_rptSelBand = -1;
+               }
+               InvalidateRect( hWnd, NULL, FALSE );
+            }
+         }
+         return 0;
+      }
+
+      case WM_CLOSE:
+         ShowWindow( hWnd, SW_HIDE );
+         return 0;
+
+      case WM_ERASEBKGND:
+         return 1;  /* handled in WM_PAINT */
+   }
+   return DefWindowProc( hWnd, msg, wParam, lParam );
+}
+
+/* RPT_DESIGNEROPEN() - create/show the report designer window */
+HB_FUNC( RPT_DESIGNEROPEN )
+{
+   if( s_rptDesigner )
+   {
+      ShowWindow( s_rptDesigner, SW_SHOW );
+      SetForegroundWindow( s_rptDesigner );
+      return;
+   }
+
+   /* Register window class */
+   {  WNDCLASSEXA wc = { sizeof(WNDCLASSEXA) };
+      wc.lpfnWndProc = RptDesignerProc;
+      wc.hInstance = GetModuleHandle(NULL);
+      wc.lpszClassName = RPT_DESIGNER_CLASS;
+      wc.hCursor = LoadCursor( NULL, IDC_ARROW );
+      wc.hbrBackground = CreateSolidBrush( RGB(37,37,38) );
+      RegisterClassExA( &wc );
+   }
+
+   s_rptDesigner = CreateWindowExA( WS_EX_TOOLWINDOW, RPT_DESIGNER_CLASS,
+      "Report Designer",
+      WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+      120, 80, 800, 600, NULL, NULL, GetModuleHandle(NULL), NULL );
+
+   /* Dark title bar */
+   {  typedef HRESULT (WINAPI *PFN)(HWND, DWORD, LPCVOID, DWORD);
+      HMODULE hDwm = LoadLibraryA("dwmapi.dll");
+      if( hDwm ) {
+         PFN pFn = (PFN)GetProcAddress(hDwm, "DwmSetWindowAttribute");
+         if( pFn ) { BOOL val = TRUE; pFn( s_rptDesigner, 20, &val, sizeof(val) ); }
+         FreeLibrary( hDwm );
+      }
+   }
+
+   /* Toolbar with buttons */
+   {  int bx = 4;
+      HWND hBtn;
+      HFONT hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
+
+      /* Add Band dropdown button */
+      hBtn = CreateWindowExA( 0, "BUTTON", "Add Band",
+         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+         bx, 4, 80, 26, s_rptDesigner, (HMENU)(LONG_PTR)RPT_ID_ADD_BAND,
+         GetModuleHandle(NULL), NULL );
+      SendMessageA( hBtn, WM_SETFONT, (WPARAM)hFont, TRUE );
+      bx += 84;
+
+      hBtn = CreateWindowExA( 0, "BUTTON", "Add Field",
+         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+         bx, 4, 80, 26, s_rptDesigner, (HMENU)(LONG_PTR)RPT_ID_ADD_FIELD,
+         GetModuleHandle(NULL), NULL );
+      SendMessageA( hBtn, WM_SETFONT, (WPARAM)hFont, TRUE );
+      bx += 84;
+
+      hBtn = CreateWindowExA( 0, "BUTTON", "Delete",
+         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+         bx, 4, 70, 26, s_rptDesigner, (HMENU)(LONG_PTR)RPT_ID_DELETE,
+         GetModuleHandle(NULL), NULL );
+      SendMessageA( hBtn, WM_SETFONT, (WPARAM)hFont, TRUE );
+      bx += 74;
+
+      hBtn = CreateWindowExA( 0, "BUTTON", "Preview",
+         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+         bx, 4, 70, 26, s_rptDesigner, (HMENU)(LONG_PTR)RPT_ID_PREVIEW,
+         GetModuleHandle(NULL), NULL );
+      SendMessageA( hBtn, WM_SETFONT, (WPARAM)hFont, TRUE );
+
+      /* "Add Band" shows a popup menu with 7 band types */
+      /* Handled when RPT_ID_ADD_BAND is clicked: */
+   }
+}
+
+/* Override Add Band button to show popup menu */
+static void RptShowAddBandMenu( HWND hWnd )
+{
+   HMENU hMenu = CreatePopupMenu();
+   const char * types[] = { "Header", "Detail", "Footer",
+      "GroupHeader", "GroupFooter", "PageHeader", "PageFooter" };
+   for( int i = 0; i < 7; i++ )
+      AppendMenuA( hMenu, MF_STRING, 2010 + i, types[i] );
+
+   RECT rc;
+   GetWindowRect( GetDlgItem( hWnd, RPT_ID_ADD_BAND ) ? hWnd : hWnd, &rc );
+   /* Get button position */
+   HWND hBtn = NULL;
+   HWND hChild = GetWindow( hWnd, GW_CHILD );
+   while( hChild )
+   {
+      if( GetDlgCtrlID( hChild ) == RPT_ID_ADD_BAND ) { hBtn = hChild; break; }
+      hChild = GetWindow( hChild, GW_HWNDNEXT );
+   }
+   if( hBtn )
+   {
+      GetWindowRect( hBtn, &rc );
+      TrackPopupMenu( hMenu, TPM_LEFTALIGN | TPM_TOPALIGN, rc.left, rc.bottom, 0, hWnd, NULL );
+   }
+   DestroyMenu( hMenu );
+}
+
+/* RPT_DESIGNERCLOSE() */
+HB_FUNC( RPT_DESIGNERCLOSE )
+{
+   if( s_rptDesigner )
+      ShowWindow( s_rptDesigner, SW_HIDE );
+}
+
+/* RPT_SETREPORT( nReportHandle ) - reserved for future Harbour object binding */
+HB_FUNC( RPT_SETREPORT )
+{
+   (void)hb_parni(1);
+}
+
+/* RPT_ADDBAND( cBandName, nHeight ) -> nIndex */
+HB_FUNC( RPT_ADDBAND )
+{
+   if( s_rptBandCount >= RPT_MAX_BANDS ) { hb_retni( -1 ); return; }
+
+   const char * cName = hb_parc(1);
+   int nHeight = HB_ISNUM(2) ? hb_parni(2) : 80;
+
+   if( !cName || !cName[0] ) { hb_retni( -1 ); return; }
+
+   RptBand * b = &s_rptBands[s_rptBandCount];
+   memset( b, 0, sizeof(RptBand) );
+   strncpy( b->cName, cName, sizeof(b->cName) - 1 );
+   b->nHeight = nHeight;
+   b->lVisible = 1;
+   b->color = rpt_band_color( cName );
+
+   int idx = s_rptBandCount;
+   s_rptBandCount++;
+
+   if( s_rptDesigner ) InvalidateRect( s_rptDesigner, NULL, FALSE );
+   hb_retni( idx );
+}
+
+/* RPT_ADDFIELD( nBandIndex, cName, cText, nLeft, nTop, nWidth, nHeight ) -> nFieldIndex */
+HB_FUNC( RPT_ADDFIELD )
+{
+   int bi = hb_parni(1);
+   if( bi < 0 || bi >= s_rptBandCount ) { hb_retni( -1 ); return; }
+
+   RptBand * b = &s_rptBands[bi];
+   if( b->nFieldCount >= RPT_MAX_FIELDS ) { hb_retni( -1 ); return; }
+
+   RptField * f = &b->fields[b->nFieldCount];
+   memset( f, 0, sizeof(RptField) );
+
+   if( HB_ISCHAR(2) ) strncpy( f->cName, hb_parc(2), sizeof(f->cName) - 1 );
+   if( HB_ISCHAR(3) ) strncpy( f->cText, hb_parc(3), sizeof(f->cText) - 1 );
+   f->nLeft   = HB_ISNUM(4) ? hb_parni(4) : 10;
+   f->nTop    = HB_ISNUM(5) ? hb_parni(5) : 10;
+   f->nWidth  = HB_ISNUM(6) ? hb_parni(6) : 70;
+   f->nHeight = HB_ISNUM(7) ? hb_parni(7) : 20;
+
+   int idx = b->nFieldCount;
+   b->nFieldCount++;
+
+   if( s_rptDesigner ) InvalidateRect( s_rptDesigner, NULL, FALSE );
+   hb_retni( idx );
+}
+
+/* RPT_GETSELECTED() -> { nBandIdx, nFieldIdx, cBandName, cFieldName } */
+HB_FUNC( RPT_GETSELECTED )
+{
+   PHB_ITEM pArray = hb_itemArrayNew( 4 );
+   hb_arraySetNI( pArray, 1, s_rptSelBand );
+   hb_arraySetNI( pArray, 2, s_rptSelField );
+
+   if( s_rptSelBand >= 0 && s_rptSelBand < s_rptBandCount )
+   {
+      hb_arraySetC( pArray, 3, s_rptBands[s_rptSelBand].cName );
+      if( s_rptSelField >= 0 && s_rptSelField < s_rptBands[s_rptSelBand].nFieldCount )
+         hb_arraySetC( pArray, 4, s_rptBands[s_rptSelBand].fields[s_rptSelField].cName );
+      else
+         hb_arraySetC( pArray, 4, "" );
+   }
+   else
+   {
+      hb_arraySetC( pArray, 3, "" );
+      hb_arraySetC( pArray, 4, "" );
+   }
+   hb_itemReturnRelease( pArray );
+}
+
+/* RPT_GETBANDPROPS( nBandIndex ) -> { {cPropName, xValue, cCategory, cType}, ... } */
+HB_FUNC( RPT_GETBANDPROPS )
+{
+   int bi = hb_parni(1);
+   if( bi < 0 || bi >= s_rptBandCount ) { hb_reta(0); return; }
+
+   RptBand * b = &s_rptBands[bi];
+   PHB_ITEM pArray = hb_itemArrayNew( 5 );
+   PHB_ITEM pRow;
+
+   pRow = hb_itemArrayNew(4);
+   hb_arraySetC(pRow,1,"cName"); hb_arraySetC(pRow,2,b->cName);
+   hb_arraySetC(pRow,3,"Info"); hb_arraySetC(pRow,4,"S");
+   hb_arraySet(pArray,1,pRow); hb_itemRelease(pRow);
+
+   pRow = hb_itemArrayNew(4);
+   hb_arraySetC(pRow,1,"nHeight"); hb_arraySetNI(pRow,2,b->nHeight);
+   hb_arraySetC(pRow,3,"Position"); hb_arraySetC(pRow,4,"N");
+   hb_arraySet(pArray,2,pRow); hb_itemRelease(pRow);
+
+   pRow = hb_itemArrayNew(4);
+   hb_arraySetC(pRow,1,"lPrintOnEveryPage"); hb_arraySetL(pRow,2,b->lPrintOnEveryPage?HB_TRUE:HB_FALSE);
+   hb_arraySetC(pRow,3,"Behavior"); hb_arraySetC(pRow,4,"L");
+   hb_arraySet(pArray,3,pRow); hb_itemRelease(pRow);
+
+   pRow = hb_itemArrayNew(4);
+   hb_arraySetC(pRow,1,"lKeepTogether"); hb_arraySetL(pRow,2,b->lKeepTogether?HB_TRUE:HB_FALSE);
+   hb_arraySetC(pRow,3,"Behavior"); hb_arraySetC(pRow,4,"L");
+   hb_arraySet(pArray,4,pRow); hb_itemRelease(pRow);
+
+   pRow = hb_itemArrayNew(4);
+   hb_arraySetC(pRow,1,"lVisible"); hb_arraySetL(pRow,2,b->lVisible?HB_TRUE:HB_FALSE);
+   hb_arraySetC(pRow,3,"Behavior"); hb_arraySetC(pRow,4,"L");
+   hb_arraySet(pArray,5,pRow); hb_itemRelease(pRow);
+
+   hb_itemReturnRelease( pArray );
+}
+
+/* RPT_GETFIELDPROPS( nBandIndex, nFieldIndex ) -> { {cPropName, xValue, cCategory, cType}, ... } */
+HB_FUNC( RPT_GETFIELDPROPS )
+{
+   int bi = hb_parni(1), fi = hb_parni(2);
+   if( bi < 0 || bi >= s_rptBandCount || fi < 0 || fi >= s_rptBands[bi].nFieldCount )
+   { hb_reta(0); return; }
+
+   RptField * f = &s_rptBands[bi].fields[fi];
+   PHB_ITEM pArray = hb_itemArrayNew( 8 );
+   PHB_ITEM pRow;
+
+   pRow = hb_itemArrayNew(4); hb_arraySetC(pRow,1,"cName"); hb_arraySetC(pRow,2,f->cName);
+   hb_arraySetC(pRow,3,"Info"); hb_arraySetC(pRow,4,"S"); hb_arraySet(pArray,1,pRow); hb_itemRelease(pRow);
+
+   pRow = hb_itemArrayNew(4); hb_arraySetC(pRow,1,"cText"); hb_arraySetC(pRow,2,f->cText);
+   hb_arraySetC(pRow,3,"Appearance"); hb_arraySetC(pRow,4,"S"); hb_arraySet(pArray,2,pRow); hb_itemRelease(pRow);
+
+   pRow = hb_itemArrayNew(4); hb_arraySetC(pRow,1,"cFieldName"); hb_arraySetC(pRow,2,f->cFieldName);
+   hb_arraySetC(pRow,3,"Data"); hb_arraySetC(pRow,4,"S"); hb_arraySet(pArray,3,pRow); hb_itemRelease(pRow);
+
+   pRow = hb_itemArrayNew(4); hb_arraySetC(pRow,1,"nLeft"); hb_arraySetNI(pRow,2,f->nLeft);
+   hb_arraySetC(pRow,3,"Position"); hb_arraySetC(pRow,4,"N"); hb_arraySet(pArray,4,pRow); hb_itemRelease(pRow);
+
+   pRow = hb_itemArrayNew(4); hb_arraySetC(pRow,1,"nTop"); hb_arraySetNI(pRow,2,f->nTop);
+   hb_arraySetC(pRow,3,"Position"); hb_arraySetC(pRow,4,"N"); hb_arraySet(pArray,5,pRow); hb_itemRelease(pRow);
+
+   pRow = hb_itemArrayNew(4); hb_arraySetC(pRow,1,"nWidth"); hb_arraySetNI(pRow,2,f->nWidth);
+   hb_arraySetC(pRow,3,"Position"); hb_arraySetC(pRow,4,"N"); hb_arraySet(pArray,6,pRow); hb_itemRelease(pRow);
+
+   pRow = hb_itemArrayNew(4); hb_arraySetC(pRow,1,"nHeight"); hb_arraySetNI(pRow,2,f->nHeight);
+   hb_arraySetC(pRow,3,"Position"); hb_arraySetC(pRow,4,"N"); hb_arraySet(pArray,7,pRow); hb_itemRelease(pRow);
+
+   pRow = hb_itemArrayNew(4); hb_arraySetC(pRow,1,"nAlignment"); hb_arraySetNI(pRow,2,f->nAlignment);
+   hb_arraySetC(pRow,3,"Appearance"); hb_arraySetC(pRow,4,"N"); hb_arraySet(pArray,8,pRow); hb_itemRelease(pRow);
+
+   hb_itemReturnRelease( pArray );
+}
+
+/* RPT_SETBANDPROP( nBandIndex, cPropName, xValue ) */
+HB_FUNC( RPT_SETBANDPROP )
+{
+   int bi = hb_parni(1);
+   const char * cProp = hb_parc(2);
+   if( bi < 0 || bi >= s_rptBandCount || !cProp ) { hb_retl(HB_FALSE); return; }
+
+   RptBand * b = &s_rptBands[bi];
+
+   if( strcmp(cProp,"cName")==0 && HB_ISCHAR(3) )
+      strncpy( b->cName, hb_parc(3), sizeof(b->cName)-1 );
+   else if( strcmp(cProp,"nHeight")==0 && HB_ISNUM(3) )
+      b->nHeight = hb_parni(3);
+   else if( strcmp(cProp,"lPrintOnEveryPage")==0 && HB_ISLOG(3) )
+      b->lPrintOnEveryPage = hb_parl(3) ? 1 : 0;
+   else if( strcmp(cProp,"lKeepTogether")==0 && HB_ISLOG(3) )
+      b->lKeepTogether = hb_parl(3) ? 1 : 0;
+   else if( strcmp(cProp,"lVisible")==0 && HB_ISLOG(3) )
+      b->lVisible = hb_parl(3) ? 1 : 0;
+   else { hb_retl(HB_FALSE); return; }
+
+   if( s_rptDesigner ) InvalidateRect( s_rptDesigner, NULL, FALSE );
+   hb_retl( HB_TRUE );
+}
+
+/* RPT_SETFIELDPROP( nBandIndex, nFieldIndex, cPropName, xValue ) */
+HB_FUNC( RPT_SETFIELDPROP )
+{
+   int bi = hb_parni(1), fi = hb_parni(2);
+   const char * cProp = hb_parc(3);
+   if( bi < 0 || bi >= s_rptBandCount || fi < 0 || fi >= s_rptBands[bi].nFieldCount || !cProp )
+   { hb_retl(HB_FALSE); return; }
+
+   RptField * f = &s_rptBands[bi].fields[fi];
+
+   if( strcmp(cProp,"cName")==0 && HB_ISCHAR(4) )
+      strncpy( f->cName, hb_parc(4), sizeof(f->cName)-1 );
+   else if( strcmp(cProp,"cText")==0 && HB_ISCHAR(4) )
+      strncpy( f->cText, hb_parc(4), sizeof(f->cText)-1 );
+   else if( strcmp(cProp,"cFieldName")==0 && HB_ISCHAR(4) )
+      strncpy( f->cFieldName, hb_parc(4), sizeof(f->cFieldName)-1 );
+   else if( strcmp(cProp,"nLeft")==0 && HB_ISNUM(4) )      f->nLeft = hb_parni(4);
+   else if( strcmp(cProp,"nTop")==0 && HB_ISNUM(4) )       f->nTop = hb_parni(4);
+   else if( strcmp(cProp,"nWidth")==0 && HB_ISNUM(4) )     f->nWidth = hb_parni(4);
+   else if( strcmp(cProp,"nHeight")==0 && HB_ISNUM(4) )    f->nHeight = hb_parni(4);
+   else if( strcmp(cProp,"nAlignment")==0 && HB_ISNUM(4) ) f->nAlignment = hb_parni(4);
+   else { hb_retl(HB_FALSE); return; }
+
+   if( s_rptDesigner ) InvalidateRect( s_rptDesigner, NULL, FALSE );
+   hb_retl( HB_TRUE );
+}
+
+/* ================================================================
+ * REPORT PREVIEW - RPT_Preview* functions
+ * Page rendering with GDI, zoom, navigation
+ * (Data types and statics declared above, before Designer section)
+ * ================================================================ */
+
+static void RptPrvUpdateLabel(void)
+{
+   if( !s_rptPrvPageLabel ) return;
+   char buf[64];
+   snprintf( buf, sizeof(buf), "Page %d / %d  (%d%%)",
+      s_rptPrvCurPage + 1, s_rptPrvPageCount > 0 ? s_rptPrvPageCount : 1,
+      s_rptPreviewZoom );
+   SetWindowTextA( s_rptPrvPageLabel, buf );
+}
+
+/* Preview paint */
+static void RptPreviewPaint( HWND hWnd )
+{
+   PAINTSTRUCT ps;
+   HDC hdc = BeginPaint( hWnd, &ps );
+   RECT rc; GetClientRect( hWnd, &rc );
+
+   HDC memDC = CreateCompatibleDC( hdc );
+   HBITMAP memBmp = CreateCompatibleBitmap( hdc, rc.right, rc.bottom );
+   SelectObject( memDC, memBmp );
+
+   /* Dark background */
+   HBRUSH hBrBg = CreateSolidBrush( RGB(50,50,50) );
+   FillRect( memDC, &rc, hBrBg );
+   DeleteObject( hBrBg );
+
+   if( s_rptPrvPageCount > 0 )
+   {
+   /* Page dimensions scaled by zoom */
+   double scale = s_rptPreviewZoom / 100.0 * 3.0;  /* 3 px/mm at 100% */
+   int pgW = (int)(s_rptPrvPgW * scale);
+   int pgH = (int)(s_rptPrvPgH * scale);
+   int pgX = (rc.right - pgW) / 2;
+   int pgY = 40;
+   if( pgX < 20 ) pgX = 20;
+
+   /* White page with shadow */
+   HBRUSH hBrShadow = CreateSolidBrush( RGB(30,30,30) );
+   RECT rcShadow = { pgX + 4, pgY + 4, pgX + pgW + 4, pgY + pgH + 4 };
+   FillRect( memDC, &rcShadow, hBrShadow );
+   DeleteObject( hBrShadow );
+
+   HBRUSH hBrPage = CreateSolidBrush( RGB(255,255,255) );
+   RECT rcPage = { pgX, pgY, pgX + pgW, pgY + pgH };
+   FillRect( memDC, &rcPage, hBrPage );
+   DeleteObject( hBrPage );
+
+   /* Dashed margin lines */
+   HPEN hPenMargin = CreatePen( PS_DOT, 1, RGB(200,200,200) );
+   SelectObject( memDC, hPenMargin );
+   int mgL = (int)(s_rptPrvMgL * scale);
+   int mgR = (int)(s_rptPrvMgR * scale);
+   int mgT = (int)(s_rptPrvMgT * scale);
+   int mgB = (int)(s_rptPrvMgB * scale);
+   MoveToEx( memDC, pgX + mgL, pgY, NULL ); LineTo( memDC, pgX + mgL, pgY + pgH );
+   MoveToEx( memDC, pgX + pgW - mgR, pgY, NULL ); LineTo( memDC, pgX + pgW - mgR, pgY + pgH );
+   MoveToEx( memDC, pgX, pgY + mgT, NULL ); LineTo( memDC, pgX + pgW, pgY + mgT );
+   MoveToEx( memDC, pgX, pgY + pgH - mgB, NULL ); LineTo( memDC, pgX + pgW, pgY + pgH - mgB );
+   DeleteObject( hPenMargin );
+
+   /* Render draw commands for current page */
+   RptPrvPage * pg = &s_rptPrvPages[s_rptPrvCurPage];
+   SetBkMode( memDC, TRANSPARENT );
+
+   for( int i = 0; i < pg->nCmds; i++ )
+   {
+      RptDrawCmd * cmd = &pg->cmds[i];
+      int cx = pgX + (int)(cmd->x * scale);
+      int cy = pgY + (int)(cmd->y * scale);
+
+      switch( cmd->type )
+      {
+         case 1: /* Text */
+         {
+            int fs = (int)(cmd->fontSize * scale / 3.0);
+            if( fs < 8 ) fs = 8;
+            HFONT hFont = CreateFontA( -fs, 0, 0, 0,
+               cmd->bold ? FW_BOLD : FW_NORMAL,
+               cmd->italic, FALSE, FALSE,
+               DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY,
+               DEFAULT_PITCH, cmd->fontName[0] ? cmd->fontName : "Segoe UI" );
+            SelectObject( memDC, hFont );
+            SetTextColor( memDC, RGB(
+               (cmd->color >> 16) & 0xFF,
+               (cmd->color >> 8) & 0xFF,
+               cmd->color & 0xFF ) );
+            TextOutA( memDC, cx, cy, cmd->text, (int)strlen(cmd->text) );
+            DeleteObject( hFont );
+            break;
+         }
+         case 2: /* Rectangle */
+         {
+            int cw = (int)(cmd->w * scale);
+            int ch = (int)(cmd->h * scale);
+            COLORREF clr = RGB( (cmd->color>>16)&0xFF, (cmd->color>>8)&0xFF, cmd->color&0xFF );
+            if( cmd->filled )
+            {
+               HBRUSH hBr = CreateSolidBrush( clr );
+               RECT r = { cx, cy, cx + cw, cy + ch };
+               FillRect( memDC, &r, hBr );
+               DeleteObject( hBr );
+            }
+            else
+            {
+               HPEN hPen = CreatePen( PS_SOLID, 1, clr );
+               SelectObject( memDC, hPen );
+               SelectObject( memDC, GetStockObject(NULL_BRUSH) );
+               Rectangle( memDC, cx, cy, cx + cw, cy + ch );
+               DeleteObject( hPen );
+            }
+            break;
+         }
+         case 3: /* Line */
+         {
+            int cx2 = pgX + (int)(cmd->x2 * scale);
+            int cy2 = pgY + (int)(cmd->y2 * scale);
+            COLORREF clr = RGB( (cmd->color>>16)&0xFF, (cmd->color>>8)&0xFF, cmd->color&0xFF );
+            HPEN hPen = CreatePen( PS_SOLID, cmd->lineWidth > 0 ? cmd->lineWidth : 1, clr );
+            SelectObject( memDC, hPen );
+            MoveToEx( memDC, cx, cy, NULL );
+            LineTo( memDC, cx2, cy2 );
+            DeleteObject( hPen );
+            break;
+         }
+      }
+   }
+   } /* end if( s_rptPrvPageCount > 0 ) */
+
+   BitBlt( hdc, 0, 0, rc.right, rc.bottom, memDC, 0, 0, SRCCOPY );
+   DeleteObject( memBmp );
+   DeleteDC( memDC );
+   EndPaint( hWnd, &ps );
+}
+
+/* Preview WndProc */
+#define RPT_PREVIEW_CLASS "HbRptPreview"
+#define RPT_PRV_FIRST 3001
+#define RPT_PRV_PREV  3002
+#define RPT_PRV_NEXT  3003
+#define RPT_PRV_LAST  3004
+#define RPT_PRV_ZOOMIN  3005
+#define RPT_PRV_ZOOMOUT 3006
+#define RPT_PRV_CLOSE   3007
+
+static LRESULT CALLBACK RptPreviewProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
+{
+   switch( msg )
+   {
+      case WM_PAINT:
+         RptPreviewPaint( hWnd );
+         return 0;
+
+      case WM_COMMAND:
+      {
+         int id = LOWORD(wParam);
+         switch( id )
+         {
+            case RPT_PRV_FIRST: s_rptPrvCurPage = 0; break;
+            case RPT_PRV_PREV:  if(s_rptPrvCurPage>0) s_rptPrvCurPage--; break;
+            case RPT_PRV_NEXT:  if(s_rptPrvCurPage<s_rptPrvPageCount-1) s_rptPrvCurPage++; break;
+            case RPT_PRV_LAST:  s_rptPrvCurPage = s_rptPrvPageCount > 0 ? s_rptPrvPageCount-1 : 0; break;
+            case RPT_PRV_ZOOMIN:  if(s_rptPreviewZoom<400) s_rptPreviewZoom+=25; break;
+            case RPT_PRV_ZOOMOUT: if(s_rptPreviewZoom>25) s_rptPreviewZoom-=25; break;
+            case RPT_PRV_CLOSE: ShowWindow(hWnd,SW_HIDE); return 0;
+         }
+         RptPrvUpdateLabel();
+         InvalidateRect( hWnd, NULL, FALSE );
+         return 0;
+      }
+
+      case WM_CLOSE:
+         ShowWindow( hWnd, SW_HIDE );
+         return 0;
+
+      case WM_ERASEBKGND:
+         return 1;
+   }
+   return DefWindowProc( hWnd, msg, wParam, lParam );
+}
+
+/* RPT_PREVIEWOPEN( nPageWidth, nPageHeight, nMarginL, nMarginR, nMarginT, nMarginB ) */
+HB_FUNC( RPT_PREVIEWOPEN )
+{
+   s_rptPrvPgW = HB_ISNUM(1) ? hb_parni(1) : 210;
+   s_rptPrvPgH = HB_ISNUM(2) ? hb_parni(2) : 297;
+   s_rptPrvMgL = HB_ISNUM(3) ? hb_parni(3) : 15;
+   s_rptPrvMgR = HB_ISNUM(4) ? hb_parni(4) : 15;
+   s_rptPrvMgT = HB_ISNUM(5) ? hb_parni(5) : 15;
+   s_rptPrvMgB = HB_ISNUM(6) ? hb_parni(6) : 15;
+
+   s_rptPrvPageCount = 0;
+   s_rptPrvCurPage = 0;
+   memset( s_rptPrvPages, 0, sizeof(s_rptPrvPages) );
+   s_rptPreviewZoom = 100;
+
+   if( s_rptPreview )
+   {
+      ShowWindow( s_rptPreview, SW_SHOW );
+      SetForegroundWindow( s_rptPreview );
+      RptPrvUpdateLabel();
+      return;
+   }
+
+   /* Register */
+   {  WNDCLASSEXA wc = { sizeof(WNDCLASSEXA) };
+      wc.lpfnWndProc = RptPreviewProc;
+      wc.hInstance = GetModuleHandle(NULL);
+      wc.lpszClassName = RPT_PREVIEW_CLASS;
+      wc.hCursor = LoadCursor( NULL, IDC_ARROW );
+      wc.hbrBackground = CreateSolidBrush( RGB(50,50,50) );
+      RegisterClassExA( &wc );
+   }
+
+   s_rptPreview = CreateWindowExA( 0, RPT_PREVIEW_CLASS, "Report Preview",
+      WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+      80, 40, 750, 850, NULL, NULL, GetModuleHandle(NULL), NULL );
+
+   /* Dark title bar */
+   {  typedef HRESULT (WINAPI *PFN)(HWND, DWORD, LPCVOID, DWORD);
+      HMODULE hDwm = LoadLibraryA("dwmapi.dll");
+      if( hDwm ) {
+         PFN pFn = (PFN)GetProcAddress(hDwm, "DwmSetWindowAttribute");
+         if( pFn ) { BOOL val = TRUE; pFn( s_rptPreview, 20, &val, sizeof(val) ); }
+         FreeLibrary( hDwm );
+      }
+   }
+
+   /* Toolbar */
+   HFONT hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
+   int bx = 4;
+   struct { const char * text; int id; int w; } btns[] = {
+      { "|<", RPT_PRV_FIRST, 30 }, { "<", RPT_PRV_PREV, 30 },
+      { ">", RPT_PRV_NEXT, 30 },   { ">|", RPT_PRV_LAST, 30 },
+      { "Zoom +", RPT_PRV_ZOOMIN, 60 }, { "Zoom -", RPT_PRV_ZOOMOUT, 60 },
+      { "Close", RPT_PRV_CLOSE, 60 }
+   };
+   for( int i = 0; i < 7; i++ )
+   {
+      HWND hBtn = CreateWindowExA( 0, "BUTTON", btns[i].text,
+         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+         bx, 4, btns[i].w, 26, s_rptPreview, (HMENU)(LONG_PTR)btns[i].id,
+         GetModuleHandle(NULL), NULL );
+      SendMessageA( hBtn, WM_SETFONT, (WPARAM)hFont, TRUE );
+      bx += btns[i].w + 4;
+   }
+
+   /* Page label */
+   s_rptPrvPageLabel = CreateWindowExA( 0, "STATIC", "",
+      WS_CHILD | WS_VISIBLE | SS_LEFT,
+      bx + 8, 8, 200, 20, s_rptPreview, NULL, GetModuleHandle(NULL), NULL );
+   SendMessageA( s_rptPrvPageLabel, WM_SETFONT, (WPARAM)hFont, TRUE );
+   RptPrvUpdateLabel();
+}
+
+/* RPT_PREVIEWCLOSE() */
+HB_FUNC( RPT_PREVIEWCLOSE )
+{
+   if( s_rptPreview ) ShowWindow( s_rptPreview, SW_HIDE );
+}
+
+/* RPT_PREVIEWADDPAGE() */
+HB_FUNC( RPT_PREVIEWADDPAGE )
+{
+   if( s_rptPrvPageCount >= RPT_PRV_MAX_PAGES ) { hb_retl(HB_FALSE); return; }
+   RptPrvPage * pg = &s_rptPrvPages[s_rptPrvPageCount];
+   memset( pg, 0, sizeof(RptPrvPage) );
+   s_rptPrvPageCount++;
+   s_rptPrvCurPage = s_rptPrvPageCount - 1;
+   hb_retl( HB_TRUE );
+}
+
+/* RPT_PREVIEWDRAWTEXT( nX, nY, cText, cFontName, nFontSize, lBold, lItalic, nColor ) */
+HB_FUNC( RPT_PREVIEWDRAWTEXT )
+{
+   if( s_rptPrvPageCount <= 0 ) return;
+   RptPrvPage * pg = &s_rptPrvPages[s_rptPrvPageCount - 1];
+   if( pg->nCmds >= RPT_PRV_MAX_CMDS ) return;
+
+   RptDrawCmd * cmd = &pg->cmds[pg->nCmds];
+   memset( cmd, 0, sizeof(RptDrawCmd) );
+   cmd->type = 1;
+   cmd->x = hb_parni(1);
+   cmd->y = hb_parni(2);
+   if( HB_ISCHAR(3) ) strncpy( cmd->text, hb_parc(3), sizeof(cmd->text)-1 );
+   if( HB_ISCHAR(4) ) strncpy( cmd->fontName, hb_parc(4), sizeof(cmd->fontName)-1 );
+   cmd->fontSize = HB_ISNUM(5) ? hb_parni(5) : 10;
+   cmd->bold     = HB_ISLOG(6) ? ( hb_parl(6) ? 1 : 0 ) : 0;
+   cmd->italic   = HB_ISLOG(7) ? ( hb_parl(7) ? 1 : 0 ) : 0;
+   cmd->color    = HB_ISNUM(8) ? hb_parni(8) : 0;
+   pg->nCmds++;
+}
+
+/* RPT_PREVIEWDRAWRECT( nX, nY, nW, nH, nColor, lFilled ) */
+HB_FUNC( RPT_PREVIEWDRAWRECT )
+{
+   if( s_rptPrvPageCount <= 0 ) return;
+   RptPrvPage * pg = &s_rptPrvPages[s_rptPrvPageCount - 1];
+   if( pg->nCmds >= RPT_PRV_MAX_CMDS ) return;
+
+   RptDrawCmd * cmd = &pg->cmds[pg->nCmds];
+   memset( cmd, 0, sizeof(RptDrawCmd) );
+   cmd->type   = 2;
+   cmd->x      = hb_parni(1);
+   cmd->y      = hb_parni(2);
+   cmd->w      = hb_parni(3);
+   cmd->h      = hb_parni(4);
+   cmd->color  = HB_ISNUM(5) ? hb_parni(5) : 0;
+   cmd->filled = HB_ISLOG(6) ? ( hb_parl(6) ? 1 : 0 ) : 0;
+   pg->nCmds++;
+}
+
+/* RPT_PREVIEWDRAWLINE( nX1, nY1, nX2, nY2, nColor, nWidth ) */
+HB_FUNC( RPT_PREVIEWDRAWLINE )
+{
+   if( s_rptPrvPageCount <= 0 ) return;
+   RptPrvPage * pg = &s_rptPrvPages[s_rptPrvPageCount - 1];
+   if( pg->nCmds >= RPT_PRV_MAX_CMDS ) return;
+
+   RptDrawCmd * cmd = &pg->cmds[pg->nCmds];
+   memset( cmd, 0, sizeof(RptDrawCmd) );
+   cmd->type      = 3;
+   cmd->x         = hb_parni(1);
+   cmd->y         = hb_parni(2);
+   cmd->x2        = hb_parni(3);
+   cmd->y2        = hb_parni(4);
+   cmd->color     = HB_ISNUM(5) ? hb_parni(5) : 0;
+   cmd->lineWidth = HB_ISNUM(6) ? hb_parni(6) : 1;
+   pg->nCmds++;
+}
+
+/* RPT_PREVIEWRENDER() */
+HB_FUNC( RPT_PREVIEWRENDER )
+{
+   if( s_rptPrvPageCount > 0 ) s_rptPrvCurPage = 0;
+   RptPrvUpdateLabel();
+   if( s_rptPreview ) InvalidateRect( s_rptPreview, NULL, FALSE );
+}

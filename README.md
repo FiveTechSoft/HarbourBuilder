@@ -145,7 +145,7 @@ return nil
   - **Output** — real-time debug log (pause points, session start/end)
 - **Compile to .hrb**: `harbour -gh -b` produces portable bytecode with debug info
 - **Load and execute**: `hb_hrbRun()` runs user code in the IDE's own VM
-- **GTK event loop during pause**: `gtk_main_iteration()` keeps UI responsive while debugger waits
+- **Event loop during pause**: GTK `gtk_main_iteration()` / Win32 `PeekMessage` loop / Cocoa run loop keeps UI responsive while debugger waits
 - Toggle/Clear breakpoints from Run menu
 - Dark themed with monospace fonts and resizable columns
 - **16 unit tests** covering state machine, breakpoints, HRB compilation, execution, and variable inspection — all passing
@@ -158,15 +158,19 @@ return nil
 - Linux: gtk-application-prefer-dark-theme toggle
 - Dark code editor and documentation theme
 
-### 📊 Report Designer (data model ready)
+### 📊 Visual Report Designer (all platforms)
+- **Visual band/field editor** with mouse interaction (drag fields, resize bands)
+  - Windows: GDI rendering | Linux: Cairo | macOS: Core Graphics
+- **Report Preview** with zoom (25%-400%), page navigation (First/Prev/Next/Last)
 - **TReport** container with band management and code generation
 - **TReportBand**: Title, Header, Detail, Group, Footer, Summary bands
   - Properties: height, visibility, colors, repeat on page, group expression
 - **TReportField**: text, field, expression, image, barcode, line, box, shape
   - Properties: position, size, font, colors, alignment, format
+- **Inspector integration**: edit band/field properties live
 - **GenerateCode()**: produces complete Harbour CLASS source from design
-- Unit tested (7 test groups, all passing)
-- Visual designer: coming soon
+- **xCommand macros**: `DEFINE REPORT`, `DEFINE BAND`, `REPORT TEXT/DATA`
+- Unit tested (49 tests, all passing)
 
 ### 📋 Project Management
 - New Application / Open / Save / **Save As** projects (.hbp files)
@@ -384,10 +388,13 @@ All three desktop platforms are **fully functional** with zero MsgInfo stubs —
 | | Two-way code sync | ✅ | ✅ | ✅ |
 | | Object Inspector (properties) | ✅ | ✅ | ✅ |
 | | Object Inspector (events) | ✅ | ✅ | ✅ |
-| | Format > Align controls (8 modes) | — | ✅ | ✅ |
+| | Copy/Paste controls (Ctrl+C/V) | ✅ | ✅ | ✅ |
+| | Undo design (50-step) | ✅ | — | ✅ |
+| | Tab Order dialog | ✅ | — | ✅ |
+| | Format > Align controls (8 modes) | ✅ | ✅ | ✅ |
 | | 109 components in 14 tabs | ✅ | ✅ | ✅ |
 | **Debugger** | Debugger panel (5 tabs) | ✅ | ✅ | ✅ |
-| | Debug toolbar (Run/Step/Stop) | — | ✅ | — |
+| | Debug toolbar (Run/Step/Stop) | ✅ | ✅ | ✅ |
 | | In-process .hrb execution | ✅ | ✅ | ✅ |
 | | Breakpoint management | ✅ | ✅ | ✅ |
 | | Local variable inspection | ✅ | ✅ | ✅ |
@@ -411,28 +418,26 @@ All three desktop platforms are **fully functional** with zero MsgInfo stubs —
 | | TDBGrid / TDBNavigator / TDBEdit | ✅ | ✅ | ✅ |
 | | TDBText / TDBComboBox / TDBCheckBox | ✅ | ✅ | ✅ |
 | | 4 sample projects (DBF, SQLite, portable, controls) | ✅ | ✅ | ✅ |
-| **Reports** | Visual Report Designer (Cairo) | — | ✅ | — |
-| | Report Preview (Cairo pages, zoom, nav) | — | ✅ | — |
+| **Reports** | Visual Report Designer | ✅ GDI | ✅ Cairo | ✅ CoreGraphics |
+| | Report Preview (pages, zoom, nav) | ✅ GDI | ✅ Cairo | ✅ CoreGraphics |
 | | TReportBand + TReportField data model | ✅ | ✅ | ✅ |
 | | Report code generation (GenerateCode) | ✅ | ✅ | ✅ |
 | | xCommand macros (DEFINE REPORT/BAND) | ✅ | ✅ | ✅ |
-| | Inspector integration (band/field props) | — | ✅ | — |
+| | Inspector integration (band/field props) | ✅ | ✅ | ✅ |
 | | 49 report unit tests | ✅ | ✅ | ✅ |
 | **Theme** | Dark mode | ✅ | ✅ | ✅ |
 | | Dark code editor | ✅ | ✅ | ✅ |
-| **Menus** | All menus functional (zero stubs) | ✅ 35 | ✅ 47 | ✅ 53 |
-| **Toolbar** | All buttons functional | ✅ 9 | ✅ 15 | ✅ 9 |
-| | Two-row toolbar | — | ✅ | — |
+| **Menus** | All menus functional (zero stubs) | ✅ 47 | ✅ 47 | ✅ 53 |
+| **Toolbar** | All buttons functional | ✅ 16 | ✅ 15 | ✅ 9 |
+| | Two-row toolbar | ✅ | ✅ | — |
 
 ### Metrics
 
 | Metric | Windows | Linux | macOS |
 |--------|:-------:|:-----:|:-----:|
-| CodeEditor HB_FUNCs | 18 | 22 | 26 |
-| Platform-specific funcs | 20 | 16 | 11 |
-| Helper functions | 13 | 42 | 42 |
-| Backend lines of code | ~4400 | ~5500 | ~3800 |
-| IDE .prg lines of code | ~1700 | ~1200 | ~1400 |
+| HB_FUNC bridge functions | 135 | 132 | 158 |
+| Backend lines of code | ~7100 | ~7300 | ~3800 |
+| IDE .prg lines of code | ~4800 | ~1200 | ~1400 |
 
 ---
 
