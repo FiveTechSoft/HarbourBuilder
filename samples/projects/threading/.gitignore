@@ -1,0 +1,5 @@
+*.o
+*.c
+classes.o
+gtk3_core.o
+thread_example

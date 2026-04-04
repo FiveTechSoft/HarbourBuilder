@@ -1,0 +1,6 @@
+*.o
+*.c
+classes.o
+gtk3_core.o
+http_example
+test_static.txt
