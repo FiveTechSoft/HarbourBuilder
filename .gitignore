@@ -24,7 +24,9 @@ samples/libscintilla.so
 samples/liblexilla.so
 tests/*.o
 tests/*.c
+!tests/ui_stubs.c
 tests/test_debugger
+tests/test_report
 tests/gtk3_core.o
 
 # IDE / editor

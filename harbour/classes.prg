@@ -1316,11 +1316,23 @@ CLASS TReport
    DATA aBands       INIT {}        // { { "Header", bBlock }, { "Detail", bBlock }, ... }
    DATA aColumns     INIT {}        // { { cTitle, cField, nWidth }, ... }
    DATA oDataSource  INIT nil
+   // Visual Report Designer support
+   DATA aDesignBands   INIT {}
+   DATA nPageWidth     INIT 210
+   DATA nPageHeight    INIT 297
+   DATA nMarginLeft    INIT 15
+   DATA nMarginRight   INIT 15
+   DATA nMarginTop     INIT 15
+   DATA nMarginBottom  INIT 15
    METHOD New( oPrn ) CONSTRUCTOR
    METHOD AddBand( cName, bBlock )
    METHOD AddColumn( cTitle, cField, nWidth )
    METHOD Preview()
    METHOD Print()
+   METHOD AddDesignBand( oBand )
+   METHOD RemoveDesignBand( nIndex )
+   METHOD GetDesignBand( cName )
+   METHOD GenerateCode( cClassName )
 ENDCLASS
 
 METHOD New( oPrn ) CLASS TReport
@@ -1368,6 +1380,107 @@ METHOD Print() CLASS TReport
    next
    ::oPrinter:EndDoc()
 return nil
+
+METHOD AddDesignBand( oBand ) CLASS TReport
+   AAdd( ::aDesignBands, oBand )
+return oBand
+
+METHOD RemoveDesignBand( nIndex ) CLASS TReport
+   if nIndex >= 1 .and. nIndex <= Len( ::aDesignBands )
+      ADel( ::aDesignBands, nIndex )
+      ASize( ::aDesignBands, Len( ::aDesignBands ) - 1 )
+   endif
+return nil
+
+METHOD GetDesignBand( cName ) CLASS TReport
+   local i
+   local cUpper := Upper( cName )
+   for i := 1 to Len( ::aDesignBands )
+      if Upper( ::aDesignBands[i]:cName ) == cUpper
+         return ::aDesignBands[i]
+      endif
+   next
+return nil
+
+METHOD GenerateCode( cClassName ) CLASS TReport
+   local cCode, i, j, oBand, oField
+   local cCRLF := Chr(13) + Chr(10)
+
+   if cClassName == nil; cClassName := "MyReport"; endif
+
+   cCode := "CLASS " + cClassName + " INHERIT TReport" + cCRLF
+   cCode += "   METHOD CreateReport() CONSTRUCTOR" + cCRLF
+   cCode += "ENDCLASS" + cCRLF
+   cCode += cCRLF
+   cCode += "METHOD CreateReport() CLASS " + cClassName + cCRLF
+   cCode += "   local oBand, oField" + cCRLF
+   cCode += cCRLF
+
+   // Page setup
+   cCode += "   ::nPageWidth    := " + LTrim(Str(::nPageWidth)) + cCRLF
+   cCode += "   ::nPageHeight   := " + LTrim(Str(::nPageHeight)) + cCRLF
+   cCode += "   ::nMarginLeft   := " + LTrim(Str(::nMarginLeft)) + cCRLF
+   cCode += "   ::nMarginRight  := " + LTrim(Str(::nMarginRight)) + cCRLF
+   cCode += "   ::nMarginTop    := " + LTrim(Str(::nMarginTop)) + cCRLF
+   cCode += "   ::nMarginBottom := " + LTrim(Str(::nMarginBottom)) + cCRLF
+   cCode += cCRLF
+
+   // Bands and fields
+   for i := 1 to Len( ::aDesignBands )
+      oBand := ::aDesignBands[i]
+      cCode += "   oBand := TReportBand():New( " + '"' + oBand:cName + '"' + " )" + cCRLF
+      cCode += "   oBand:nHeight := " + LTrim(Str(oBand:nHeight)) + cCRLF
+      if oBand:lPrintOnEveryPage
+         cCode += "   oBand:lPrintOnEveryPage := .T." + cCRLF
+      endif
+      if oBand:nBackColor != -1
+         cCode += "   oBand:nBackColor := " + LTrim(Str(oBand:nBackColor)) + cCRLF
+      endif
+
+      for j := 1 to Len( oBand:aFields )
+         oField := oBand:aFields[j]
+         cCode += "   oField := TReportField():New( " + '"' + oField:cName + '"' + " )" + cCRLF
+         if ! Empty( oField:cText )
+            cCode += '   oField:cText := "' + oField:cText + '"' + cCRLF
+         endif
+         if ! Empty( oField:cFieldName )
+            cCode += '   oField:cFieldName := "' + oField:cFieldName + '"' + cCRLF
+         endif
+         if ! Empty( oField:cExpression )
+            cCode += '   oField:cExpression := "' + oField:cExpression + '"' + cCRLF
+         endif
+         cCode += "   oField:nLeft := " + LTrim(Str(oField:nLeft)) + cCRLF
+         cCode += "   oField:nTop := " + LTrim(Str(oField:nTop)) + cCRLF
+         cCode += "   oField:nWidth := " + LTrim(Str(oField:nWidth)) + cCRLF
+         cCode += "   oField:nHeight := " + LTrim(Str(oField:nHeight)) + cCRLF
+         if oField:nAlignment != 0
+            cCode += "   oField:nAlignment := " + LTrim(Str(oField:nAlignment)) + cCRLF
+         endif
+         if oField:cFontName != "Sans"
+            cCode += '   oField:cFontName := "' + oField:cFontName + '"' + cCRLF
+         endif
+         if oField:nFontSize != 10
+            cCode += "   oField:nFontSize := " + LTrim(Str(oField:nFontSize)) + cCRLF
+         endif
+         if oField:lBold
+            cCode += "   oField:lBold := .T." + cCRLF
+         endif
+         if oField:lItalic
+            cCode += "   oField:lItalic := .T." + cCRLF
+         endif
+         if ! Empty( oField:cFormat )
+            cCode += '   oField:cFormat := "' + oField:cFormat + '"' + cCRLF
+         endif
+         cCode += "   oBand:AddField( oField )" + cCRLF
+      next
+
+      cCode += "   ::AddDesignBand( oBand )" + cCRLF
+      cCode += cCRLF
+   next
+
+   cCode += "return Self" + cCRLF
+
+return cCode
 
 //============================================================================//
 //  INTERNET COMPONENTS (Internet tab)
@@ -1538,3 +1651,89 @@ return xVal
 
 METHOD Count() CLASS TChannel
 return Len( ::aBuffer )
+
+//============================================================================//
+//  REPORT DESIGNER DATA MODEL
+//============================================================================//
+
+CLASS TReportBand
+   DATA cName              INIT ""
+   DATA nHeight            INIT 30
+   DATA aFields            INIT {}
+   DATA lPrintOnEveryPage  INIT .F.
+   DATA lKeepTogether      INIT .T.
+   DATA lVisible           INIT .T.
+   DATA nBackColor         INIT -1
+   METHOD New( cName ) CONSTRUCTOR
+   METHOD AddField( oField )
+   METHOD RemoveField( nIndex )
+   METHOD FieldCount()
+ENDCLASS
+
+METHOD New( cName ) CLASS TReportBand
+   ::aFields := {}
+   if cName != nil
+      ::cName := cName
+      if "HEADER" $ Upper( cName ) .or. "PAGEHEADER" $ Upper( cName )
+         ::lPrintOnEveryPage := .T.
+      endif
+   endif
+return Self
+
+METHOD AddField( oField ) CLASS TReportBand
+   AAdd( ::aFields, oField )
+return oField
+
+METHOD RemoveField( nIndex ) CLASS TReportBand
+   if nIndex >= 1 .and. nIndex <= Len( ::aFields )
+      ADel( ::aFields, nIndex )
+      ASize( ::aFields, Len( ::aFields ) - 1 )
+   endif
+return nil
+
+METHOD FieldCount() CLASS TReportBand
+return Len( ::aFields )
+
+//----------------------------------------------------------------------------//
+
+CLASS TReportField
+   DATA cName         INIT ""
+   DATA cText         INIT ""
+   DATA cFieldName    INIT ""
+   DATA cExpression   INIT ""
+   DATA nLeft         INIT 0
+   DATA nTop          INIT 0
+   DATA nWidth        INIT 80
+   DATA nHeight       INIT 16
+   DATA nAlignment    INIT 0
+   DATA cFontName     INIT "Sans"
+   DATA nFontSize     INIT 10
+   DATA lBold         INIT .F.
+   DATA lItalic       INIT .F.
+   DATA lUnderline    INIT .F.
+   DATA cFormat       INIT ""
+   DATA nForeColor    INIT 0
+   DATA nBackColor    INIT -1
+   DATA nBorderWidth  INIT 0
+   DATA cFieldType    INIT "text"
+   METHOD New( cName ) CONSTRUCTOR
+   METHOD IsDataBound()
+   METHOD GetValue( oDataSource )
+ENDCLASS
+
+METHOD New( cName ) CLASS TReportField
+   if cName != nil; ::cName := cName; endif
+return Self
+
+METHOD IsDataBound() CLASS TReportField
+return ! Empty( ::cFieldName )
+
+METHOD GetValue( oDataSource ) CLASS TReportField
+   local xValue := nil
+   if oDataSource != nil .and. oDataSource:oDatabase != nil .and. ! Empty( ::cFieldName )
+      xValue := oDataSource:oDatabase:FieldGet( ::cFieldName )
+      if ! Empty( ::cFormat ) .and. xValue != nil
+         xValue := Transform( xValue, ::cFormat )
+      endif
+   endif
+return xValue
