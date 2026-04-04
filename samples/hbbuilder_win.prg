@@ -648,13 +648,11 @@ static function RegenerateFormCode( cName, hForm )
    // Form properties (read from live form or use defaults)
    if hForm != 0
       cTitle := UI_GetProp( hForm, "cText" )
-      nW     := UI_GetProp( hForm, "nWidth" )
-      nH     := UI_GetProp( hForm, "nHeight" )
+      nFL    := UI_GetProp( hForm, "nLeft" )
+      nFT    := UI_GetProp( hForm, "nTop" )
+      nW     := UI_GetProp( hForm, "nClientWidth" )
+      nH     := UI_GetProp( hForm, "nClientHeight" )
       nClr   := UI_GetProp( hForm, "nClrPane" )
-      // Left/Top: design-time property (user's intended runtime position)
-      // Not the designer's screen position
-      nFL := 100
-      nFT := 100
 
    else
       cTitle := cName
@@ -812,6 +810,8 @@ static function RegenerateFormCode( cName, hForm )
    cCode += "   ::Top    := " + LTrim(Str(nFT)) + e
    cCode += "   ::Width  := " + LTrim(Str(nW)) + e
    cCode += "   ::Height := " + LTrim(Str(nH)) + e
+   cCode += '   ::FontName := "Segoe UI"' + e
+   cCode += "   ::FontSize := 9" + e
    if nClr != 15790320  // non-default color
       cCode += "   ::Color  := " + LTrim(Str(nClr)) + e
    endif
@@ -1665,6 +1665,9 @@ static function TBRun()
    W32_ShellExec( 'cmd /c del "' + cBuildDir + '\UserApp.exe" 2>nul' )
    W32_ShellExec( 'cmd /c del "' + cBuildDir + '\*.obj" 2>nul' )
 
+   // Create DPI manifest resource file
+   MemoWrit( cBuildDir + "\app.rc", '1 24 "' + cProjDir + '\resources\app.manifest"' + Chr(10) )
+
    // Show progress dialog (7 steps)
    W32_ProgressOpen( "Building Project...", 7 )
 
@@ -1689,7 +1692,11 @@ static function TBRun()
    for i := 1 to Len( aForms )
       cAllPrg += MemoRead( cBuildDir + "\" + aForms[i][1] + ".prg" ) + Chr(10)
    next
-   // Note: SetDPIAware() is provided by hbbridge.cpp, no #pragma BEGINDUMP needed
+   // Add early DPI awareness (must be before any window creation)
+   cAllPrg += Chr(10)
+   cAllPrg += "INIT PROCEDURE _InitDPI()" + Chr(10)
+   cAllPrg += "   SetDPIAware()" + Chr(10)
+   cAllPrg += "return" + Chr(10)
    MemoWrit( cBuildDir + "\main.prg", cAllPrg )
 
    // Step 3: Compile user code with Harbour
@@ -1807,6 +1814,17 @@ static function TBRun()
       if ! lError; cLog += "    OK" + Chr(10); endif
    endif
 
+   // Step 6b: Compile manifest resource
+   if ! lError
+      if cCompiler == "msvc"
+         cCmd := 'cmd /S /c ""' + cWinKit + '\bin\' + cWinKitVer + '\x86\rc.exe" /fo"' + ;
+                 cBuildDir + '\app.res" "' + cBuildDir + '\app.rc" 2>&1"'
+      else
+         cCmd := cCDir + '\bin\brcc32.exe "' + cBuildDir + '\app.rc" -fo"' + cBuildDir + '\app.res"'
+      endif
+      W32_ShellExec( cCmd )
+   endif
+
    // Step 7: Link
    if ! lError
       W32_ProgressStep( "Linking executable..." )
@@ -1838,6 +1856,7 @@ static function TBRun()
          cRspContent += "user32.lib gdi32.lib comctl32.lib comdlg32.lib shell32.lib" + Chr(10)
          cRspContent += "ole32.lib oleaut32.lib advapi32.lib ws2_32.lib winmm.lib" + Chr(10)
          cRspContent += "msimg32.lib gdiplus.lib ucrt.lib vcruntime.lib msvcrt.lib" + Chr(10)
+         cRspContent += '"' + cBuildDir + '\app.res"' + Chr(10)
          MemoWrit( cRsp, cRspContent )
          cCmd := 'cmd /S /c ""' + cLinker + '" @"' + cRsp + '" 2>&1"'
       else
@@ -1858,7 +1877,8 @@ static function TBRun()
                  " cw32mt.lib import32.lib ws2_32.lib winmm.lib" + ;
                  " user32.lib gdi32.lib comctl32.lib comdlg32.lib shell32.lib" + ;
                  " ole32.lib oleaut32.lib uuid.lib advapi32.lib" + ;
-                 " msimg32.lib gdiplus.lib,,"
+                 " msimg32.lib gdiplus.lib,," + ;
+                 " " + cBuildDir + "\app.res"
       endif
       cOutput := W32_ShellExec( cCmd )
       // Also check if exe was actually created

@@ -474,9 +474,11 @@ HB_FUNC( UI_SETPROP )
       p->SetText( hb_parc(3) );
    else if( lstrcmpi( szProp, "nLeft" ) == 0 )
    {  p->FLeft = hb_parni(3);
+      if( p->FControlType == CT_FORM ) ((TForm*)p)->FCenter = FALSE;
       if( p->FHandle ) SetWindowPos( p->FHandle, NULL, p->FLeft, p->FTop, p->FWidth, p->FHeight, SWP_NOZORDER ); }
    else if( lstrcmpi( szProp, "nTop" ) == 0 )
    {  p->FTop = hb_parni(3);
+      if( p->FControlType == CT_FORM ) ((TForm*)p)->FCenter = FALSE;
       if( p->FHandle ) SetWindowPos( p->FHandle, NULL, p->FLeft, p->FTop, p->FWidth, p->FHeight, SWP_NOZORDER ); }
    else if( lstrcmpi( szProp, "nWidth" ) == 0 )
    {  p->FWidth = hb_parni(3);
