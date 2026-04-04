@@ -86,9 +86,9 @@ function Main()
    nBottomY := W32_GetWorkAreaHeight() + 16  // +16 to cover bottom DWM border
    nEditorH := nBottomY - nEditorTop
 
-   // Form Designer: centered in editor area, slightly above center
-   nFormX := nEditorX + Int( ( nEditorW - 400 ) / 2 )
-   nFormY := nEditorTop + Int( ( nEditorH - 300 ) * 0.35 )
+   // Form Designer: default position
+   nFormX := 1129
+   nFormY := 456
 
    // Menu bar
    DEFINE MENUBAR OF oIDE
@@ -534,7 +534,7 @@ static function CreateDesignForm( nX, nY )
    cName := "Form" + LTrim( Str( nIdx ) )
 
    // Create new empty form (like C++Builder File > New > VCL Forms Application)
-   DEFINE FORM oDesignForm TITLE cName SIZE 400, 300 FONT "Segoe UI", 12 SIZABLE
+   DEFINE FORM oDesignForm TITLE cName SIZE 650, 421 FONT "Segoe UI", 12 SIZABLE
    UI_FormSetPos( oDesignForm:hCpp, nX, nY )
 
    // Register in project form list
