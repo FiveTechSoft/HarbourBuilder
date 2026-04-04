@@ -158,6 +158,16 @@ return nil
 - Linux: gtk-application-prefer-dark-theme toggle
 - Dark code editor and documentation theme
 
+### 📊 Report Designer (data model ready)
+- **TReport** container with band management and code generation
+- **TReportBand**: Title, Header, Detail, Group, Footer, Summary bands
+  - Properties: height, visibility, colors, repeat on page, group expression
+- **TReportField**: text, field, expression, image, barcode, line, box, shape
+  - Properties: position, size, font, colors, alignment, format
+- **GenerateCode()**: produces complete Harbour CLASS source from design
+- Unit tested (7 test groups, all passing)
+- Visual designer: coming soon
+
 ### 📋 Project Management
 - New Application / Open / Save / **Save As** projects (.hbp files)
 - Multi-form support (Form1, Form2, Form3...)

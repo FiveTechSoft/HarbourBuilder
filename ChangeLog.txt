@@ -1,6 +1,40 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-04 (Session 7: Report Designer Data Model)
+----------------------------------------------------
+
+REPORT DATA MODEL (classes.prg):
+  TReport .............. report container with band management
+                          AddDesignBand, RemoveDesignBand, GetDesignBand
+                          GenerateCode: produces CLASS..ENDCLASS with full
+                          band/field structure as Harbour source code
+  TReportBand .......... report band (Title/Header/Detail/Group/Footer/Summary)
+                          Properties: cName, nType, nHeight, nTop, lVisible,
+                          nBackColor, nForeColor, lRepeatOnPage, cGroupExpr
+                          Field management: AddField, RemoveField, GetField
+  TReportField ......... field within a band
+                          Properties: cName, cFieldName, cExpression, cText,
+                          nLeft, nTop, nWidth, nHeight, nAlign, cFontName,
+                          nFontSize, lFontBold, lFontItalic, nForeColor,
+                          nBackColor, cFormat, cType (text/field/expression/
+                          image/barcode/line/box/shape)
+
+UNIT TESTS (tests/test_report.prg):
+  7 test groups, comprehensive coverage:
+  - Band Creation: TReportBand constructor, defaults
+  - Field Addition: AddField, field count, retrieval
+  - Band Properties: type, height, visibility, colors, repeat, group
+  - Field Properties: position, size, font, colors, alignment, format
+  - Field Data Binding: field name, expression, type variants
+  - Report Band Management: AddDesignBand, RemoveDesignBand, GetDesignBand
+  - Code Generation: GenerateCode produces valid CLASS structure
+
+BUILD:
+  tests/build_test_report.sh ... compiles and runs report tests
+  tests/ui_stubs.c ............. UI function stubs for headless testing
+
+
 2026-04-03 (Session 5c: Database Testing + Bug Fixes)
 -------------------------------------------------------
 
