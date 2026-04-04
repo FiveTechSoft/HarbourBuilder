@@ -439,6 +439,253 @@ METHOD Run() CLASS TApplication
 
 return Self
 
+//============================================================================//
+//  DATA CONTROLS (visual, Data Controls tab - bind to TDatabase)
+//============================================================================//
+
+//----------------------------------------------------------------------------//
+// TDataSource - binds a TDatabase to visual data controls
+//----------------------------------------------------------------------------//
+
+CLASS TDataSource
+
+   DATA oDatabase   INIT nil       // TDatabase subclass instance
+   DATA cTable      INIT ""        // Table/alias name
+   DATA aControls   INIT {}        // Bound data controls
+   DATA lActive     INIT .F.       // Active state
+
+   METHOD New( oDb ) CONSTRUCTOR
+   METHOD AddControl( oCtrl )
+   METHOD Refresh()
+   METHOD MoveFirst()
+   METHOD MovePrev()
+   METHOD MoveNext()
+   METHOD MoveLast()
+   METHOD Append()
+   METHOD Delete()
+   METHOD Save()
+
+ENDCLASS
+
+METHOD New( oDb ) CLASS TDataSource
+   if oDb != nil; ::oDatabase := oDb; endif
+return Self
+
+METHOD AddControl( oCtrl ) CLASS TDataSource
+   AAdd( ::aControls, oCtrl )
+   oCtrl:oDataSource := Self
+return nil
+
+METHOD Refresh() CLASS TDataSource
+   local i
+   for i := 1 to Len( ::aControls )
+      ::aControls[i]:RefreshFromDB()
+   next
+return nil
+
+METHOD MoveFirst() CLASS TDataSource
+   if ::oDatabase != nil .and. ::oDatabase:IsConnected()
+      ::oDatabase:GoTop()
+      ::Refresh()
+   endif
+return nil
+
+METHOD MovePrev() CLASS TDataSource
+   if ::oDatabase != nil .and. ::oDatabase:IsConnected()
+      ::oDatabase:Skip( -1 )
+      ::Refresh()
+   endif
+return nil
+
+METHOD MoveNext() CLASS TDataSource
+   if ::oDatabase != nil .and. ::oDatabase:IsConnected()
+      ::oDatabase:Skip( 1 )
+      ::Refresh()
+   endif
+return nil
+
+METHOD MoveLast() CLASS TDataSource
+   if ::oDatabase != nil .and. ::oDatabase:IsConnected()
+      ::oDatabase:GoBottom()
+      ::Refresh()
+   endif
+return nil
+
+METHOD Append() CLASS TDataSource
+   if ::oDatabase != nil .and. ::oDatabase:IsConnected()
+      ::oDatabase:Append()
+      ::Refresh()
+   endif
+return nil
+
+METHOD Delete() CLASS TDataSource
+   if ::oDatabase != nil .and. ::oDatabase:IsConnected()
+      ::oDatabase:Delete()
+      ::oDatabase:Skip()
+      if ::oDatabase:Eof(); ::oDatabase:GoBottom(); endif
+      ::Refresh()
+   endif
+return nil
+
+METHOD Save() CLASS TDataSource
+   ::Refresh()
+return nil
+
+//----------------------------------------------------------------------------//
+// TDBControl - base for all data-aware controls
+//----------------------------------------------------------------------------//
+
+CLASS TDBControl INHERIT TControl
+
+   DATA oDataSource INIT nil       // TDataSource reference
+   DATA cFieldName  INIT ""        // Bound field name
+   DATA nFieldIndex INIT 0         // Bound field index (1-based)
+
+   METHOD RefreshFromDB()
+   METHOD WriteToDB()
+
+ENDCLASS
+
+METHOD RefreshFromDB() CLASS TDBControl
+   // Override in subclass
+return nil
+
+METHOD WriteToDB() CLASS TDBControl
+   // Override in subclass
+return nil
+
+//----------------------------------------------------------------------------//
+// TDBText - label displaying a field value (read-only)
+//----------------------------------------------------------------------------//
+
+CLASS TDBText INHERIT TDBControl
+   METHOD RefreshFromDB()
+ENDCLASS
+
+METHOD RefreshFromDB() CLASS TDBText
+   local xVal
+   if ::oDataSource != nil .and. ::oDataSource:oDatabase != nil .and. ::nFieldIndex > 0
+      xVal := ::oDataSource:oDatabase:FieldGet( ::nFieldIndex )
+      ::Text := hb_ValToStr( xVal )
+   endif
+return nil
+
+//----------------------------------------------------------------------------//
+// TDBEdit - editable entry bound to a field
+//----------------------------------------------------------------------------//
+
+CLASS TDBEdit INHERIT TDBControl
+   METHOD RefreshFromDB()
+   METHOD WriteToDB()
+ENDCLASS
+
+METHOD RefreshFromDB() CLASS TDBEdit
+   local xVal
+   if ::oDataSource != nil .and. ::oDataSource:oDatabase != nil .and. ::nFieldIndex > 0
+      xVal := ::oDataSource:oDatabase:FieldGet( ::nFieldIndex )
+      ::Text := hb_ValToStr( xVal )
+   endif
+return nil
+
+METHOD WriteToDB() CLASS TDBEdit
+   if ::oDataSource != nil .and. ::oDataSource:oDatabase != nil .and. ::nFieldIndex > 0
+      ::oDataSource:oDatabase:FieldPut( ::nFieldIndex, ::Text )
+   endif
+return nil
+
+//----------------------------------------------------------------------------//
+// TDBComboBox - combo box bound to a field
+//----------------------------------------------------------------------------//
+
+CLASS TDBComboBox INHERIT TDBControl
+   METHOD RefreshFromDB()
+ENDCLASS
+
+METHOD RefreshFromDB() CLASS TDBComboBox
+   local xVal
+   if ::oDataSource != nil .and. ::oDataSource:oDatabase != nil .and. ::nFieldIndex > 0
+      xVal := ::oDataSource:oDatabase:FieldGet( ::nFieldIndex )
+      ::Text := hb_ValToStr( xVal )
+   endif
+return nil
+
+//----------------------------------------------------------------------------//
+// TDBCheckBox - check button bound to a logical field
+//----------------------------------------------------------------------------//
+
+CLASS TDBCheckBox INHERIT TDBControl
+   METHOD RefreshFromDB()
+   METHOD WriteToDB()
+ENDCLASS
+
+METHOD RefreshFromDB() CLASS TDBCheckBox
+   local xVal
+   if ::oDataSource != nil .and. ::oDataSource:oDatabase != nil .and. ::nFieldIndex > 0
+      xVal := ::oDataSource:oDatabase:FieldGet( ::nFieldIndex )
+      if ValType( xVal ) == "L"
+         // Set checked state via property
+         UI_SetProp( ::hCpp, "lChecked", xVal )
+      endif
+   endif
+return nil
+
+METHOD WriteToDB() CLASS TDBCheckBox
+   if ::oDataSource != nil .and. ::oDataSource:oDatabase != nil .and. ::nFieldIndex > 0
+      ::oDataSource:oDatabase:FieldPut( ::nFieldIndex, UI_GetProp( ::hCpp, "lChecked" ) )
+   endif
+return nil
+
+//----------------------------------------------------------------------------//
+// TDBNavigator - navigation button bar
+//----------------------------------------------------------------------------//
+
+CLASS TDBNavigator INHERIT TDBControl
+
+   DATA oDataSource INIT nil
+
+   METHOD New( oDS ) CONSTRUCTOR
+   METHOD First()
+   METHOD Prior()
+   METHOD Next()
+   METHOD Last()
+   METHOD Insert()
+   METHOD Remove()
+   METHOD Post()
+
+ENDCLASS
+
+METHOD New( oDS ) CLASS TDBNavigator
+   if oDS != nil; ::oDataSource := oDS; endif
+return Self
+
+METHOD First() CLASS TDBNavigator
+   if ::oDataSource != nil; ::oDataSource:MoveFirst(); endif
+return nil
+
+METHOD Prior() CLASS TDBNavigator
+   if ::oDataSource != nil; ::oDataSource:MovePrev(); endif
+return nil
+
+METHOD Next() CLASS TDBNavigator
+   if ::oDataSource != nil; ::oDataSource:MoveNext(); endif
+return nil
+
+METHOD Last() CLASS TDBNavigator
+   if ::oDataSource != nil; ::oDataSource:MoveLast(); endif
+return nil
+
+METHOD Insert() CLASS TDBNavigator
+   if ::oDataSource != nil; ::oDataSource:Append(); endif
+return nil
+
+METHOD Remove() CLASS TDBNavigator
+   if ::oDataSource != nil; ::oDataSource:Delete(); endif
+return nil
+
+METHOD Post() CLASS TDBNavigator
+   if ::oDataSource != nil; ::oDataSource:Save(); endif
+return nil
+
 //----------------------------------------------------------------------------//
 // MsgInfo - cross-platform message box
 //----------------------------------------------------------------------------//

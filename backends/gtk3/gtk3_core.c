@@ -1022,6 +1022,100 @@ static void HBPaintBox_CreateWidget( HBControl * p, GtkWidget * container )
    HBGeneric_CreateWidget( p, container, da );
 }
 
+/* ======================================================================
+ * Data Controls - DB-aware visual widgets
+ * ====================================================================== */
+
+/* TBrowse / TDBGrid - scrollable data table */
+static void HBDBGrid_CreateWidget( HBControl * p, GtkWidget * container )
+{
+   GtkWidget * sw = gtk_scrolled_window_new( NULL, NULL );
+   gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(sw),
+      GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC );
+   gtk_scrolled_window_set_shadow_type( GTK_SCROLLED_WINDOW(sw), GTK_SHADOW_IN );
+
+   /* Default 4-column grid (user configures via code) */
+   GtkListStore * store = gtk_list_store_new( 4,
+      G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING );
+   GtkWidget * tv = gtk_tree_view_new_with_model( GTK_TREE_MODEL(store) );
+   g_object_unref( store );
+
+   GtkCellRenderer * r = gtk_cell_renderer_text_new();
+   gtk_tree_view_insert_column_with_attributes( GTK_TREE_VIEW(tv), -1, "Field 1", r, "text", 0, NULL );
+   gtk_tree_view_insert_column_with_attributes( GTK_TREE_VIEW(tv), -1, "Field 2", r, "text", 1, NULL );
+   gtk_tree_view_insert_column_with_attributes( GTK_TREE_VIEW(tv), -1, "Field 3", r, "text", 2, NULL );
+   gtk_tree_view_insert_column_with_attributes( GTK_TREE_VIEW(tv), -1, "Field 4", r, "text", 3, NULL );
+
+   gtk_tree_view_set_grid_lines( GTK_TREE_VIEW(tv), GTK_TREE_VIEW_GRID_LINES_BOTH );
+   { int c; for( c = 0; c < 4; c++ )
+      gtk_tree_view_column_set_resizable( gtk_tree_view_get_column(GTK_TREE_VIEW(tv), c), TRUE );
+   }
+
+   gtk_container_add( GTK_CONTAINER(sw), tv );
+   HBGeneric_CreateWidget( p, container, sw );
+}
+
+/* TDBNavigator - record navigation buttons */
+static void HBDBNavigator_CreateWidget( HBControl * p, GtkWidget * container )
+{
+   GtkWidget * box = gtk_button_box_new( GTK_ORIENTATION_HORIZONTAL );
+   gtk_button_box_set_layout( GTK_BUTTON_BOX(box), GTK_BUTTONBOX_START );
+   gtk_box_set_spacing( GTK_BOX(box), 1 );
+
+   const char * labels[] = { "|<", "<", ">", ">|", "+", "-", "v" };
+   const char * tips[] = { "First", "Previous", "Next", "Last", "Add", "Delete", "Save" };
+   int i;
+   for( i = 0; i < 7; i++ ) {
+      GtkWidget * btn = gtk_button_new_with_label( labels[i] );
+      gtk_widget_set_tooltip_text( btn, tips[i] );
+      gtk_widget_set_size_request( btn, 30, 26 );
+      gtk_container_add( GTK_CONTAINER(box), btn );
+   }
+
+   HBGeneric_CreateWidget( p, container, box );
+}
+
+/* TDBText - label bound to a database field */
+static void HBDBText_CreateWidget( HBControl * p, GtkWidget * container )
+{
+   GtkWidget * lbl = gtk_label_new( "(DBText)" );
+   gtk_label_set_xalign( GTK_LABEL(lbl), 0.0 );
+   HBGeneric_CreateWidget( p, container, lbl );
+}
+
+/* TDBEdit - entry bound to a database field */
+static void HBDBEdit_CreateWidget( HBControl * p, GtkWidget * container )
+{
+   GtkWidget * entry = gtk_entry_new();
+   gtk_entry_set_placeholder_text( GTK_ENTRY(entry), "(DBEdit)" );
+   HBGeneric_CreateWidget( p, container, entry );
+}
+
+/* TDBComboBox - combo bound to a database field */
+static void HBDBComboBox_CreateWidget( HBControl * p, GtkWidget * container )
+{
+   GtkWidget * combo = gtk_combo_box_text_new();
+   gtk_combo_box_text_append_text( GTK_COMBO_BOX_TEXT(combo), "(DBComboBox)" );
+   gtk_combo_box_set_active( GTK_COMBO_BOX(combo), 0 );
+   HBGeneric_CreateWidget( p, container, combo );
+}
+
+/* TDBCheckBox - check button bound to a logical field */
+static void HBDBCheckBox_CreateWidget( HBControl * p, GtkWidget * container )
+{
+   GtkWidget * chk = gtk_check_button_new_with_label( "(DBCheckBox)" );
+   HBGeneric_CreateWidget( p, container, chk );
+}
+
+/* TDBImage - image display bound to a blob/path field */
+static void HBDBImage_CreateWidget( HBControl * p, GtkWidget * container )
+{
+   GtkWidget * frame = gtk_frame_new( "DBImage" );
+   GtkWidget * img = gtk_image_new_from_icon_name( "image-x-generic", GTK_ICON_SIZE_DIALOG );
+   gtk_container_add( GTK_CONTAINER(frame), img );
+   HBGeneric_CreateWidget( p, container, frame );
+}
+
 static void HBControl_CreateWidget( HBControl * child, GtkWidget * fixed, const char * fontDesc )
 {
    strcpy( child->FFontDesc, fontDesc );
@@ -1062,6 +1156,15 @@ static void HBControl_CreateWidget( HBControl * child, GtkWidget * fixed, const 
       case CT_MONTHCALENDAR: HBMonthCalendar_CreateWidget( child, fixed ); break;
       /* System */
       case CT_PAINTBOX: HBPaintBox_CreateWidget( child, fixed ); break;
+      /* Data Controls */
+      case CT_BROWSE:      HBDBGrid_CreateWidget( child, fixed ); break;
+      case CT_DBGRID:      HBDBGrid_CreateWidget( child, fixed ); break;
+      case CT_DBNAVIGATOR: HBDBNavigator_CreateWidget( child, fixed ); break;
+      case CT_DBTEXT:      HBDBText_CreateWidget( child, fixed ); break;
+      case CT_DBEDIT:      HBDBEdit_CreateWidget( child, fixed ); break;
+      case CT_DBCOMBOBOX:  HBDBComboBox_CreateWidget( child, fixed ); break;
+      case CT_DBCHECKBOX:  HBDBCheckBox_CreateWidget( child, fixed ); break;
+      case CT_DBIMAGE:     HBDBImage_CreateWidget( child, fixed ); break;
    }
 }
 
