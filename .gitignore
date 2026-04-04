@@ -17,9 +17,20 @@ samples/*.exe
 samples/*.tds
 samples/*.log
 
+# Linux build artifacts
+samples/*.o
+samples/hbbuilder_linux
+samples/libscintilla.so
+samples/liblexilla.so
+tests/*.o
+tests/*.c
+tests/test_debugger
+tests/gtk3_core.o
+
 # IDE / editor
 *.bak
 *.swp
+.claude/settings.local.json
 
 # Misc generated
 samples/prefs.json
