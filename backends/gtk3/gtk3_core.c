@@ -4043,6 +4043,105 @@ HB_FUNC( CODEEDITORREPLACE )
    if( ed ) CE_ShowFindBar( ed, 1, 1 );
 }
 
+/* CodeEditorFindNext( hEditor ) */
+HB_FUNC( CODEEDITORFINDNEXT )
+{
+   CODEEDITOR * ed = (CODEEDITOR *)(HB_PTRUINT) hb_parnint(1);
+   if( ed ) CE_FindNext( ed, 1 );
+}
+
+/* CodeEditorFindPrev( hEditor ) */
+HB_FUNC( CODEEDITORFINDPREV )
+{
+   CODEEDITOR * ed = (CODEEDITOR *)(HB_PTRUINT) hb_parnint(1);
+   if( ed ) CE_FindNext( ed, 0 );
+}
+
+/* CodeEditorAutoComplete( hEditor ) */
+HB_FUNC( CODEEDITORAUTOCOMPLETE )
+{
+   CODEEDITOR * ed = (CODEEDITOR *)(HB_PTRUINT) hb_parnint(1);
+   if( ed && ed->sciWidget ) CE_ShowAutoComplete( ed->sciWidget );
+}
+
+/* UI_FormAlignSelected( hForm, nMode ) - align selected controls
+ * Modes: 1=left, 2=right, 3=top, 4=bottom, 5=centerH, 6=centerV, 7=spaceH, 8=spaceV */
+HB_FUNC( UI_FORMALIGNSELECTED )
+{
+   HBForm * form = GetForm(1);
+   int nMode = hb_parni(2);
+   int nSel, i;
+
+   if( !form || !form->FFixed || nMode < 1 || nMode > 8 ) return;
+   nSel = form->FSelCount;
+   if( nSel < 2 ) return;
+
+   /* Reference = first selected control */
+   HBControl * ref = form->FSelected[0];
+   int refX = ref->FLeft, refY = ref->FTop;
+   int refR = refX + ref->FWidth, refB = refY + ref->FHeight;
+   int refCX = refX + ref->FWidth / 2, refCY = refY + ref->FHeight / 2;
+
+   /* Find bounds for spacing */
+   int minX = refX, maxR = refR, minY = refY, maxB = refB;
+   for( i = 1; i < nSel; i++ ) {
+      HBControl * c = form->FSelected[i];
+      if( c->FLeft < minX ) minX = c->FLeft;
+      if( c->FLeft + c->FWidth > maxR ) maxR = c->FLeft + c->FWidth;
+      if( c->FTop < minY ) minY = c->FTop;
+      if( c->FTop + c->FHeight > maxB ) maxB = c->FTop + c->FHeight;
+   }
+
+   for( i = 1; i < nSel; i++ )
+   {
+      HBControl * c = form->FSelected[i];
+      int newX = c->FLeft, newY = c->FTop;
+
+      switch( nMode ) {
+         case 1: newX = refX; break;
+         case 2: newX = refR - c->FWidth; break;
+         case 3: newY = refY; break;
+         case 4: newY = refB - c->FHeight; break;
+         case 5: newX = refCX - c->FWidth / 2; break;
+         case 6: newY = refCY - c->FHeight / 2; break;
+         case 7: case 8:
+         {
+            int totalW = 0, totalH = 0, gap, j;
+            for( j = 0; j < nSel; j++ ) {
+               totalW += form->FSelected[j]->FWidth;
+               totalH += form->FSelected[j]->FHeight;
+            }
+            if( nMode == 7 ) {
+               gap = (nSel > 1) ? (maxR - minX - totalW) / (nSel - 1) : 0;
+               int cx = minX;
+               for( j = 0; j < nSel; j++ ) {
+                  HBControl * cj = form->FSelected[j];
+                  cj->FLeft = cx;
+                  if( cj->FWidget ) gtk_fixed_move( GTK_FIXED(form->FFixed), cj->FWidget, cx, cj->FTop );
+                  cx += cj->FWidth + gap;
+               }
+            } else {
+               gap = (nSel > 1) ? (maxB - minY - totalH) / (nSel - 1) : 0;
+               int cy = minY;
+               for( j = 0; j < nSel; j++ ) {
+                  HBControl * cj = form->FSelected[j];
+                  cj->FTop = cy;
+                  if( cj->FWidget ) gtk_fixed_move( GTK_FIXED(form->FFixed), cj->FWidget, cj->FLeft, cy );
+                  cy += cj->FHeight + gap;
+               }
+            }
+            if( form->FOverlay ) gtk_widget_queue_draw( form->FOverlay );
+            return;
+         }
+      }
+
+      c->FLeft = newX; c->FTop = newY;
+      if( c->FWidget ) gtk_fixed_move( GTK_FIXED(form->FFixed), c->FWidget, newX, newY );
+   }
+
+   if( form->FOverlay ) gtk_widget_queue_draw( form->FOverlay );
+}
+
 /* ======================================================================
  * BMP Strip Loader - slice a BMP strip into 32x32 icons with magenta transparency
  * ====================================================================== */

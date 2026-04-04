@@ -32,7 +32,7 @@ static nActiveForm   // Index of active form (1-based)
 
 function Main()
 
-   local oTB, oTB2, oFile, oEdit, oSearch, oView, oProject, oRun, oComp, oTools, oHelp
+   local oTB, oTB2, oFile, oEdit, oSearch, oView, oProject, oRun, oFormat, oComp, oTools, oHelp
    local nBarH, nInsW, nEditorX, nEditorW, nEditorH
    local nFormX, nFormY, nInsTop, nEditorTop, nBottomY
 
@@ -87,8 +87,13 @@ function Main()
    MENUITEM "Paste" OF oEdit ACTION CodeEditorPaste( hCodeEditor ) ACCEL "v"
 
    DEFINE POPUP oSearch PROMPT "Search" OF oIDE
-   MENUITEM "Find..."      OF oSearch ACTION CodeEditorFind( hCodeEditor )    ACCEL "f"
-   MENUITEM "Replace..."   OF oSearch ACTION CodeEditorReplace( hCodeEditor ) ACCEL "h"
+   MENUITEM "Find..."        OF oSearch ACTION CodeEditorFind( hCodeEditor )          ACCEL "f"
+   MENUITEM "Replace..."     OF oSearch ACTION CodeEditorReplace( hCodeEditor )       ACCEL "h"
+   MENUSEPARATOR OF oSearch
+   MENUITEM "Find Next"      OF oSearch ACTION CodeEditorFindNext( hCodeEditor )
+   MENUITEM "Find Previous"  OF oSearch ACTION CodeEditorFindPrev( hCodeEditor )
+   MENUSEPARATOR OF oSearch
+   MENUITEM "Auto-Complete"  OF oSearch ACTION CodeEditorAutoComplete( hCodeEditor )
 
    DEFINE POPUP oView PROMPT "View" OF oIDE
    MENUITEM "Forms..."     OF oView ACTION MenuViewForms()
@@ -114,6 +119,18 @@ function Main()
    MENUSEPARATOR OF oRun
    MENUITEM "Toggle Breakpoint"  OF oRun ACTION ToggleBreakpoint()
    MENUITEM "Clear Breakpoints"  OF oRun ACTION ClearBreakpoints()
+
+   DEFINE POPUP oFormat PROMPT "Format" OF oIDE
+   MENUITEM "Align Left"              OF oFormat ACTION AlignControls( 1 )
+   MENUITEM "Align Right"             OF oFormat ACTION AlignControls( 2 )
+   MENUITEM "Align Top"               OF oFormat ACTION AlignControls( 3 )
+   MENUITEM "Align Bottom"            OF oFormat ACTION AlignControls( 4 )
+   MENUSEPARATOR OF oFormat
+   MENUITEM "Center Horizontally"     OF oFormat ACTION AlignControls( 5 )
+   MENUITEM "Center Vertically"       OF oFormat ACTION AlignControls( 6 )
+   MENUSEPARATOR OF oFormat
+   MENUITEM "Space Evenly Horizontal" OF oFormat ACTION AlignControls( 7 )
+   MENUITEM "Space Evenly Vertical"   OF oFormat ACTION AlignControls( 8 )
 
    DEFINE POPUP oComp PROMPT "Component" OF oIDE
    MENUITEM "Install Component..." OF oComp ACTION InstallComponent()
@@ -1351,6 +1368,15 @@ static function ShowEnvironmentOptions()
    static cHbFlags := "-n -w -q"
    GTK_ProjectOptionsDialog( cHbDir, "/usr/bin", ".", "./build", ;
       cHbFlags, cCFlags, "", "", "", "" )
+return nil
+
+// === Format > Align Controls ===
+
+static function AlignControls( nMode )
+   if oDesignForm != nil
+      UI_FormAlignSelected( oDesignForm:hCpp, nMode )
+      SyncDesignerToCode()
+   endif
 return nil
 
 // === Dark Mode (toggle) ===

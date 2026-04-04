@@ -105,8 +105,13 @@ function Main()
    MENUITEM "&Paste" OF oEdit ACTION CodeEditorPaste( hCodeEditor )
 
    DEFINE POPUP oSearch PROMPT "&Search" OF oIDE
-   MENUITEM "&Find..."      OF oSearch ACTION CodeEditorFind( hCodeEditor )
-   MENUITEM "&Replace..."   OF oSearch ACTION CodeEditorReplace( hCodeEditor )
+   MENUITEM "&Find..."        OF oSearch ACTION CodeEditorFind( hCodeEditor )
+   MENUITEM "&Replace..."     OF oSearch ACTION CodeEditorReplace( hCodeEditor )
+   MENUSEPARATOR OF oSearch
+   MENUITEM "Find &Next"      OF oSearch ACTION CodeEditorFindNext( hCodeEditor )
+   MENUITEM "Find &Previous"  OF oSearch ACTION CodeEditorFindPrev( hCodeEditor )
+   MENUSEPARATOR OF oSearch
+   MENUITEM "&Auto-Complete"  OF oSearch ACTION CodeEditorAutoComplete( hCodeEditor )
 
    DEFINE POPUP oView PROMPT "&View" OF oIDE
    MENUITEM "&Forms..."     OF oView ACTION MenuViewForms()
@@ -4570,6 +4575,27 @@ HB_FUNC( CODEEDITORREPLACE )
 {
    CODEEDITOR * ed = (CODEEDITOR *) (HB_PTRUINT) hb_parnint(1);
    if( ed ) CE_ShowFindBar( ed, TRUE, TRUE );
+}
+
+/* CodeEditorFindNext( hEditor ) */
+HB_FUNC( CODEEDITORFINDNEXT )
+{
+   CODEEDITOR * ed = (CODEEDITOR *) (HB_PTRUINT) hb_parnint(1);
+   if( ed ) CE_FindNext( ed, TRUE );
+}
+
+/* CodeEditorFindPrev( hEditor ) */
+HB_FUNC( CODEEDITORFINDPREV )
+{
+   CODEEDITOR * ed = (CODEEDITOR *) (HB_PTRUINT) hb_parnint(1);
+   if( ed ) CE_FindNext( ed, FALSE );
+}
+
+/* CodeEditorAutoComplete( hEditor ) */
+HB_FUNC( CODEEDITORAUTOCOMPLETE )
+{
+   CODEEDITOR * ed = (CODEEDITOR *) (HB_PTRUINT) hb_parnint(1);
+   if( ed ) CE_ShowAutoComplete( ed );
 }
 
 #pragma ENDDUMP
