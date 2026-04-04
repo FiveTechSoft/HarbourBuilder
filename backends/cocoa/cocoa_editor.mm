@@ -769,6 +769,60 @@ static void CE_InstallKeyMonitor( CODEEDITOR * ed )
          }
       }
 
+      /* F12 (keyCode 111) — Go to definition */
+      if( !cmd && !shift && keyCode == 111 )
+      {
+         /* Get word under cursor */
+         sptr_t pos = SciMsg0( sv, SCI_GETCURRENTPOS );
+         sptr_t wordStart = SciMsg( sv, SCI_WORDSTARTPOSITION, (uptr_t)pos, 1 );
+         sptr_t wordEnd = SciMsg( sv, SCI_WORDENDPOSITION, (uptr_t)pos, 1 );
+         sptr_t wLen = wordEnd - wordStart;
+
+         if( wLen > 0 && wLen < 128 )
+         {
+            char word[128];
+            struct Sci_TextRange tr;
+            tr.chrg.cpMin = (long)wordStart;
+            tr.chrg.cpMax = (long)wordEnd;
+            tr.lpstrText = word;
+            SciMsg( sv, SCI_GETTEXTRANGE, 0, (sptr_t)&tr );
+            word[wLen] = 0;
+
+            /* Search for "function word(", "procedure word(", "method word(",
+               "class word", "#define word" */
+            sptr_t docLen = SciMsg0( sv, SCI_GETLENGTH );
+            char patterns[6][160];
+            snprintf( patterns[0], 160, "function %s", word );
+            snprintf( patterns[1], 160, "procedure %s", word );
+            snprintf( patterns[2], 160, "method %s", word );
+            snprintf( patterns[3], 160, "FUNCTION %s", word );
+            snprintf( patterns[4], 160, "METHOD %s", word );
+            snprintf( patterns[5], 160, "class %s", word );
+
+            sptr_t found = -1;
+            for( int p = 0; p < 6 && found < 0; p++ )
+            {
+               SciMsg( sv, SCI_SETTARGETSTART, 0, 0 );
+               SciMsg( sv, SCI_SETTARGETEND, (uptr_t)docLen, 0 );
+               SciMsg( sv, SCI_SETSEARCHFLAGS, SCFIND_NONE, 0 );
+               found = SciMsg( sv, SCI_SEARCHINTARGET,
+                               (uptr_t)strlen(patterns[p]), (sptr_t)patterns[p] );
+            }
+
+            if( found >= 0 )
+            {
+               SciMsg( sv, SCI_GOTOPOS, (uptr_t)found, 0 );
+               SciMsg( sv, SCI_SCROLLCARET, 0, 0 );
+               /* Select the found line */
+               sptr_t line = SciMsg( sv, SCI_LINEFROMPOSITION, (uptr_t)found, 0 );
+               sptr_t ls = SciMsg( sv, SCI_POSITIONFROMLINE, (uptr_t)line, 0 );
+               sptr_t le = SciMsg( sv, SCI_GETLINEENDPOSITION, (uptr_t)line, 0 );
+               SciMsg( sv, SCI_SETSEL, (uptr_t)ls, le );
+            }
+         }
+         return nil;
+      }
+
       return event;
    }];
 }

@@ -28,35 +28,84 @@ if [ ! -f "$SCIBUILD/libscintilla.a" ] || [ ! -f "$SCIBUILD/liblexilla.a" ]; the
    bash "$SCIDIR/build_scintilla_mac.sh"
 fi
 
-echo "[1/4] Compiling ${SRC}.prg..."
-"$HBBIN/harbour" ${SRC}.prg -n -w -q \
-   -I"$HBINC" \
-   -I"$PROJDIR/include" \
-   -I"$PROJDIR/harbour" \
-   -o${SRC}.c
+# Helper: compile only if source is newer than object
+needs_rebuild() {
+   [ ! -f "$2" ] && return 0
+   [ "$1" -nt "$2" ] && return 0
+   return 1
+}
 
-echo "[2/4] Compiling ${SRC}.c..."
-clang -c -O2 -Wno-unused-value \
-   -I"$HBINC" \
-   ${SRC}.c -o ${SRC}.o
+NEED_LINK=0
 
-echo "[3/4] Compiling Cocoa sources..."
-clang -c -O2 -fobjc-arc \
-   -I"$HBINC" \
-   "$PROJDIR/backends/cocoa/cocoa_core.m" -o cocoa_core.o
+# [1/4] Harbour → C (only if .prg changed)
+if needs_rebuild "${SRC}.prg" "${SRC}.c" || \
+   needs_rebuild "$PROJDIR/harbour/classes.prg" "${SRC}.c" || \
+   needs_rebuild "$PROJDIR/harbour/hbbuilder.ch" "${SRC}.c"; then
+   echo "[1/4] Compiling ${SRC}.prg..."
+   "$HBBIN/harbour" ${SRC}.prg -n -w -q \
+      -I"$HBINC" \
+      -I"$PROJDIR/include" \
+      -I"$PROJDIR/harbour" \
+      -o${SRC}.c
+   NEED_LINK=1
+else
+   echo "[1/4] ${SRC}.prg — up to date"
+fi
 
-clang -c -O2 -fobjc-arc \
-   -I"$HBINC" \
-   "$PROJDIR/backends/cocoa/cocoa_inspector.m" -o cocoa_inspector.o
+# [2/4] C → Object (only if .c changed)
+if needs_rebuild "${SRC}.c" "${SRC}.o"; then
+   echo "[2/4] Compiling ${SRC}.c..."
+   clang -c -O2 -Wno-unused-value \
+      -I"$HBINC" \
+      ${SRC}.c -o ${SRC}.o
+   NEED_LINK=1
+else
+   echo "[2/4] ${SRC}.o — up to date"
+fi
 
-echo "[3b/4] Compiling Scintilla editor (Objective-C++)..."
-clang++ -c -O2 -fobjc-arc -std=c++17 \
-   -I"$HBINC" \
-   -I"$SCIINC" \
-   -I"$SCICOCOA" \
-   -I"$LEXINC" \
-   -I"$SCIDIR/scintilla/src" \
-   "$PROJDIR/backends/cocoa/cocoa_editor.mm" -o cocoa_editor.o
+# [3/4] Cocoa sources (only if .m changed)
+if needs_rebuild "$PROJDIR/backends/cocoa/cocoa_core.m" cocoa_core.o; then
+   echo "[3/4] Compiling cocoa_core.m..."
+   clang -c -O2 -fobjc-arc \
+      -I"$HBINC" \
+      "$PROJDIR/backends/cocoa/cocoa_core.m" -o cocoa_core.o
+   NEED_LINK=1
+else
+   echo "[3/4] cocoa_core.o — up to date"
+fi
+
+if needs_rebuild "$PROJDIR/backends/cocoa/cocoa_inspector.m" cocoa_inspector.o; then
+   echo "[3/4] Compiling cocoa_inspector.m..."
+   clang -c -O2 -fobjc-arc \
+      -I"$HBINC" \
+      "$PROJDIR/backends/cocoa/cocoa_inspector.m" -o cocoa_inspector.o
+   NEED_LINK=1
+else
+   echo "[3/4] cocoa_inspector.o — up to date"
+fi
+
+# [3b/4] Scintilla editor (only if .mm changed)
+if needs_rebuild "$PROJDIR/backends/cocoa/cocoa_editor.mm" cocoa_editor.o; then
+   echo "[3b/4] Compiling cocoa_editor.mm..."
+   clang++ -c -O2 -fobjc-arc -std=c++17 \
+      -I"$HBINC" \
+      -I"$SCIINC" \
+      -I"$SCICOCOA" \
+      -I"$LEXINC" \
+      -I"$SCIDIR/scintilla/src" \
+      "$PROJDIR/backends/cocoa/cocoa_editor.mm" -o cocoa_editor.o
+   NEED_LINK=1
+else
+   echo "[3b/4] cocoa_editor.o — up to date"
+fi
+
+if [ "$NEED_LINK" -eq 0 ] && [ -f "${PROG}" ]; then
+   echo "[4/4] ${PROG} — up to date (nothing changed)"
+   echo ""
+   echo "-- ${PROG} is up to date (incremental build) --"
+   echo "Run with: ./${PROG}"
+   exit 0
+fi
 
 echo "[4/4] Linking ${PROG}..."
 clang++ -o ${PROG} \
