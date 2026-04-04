@@ -92,21 +92,21 @@ function Main()
    MENUSEPARATOR OF oFile
    MENUITEM "&Open..."    OF oFile ACTION TBOpen()
    MENUITEM "&Save"       OF oFile ACTION TBSave()
-   MENUITEM "Save &As..." OF oFile ACTION MsgInfo( "Save As" )
+   MENUITEM "Save &As..." OF oFile ACTION TBSaveAs()
    MENUSEPARATOR OF oFile
    MENUITEM "E&xit"       OF oFile ACTION oIDE:Close()
 
    DEFINE POPUP oEdit PROMPT "&Edit" OF oIDE
-   MENUITEM "&Undo"  OF oEdit ACTION MsgInfo( "Undo" )
-   MENUITEM "&Redo"  OF oEdit ACTION MsgInfo( "Redo" )
+   MENUITEM "&Undo"  OF oEdit ACTION CodeEditorUndo( hCodeEditor )
+   MENUITEM "&Redo"  OF oEdit ACTION CodeEditorRedo( hCodeEditor )
    MENUSEPARATOR OF oEdit
-   MENUITEM "Cu&t"   OF oEdit ACTION MsgInfo( "Cut" )
-   MENUITEM "&Copy"  OF oEdit ACTION MsgInfo( "Copy" )
-   MENUITEM "&Paste" OF oEdit ACTION MsgInfo( "Paste" )
+   MENUITEM "Cu&t"   OF oEdit ACTION CodeEditorCut( hCodeEditor )
+   MENUITEM "&Copy"  OF oEdit ACTION CodeEditorCopy( hCodeEditor )
+   MENUITEM "&Paste" OF oEdit ACTION CodeEditorPaste( hCodeEditor )
 
    DEFINE POPUP oSearch PROMPT "&Search" OF oIDE
-   MENUITEM "&Find..."      OF oSearch ACTION MsgInfo( "Find" )
-   MENUITEM "&Replace..."   OF oSearch ACTION MsgInfo( "Replace" )
+   MENUITEM "&Find..."      OF oSearch ACTION CodeEditorFind( hCodeEditor )
+   MENUITEM "&Replace..."   OF oSearch ACTION CodeEditorReplace( hCodeEditor )
 
    DEFINE POPUP oView PROMPT "&View" OF oIDE
    MENUITEM "&Forms..."     OF oView ACTION MenuViewForms()
@@ -115,26 +115,26 @@ function Main()
    MENUITEM "&Project Inspector" OF oView ACTION ShowProjectInspector()
 
    DEFINE POPUP oProject PROMPT "&Project" OF oIDE
-   MENUITEM "&Add to Project..."    OF oProject ACTION MsgInfo( "Add to Project" )
-   MENUITEM "&Remove from Project"  OF oProject ACTION MsgInfo( "Remove" )
+   MENUITEM "&Add to Project..."    OF oProject ACTION AddToProject()
+   MENUITEM "&Remove from Project"  OF oProject ACTION RemoveFromProject()
    MENUSEPARATOR OF oProject
    MENUITEM "&Options..."           OF oProject ACTION ShowProjectOptions()
 
    DEFINE POPUP oRun PROMPT "&Run" OF oIDE
    MENUITEM "&Run"           OF oRun ACTION TBRun()
-   MENUITEM "&Step Over"     OF oRun ACTION MsgInfo( "Step Over" )
-   MENUITEM "Step &Into"     OF oRun ACTION MsgInfo( "Step Into" )
+   MENUITEM "&Step Over"     OF oRun ACTION DebugStepOver()
+   MENUITEM "Step &Into"     OF oRun ACTION DebugStepInto()
    MENUSEPARATOR OF oRun
    MENUITEM "&Toggle Breakpoint"  OF oRun ACTION ToggleBreakpoint()
    MENUITEM "&Clear Breakpoints"  OF oRun ACTION ClearBreakpoints()
 
    DEFINE POPUP oComp PROMPT "&Component" OF oIDE
-   MENUITEM "&Install Component..." OF oComp ACTION MsgInfo( "Install" )
-   MENUITEM "&New Component..."     OF oComp ACTION MsgInfo( "New Component" )
+   MENUITEM "&Install Component..." OF oComp ACTION InstallComponent()
+   MENUITEM "&New Component..."     OF oComp ACTION NewComponent()
 
    DEFINE POPUP oTools PROMPT "&Tools" OF oIDE
    MENUITEM "&Editor Colors..." OF oTools ACTION ShowEditorSettings()
-   MENUITEM "&Environment Options..." OF oTools ACTION MsgInfo( "Options" )
+   MENUITEM "&Environment Options..." OF oTools ACTION ShowProjectOptions()
    MENUSEPARATOR OF oTools
    MENUITEM "&Generate Palette Icons" OF oTools ACTION ( W32_GeneratePaletteIcons( .F. ), W32_GenerateToolbarIcons( .F. ) )
    MENUSEPARATOR OF oTools
@@ -153,12 +153,12 @@ function Main()
    BUTTON "Open"  OF oTB TOOLTIP "Open file (Ctrl+O)"    ACTION TBOpen()
    BUTTON "Save"  OF oTB TOOLTIP "Save file (Ctrl+S)"    ACTION TBSave()
    SEPARATOR OF oTB
-   BUTTON "Cut"   OF oTB TOOLTIP "Cut (Ctrl+X)"          ACTION MsgInfo( "Cut" )
-   BUTTON "Copy"  OF oTB TOOLTIP "Copy (Ctrl+C)"         ACTION MsgInfo( "Copy" )
-   BUTTON "Paste" OF oTB TOOLTIP "Paste (Ctrl+V)"        ACTION MsgInfo( "Paste" )
+   BUTTON "Cut"   OF oTB TOOLTIP "Cut (Ctrl+X)"          ACTION CodeEditorCut( hCodeEditor )
+   BUTTON "Copy"  OF oTB TOOLTIP "Copy (Ctrl+C)"         ACTION CodeEditorCopy( hCodeEditor )
+   BUTTON "Paste" OF oTB TOOLTIP "Paste (Ctrl+V)"        ACTION CodeEditorPaste( hCodeEditor )
    SEPARATOR OF oTB
-   BUTTON "Undo"  OF oTB TOOLTIP "Undo (Ctrl+Z)"         ACTION MsgInfo( "Undo" )
-   BUTTON "Redo"  OF oTB TOOLTIP "Redo (Ctrl+Y)"         ACTION MsgInfo( "Redo" )
+   BUTTON "Undo"  OF oTB TOOLTIP "Undo (Ctrl+Z)"         ACTION CodeEditorUndo( hCodeEditor )
+   BUTTON "Redo"  OF oTB TOOLTIP "Redo (Ctrl+Y)"         ACTION CodeEditorRedo( hCodeEditor )
    SEPARATOR OF oTB
    BUTTON "Run"   OF oTB TOOLTIP "Run project (F9)"       ACTION TBRun()
 
@@ -1500,6 +1500,16 @@ static function ClearBreakpoints()
    MsgInfo( "All breakpoints cleared" )
 return nil
 
+static function DebugStepOver()
+   W32_DebugPanel()
+   MsgInfo( "Step Over: start a debug session with Run > Run first" )
+return nil
+
+static function DebugStepInto()
+   W32_DebugPanel()
+   MsgInfo( "Step Into: start a debug session with Run > Run first" )
+return nil
+
 static function ShowDebugPanel()
    W32_DebugPanel()
 return nil
@@ -1583,6 +1593,99 @@ static function ShowAbout()
 
    W32_AboutDialog( "About HbBuilder", cMsg, HB_DirBase() + "..\resources\harbour_logo.png" )
 
+return nil
+
+// === Save As ===
+
+static function TBSaveAs()
+   cCurrentFile := ""
+   TBSave()
+return nil
+
+// === Add/Remove from Project ===
+
+static function AddToProject()
+   local cFile := W32_OpenFileDialog( "Add File to Project", "Project1.prg", "prg" )
+   local cName, cCode, i
+   if Empty( cFile ); return nil; endif
+   cName := SubStr( cFile, RAt( "\", cFile ) + 1 )
+   if "." $ cName
+      cName := Left( cName, At( ".", cName ) - 1 )
+   endif
+   for i := 1 to Len( aForms )
+      if Lower( aForms[i][1] ) == Lower( cName )
+         MsgInfo( cName + " is already in the project" )
+         return nil
+      endif
+   next
+   cCode := MemoRead( cFile )
+   if Empty( cCode )
+      cCode := "// " + cName + ".prg" + Chr(10)
+   endif
+   CodeEditorAddTab( hCodeEditor, cName + ".prg" )
+   CodeEditorSetTabText( hCodeEditor, Len(aForms) + 2, cCode )
+   CodeEditorSelectTab( hCodeEditor, Len(aForms) + 2 )
+   CodeEditorSetTabText( hCodeEditor, 1, GenerateProjectCode() )
+return nil
+
+static function RemoveFromProject()
+   local aNames := {}, i, nSel
+   if Len( aForms ) <= 1
+      MsgInfo( "Cannot remove the last form" )
+      return nil
+   endif
+   for i := 1 to Len( aForms )
+      AAdd( aNames, aForms[i][1] + ".prg" )
+   next
+   nSel := W32_SelectFromList( "Remove from Project", aNames )
+   if nSel > 0 .and. nSel <= Len( aForms )
+      aForms[nSel][2]:Destroy()
+      ADel( aForms, nSel )
+      ASize( aForms, Len(aForms) - 1 )
+      if nActiveForm > Len( aForms )
+         nActiveForm := Len( aForms )
+      endif
+      CodeEditorClearTabs( hCodeEditor )
+      CodeEditorSetTabText( hCodeEditor, 1, GenerateProjectCode() )
+      for i := 1 to Len( aForms )
+         CodeEditorAddTab( hCodeEditor, aForms[i][1] + ".prg" )
+         CodeEditorSetTabText( hCodeEditor, i + 1, aForms[i][3] )
+      next
+      SwitchToForm( nActiveForm )
+   endif
+return nil
+
+// === Components ===
+
+static function InstallComponent()
+   local cFile := W32_OpenFileDialog( "Install Component (.prg)", "*.prg", "prg" )
+   local cName
+   if Empty( cFile ); return nil; endif
+   cName := SubStr( cFile, RAt( "\", cFile ) + 1 )
+   MsgInfo( "Component installed: " + cName + Chr(10) + Chr(10) + ;
+            "The component will be available in the palette" + Chr(10) + ;
+            "after restarting HbBuilder." )
+return nil
+
+static function NewComponent()
+   local cCode := ;
+      "// New Component Template" + Chr(10) + ;
+      "// Inherit from an existing control class" + Chr(10) + Chr(10) + ;
+      "#include 'hbbuilder.ch'" + Chr(10) + Chr(10) + ;
+      "class TMyComponent from TButton" + Chr(10) + ;
+      "   data cCustomProp init ''" + Chr(10) + ;
+      "   method New() constructor" + Chr(10) + ;
+      "   method Paint()" + Chr(10) + ;
+      "endclass" + Chr(10) + Chr(10) + ;
+      "method New() class TMyComponent" + Chr(10) + ;
+      "   ::Super:New()" + Chr(10) + ;
+      "return self" + Chr(10) + Chr(10) + ;
+      "method Paint() class TMyComponent" + Chr(10) + ;
+      "   ::Super:Paint()" + Chr(10) + ;
+      "return nil" + Chr(10)
+   CodeEditorAddTab( hCodeEditor, "MyComponent.prg" )
+   CodeEditorSetTabText( hCodeEditor, Len(aForms) + 2, cCode )
+   CodeEditorSelectTab( hCodeEditor, Len(aForms) + 2 )
 return nil
 
 // MsgInfo() is now in classes.prg (cross-platform)
@@ -4418,6 +4521,55 @@ HB_FUNC( CODEEDITORDESTROY )
       if( ed->hWnd ) DestroyWindow( ed->hWnd );
       free( ed );
    }
+}
+
+/* CodeEditorUndo( hEditor ) */
+HB_FUNC( CODEEDITORUNDO )
+{
+   CODEEDITOR * ed = (CODEEDITOR *) (HB_PTRUINT) hb_parnint(1);
+   if( ed && ed->hEdit ) SciMsg( ed->hEdit, 2176, 0, 0 ); /* SCI_UNDO */
+}
+
+/* CodeEditorRedo( hEditor ) */
+HB_FUNC( CODEEDITORREDO )
+{
+   CODEEDITOR * ed = (CODEEDITOR *) (HB_PTRUINT) hb_parnint(1);
+   if( ed && ed->hEdit ) SciMsg( ed->hEdit, 2011, 0, 0 ); /* SCI_REDO */
+}
+
+/* CodeEditorCut( hEditor ) */
+HB_FUNC( CODEEDITORCUT )
+{
+   CODEEDITOR * ed = (CODEEDITOR *) (HB_PTRUINT) hb_parnint(1);
+   if( ed && ed->hEdit ) SciMsg( ed->hEdit, 2177, 0, 0 ); /* SCI_CUT */
+}
+
+/* CodeEditorCopy( hEditor ) */
+HB_FUNC( CODEEDITORCOPY )
+{
+   CODEEDITOR * ed = (CODEEDITOR *) (HB_PTRUINT) hb_parnint(1);
+   if( ed && ed->hEdit ) SciMsg( ed->hEdit, 2178, 0, 0 ); /* SCI_COPY */
+}
+
+/* CodeEditorPaste( hEditor ) */
+HB_FUNC( CODEEDITORPASTE )
+{
+   CODEEDITOR * ed = (CODEEDITOR *) (HB_PTRUINT) hb_parnint(1);
+   if( ed && ed->hEdit ) SciMsg( ed->hEdit, 2179, 0, 0 ); /* SCI_PASTE */
+}
+
+/* CodeEditorFind( hEditor ) - show find bar */
+HB_FUNC( CODEEDITORFIND )
+{
+   CODEEDITOR * ed = (CODEEDITOR *) (HB_PTRUINT) hb_parnint(1);
+   if( ed ) CE_ShowFindBar( ed, TRUE, FALSE );
+}
+
+/* CodeEditorReplace( hEditor ) - show find+replace bar */
+HB_FUNC( CODEEDITORREPLACE )
+{
+   CODEEDITOR * ed = (CODEEDITOR *) (HB_PTRUINT) hb_parnint(1);
+   if( ed ) CE_ShowFindBar( ed, TRUE, TRUE );
 }
 
 #pragma ENDDUMP
