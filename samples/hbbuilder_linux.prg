@@ -142,6 +142,8 @@ function Main()
    MENUITEM "Dark Mode"              OF oTools ACTION ToggleDarkMode()
    MENUSEPARATOR OF oTools
    MENUITEM "AI Assistant..."         OF oTools ACTION ShowAIAssistant()
+   MENUSEPARATOR OF oTools
+   MENUITEM "Report Designer"        OF oTools ACTION OpenReportDesigner()
 
    DEFINE POPUP oHelp PROMPT "Help" OF oIDE
    MENUITEM "Documentation"        OF oHelp ACTION GTK_ShellExec( "xdg-open ../docs/en/index.html" )
@@ -1419,6 +1421,27 @@ static function ShowAbout()
    cMsg += "Vibe coded 100% using Claude Code" + Chr(10)
 
    GTK_AboutDialog( "About HbBuilder", cMsg, "../resources/harbour_logo.png" )
+
+return nil
+
+// === Report Designer ===
+
+static function OpenReportDesigner()
+
+   // Open the designer window
+   RPT_DesignerOpen()
+
+   // Add default bands
+   RPT_AddBand( "Header", 40 )
+   RPT_AddBand( "Detail", 20 )
+   RPT_AddBand( "Footer", 30 )
+
+   // Add sample fields to Header (band index 0)
+   RPT_AddField( 0, "Title", "Report Title", 10, 5, 180, 20 )
+
+   // Add sample fields to Detail (band index 1)
+   RPT_AddField( 1, "Field1", "[Field1]", 10, 2, 80, 14 )
+   RPT_AddField( 1, "Field2", "[Field2]", 100, 2, 80, 14 )
 
 return nil
 

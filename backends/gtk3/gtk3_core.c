@@ -5961,6 +5961,7 @@ typedef struct {
    char cText[128];
    char cFieldName[64];
    int  nLeft, nTop, nWidth, nHeight;
+   int  nAlignment;   /* 0=Left, 1=Center, 2=Right */
 } RptField;
 
 typedef struct {
@@ -5969,6 +5970,9 @@ typedef struct {
    int      nFieldCount;
    RptField fields[RPT_MAX_FIELDS];
    double   colorR, colorG, colorB;
+   int      lPrintOnEveryPage;
+   int      lKeepTogether;
+   int      lVisible;
 } RptBand;
 
 static GtkWidget * s_rptDesigner = NULL;
@@ -6325,6 +6329,7 @@ static void on_rpt_add_band_type( GtkMenuItem * item, gpointer data )
    memset( b, 0, sizeof(RptBand) );
    strncpy( b->cName, name, sizeof(b->cName) - 1 );
    b->nHeight = 80;
+   b->lVisible = 1;
    rpt_band_color( name, &b->colorR, &b->colorG, &b->colorB );
    s_rptBandCount++;
 
@@ -6534,6 +6539,7 @@ HB_FUNC( RPT_ADDBAND )
    memset( b, 0, sizeof(RptBand) );
    strncpy( b->cName, cName, sizeof(b->cName) - 1 );
    b->nHeight = nHeight;
+   b->lVisible = 1;
    rpt_band_color( cName, &b->colorR, &b->colorG, &b->colorB );
 
    int idx = s_rptBandCount;
@@ -6597,5 +6603,242 @@ HB_FUNC( RPT_GETSELECTED )
    }
 
    hb_itemReturnRelease( pArray );
+}
+
+/* RPT_GETBANDPROPS( nBandIndex ) -> { {cPropName, xValue, cCategory, cType}, ... }
+ * Returns property array for a band, compatible with the inspector format.
+ * Types: "S"=String, "N"=Numeric, "L"=Logical */
+HB_FUNC( RPT_GETBANDPROPS )
+{
+   int bi = hb_parni(1);
+   if( bi < 0 || bi >= s_rptBandCount )
+   {
+      hb_reta(0);
+      return;
+   }
+
+   RptBand * b = &s_rptBands[bi];
+   PHB_ITEM pArray = hb_itemArrayNew( 5 );
+   PHB_ITEM pRow;
+
+   /* 1: cName */
+   pRow = hb_itemArrayNew( 4 );
+   hb_arraySetC( pRow, 1, "cName" );
+   hb_arraySetC( pRow, 2, b->cName );
+   hb_arraySetC( pRow, 3, "Info" );
+   hb_arraySetC( pRow, 4, "S" );
+   hb_arraySet( pArray, 1, pRow );
+   hb_itemRelease( pRow );
+
+   /* 2: nHeight */
+   pRow = hb_itemArrayNew( 4 );
+   hb_arraySetC( pRow, 1, "nHeight" );
+   hb_arraySetNI( pRow, 2, b->nHeight );
+   hb_arraySetC( pRow, 3, "Position" );
+   hb_arraySetC( pRow, 4, "N" );
+   hb_arraySet( pArray, 2, pRow );
+   hb_itemRelease( pRow );
+
+   /* 3: lPrintOnEveryPage */
+   pRow = hb_itemArrayNew( 4 );
+   hb_arraySetC( pRow, 1, "lPrintOnEveryPage" );
+   hb_arraySetL( pRow, 2, b->lPrintOnEveryPage ? HB_TRUE : HB_FALSE );
+   hb_arraySetC( pRow, 3, "Behavior" );
+   hb_arraySetC( pRow, 4, "L" );
+   hb_arraySet( pArray, 3, pRow );
+   hb_itemRelease( pRow );
+
+   /* 4: lKeepTogether */
+   pRow = hb_itemArrayNew( 4 );
+   hb_arraySetC( pRow, 1, "lKeepTogether" );
+   hb_arraySetL( pRow, 2, b->lKeepTogether ? HB_TRUE : HB_FALSE );
+   hb_arraySetC( pRow, 3, "Behavior" );
+   hb_arraySetC( pRow, 4, "L" );
+   hb_arraySet( pArray, 4, pRow );
+   hb_itemRelease( pRow );
+
+   /* 5: lVisible */
+   pRow = hb_itemArrayNew( 4 );
+   hb_arraySetC( pRow, 1, "lVisible" );
+   hb_arraySetL( pRow, 2, b->lVisible ? HB_TRUE : HB_FALSE );
+   hb_arraySetC( pRow, 3, "Behavior" );
+   hb_arraySetC( pRow, 4, "L" );
+   hb_arraySet( pArray, 5, pRow );
+   hb_itemRelease( pRow );
+
+   hb_itemReturnRelease( pArray );
+}
+
+/* RPT_GETFIELDPROPS( nBandIndex, nFieldIndex ) -> { {cPropName, xValue, cCategory, cType}, ... }
+ * Returns property array for a field, compatible with the inspector format. */
+HB_FUNC( RPT_GETFIELDPROPS )
+{
+   int bi = hb_parni(1);
+   int fi = hb_parni(2);
+
+   if( bi < 0 || bi >= s_rptBandCount ||
+       fi < 0 || fi >= s_rptBands[bi].nFieldCount )
+   {
+      hb_reta(0);
+      return;
+   }
+
+   RptField * f = &s_rptBands[bi].fields[fi];
+   PHB_ITEM pArray = hb_itemArrayNew( 8 );
+   PHB_ITEM pRow;
+
+   /* 1: cName */
+   pRow = hb_itemArrayNew( 4 );
+   hb_arraySetC( pRow, 1, "cName" );
+   hb_arraySetC( pRow, 2, f->cName );
+   hb_arraySetC( pRow, 3, "Info" );
+   hb_arraySetC( pRow, 4, "S" );
+   hb_arraySet( pArray, 1, pRow );
+   hb_itemRelease( pRow );
+
+   /* 2: cText */
+   pRow = hb_itemArrayNew( 4 );
+   hb_arraySetC( pRow, 1, "cText" );
+   hb_arraySetC( pRow, 2, f->cText );
+   hb_arraySetC( pRow, 3, "Appearance" );
+   hb_arraySetC( pRow, 4, "S" );
+   hb_arraySet( pArray, 2, pRow );
+   hb_itemRelease( pRow );
+
+   /* 3: cFieldName */
+   pRow = hb_itemArrayNew( 4 );
+   hb_arraySetC( pRow, 1, "cFieldName" );
+   hb_arraySetC( pRow, 2, f->cFieldName );
+   hb_arraySetC( pRow, 3, "Data" );
+   hb_arraySetC( pRow, 4, "S" );
+   hb_arraySet( pArray, 3, pRow );
+   hb_itemRelease( pRow );
+
+   /* 4: nLeft */
+   pRow = hb_itemArrayNew( 4 );
+   hb_arraySetC( pRow, 1, "nLeft" );
+   hb_arraySetNI( pRow, 2, f->nLeft );
+   hb_arraySetC( pRow, 3, "Position" );
+   hb_arraySetC( pRow, 4, "N" );
+   hb_arraySet( pArray, 4, pRow );
+   hb_itemRelease( pRow );
+
+   /* 5: nTop */
+   pRow = hb_itemArrayNew( 4 );
+   hb_arraySetC( pRow, 1, "nTop" );
+   hb_arraySetNI( pRow, 2, f->nTop );
+   hb_arraySetC( pRow, 3, "Position" );
+   hb_arraySetC( pRow, 4, "N" );
+   hb_arraySet( pArray, 5, pRow );
+   hb_itemRelease( pRow );
+
+   /* 6: nWidth */
+   pRow = hb_itemArrayNew( 4 );
+   hb_arraySetC( pRow, 1, "nWidth" );
+   hb_arraySetNI( pRow, 2, f->nWidth );
+   hb_arraySetC( pRow, 3, "Position" );
+   hb_arraySetC( pRow, 4, "N" );
+   hb_arraySet( pArray, 6, pRow );
+   hb_itemRelease( pRow );
+
+   /* 7: nHeight */
+   pRow = hb_itemArrayNew( 4 );
+   hb_arraySetC( pRow, 1, "nHeight" );
+   hb_arraySetNI( pRow, 2, f->nHeight );
+   hb_arraySetC( pRow, 3, "Position" );
+   hb_arraySetC( pRow, 4, "N" );
+   hb_arraySet( pArray, 7, pRow );
+   hb_itemRelease( pRow );
+
+   /* 8: nAlignment */
+   pRow = hb_itemArrayNew( 4 );
+   hb_arraySetC( pRow, 1, "nAlignment" );
+   hb_arraySetNI( pRow, 2, f->nAlignment );
+   hb_arraySetC( pRow, 3, "Appearance" );
+   hb_arraySetC( pRow, 4, "N" );
+   hb_arraySet( pArray, 8, pRow );
+   hb_itemRelease( pRow );
+
+   hb_itemReturnRelease( pArray );
+}
+
+/* RPT_SETBANDPROP( nBandIndex, cPropName, xValue ) - Update a band property and redraw */
+HB_FUNC( RPT_SETBANDPROP )
+{
+   int bi = hb_parni(1);
+   const char * cProp = hb_parc(2);
+
+   if( bi < 0 || bi >= s_rptBandCount || !cProp )
+   {
+      hb_retl( HB_FALSE );
+      return;
+   }
+
+   RptBand * b = &s_rptBands[bi];
+
+   if( strcmp( cProp, "cName" ) == 0 && HB_ISCHAR(3) )
+      strncpy( b->cName, hb_parc(3), sizeof(b->cName) - 1 );
+   else if( strcmp( cProp, "nHeight" ) == 0 && HB_ISNUM(3) )
+      b->nHeight = hb_parni(3);
+   else if( strcmp( cProp, "lPrintOnEveryPage" ) == 0 && HB_ISLOG(3) )
+      b->lPrintOnEveryPage = hb_parl(3) ? 1 : 0;
+   else if( strcmp( cProp, "lKeepTogether" ) == 0 && HB_ISLOG(3) )
+      b->lKeepTogether = hb_parl(3) ? 1 : 0;
+   else if( strcmp( cProp, "lVisible" ) == 0 && HB_ISLOG(3) )
+      b->lVisible = hb_parl(3) ? 1 : 0;
+   else
+   {
+      hb_retl( HB_FALSE );
+      return;
+   }
+
+   if( s_rptDrawArea )
+      gtk_widget_queue_draw( s_rptDrawArea );
+
+   hb_retl( HB_TRUE );
+}
+
+/* RPT_SETFIELDPROP( nBandIndex, nFieldIndex, cPropName, xValue ) - Update a field property and redraw */
+HB_FUNC( RPT_SETFIELDPROP )
+{
+   int bi = hb_parni(1);
+   int fi = hb_parni(2);
+   const char * cProp = hb_parc(3);
+
+   if( bi < 0 || bi >= s_rptBandCount ||
+       fi < 0 || fi >= s_rptBands[bi].nFieldCount || !cProp )
+   {
+      hb_retl( HB_FALSE );
+      return;
+   }
+
+   RptField * f = &s_rptBands[bi].fields[fi];
+
+   if( strcmp( cProp, "cName" ) == 0 && HB_ISCHAR(4) )
+      strncpy( f->cName, hb_parc(4), sizeof(f->cName) - 1 );
+   else if( strcmp( cProp, "cText" ) == 0 && HB_ISCHAR(4) )
+      strncpy( f->cText, hb_parc(4), sizeof(f->cText) - 1 );
+   else if( strcmp( cProp, "cFieldName" ) == 0 && HB_ISCHAR(4) )
+      strncpy( f->cFieldName, hb_parc(4), sizeof(f->cFieldName) - 1 );
+   else if( strcmp( cProp, "nLeft" ) == 0 && HB_ISNUM(4) )
+      f->nLeft = hb_parni(4);
+   else if( strcmp( cProp, "nTop" ) == 0 && HB_ISNUM(4) )
+      f->nTop = hb_parni(4);
+   else if( strcmp( cProp, "nWidth" ) == 0 && HB_ISNUM(4) )
+      f->nWidth = hb_parni(4);
+   else if( strcmp( cProp, "nHeight" ) == 0 && HB_ISNUM(4) )
+      f->nHeight = hb_parni(4);
+   else if( strcmp( cProp, "nAlignment" ) == 0 && HB_ISNUM(4) )
+      f->nAlignment = hb_parni(4);
+   else
+   {
+      hb_retl( HB_FALSE );
+      return;
+   }
+
+   if( s_rptDrawArea )
+      gtk_widget_queue_draw( s_rptDrawArea );
+
+   hb_retl( HB_TRUE );
 }
 
