@@ -295,39 +295,75 @@ Professional HTML documentation with dark/light theme, Mermaid diagrams, and cod
 
 All three desktop platforms are **fully functional** with zero MsgInfo stubs — every menu item, toolbar button, and dialog is implemented with native controls.
 
-| Platform | Backend | Editor | CodeEditor Funcs | Menus | Debugger | Status |
-|----------|---------|--------|-----------------|-------|----------|--------|
-| **Windows** | Win32 API (C++) + Scintilla 5.6.1 DLL | Scintilla (dynamic) | 18 | 35/35 | Panel + engine | ✅ Full IDE |
-| **Linux** | GTK3 (C) + Scintilla 5.6.1 shared lib | Scintilla (dynamic) | 22 | 36/36 | Panel + engine + 16 tests | ✅ Full IDE |
-| **macOS** | Cocoa/AppKit (Obj-C++) + Scintilla 5.5.3 static lib | Scintilla (static) | 26 | 53/53 | Panel + engine | ✅ Full IDE |
-| **Android** | NDK + JNI | — | — | — | — | 🔮 Planned |
-| **iOS** | UIKit (Objective-C) | — | — | — | — | 🔮 Planned |
+| Platform | Backend | Status |
+|----------|---------|--------|
+| **Windows** | Win32 API (C++) + Scintilla 5.6.1 DLL | ✅ Full IDE |
+| **Linux** | GTK3 (C) + Scintilla 5.6.1 shared lib | ✅ Full IDE |
+| **macOS** | Cocoa/AppKit (Obj-C++) + Scintilla 5.5.3 static lib | ✅ Full IDE |
+| **Android** | NDK + JNI | 🔮 Planned |
+| **iOS** | UIKit (Objective-C) | 🔮 Planned |
 
-### Platform parity details
+### IDE Progress by Platform
 
-| Feature | Windows | Linux | macOS |
-|---------|---------|-------|-------|
-| Menu items functional | 35/35 (100%) | 36/36 (100%) | 53/53 (100%) |
-| Toolbar buttons functional | 9/9 (100%) | 15/15 (100%) | 9/9 (100%) |
-| Toolbar rows | 1 | 2 (file + debug) | 1 |
-| MsgInfo stubs remaining | **0** | **0** | **0** |
-| Scintilla editor | ✅ DLL (824 KB) | ✅ .so (2.0 MB) | ✅ .a (static) |
-| Syntax highlighting | ✅ Lexilla C++ lexer | ✅ Lexilla C++ lexer | ✅ Lexilla C++ lexer |
-| Code folding | ✅ Harbour-aware | ✅ Harbour-aware | ✅ Harbour-aware |
-| Auto-complete (Ctrl+Space) | ✅ | ✅ | ✅ (Cmd+Space) |
-| Find/Replace bar | ✅ | ✅ | ✅ (NSTextFinder) |
-| Undo/Redo/Cut/Copy/Paste | ✅ | ✅ | ✅ |
-| Status bar (Ln/Col/INS) | ✅ | ✅ | ✅ |
-| Debugger panel | ✅ 5 tabs | ✅ 5 tabs + toolbar | ✅ 5 tabs |
-| Debugger engine (in-process) | ✅ | ✅ + 16 unit tests | ✅ |
-| AI Assistant (Ollama) | ✅ | ✅ | ✅ |
-| Project Inspector | ✅ TreeView | ✅ TreeView | ✅ NSOutlineView |
-| Editor Colors dialog | ✅ Color picker | ✅ GtkColorButton | ✅ 4 presets |
-| Project Options dialog | ✅ 4 tabs | ✅ 4 tabs | ✅ |
-| Dark Mode | ✅ Title bar (DWM) | ✅ GTK theme toggle | ✅ NSAppearance (app-wide) |
-| Format > Align controls | — | — | ✅ 8 modes |
-| Build to .app bundle | — | — | ✅ |
+> ✅ Done &nbsp; 🔧 Partial &nbsp; — Not started
+
+| Area | Feature | Windows | Linux | macOS |
+|------|---------|:-------:|:-----:|:-----:|
+| **Editor** | Scintilla integration | ✅ | ✅ | ✅ |
+| | Syntax highlighting (Harbour lexer) | ✅ | ✅ | ✅ |
+| | Code folding (Harbour-aware) | ✅ | ✅ | ✅ |
+| | Auto-complete (150+ keywords) | ✅ | ✅ | ✅ |
+| | Find / Replace bar | ✅ | ✅ | ✅ |
+| | Find Next / Find Previous | ✅ | ✅ | ✅ |
+| | Undo / Redo / Cut / Copy / Paste | ✅ | ✅ | ✅ |
+| | Auto-indent on Enter | ✅ | ✅ | ✅ |
+| | Toggle comment (Ctrl+/) | ✅ | ✅ | ✅ |
+| | Line numbers + status bar | ✅ | ✅ | ✅ |
+| | Tabbed multi-file editing | ✅ | ✅ | ✅ |
+| **Designer** | Visual form designer (WYSIWYG) | ✅ | ✅ | ✅ |
+| | Drag & drop from palette | ✅ | ✅ | ✅ |
+| | Two-way code sync | ✅ | ✅ | ✅ |
+| | Object Inspector (properties) | ✅ | ✅ | ✅ |
+| | Object Inspector (events) | ✅ | ✅ | ✅ |
+| | Format > Align controls (8 modes) | — | ✅ | ✅ |
+| | 109 components in 14 tabs | ✅ | ✅ | ✅ |
+| **Debugger** | Debugger panel (5 tabs) | ✅ | ✅ | ✅ |
+| | Debug toolbar (Run/Step/Stop) | — | ✅ | — |
+| | In-process .hrb execution | ✅ | ✅ | ✅ |
+| | Breakpoint management | ✅ | ✅ | ✅ |
+| | Local variable inspection | ✅ | ✅ | ✅ |
+| | Call stack display | ✅ | ✅ | ✅ |
+| | Unit tests (16 tests) | — | ✅ | — |
+| **Panels** | AI Assistant (Ollama chat) | ✅ | ✅ | ✅ |
+| | Project Inspector (TreeView) | ✅ | ✅ | ✅ |
+| | Editor Colors dialog | ✅ | ✅ | ✅ |
+| | Project Options (4 tabs) | ✅ | ✅ | ✅ |
+| **Project** | New / Open / Save / Save As | ✅ | ✅ | ✅ |
+| | Multi-form projects | ✅ | ✅ | ✅ |
+| | Add / Remove from project | ✅ | ✅ | ✅ |
+| | Build & Run (native compile) | ✅ | ✅ | ✅ |
+| | Build to .app bundle | — | — | ✅ |
+| **Database** | TDatabase (abstract base) | ✅ | ✅ | ✅ |
+| | TDBFTable (native DBF/CDX) | ✅ | ✅ | ✅ |
+| | TSQLite (SQLite3) | ✅ | ✅ | ✅ |
+| | TMySQL / TMariaDB | 🔧 | 🔧 | 🔧 |
+| | TPostgreSQL | 🔧 | 🔧 | 🔧 |
+| | TFirebird / TSQLServer / TOracle / TMongoDB | 🔧 | 🔧 | 🔧 |
+| **Theme** | Dark mode | ✅ | ✅ | ✅ |
+| | Dark code editor | ✅ | ✅ | ✅ |
+| **Menus** | All menus functional (zero stubs) | ✅ 35 | ✅ 47 | ✅ 53 |
+| **Toolbar** | All buttons functional | ✅ 9 | ✅ 15 | ✅ 9 |
+| | Two-row toolbar | — | ✅ | — |
+
+### Metrics
+
+| Metric | Windows | Linux | macOS |
+|--------|:-------:|:-----:|:-----:|
+| CodeEditor HB_FUNCs | 18 | 22 | 26 |
+| Platform-specific funcs | 20 | 16 | 11 |
 | Helper functions | 13 | 42 | 42 |
+| Backend lines of code | ~4400 | ~5500 | ~3800 |
+| IDE .prg lines of code | ~1700 | ~1200 | ~1400 |
 
 ---
 
