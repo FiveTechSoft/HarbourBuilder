@@ -414,6 +414,7 @@ CLASS TApplication
 ENDCLASS
 
 METHOD New() CLASS TApplication
+   SetDPIAware()
 return Self
 
 METHOD CreateForm( oForm ) CLASS TApplication

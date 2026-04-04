@@ -1480,6 +1480,13 @@ static function TBRun()
    for i := 1 to Len( aForms )
       cAllPrg += MemoRead( cBuildDir + "\" + aForms[i][1] + ".prg" ) + Chr(10)
    next
+   // Add DPI awareness to prevent zoom distortion on close
+   cAllPrg += Chr(10)
+   cAllPrg += "#pragma BEGINDUMP" + Chr(10)
+   cAllPrg += '#include <windows.h>' + Chr(10)
+   cAllPrg += '#include "hbapi.h"' + Chr(10)
+   cAllPrg += "HB_FUNC( SETDPIAWARE ) { SetProcessDPIAware(); }" + Chr(10)
+   cAllPrg += "#pragma ENDDUMP" + Chr(10)
    MemoWrit( cBuildDir + "\main.prg", cAllPrg )
 
    // Step 3: Compile user code with Harbour
