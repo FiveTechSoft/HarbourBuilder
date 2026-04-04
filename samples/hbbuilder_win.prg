@@ -1084,7 +1084,8 @@ static function WireDesignForm()
       InspectorRefresh( oDesignForm:hCpp ) }
 
    // When design form gets focus, bring all IDE windows to front
-   oDesignForm:OnActivate := { || RestoreAllIDEWindows() }
+   // (disabled: was blocking resize by stealing focus)
+   // oDesignForm:OnActivate := { || RestoreAllIDEWindows() }
 
 return nil
 

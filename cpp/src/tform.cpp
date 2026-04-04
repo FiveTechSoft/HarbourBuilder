@@ -164,7 +164,7 @@ void TForm::CreateHandle( HWND hParent )
    /* Create window */
    {
       DWORD dwStyle;
-      DWORD dwExStyle = WS_EX_COMPOSITED;
+      DWORD dwExStyle = 0;
 
       if( FAppBar )
       {
@@ -178,7 +178,7 @@ void TForm::CreateHandle( HWND hParent )
          dwStyle = WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_CLIPCHILDREN;
          dwExStyle = WS_EX_TOOLWINDOW;
       }
-      else if( FSizable )
+      else if( FSizable || FDesignMode )
          dwStyle = WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN;
       else
          dwStyle = WS_POPUP | WS_CAPTION | WS_SYSMENU | DS_MODALFRAME | WS_CLIPCHILDREN;
@@ -250,6 +250,8 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
          }
          break;
       }
+
+      /* WM_NCHITTEST: default handling (resize via standard window borders) */
 
       case WM_COMMAND:
       {
@@ -680,6 +682,8 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
          if( FDesignMode )
          {
             int mx = (short)LOWORD(lParam), my = (short)HIWORD(lParam) - FClientTop;
+
+
             BOOL bCtrl = ( wParam & MK_CONTROL ) != 0;
             int nHandle;
             TControl * pHit;
@@ -797,7 +801,7 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
             return 0;
          }
 
-         /* Resize */
+         /* Control resize */
          if( FDesignMode && FResizing && FSelCount > 0 )
          {
             int mx = (short)LOWORD(lParam), my = (short)HIWORD(lParam) - FClientTop;
@@ -1502,9 +1506,18 @@ void TForm::PaintSelectionHandles( HDC hDC )
    DeleteObject( hWhite );
 }
 
+/* Overlay WndProc: passes all hits through to the window below */
+static LRESULT CALLBACK OverlayWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
+{
+   if( msg == WM_NCHITTEST )
+      return HTTRANSPARENT;
+   return DefWindowProc( hWnd, msg, wParam, lParam );
+}
+
 /* Updates the layered popup overlay window with current selection handles */
 void TForm::UpdateOverlay()
 {
+   /* Overlay re-enabled */
    RECT rcClient;
    POINT ptClient = {0, 0};
    int w, h, x, y;
@@ -1535,12 +1548,23 @@ void TForm::UpdateOverlay()
    /* Create overlay popup owned by the form (stays with form in z-order) */
    if( !FOverlay )
    {
+      /* Register overlay class that returns HTTRANSPARENT for all hit tests */
+      static BOOL bOverlayReg = FALSE;
+      if( !bOverlayReg )
+      {
+         WNDCLASSEXA wc = { sizeof(WNDCLASSEXA) };
+         wc.lpfnWndProc = OverlayWndProc;
+         wc.hInstance = GetModuleHandle(NULL);
+         wc.lpszClassName = "HbOverlay";
+         RegisterClassExA( &wc );
+         bOverlayReg = TRUE;
+      }
       FOverlay = CreateWindowExA(
          WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW,
-         "STATIC", "",
+         "HbOverlay", "",
          WS_POPUP,
          0, 0, 1, 1,
-         FHandle,  /* owner = form, so overlay follows form's z-order */
+         FHandle,
          NULL, GetModuleHandle(NULL), NULL );
    }
 
