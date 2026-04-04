@@ -2733,18 +2733,602 @@ HB_FUNC( GTK_GETWINDOWBOTTOM )
 }
 
 /* ======================================================================
- * Code Editor - GtkTextView with syntax highlighting (dark theme)
+ * Code Editor - Scintilla with syntax highlighting and TABS (dark theme)
+ * Replaces the GtkTextView-based editor with Scintilla 5.x via GTK widget.
  * ====================================================================== */
 
-#define GUTTER_WIDTH 50
-#define CE_MAX_TABS  16
+#include <dlfcn.h>
+
+#define CE_MAX_TABS  32
+#define STATUSBAR_HEIGHT 24
+
+/* Scintilla message defines */
+#define SCI_SETTEXT        2181
+#define SCI_GETTEXT        2182
+#define SCI_GETTEXTLENGTH  2183
+#define SCI_ADDTEXT        2001
+#define SCI_CLEARALL       2004
+#define SCI_GETLENGTH      2006
+#define SCI_GETCURRENTPOS  2008
+#define SCI_SETSEL         2160
+#define SCI_GOTOPOS        2025
+#define SCI_GOTOLINE       2024
+#define SCI_SCROLLCARET    2169
+#define SCI_SETREADONLY    2171
+#define SCI_GETREADONLY    2173
+#define SCI_REPLACESEL     2170
+#define SCI_SEARCHNEXT     2367
+#define SCI_SEARCHPREV     2368
+#define SCI_SETTARGETSTART 2190
+#define SCI_SETTARGETEND   2192
+#define SCI_SEARCHINTARGET 2197
+#define SCI_REPLACETARGET  2194
+#define SCI_GETSELECTIONSTART 2143
+#define SCI_GETSELECTIONEND   2145
+#define SCI_SETSELECTIONSTART 2142
+#define SCI_SETSELECTIONEND   2144
+#define SCI_FINDTEXT       2150
+#define SCI_GETCHARAT      2007
+#define SCI_EMPTYUNDOBUFFER    2175
+#define SCI_SETUNDOCOLLECTION  2012
+#define SCI_SETSAVEPOINT       2014
+#define SCI_SETFOCUS           2380
+
+/* Lexer + Styles */
+#define SCI_SETILEXER      4033
+#define SCI_SETKEYWORDS    4005
+#define SCI_SETPROPERTY    4004
+#define SCI_STYLESETFORE   2051
+#define SCI_STYLESETBACK   2052
+#define SCI_STYLESETBOLD   2053
+#define SCI_STYLESETITALIC 2054
+#define SCI_STYLESETSIZE   2055
+#define SCI_STYLESETFONT   2056
+#define SCI_STYLECLEARALL  2050
+
+/* Margin */
+#define SCI_SETMARGINTYPEN     2240
+#define SCI_SETMARGINWIDTHN    2242
+#define SCI_SETMARGINSENSITIVEN 2246
+#define SC_MARGIN_NUMBER       1
+#define SC_MARGIN_SYMBOL       0
+
+/* Folding */
+#define SCI_SETFOLDFLAGS       2233
+#define SCI_SETMARGINMASKN     2244
+#define SCI_MARKERDEFINE       2040
+#define SCI_MARKERSETFORE      2041
+#define SCI_MARKERSETBACK      2042
+#define SCI_SETAUTOMATICFOLD   2663
+#define SC_AUTOMATICFOLD_SHOW  0x01
+#define SC_AUTOMATICFOLD_CLICK 0x02
+#define SC_AUTOMATICFOLD_CHANGE 0x04
+#define SC_FOLDLEVELBASE       0x400
+#define SC_FOLDLEVELHEADERFLAG 0x2000
+#define SC_MARKNUM_FOLDEROPEN  31
+#define SC_MARKNUM_FOLDER      30
+#define SC_MARKNUM_FOLDERSUB   29
+#define SC_MARKNUM_FOLDERTAIL  28
+#define SC_MARKNUM_FOLDEREND   25
+#define SC_MARKNUM_FOLDEROPENMID 26
+#define SC_MARKNUM_FOLDERMIDTAIL 27
+#define SC_MARK_BOXPLUS         12
+#define SC_MARK_BOXMINUS        14
+#define SC_MARK_VLINE           9
+#define SC_MARK_LCORNER         10
+#define SC_MARK_BOXPLUSCONNECTED  13
+#define SC_MARK_BOXMINUSCONNECTED 15
+#define SC_MARK_TCORNER         11
+#define SC_MASK_FOLDERS          0xFE000000
+
+/* Misc */
+#define SCI_SETTABWIDTH        2036
+#define SCI_SETINDENTATIONGUIDES 2132
+#define SC_IV_LOOKBOTH           3
+#define SCI_SETVIEWEOL         2356
+#define SCI_SETWRAPMODE        2268
+#define SCI_SETSELEOLFILLED    2477
+#define SCI_SETCARETFORE       2069
+#define SCI_SETSELBACK         2068
+#define SCI_SETWHITESPACEFORE  2084
+#define SCI_SETWHITESPACEBACK  2085
+#define SCI_SETEXTRAASCENT     2525
+#define SCI_SETEXTRADESCENT    2527
+#define SCI_GETCURLINE         2027
+#define SCI_LINEFROMPOSITION   2166
+#define SCI_POSITIONFROMLINE   2167
+#define SCI_GETLINECOUNT       2154
+#define SCI_GETLINE            2153
+#define SCI_LINELENGTH         2350
+#define SCI_SETCODEPAGE        2037
+#define SC_CP_UTF8             65001
+#define STYLE_DEFAULT          32
+#define STYLE_LINENUMBER       33
+#define SCI_SETFOLDLEVEL       2222
+#define SCI_GETFOLDLEVEL       2223
+#define SCI_TOGGLEFOLD         2231
+#define SCI_GETCOLUMN          2129
+#define SCI_GETOVERTYPE        2187
+#define SCI_GETLINEINDENTATION    2127
+#define SCI_SETLINEINDENTATION    2126
+#define SCI_GETLINEINDENTPOSITION 2128
+#define SCI_LINEDUPLICATE      2469
+#define SCI_LINEDELETE         2338
+
+/* Auto-complete */
+#define SCI_AUTOCSHOW          2100
+#define SCI_AUTOCCANCEL        2101
+#define SCI_AUTOCACTIVE        2102
+#define SCI_AUTOCSETSEPARATOR  2106
+#define SCI_AUTOCSETIGNORECASE 2115
+
+/* C/C++ lexer style IDs (used for Harbour too) */
+#define SCE_C_DEFAULT          0
+#define SCE_C_COMMENT          1
+#define SCE_C_COMMENTLINE      2
+#define SCE_C_COMMENTDOC       3
+#define SCE_C_NUMBER           4
+#define SCE_C_WORD             5
+#define SCE_C_STRING           6
+#define SCE_C_CHARACTER        7
+#define SCE_C_PREPROCESSOR     9
+#define SCE_C_OPERATOR         10
+#define SCE_C_IDENTIFIER       11
+#define SCE_C_WORD2            16
+#define SCE_C_GLOBALCLASS      19
+
+/* Scintilla notification codes */
+#define SCN_CHARADDED     2001
+#define SCN_UPDATEUI      2007
+#define SCN_MODIFIED      2008
+#define SCN_MARGINCLICK   2010
+
+/* Scintilla GTK function types */
+typedef void * ILexer5;
+typedef ILexer5 * (* CreateLexerFn)(const char * name);
+
+/* GTK Scintilla API function pointers */
+typedef GtkWidget * (* ScintillaNewFn)(void);
+typedef ssize_t (* ScintillaSendMessageFn)(GtkWidget *, unsigned int, uintptr_t, intptr_t);
+
+static void * s_hScintilla = NULL;
+static void * s_hLexilla   = NULL;
+static CreateLexerFn         s_pCreateLexer = NULL;
+static ScintillaNewFn        s_pScintillaNew = NULL;
+static ScintillaSendMessageFn s_pSciSendMsg  = NULL;
+
+/* Helper: send message to Scintilla GTK widget */
+static ssize_t SciMsg( GtkWidget * sci, unsigned int msg, uintptr_t wp, intptr_t lp )
+{
+   if( s_pSciSendMsg && sci )
+      return s_pSciSendMsg( sci, msg, wp, lp );
+   return 0;
+}
+
+/* Helper: pack RGB for Scintilla (0x00BBGGRR on all platforms) */
+static int SciRGB( int r, int g, int b )
+{
+   return r | (g << 8) | (b << 16);
+}
+
+/* Initialize Scintilla shared libraries */
+static int InitScintilla( void )
+{
+   char szPath[1024];
+   FILE * fLog;
+
+   if( s_hScintilla ) return 1;  /* already loaded */
+
+   fLog = fopen( "/tmp/scintilla_trace.log", "a" );
+
+   /* Try loading from ../resources/ relative to executable */
+   {
+      ssize_t len = readlink( "/proc/self/exe", szPath, sizeof(szPath) - 1 );
+      if( len > 0 ) {
+         szPath[len] = 0;
+         char * p = strrchr( szPath, '/' );
+         if( p ) *p = 0;
+      } else {
+         strcpy( szPath, "." );
+      }
+   }
+
+   {
+      char libPath[1024];
+      snprintf( libPath, sizeof(libPath), "%s/../resources/libscintilla.so", szPath );
+      s_hScintilla = dlopen( libPath, RTLD_LAZY );
+      if( fLog ) fprintf( fLog, "dlopen Scintilla '%s' => %p\n", libPath, s_hScintilla );
+   }
+
+   if( !s_hScintilla ) {
+      /* Try resources/ in project root */
+      char libPath[1024];
+      snprintf( libPath, sizeof(libPath), "%s/resources/libscintilla.so", szPath );
+      s_hScintilla = dlopen( libPath, RTLD_LAZY );
+      if( fLog ) fprintf( fLog, "dlopen Scintilla '%s' => %p\n", libPath, s_hScintilla );
+   }
+
+   if( !s_hScintilla ) {
+      /* Try system library path */
+      s_hScintilla = dlopen( "libscintilla.so", RTLD_LAZY );
+      if( fLog ) fprintf( fLog, "dlopen libscintilla.so (system) => %p\n", s_hScintilla );
+   }
+
+   if( !s_hScintilla ) {
+      if( fLog ) { fprintf( fLog, "FAILED to load libscintilla.so: %s\n", dlerror() ); fclose( fLog ); }
+      return 0;
+   }
+
+   /* Get Scintilla GTK API functions */
+   s_pScintillaNew = (ScintillaNewFn) dlsym( s_hScintilla, "scintilla_new" );
+   s_pSciSendMsg   = (ScintillaSendMessageFn) dlsym( s_hScintilla, "scintilla_send_message" );
+   if( fLog ) fprintf( fLog, "scintilla_new => %p, scintilla_send_message => %p\n",
+      s_pScintillaNew, s_pSciSendMsg );
+
+   if( !s_pScintillaNew || !s_pSciSendMsg ) {
+      if( fLog ) { fprintf( fLog, "FAILED to resolve Scintilla symbols\n" ); fclose( fLog ); }
+      dlclose( s_hScintilla ); s_hScintilla = NULL;
+      return 0;
+   }
+
+   /* Load Lexilla */
+   {
+      char libPath[1024];
+      snprintf( libPath, sizeof(libPath), "%s/../resources/liblexilla.so", szPath );
+      s_hLexilla = dlopen( libPath, RTLD_LAZY );
+      if( fLog ) fprintf( fLog, "dlopen Lexilla '%s' => %p\n", libPath, s_hLexilla );
+
+      if( !s_hLexilla ) {
+         snprintf( libPath, sizeof(libPath), "%s/resources/liblexilla.so", szPath );
+         s_hLexilla = dlopen( libPath, RTLD_LAZY );
+         if( fLog ) fprintf( fLog, "dlopen Lexilla '%s' => %p\n", libPath, s_hLexilla );
+      }
+
+      if( !s_hLexilla ) {
+         s_hLexilla = dlopen( "liblexilla.so", RTLD_LAZY );
+         if( fLog ) fprintf( fLog, "dlopen liblexilla.so (system) => %p\n", s_hLexilla );
+      }
+   }
+
+   if( s_hLexilla ) {
+      s_pCreateLexer = (CreateLexerFn) dlsym( s_hLexilla, "CreateLexer" );
+      if( fLog ) fprintf( fLog, "CreateLexer proc => %p\n", s_pCreateLexer );
+   }
+
+   if( fLog ) { fprintf( fLog, "InitScintilla OK\n" ); fclose( fLog ); }
+   return 1;
+}
+
+/* Configure Scintilla with Harbour syntax highlighting */
+static void ConfigureScintilla( GtkWidget * sci )
+{
+   ILexer5 * pLexer;
+
+   /* UTF-8 code page */
+   SciMsg( sci, SCI_SETCODEPAGE, SC_CP_UTF8, 0 );
+
+   /* Tab width */
+   SciMsg( sci, SCI_SETTABWIDTH, 3, 0 );
+
+   /* Set C/C++ lexer via Lexilla (works for Harbour too) */
+   if( s_pCreateLexer ) {
+      pLexer = s_pCreateLexer( "cpp" );
+      if( pLexer ) {
+         SciMsg( sci, SCI_SETILEXER, 0, (intptr_t) pLexer );
+      }
+   }
+
+   /* Default style: Monospace 14pt, light gray on dark */
+   SciMsg( sci, SCI_STYLESETFONT, STYLE_DEFAULT, (intptr_t) "Monospace" );
+   SciMsg( sci, SCI_STYLESETSIZE, STYLE_DEFAULT, 14 );
+   SciMsg( sci, SCI_STYLESETFORE, STYLE_DEFAULT, SciRGB(212,212,212) );
+   SciMsg( sci, SCI_STYLESETBACK, STYLE_DEFAULT, SciRGB(30,30,30) );
+   SciMsg( sci, SCI_STYLECLEARALL, 0, 0 );  /* Apply default to all styles */
+
+   /* Line number margin */
+   SciMsg( sci, SCI_SETMARGINTYPEN, 0, SC_MARGIN_NUMBER );
+   SciMsg( sci, SCI_SETMARGINWIDTHN, 0, 48 );
+   SciMsg( sci, SCI_STYLESETFORE, STYLE_LINENUMBER, SciRGB(133,133,133) );
+   SciMsg( sci, SCI_STYLESETBACK, STYLE_LINENUMBER, SciRGB(37,37,38) );
+
+   /* Folding margin */
+   SciMsg( sci, SCI_SETMARGINTYPEN, 2, SC_MARGIN_SYMBOL );
+   SciMsg( sci, SCI_SETMARGINMASKN, 2, SC_MASK_FOLDERS );
+   SciMsg( sci, SCI_SETMARGINWIDTHN, 2, 16 );
+   SciMsg( sci, SCI_SETMARGINSENSITIVEN, 2, 1 );
+   SciMsg( sci, SCI_SETAUTOMATICFOLD,
+      SC_AUTOMATICFOLD_SHOW | SC_AUTOMATICFOLD_CLICK | SC_AUTOMATICFOLD_CHANGE, 0 );
+
+   /* Fold markers - box style */
+   SciMsg( sci, SCI_MARKERDEFINE, SC_MARKNUM_FOLDER,        SC_MARK_BOXPLUS );
+   SciMsg( sci, SCI_MARKERDEFINE, SC_MARKNUM_FOLDEROPEN,    SC_MARK_BOXMINUS );
+   SciMsg( sci, SCI_MARKERDEFINE, SC_MARKNUM_FOLDERSUB,     SC_MARK_VLINE );
+   SciMsg( sci, SCI_MARKERDEFINE, SC_MARKNUM_FOLDERTAIL,    SC_MARK_LCORNER );
+   SciMsg( sci, SCI_MARKERDEFINE, SC_MARKNUM_FOLDEREND,     SC_MARK_BOXPLUSCONNECTED );
+   SciMsg( sci, SCI_MARKERDEFINE, SC_MARKNUM_FOLDEROPENMID, SC_MARK_BOXMINUSCONNECTED );
+   SciMsg( sci, SCI_MARKERDEFINE, SC_MARKNUM_FOLDERMIDTAIL, SC_MARK_TCORNER );
+
+   { int m;
+     for( m = 25; m <= 31; m++ ) {
+        SciMsg( sci, SCI_MARKERSETFORE, m, SciRGB(160,160,160) );
+        SciMsg( sci, SCI_MARKERSETBACK, m, SciRGB(37,37,38) );
+     }
+   }
+
+   /* Enable folding property */
+   SciMsg( sci, SCI_SETPROPERTY, (uintptr_t) "fold",              (intptr_t) "1" );
+   SciMsg( sci, SCI_SETPROPERTY, (uintptr_t) "fold.compact",      (intptr_t) "0" );
+   SciMsg( sci, SCI_SETPROPERTY, (uintptr_t) "fold.comment",      (intptr_t) "1" );
+   SciMsg( sci, SCI_SETPROPERTY, (uintptr_t) "fold.preprocessor", (intptr_t) "1" );
+
+   /* ===== Harbour keyword lists ===== */
+   /* Keywords set 0: Harbour language keywords (all cases) */
+   SciMsg( sci, SCI_SETKEYWORDS, 0, (intptr_t)
+      "function procedure return local static private public "
+      "if else elseif endif do while enddo for next to step in "
+      "switch case otherwise endswitch endcase default "
+      "class endclass method data access assign inherit inline "
+      "nil self super begin end exit loop with sequence recover "
+      "try catch finally true false and or not "
+      "init announce request external memvar field parameters "
+      "break continue optional redefine "
+      "FUNCTION PROCEDURE RETURN LOCAL STATIC PRIVATE PUBLIC "
+      "IF ELSE ELSEIF ENDIF DO WHILE ENDDO FOR NEXT TO STEP IN "
+      "SWITCH CASE OTHERWISE ENDSWITCH ENDCASE DEFAULT "
+      "CLASS ENDCLASS METHOD DATA ACCESS ASSIGN INHERIT INLINE "
+      "NIL SELF SUPER BEGIN END EXIT LOOP WITH SEQUENCE RECOVER "
+      "TRY CATCH FINALLY TRUE FALSE AND OR NOT "
+      "INIT ANNOUNCE REQUEST EXTERNAL MEMVAR FIELD PARAMETERS "
+      "BREAK CONTINUE OPTIONAL REDEFINE "
+      "Function Procedure Return Local Static Private Public "
+      "If Else ElseIf EndIf Do While EndDo For Next To Step In "
+      "Switch Case Otherwise EndSwitch EndCase Default "
+      "Class EndClass Method Data Access Assign Inherit Inline "
+      "Nil Self Super Begin End Exit Loop With Sequence Recover "
+      "Try Catch Finally True False And Or Not " );
+
+   /* Keywords set 1: xBase commands + FiveWin (uppercase mapped to WORD2) */
+   SciMsg( sci, SCI_SETKEYWORDS, 1, (intptr_t)
+      "DEFINE ACTIVATE FORM TITLE SIZE FONT SIZABLE APPBAR TOOLWINDOW "
+      "CENTERED SAY GET BUTTON PROMPT CHECKBOX COMBOBOX GROUPBOX "
+      "ITEMS CHECKED DEFAULT CANCEL OF VAR ACTION ON VALID WHEN FROM "
+      "TOOLBAR SEPARATOR TOOLTIP MENUBAR POPUP MENUITEM MENUSEPARATOR "
+      "PALETTE REQUEST ACCEL BITMAP ICON BROWSE DIALOG "
+      "LISTBOX RADIOBUTTON SCROLLBAR PANEL IMAGE SHAPE BEVEL "
+      "TREEVIEW LISTVIEW PROGRESSBAR RICHEDIT STATUSBAR SPLITTER "
+      "TABS TAB MEMO DATEPICKER SPINNER GAUGE HEADER "
+      "REPORT BAND COLUMN PRINTER PREVIEW "
+      "WEBVIEW WEBSERVER SOCKET WEBSOCKET HTTPGET HTTPPOST "
+      "THREAD MUTEX SEMAPHORE CRITICALSECTION ATOMICOP "
+      "OLLAMA OPENAI GEMINI CLAUDE DEEPSEEK TRANSFORMER " );
+
+   /* ===== Syntax highlighting colors (VS Code Dark+ inspired) ===== */
+   /* Keywords: bright blue, bold */
+   SciMsg( sci, SCI_STYLESETFORE, SCE_C_WORD, SciRGB(86,156,214) );
+   SciMsg( sci, SCI_STYLESETBOLD, SCE_C_WORD, 1 );
+
+   /* Commands (WORD2): teal/cyan */
+   SciMsg( sci, SCI_STYLESETFORE, SCE_C_WORD2, SciRGB(78,201,176) );
+
+   /* Comments: green, italic */
+   SciMsg( sci, SCI_STYLESETFORE, SCE_C_COMMENT,     SciRGB(106,153,85) );
+   SciMsg( sci, SCI_STYLESETFORE, SCE_C_COMMENTLINE,  SciRGB(106,153,85) );
+   SciMsg( sci, SCI_STYLESETFORE, SCE_C_COMMENTDOC,   SciRGB(106,153,85) );
+   SciMsg( sci, SCI_STYLESETITALIC, SCE_C_COMMENT, 1 );
+   SciMsg( sci, SCI_STYLESETITALIC, SCE_C_COMMENTLINE, 1 );
+
+   /* Strings: orange */
+   SciMsg( sci, SCI_STYLESETFORE, SCE_C_STRING,    SciRGB(206,145,120) );
+   SciMsg( sci, SCI_STYLESETFORE, SCE_C_CHARACTER,  SciRGB(206,145,120) );
+
+   /* Numbers: light green */
+   SciMsg( sci, SCI_STYLESETFORE, SCE_C_NUMBER, SciRGB(181,206,168) );
+
+   /* Preprocessor: magenta */
+   SciMsg( sci, SCI_STYLESETFORE, SCE_C_PREPROCESSOR, SciRGB(197,134,192) );
+
+   /* Operators: light gray */
+   SciMsg( sci, SCI_STYLESETFORE, SCE_C_OPERATOR, SciRGB(212,212,212) );
+
+   /* Identifiers: default light gray */
+   SciMsg( sci, SCI_STYLESETFORE, SCE_C_IDENTIFIER, SciRGB(220,220,220) );
+
+   /* Global classes: teal */
+   SciMsg( sci, SCI_STYLESETFORE, SCE_C_GLOBALCLASS, SciRGB(78,201,176) );
+
+   /* Caret and selection */
+   SciMsg( sci, SCI_SETCARETFORE, SciRGB(255,255,255), 0 );
+   SciMsg( sci, SCI_SETSELBACK, 1, SciRGB(38,79,120) );
+
+   /* Extra line spacing for readability */
+   SciMsg( sci, SCI_SETEXTRAASCENT, 1, 0 );
+   SciMsg( sci, SCI_SETEXTRADESCENT, 1, 0 );
+
+   /* Indentation guides */
+   SciMsg( sci, SCI_SETINDENTATIONGUIDES, SC_IV_LOOKBOTH, 0 );
+
+   { FILE * fLog = fopen( "/tmp/scintilla_trace.log", "a" );
+     if( fLog ) { fprintf( fLog, "ConfigureScintilla done for widget=%p\n", sci ); fclose( fLog ); }
+   }
+}
+
+/* ======================================================================
+ * Harbour-aware code folding
+ * Scans all lines and sets fold levels based on Harbour keywords
+ * ====================================================================== */
+
+static int LineStartsWithCI_GTK( const char * line, int lineLen, const char * word )
+{
+   int i = 0, wLen = (int)strlen(word);
+   while( i < lineLen && (line[i] == ' ' || line[i] == '\t') ) i++;
+   if( i + wLen > lineLen ) return 0;
+   if( strncasecmp( line + i, word, wLen ) != 0 ) return 0;
+   if( i + wLen < lineLen ) {
+      char c = line[i + wLen];
+      if( (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_' || (c >= '0' && c <= '9') )
+         return 0;
+   }
+   return 1;
+}
+
+static void UpdateHarbourFolding( GtkWidget * sci )
+{
+   int lineCount, i, level;
+
+   if( !sci ) return;
+
+   lineCount = (int) SciMsg( sci, SCI_GETLINECOUNT, 0, 0 );
+   level = SC_FOLDLEVELBASE;
+
+   for( i = 0; i < lineCount; i++ )
+   {
+      int lineLen = (int) SciMsg( sci, SCI_LINELENGTH, i, 0 );
+      int curLevel = level;
+      int nextLevel = level;
+      int isHeader = 0;
+
+      if( lineLen > 0 && lineLen < 4096 )
+      {
+         char * buf = (char *) malloc( lineLen + 1 );
+         SciMsg( sci, SCI_GETLINE, i, (intptr_t) buf );
+         buf[lineLen] = 0;
+
+         while( lineLen > 0 && (buf[lineLen-1] == '\r' || buf[lineLen-1] == '\n') )
+            buf[--lineLen] = 0;
+
+         if( LineStartsWithCI_GTK(buf, lineLen, "function") ||
+             LineStartsWithCI_GTK(buf, lineLen, "procedure") ||
+             LineStartsWithCI_GTK(buf, lineLen, "method") )
+         {
+            isHeader = 1; nextLevel = level + 1;
+         }
+         else if( LineStartsWithCI_GTK(buf, lineLen, "class") &&
+                  !LineStartsWithCI_GTK(buf, lineLen, "endclass") )
+         {
+            isHeader = 1; nextLevel = level + 1;
+         }
+         else if( LineStartsWithCI_GTK(buf, lineLen, "if") &&
+                  !LineStartsWithCI_GTK(buf, lineLen, "endif") )
+         {
+            isHeader = 1; nextLevel = level + 1;
+         }
+         else if( LineStartsWithCI_GTK(buf, lineLen, "do") )
+         {
+            isHeader = 1; nextLevel = level + 1;
+         }
+         else if( LineStartsWithCI_GTK(buf, lineLen, "for") )
+         {
+            isHeader = 1; nextLevel = level + 1;
+         }
+         else if( LineStartsWithCI_GTK(buf, lineLen, "switch") &&
+                  !LineStartsWithCI_GTK(buf, lineLen, "endswitch") )
+         {
+            isHeader = 1; nextLevel = level + 1;
+         }
+         else if( LineStartsWithCI_GTK(buf, lineLen, "begin") )
+         {
+            isHeader = 1; nextLevel = level + 1;
+         }
+         else if( LineStartsWithCI_GTK(buf, lineLen, "while") &&
+                  !LineStartsWithCI_GTK(buf, lineLen, "enddo") )
+         {
+            isHeader = 1; nextLevel = level + 1;
+         }
+         else if( LineStartsWithCI_GTK(buf, lineLen, "#pragma BEGINDUMP") ||
+                  LineStartsWithCI_GTK(buf, lineLen, "#pragma begindump") )
+         {
+            isHeader = 1; nextLevel = level + 1;
+         }
+         else if( LineStartsWithCI_GTK(buf, lineLen, "return") ||
+                  LineStartsWithCI_GTK(buf, lineLen, "endclass") ||
+                  LineStartsWithCI_GTK(buf, lineLen, "endif") ||
+                  LineStartsWithCI_GTK(buf, lineLen, "enddo") ||
+                  LineStartsWithCI_GTK(buf, lineLen, "next") ||
+                  LineStartsWithCI_GTK(buf, lineLen, "endswitch") ||
+                  LineStartsWithCI_GTK(buf, lineLen, "endcase") ||
+                  LineStartsWithCI_GTK(buf, lineLen, "end") ||
+                  LineStartsWithCI_GTK(buf, lineLen, "#pragma ENDDUMP") ||
+                  LineStartsWithCI_GTK(buf, lineLen, "#pragma enddump") )
+         {
+            if( level > SC_FOLDLEVELBASE )
+            {
+               curLevel = level - 1;
+               nextLevel = level - 1;
+            }
+         }
+
+         free( buf );
+      }
+
+      SciMsg( sci, SCI_SETFOLDLEVEL, i,
+         curLevel | (isHeader ? SC_FOLDLEVELHEADERFLAG : 0) );
+
+      level = nextLevel;
+   }
+}
+
+/* All Harbour keywords + functions for auto-complete (space-separated) */
+static const char * s_acList =
+   "AAdd AClone ADel AEval AFill AIns ASize AScan ASort "
+   "Abs AllTrim Array Asc At "
+   "begin break "
+   "CToD Chr class "
+   "DToC Date data default do "
+   "Empty Eval "
+   "FClose FOpen FRead FWrite File "
+   "GetEnv "
+   "HB_ATokens HB_CRC32 HB_DirCreate HB_FNameDir HB_Random HB_StrToUTF8 HB_UTF8ToStr HB_ValToStr "
+   "Iif If Int "
+   "LTrim Len Lower "
+   "Max MemoRead MemoWrit Min MsgInfo MsgStop MsgYesNo "
+   "RTrim RAt Replicate Round "
+   "Space Str StrTran SubStr "
+   "Time Type "
+   "Upper "
+   "Val ValType "
+   "access assign "
+   "case class "
+   "else elseif end endcase endclass enddo endif endswitch exit "
+   "for function "
+   "if in inherit inline "
+   "local loop "
+   "method "
+   "next nil not "
+   "or otherwise "
+   "private procedure public "
+   "recover request return "
+   "self sequence static step super switch "
+   "to try "
+   "while with";
+
+static void CE_ShowAutoComplete( GtkWidget * sci )
+{
+   int nPos, nStart;
+
+   if( !sci ) return;
+
+   nPos = (int) SciMsg( sci, SCI_GETCURRENTPOS, 0, 0 );
+   nStart = nPos;
+
+   while( nStart > 0 ) {
+      int ch = (int) SciMsg( sci, SCI_GETCHARAT, nStart - 1, 0 );
+      if( (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') ||
+          (ch >= '0' && ch <= '9') || ch == '_' )
+         nStart--;
+      else
+         break;
+   }
+
+   if( nPos - nStart >= 2 ) {
+      SciMsg( sci, SCI_AUTOCSETIGNORECASE, 1, 0 );
+      SciMsg( sci, SCI_AUTOCSETSEPARATOR, ' ', 0 );
+      SciMsg( sci, SCI_AUTOCSHOW, nPos - nStart, (intptr_t) s_acList );
+   }
+}
 
 typedef struct {
    GtkWidget *    window;
-   GtkWidget *    textView;
-   GtkWidget *    scrollView;
-   GtkWidget *    gutterView;  /* GtkDrawingArea for line numbers */
-   GtkTextBuffer * buffer;
+   GtkWidget *    sciWidget;   /* Scintilla GTK widget */
    /* Tabs */
    GtkWidget *    tabBar;      /* GtkNotebook used as tab bar */
    char           tabNames[CE_MAX_TABS][64];
@@ -2752,224 +3336,378 @@ typedef struct {
    int            nTabs;
    int            nActiveTab;  /* 0-based */
    PHB_ITEM       pOnTabChange;
+   /* Find bar */
+   GtkWidget *    findBar;
+   GtkWidget *    findEntry;
+   GtkWidget *    findLabel;
+   GtkWidget *    replaceEntry;
+   int            bFindVisible;
+   int            bReplaceVisible;
+   /* Status bar */
+   GtkWidget *    statusBar;
 } CODEEDITOR;
 
-/* Harbour/xBase keywords for syntax highlighting */
-static const char * s_keywords[] = {
-   "function", "procedure", "return", "local", "static", "private", "public",
-   "if", "else", "elseif", "endif", "do", "while", "enddo", "for", "next", "to", "step",
-   "switch", "case", "otherwise", "endswitch", "endcase",
-   "class", "endclass", "method", "data", "access", "assign", "inherit", "inline",
-   "nil", "self", "begin", "end", "exit", "loop", "with",
-   NULL
-};
-
-/* xBase commands (uppercase) */
-static const char * s_commands[] = {
-   "DEFINE", "ACTIVATE", "FORM", "TITLE", "SIZE", "FONT", "SIZABLE", "APPBAR", "TOOLWINDOW",
-   "CENTERED", "SAY", "GET", "BUTTON", "PROMPT", "CHECKBOX", "COMBOBOX", "GROUPBOX",
-   "ITEMS", "CHECKED", "DEFAULT", "CANCEL", "OF", "VAR", "ACTION",
-   "TOOLBAR", "SEPARATOR", "TOOLTIP", "MENUBAR", "POPUP", "MENUITEM", "MENUSEPARATOR",
-   "PALETTE", "REQUEST",
-   NULL
-};
-
-static int CE_IsWordChar( char c )
+/* Save current Scintilla text to the active tab's buffer */
+static void SaveCurrentTabText( CODEEDITOR * ed )
 {
-   return ( c >= 'A' && c <= 'Z' ) || ( c >= 'a' && c <= 'z' ) ||
-          ( c >= '0' && c <= '9' ) || c == '_';
+   int nLen;
+   if( !ed || !ed->sciWidget || ed->nActiveTab < 0 || ed->nActiveTab >= ed->nTabs )
+      return;
+
+   if( ed->tabTexts[ed->nActiveTab] )
+      free( ed->tabTexts[ed->nActiveTab] );
+
+   nLen = (int) SciMsg( ed->sciWidget, SCI_GETLENGTH, 0, 0 );
+   ed->tabTexts[ed->nActiveTab] = (char *) malloc( nLen + 1 );
+   SciMsg( ed->sciWidget, SCI_GETTEXT, nLen + 1, (intptr_t) ed->tabTexts[ed->nActiveTab] );
 }
 
-static int CE_IsKeyword( const char * word, int len )
+/* Switch to a different tab */
+static void CE_SwitchTab( CODEEDITOR * ed, int nNewTab )
 {
-   char buf[64];
-   if( len <= 0 || len >= 63 ) return 0;
-   for( int i = 0; i < len; i++ ) buf[i] = (char)tolower( (unsigned char)word[i] );
-   buf[len] = 0;
-   for( int i = 0; s_keywords[i]; i++ )
-      if( strcmp( buf, s_keywords[i] ) == 0 ) return 1;
-   return 0;
+   if( !ed || nNewTab < 0 || nNewTab >= ed->nTabs || nNewTab == ed->nActiveTab )
+      return;
+
+   SaveCurrentTabText( ed );
+
+   ed->nActiveTab = nNewTab;
+   SciMsg( ed->sciWidget, SCI_SETTEXT, 0,
+      (intptr_t)( ed->tabTexts[nNewTab] ? ed->tabTexts[nNewTab] : "" ) );
+
+   SciMsg( ed->sciWidget, SCI_EMPTYUNDOBUFFER, 0, 0 );
+   UpdateHarbourFolding( ed->sciWidget );
 }
 
-static int CE_IsCommand( const char * word, int len )
+/* Update status bar: Ln X, Col Y | INS/OVR | lines | chars */
+static void UpdateStatusBar( CODEEDITOR * ed )
 {
-   char buf[64];
-   if( len <= 0 || len >= 63 ) return 0;
-   memcpy( buf, word, len ); buf[len] = 0;
-   for( int i = 0; s_commands[i]; i++ )
-      if( strcmp( buf, s_commands[i] ) == 0 ) return 1;
-   return 0;
+   int pos, line, col, lineCount, nLen, ovr;
+   char szStatus[256];
+
+   if( !ed || !ed->sciWidget || !ed->statusBar ) return;
+
+   pos = (int) SciMsg( ed->sciWidget, SCI_GETCURRENTPOS, 0, 0 );
+   line = (int) SciMsg( ed->sciWidget, SCI_LINEFROMPOSITION, pos, 0 );
+   col = (int) SciMsg( ed->sciWidget, SCI_GETCOLUMN, pos, 0 );
+   lineCount = (int) SciMsg( ed->sciWidget, SCI_GETLINECOUNT, 0, 0 );
+   nLen = (int) SciMsg( ed->sciWidget, SCI_GETLENGTH, 0, 0 );
+   ovr = (int) SciMsg( ed->sciWidget, SCI_GETOVERTYPE, 0, 0 );
+
+   snprintf( szStatus, sizeof(szStatus),
+      "  Ln %d, Col %d      %s      %d lines      %d chars      UTF-8",
+      line + 1, col + 1,
+      ovr ? "OVR" : "INS",
+      lineCount, nLen );
+
+   gtk_label_set_text( GTK_LABEL(ed->statusBar), szStatus );
 }
 
-static void CE_HighlightCode( GtkTextBuffer * buffer )
+/* Find text in Scintilla */
+static void CE_FindNext( CODEEDITOR * ed, int bForward )
 {
-   GtkTextIter start, end;
-   gtk_text_buffer_get_start_iter( buffer, &start );
-   gtk_text_buffer_get_end_iter( buffer, &end );
+   const char * szFind;
+   int nPos, nCount = 0, nLen, nFindLen, nCurPos;
 
-   char * text = gtk_text_buffer_get_text( buffer, &start, &end, FALSE );
-   if( !text ) return;
-   int nLen = (int)strlen( text );
+   if( !ed || !ed->sciWidget || !ed->findEntry ) return;
 
-   /* Remove existing tags */
-   gtk_text_buffer_remove_all_tags( buffer, &start, &end );
+   szFind = gtk_entry_get_text( GTK_ENTRY(ed->findEntry) );
+   if( !szFind || !szFind[0] ) return;
 
-   int i = 0;
-   while( i < nLen )
-   {
-      /* Line comments: // */
-      if( text[i] == '/' && i + 1 < nLen && text[i+1] == '/' )
-      {
-         int s = i;
-         while( i < nLen && text[i] != '\r' && text[i] != '\n' ) i++;
-         GtkTextIter a, b;
-         gtk_text_buffer_get_iter_at_offset( buffer, &a, s );
-         gtk_text_buffer_get_iter_at_offset( buffer, &b, i );
-         gtk_text_buffer_apply_tag_by_name( buffer, "comment", &a, &b );
-         continue;
-      }
+   nLen = (int) SciMsg( ed->sciWidget, SCI_GETLENGTH, 0, 0 );
+   nFindLen = (int) strlen( szFind );
+   nCurPos = (int) SciMsg( ed->sciWidget,
+      bForward ? SCI_GETSELECTIONEND : SCI_GETSELECTIONSTART, 0, 0 );
 
-      /* Block comments */
-      if( text[i] == '/' && i + 1 < nLen && text[i+1] == '*' )
-      {
-         int s = i; i += 2;
-         while( i + 1 < nLen && !( text[i] == '*' && text[i+1] == '/' ) ) i++;
-         if( i + 1 < nLen ) i += 2;
-         GtkTextIter a, b;
-         gtk_text_buffer_get_iter_at_offset( buffer, &a, s );
-         gtk_text_buffer_get_iter_at_offset( buffer, &b, i );
-         gtk_text_buffer_apply_tag_by_name( buffer, "comment", &a, &b );
-         continue;
-      }
-
-      /* Strings */
-      if( text[i] == '"' || text[i] == '\'' )
-      {
-         char q = text[i]; int s = i; i++;
-         while( i < nLen && text[i] != q && text[i] != '\r' && text[i] != '\n' ) i++;
-         if( i < nLen && text[i] == q ) i++;
-         GtkTextIter a, b;
-         gtk_text_buffer_get_iter_at_offset( buffer, &a, s );
-         gtk_text_buffer_get_iter_at_offset( buffer, &b, i );
-         gtk_text_buffer_apply_tag_by_name( buffer, "string", &a, &b );
-         continue;
-      }
-
-      /* Preprocessor: # */
-      if( text[i] == '#' )
-      {
-         int s = i; i++;
-         while( i < nLen && CE_IsWordChar(text[i]) ) i++;
-         GtkTextIter a, b;
-         gtk_text_buffer_get_iter_at_offset( buffer, &a, s );
-         gtk_text_buffer_get_iter_at_offset( buffer, &b, i );
-         gtk_text_buffer_apply_tag_by_name( buffer, "preproc", &a, &b );
-         continue;
-      }
-
-      /* Logical literals: .T. .F. .AND. .OR. .NOT. */
-      if( text[i] == '.' && i + 2 < nLen )
-      {
-         int s = i; i++;
-         while( i < nLen && text[i] != '.' && CE_IsWordChar(text[i]) ) i++;
-         if( i < nLen && text[i] == '.' ) {
-            i++;
-            GtkTextIter a, b;
-            gtk_text_buffer_get_iter_at_offset( buffer, &a, s );
-            gtk_text_buffer_get_iter_at_offset( buffer, &b, i );
-            gtk_text_buffer_apply_tag_by_name( buffer, "preproc", &a, &b );
-         }
-         continue;
-      }
-
-      /* Words */
-      if( CE_IsWordChar(text[i]) )
-      {
-         int ws = i;
-         while( i < nLen && CE_IsWordChar(text[i]) ) i++;
-         int wlen = i - ws;
-         if( CE_IsKeyword( text + ws, wlen ) ) {
-            GtkTextIter a, b;
-            gtk_text_buffer_get_iter_at_offset( buffer, &a, ws );
-            gtk_text_buffer_get_iter_at_offset( buffer, &b, i );
-            gtk_text_buffer_apply_tag_by_name( buffer, "keyword", &a, &b );
-         } else if( CE_IsCommand( text + ws, wlen ) ) {
-            GtkTextIter a, b;
-            gtk_text_buffer_get_iter_at_offset( buffer, &a, ws );
-            gtk_text_buffer_get_iter_at_offset( buffer, &b, i );
-            gtk_text_buffer_apply_tag_by_name( buffer, "command", &a, &b );
-         }
-         continue;
-      }
-
-      i++;
+   if( bForward ) {
+      SciMsg( ed->sciWidget, SCI_SETTARGETSTART, nCurPos, 0 );
+      SciMsg( ed->sciWidget, SCI_SETTARGETEND, nLen, 0 );
+   } else {
+      SciMsg( ed->sciWidget, SCI_SETTARGETSTART, nCurPos - 1, 0 );
+      SciMsg( ed->sciWidget, SCI_SETTARGETEND, 0, 0 );
    }
 
-   g_free( text );
-}
+   nPos = (int) SciMsg( ed->sciWidget, SCI_SEARCHINTARGET, nFindLen, (intptr_t) szFind );
 
-/* Gutter drawing callback */
-static gboolean on_gutter_draw( GtkWidget * widget, cairo_t * cr, gpointer data )
-{
-   CODEEDITOR * ed = (CODEEDITOR *)data;
-   if( !ed || !ed->textView ) return FALSE;
-
-   GtkAllocation alloc;
-   gtk_widget_get_allocation( widget, &alloc );
-
-   /* Dark background for gutter */
-   cairo_set_source_rgb( cr, 0.15, 0.15, 0.15 );
-   cairo_rectangle( cr, 0, 0, alloc.width, alloc.height );
-   cairo_fill( cr );
-
-   /* Get visible range of text view */
-   GdkRectangle visible;
-   gtk_text_view_get_visible_rect( GTK_TEXT_VIEW(ed->textView), &visible );
-
-   GtkTextIter iter;
-   int line_top;
-   gtk_text_view_get_line_at_y( GTK_TEXT_VIEW(ed->textView), &iter, visible.y, &line_top );
-
-   /* Draw line numbers */
-   cairo_set_source_rgb( cr, 0.5, 0.5, 0.5 );
-   cairo_select_font_face( cr, "Monospace", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL );
-   cairo_set_font_size( cr, 12 );
-
-   int y = line_top - visible.y;
-   while( y < visible.height )
-   {
-      int lineNum = gtk_text_iter_get_line( &iter ) + 1;
-      GdkRectangle loc;
-      gtk_text_view_get_iter_location( GTK_TEXT_VIEW(ed->textView), &iter, &loc );
-      int wy;
-      gtk_text_view_buffer_to_window_coords( GTK_TEXT_VIEW(ed->textView),
-         GTK_TEXT_WINDOW_WIDGET, 0, loc.y, NULL, &wy );
-
-      char numStr[16];
-      snprintf( numStr, sizeof(numStr), "%d", lineNum );
-      cairo_move_to( cr, alloc.width - 8 - strlen(numStr) * 7, wy + loc.height - 4 );
-      cairo_show_text( cr, numStr );
-
-      if( !gtk_text_iter_forward_line( &iter ) ) break;
-      y = loc.y + loc.height - visible.y;
+   /* Wrap around if not found */
+   if( nPos < 0 ) {
+      if( bForward ) {
+         SciMsg( ed->sciWidget, SCI_SETTARGETSTART, 0, 0 );
+         SciMsg( ed->sciWidget, SCI_SETTARGETEND, nLen, 0 );
+      } else {
+         SciMsg( ed->sciWidget, SCI_SETTARGETSTART, nLen, 0 );
+         SciMsg( ed->sciWidget, SCI_SETTARGETEND, 0, 0 );
+      }
+      nPos = (int) SciMsg( ed->sciWidget, SCI_SEARCHINTARGET, nFindLen, (intptr_t) szFind );
    }
 
-   return TRUE;
+   if( nPos >= 0 ) {
+      SciMsg( ed->sciWidget, SCI_SETSEL, nPos, nPos + nFindLen );
+      SciMsg( ed->sciWidget, SCI_SCROLLCARET, 0, 0 );
+   }
+
+   /* Count total matches */
+   { int p, s = 0;
+     while( s < nLen ) {
+        SciMsg( ed->sciWidget, SCI_SETTARGETSTART, s, 0 );
+        SciMsg( ed->sciWidget, SCI_SETTARGETEND, nLen, 0 );
+        p = (int) SciMsg( ed->sciWidget, SCI_SEARCHINTARGET, nFindLen, (intptr_t) szFind );
+        if( p < 0 ) break;
+        nCount++;
+        s = p + 1;
+     }
+   }
+
+   if( ed->findLabel ) {
+      char buf[64];
+      snprintf( buf, sizeof(buf), "%d matches", nCount );
+      gtk_label_set_text( GTK_LABEL(ed->findLabel), buf );
+   }
 }
 
-static void on_editor_buffer_changed( GtkTextBuffer * buffer, gpointer data )
+/* Replace current match */
+static void CE_ReplaceCurrent( CODEEDITOR * ed )
 {
-   CODEEDITOR * ed = (CODEEDITOR *)data;
-   CE_HighlightCode( buffer );
-   if( ed->gutterView )
-      gtk_widget_queue_draw( ed->gutterView );
+   const char * szFind;
+   const char * szReplace;
+   int selStart, selEnd, nFindLen;
+
+   if( !ed || !ed->sciWidget || !ed->findEntry || !ed->replaceEntry ) return;
+
+   szFind = gtk_entry_get_text( GTK_ENTRY(ed->findEntry) );
+   szReplace = gtk_entry_get_text( GTK_ENTRY(ed->replaceEntry) );
+   if( !szFind || !szFind[0] ) return;
+
+   selStart = (int) SciMsg( ed->sciWidget, SCI_GETSELECTIONSTART, 0, 0 );
+   selEnd = (int) SciMsg( ed->sciWidget, SCI_GETSELECTIONEND, 0, 0 );
+   nFindLen = (int) strlen( szFind );
+
+   if( selEnd - selStart == nFindLen ) {
+      SciMsg( ed->sciWidget, SCI_REPLACESEL, 0, (intptr_t)(szReplace ? szReplace : "") );
+   }
+   CE_FindNext( ed, 1 );
 }
 
-static void on_editor_vadjust_changed( GtkAdjustment * adj, gpointer data )
+/* Replace all matches */
+static void CE_ReplaceAll( CODEEDITOR * ed )
+{
+   const char * szFind;
+   const char * szReplace;
+   int nLen, nFindLen, nReplLen, nPos, nCount = 0;
+
+   if( !ed || !ed->sciWidget || !ed->findEntry || !ed->replaceEntry ) return;
+
+   szFind = gtk_entry_get_text( GTK_ENTRY(ed->findEntry) );
+   szReplace = gtk_entry_get_text( GTK_ENTRY(ed->replaceEntry) );
+   if( !szFind || !szFind[0] ) return;
+   if( !szReplace ) szReplace = "";
+
+   nFindLen = (int) strlen( szFind );
+   nReplLen = (int) strlen( szReplace );
+
+   SciMsg( ed->sciWidget, SCI_SETTARGETSTART, 0, 0 );
+   nLen = (int) SciMsg( ed->sciWidget, SCI_GETLENGTH, 0, 0 );
+   SciMsg( ed->sciWidget, SCI_SETTARGETEND, nLen, 0 );
+
+   while( 1 ) {
+      nPos = (int) SciMsg( ed->sciWidget, SCI_SEARCHINTARGET, nFindLen, (intptr_t) szFind );
+      if( nPos < 0 ) break;
+      SciMsg( ed->sciWidget, SCI_REPLACETARGET, nReplLen, (intptr_t) szReplace );
+      nCount++;
+      SciMsg( ed->sciWidget, SCI_SETTARGETSTART, nPos + nReplLen, 0 );
+      nLen = (int) SciMsg( ed->sciWidget, SCI_GETLENGTH, 0, 0 );
+      SciMsg( ed->sciWidget, SCI_SETTARGETEND, nLen, 0 );
+   }
+
+   if( ed->findLabel ) {
+      char buf[64];
+      snprintf( buf, sizeof(buf), "%d replaced", nCount );
+      gtk_label_set_text( GTK_LABEL(ed->findLabel), buf );
+   }
+}
+
+/* Find bar button callbacks */
+static void on_find_next_clicked( GtkButton * btn, gpointer data )
+{ CE_FindNext( (CODEEDITOR *)data, 1 ); }
+
+static void on_find_prev_clicked( GtkButton * btn, gpointer data )
+{ CE_FindNext( (CODEEDITOR *)data, 0 ); }
+
+static void on_find_close_clicked( GtkButton * btn, gpointer data )
 {
    CODEEDITOR * ed = (CODEEDITOR *)data;
-   if( ed->gutterView )
-      gtk_widget_queue_draw( ed->gutterView );
+   if( ed && ed->findBar ) {
+      gtk_widget_hide( ed->findBar );
+      ed->bFindVisible = 0;
+      gtk_widget_grab_focus( ed->sciWidget );
+   }
+}
+
+static void on_replace_clicked( GtkButton * btn, gpointer data )
+{ CE_ReplaceCurrent( (CODEEDITOR *)data ); }
+
+static void on_replace_all_clicked( GtkButton * btn, gpointer data )
+{ CE_ReplaceAll( (CODEEDITOR *)data ); }
+
+/* Find entry key-press: Enter = next, Shift+Enter = prev, Esc = close */
+static gboolean on_find_entry_key( GtkWidget * w, GdkEventKey * ev, gpointer data )
+{
+   CODEEDITOR * ed = (CODEEDITOR *)data;
+   if( ev->keyval == GDK_KEY_Return || ev->keyval == GDK_KEY_KP_Enter ) {
+      CE_FindNext( ed, !(ev->state & GDK_SHIFT_MASK) );
+      return TRUE;
+   }
+   if( ev->keyval == GDK_KEY_Escape ) {
+      on_find_close_clicked( NULL, data );
+      return TRUE;
+   }
+   return FALSE;
+}
+
+static void CE_ShowFindBar( CODEEDITOR * ed, int bShow, int bReplace )
+{
+   if( !ed || !ed->findBar ) return;
+
+   ed->bFindVisible = bShow;
+   ed->bReplaceVisible = bReplace;
+
+   if( bShow ) {
+      gtk_widget_show( ed->findBar );
+      if( ed->replaceEntry ) {
+         if( bReplace )
+            gtk_widget_show( ed->replaceEntry );
+         else
+            gtk_widget_hide( ed->replaceEntry );
+      }
+      gtk_widget_grab_focus( ed->findEntry );
+   } else {
+      gtk_widget_hide( ed->findBar );
+      gtk_widget_grab_focus( ed->sciWidget );
+   }
+}
+
+/* Scintilla notification handler via GtkWidget "sci-notify" signal */
+static void on_sci_notify( GtkWidget * sci, gint id, gpointer scnPtr, gpointer data )
+{
+   CODEEDITOR * ed = (CODEEDITOR *)data;
+   /* SCNotification is passed as a struct pointer.
+      We cast to access the notification code and fields. */
+   struct SCNotification {
+      unsigned int hwndFrom; unsigned int idFrom; unsigned int code;
+      int position; int ch; int modifiers; int modificationType;
+      const char * text; int length; int linesAdded;
+      int message; uintptr_t wParam; intptr_t lParam;
+      int line; int foldLevelNow; int foldLevelPrev; int margin;
+   } * scn = (struct SCNotification *) scnPtr;
+
+   if( !ed || !scn ) return;
+
+   if( scn->code == SCN_MARGINCLICK ) {
+      int line = (int) SciMsg( sci, SCI_LINEFROMPOSITION, scn->position, 0 );
+      SciMsg( sci, SCI_TOGGLEFOLD, line, 0 );
+   }
+
+   if( scn->code == SCN_CHARADDED ) {
+      if( scn->ch == '\n' || scn->ch == '\r' ) {
+         int curLine = (int) SciMsg( sci, SCI_LINEFROMPOSITION,
+            SciMsg( sci, SCI_GETCURRENTPOS, 0, 0 ), 0 );
+         if( curLine > 0 ) {
+            int indent = (int) SciMsg( sci, SCI_GETLINEINDENTATION, curLine - 1, 0 );
+            SciMsg( sci, SCI_SETLINEINDENTATION, curLine, indent );
+            int pos = (int) SciMsg( sci, SCI_GETLINEINDENTPOSITION, curLine, 0 );
+            SciMsg( sci, SCI_GOTOPOS, pos, 0 );
+         }
+      }
+   }
+
+   if( scn->code == SCN_UPDATEUI ) {
+      UpdateStatusBar( ed );
+   }
+
+   if( scn->code == SCN_MODIFIED ) {
+      if( scn->linesAdded != 0 && (scn->modificationType & (0x01|0x02)) ) {
+         static int s_inFoldUpdate = 0;
+         if( !s_inFoldUpdate ) {
+            s_inFoldUpdate = 1;
+            UpdateHarbourFolding( sci );
+            s_inFoldUpdate = 0;
+         }
+      }
+      UpdateStatusBar( ed );
+   }
+}
+
+/* Key-press handler for Scintilla keyboard shortcuts */
+static gboolean on_sci_key_press( GtkWidget * sci, GdkEventKey * ev, gpointer data )
+{
+   CODEEDITOR * ed = (CODEEDITOR *)data;
+   int ctrl  = (ev->state & GDK_CONTROL_MASK) != 0;
+   int shift = (ev->state & GDK_SHIFT_MASK) != 0;
+
+   if( ctrl && (ev->keyval == GDK_KEY_f || ev->keyval == GDK_KEY_F) ) {
+      CE_ShowFindBar( ed, !ed->bFindVisible, 0 );
+      return TRUE;
+   }
+   if( ctrl && (ev->keyval == GDK_KEY_h || ev->keyval == GDK_KEY_H) ) {
+      CE_ShowFindBar( ed, 1, 1 );
+      return TRUE;
+   }
+   if( ev->keyval == GDK_KEY_Escape && ed->bFindVisible ) {
+      CE_ShowFindBar( ed, 0, 0 );
+      return TRUE;
+   }
+   if( ev->keyval == GDK_KEY_F3 ) {
+      CE_FindNext( ed, !shift );
+      return TRUE;
+   }
+   if( ctrl && ev->keyval == GDK_KEY_space ) {
+      CE_ShowAutoComplete( ed->sciWidget );
+      return TRUE;
+   }
+   if( ctrl && (ev->keyval == GDK_KEY_g || ev->keyval == GDK_KEY_G) && !shift ) {
+      SciMsg( ed->sciWidget, SCI_GOTOPOS, 0, 0 );
+      return TRUE;
+   }
+   if( ctrl && ev->keyval == GDK_KEY_slash ) {
+      /* Toggle line comment */
+      int pos = (int) SciMsg( sci, SCI_GETCURRENTPOS, 0, 0 );
+      int line = (int) SciMsg( sci, SCI_LINEFROMPOSITION, pos, 0 );
+      int lineStart = (int) SciMsg( sci, SCI_POSITIONFROMLINE, line, 0 );
+      int lineLen = (int) SciMsg( sci, SCI_LINELENGTH, line, 0 );
+      if( lineLen > 0 && lineLen < 1000 ) {
+         char * lineBuf = (char *) malloc( lineLen + 1 );
+         SciMsg( sci, SCI_GETLINE, line, (intptr_t) lineBuf );
+         lineBuf[lineLen] = 0;
+         if( lineBuf[0] == '/' && lineBuf[1] == '/' ) {
+            int rmLen = (lineLen > 2 && lineBuf[2] == ' ') ? 3 : 2;
+            SciMsg( sci, SCI_SETSEL, lineStart, lineStart + rmLen );
+            SciMsg( sci, SCI_REPLACESEL, 0, (intptr_t) "" );
+         } else {
+            SciMsg( sci, SCI_SETSEL, lineStart, lineStart );
+            SciMsg( sci, SCI_REPLACESEL, 0, (intptr_t) "// " );
+         }
+         free( lineBuf );
+      }
+      return TRUE;
+   }
+   if( ctrl && shift && (ev->keyval == GDK_KEY_d || ev->keyval == GDK_KEY_D) ) {
+      SciMsg( sci, SCI_LINEDUPLICATE, 0, 0 );
+      return TRUE;
+   }
+   if( ctrl && shift && (ev->keyval == GDK_KEY_k || ev->keyval == GDK_KEY_K) ) {
+      SciMsg( sci, SCI_LINEDELETE, 0, 0 );
+      return TRUE;
+   }
+   if( ctrl && (ev->keyval == GDK_KEY_l || ev->keyval == GDK_KEY_L) && !shift ) {
+      int pos2 = (int) SciMsg( sci, SCI_GETCURRENTPOS, 0, 0 );
+      int ln2 = (int) SciMsg( sci, SCI_LINEFROMPOSITION, pos2, 0 );
+      int ls2 = (int) SciMsg( sci, SCI_POSITIONFROMLINE, ln2, 0 );
+      int le2 = (int) SciMsg( sci, SCI_POSITIONFROMLINE, ln2 + 1, 0 );
+      if( le2 <= ls2 ) le2 = ls2 + (int)SciMsg( sci, SCI_LINELENGTH, ln2, 0 );
+      SciMsg( sci, SCI_SETSEL, ls2, le2 );
+      return TRUE;
+   }
+
+   return FALSE;  /* let Scintilla handle other keys */
 }
 
 /* Prevent code editor window close from destroying; just hide */
@@ -2979,43 +3717,6 @@ static gboolean on_editor_delete( GtkWidget * widget, GdkEvent * event, gpointer
    return TRUE;
 }
 
-/* Helper: save current tab text, load new tab text */
-static void CE_SwitchTab( CODEEDITOR * ed, int nNewTab )
-{
-   if( !ed || nNewTab < 0 || nNewTab >= ed->nTabs || nNewTab == ed->nActiveTab ) return;
-
-   /* Save current tab text */
-   if( ed->nActiveTab >= 0 && ed->nActiveTab < ed->nTabs && ed->buffer )
-   {
-      GtkTextIter start, end;
-      gtk_text_buffer_get_start_iter( ed->buffer, &start );
-      gtk_text_buffer_get_end_iter( ed->buffer, &end );
-      char * text = gtk_text_buffer_get_text( ed->buffer, &start, &end, FALSE );
-      if( ed->tabTexts[ed->nActiveTab] ) free( ed->tabTexts[ed->nActiveTab] );
-      ed->tabTexts[ed->nActiveTab] = text ? strdup( text ) : strdup( "" );
-      if( text ) g_free( text );
-   }
-
-   ed->nActiveTab = nNewTab;
-
-   /* Load new tab text */
-   if( ed->buffer )
-   {
-      const char * newText = ed->tabTexts[nNewTab] ? ed->tabTexts[nNewTab] : "";
-      g_signal_handlers_block_matched( ed->buffer, G_SIGNAL_MATCH_FUNC,
-         0, 0, NULL, (gpointer)on_editor_buffer_changed, NULL );
-      gtk_text_buffer_set_text( ed->buffer, newText, -1 );
-      CE_HighlightCode( ed->buffer );
-      g_signal_handlers_unblock_matched( ed->buffer, G_SIGNAL_MATCH_FUNC,
-         0, 0, NULL, (gpointer)on_editor_buffer_changed, NULL );
-      if( ed->gutterView ) gtk_widget_queue_draw( ed->gutterView );
-      /* Scroll to top */
-      GtkTextIter top;
-      gtk_text_buffer_get_start_iter( ed->buffer, &top );
-      gtk_text_view_scroll_to_iter( GTK_TEXT_VIEW(ed->textView), &top, 0, FALSE, 0, 0 );
-   }
-}
-
 static void on_editor_tab_switched( GtkNotebook * nb, GtkWidget * page, guint nPage, gpointer data )
 {
    CODEEDITOR * ed = (CODEEDITOR *)data;
@@ -3023,7 +3724,6 @@ static void on_editor_tab_switched( GtkNotebook * nb, GtkWidget * page, guint nP
 
    CE_SwitchTab( ed, (int)nPage );
 
-   /* Fire Harbour callback */
    if( ed->pOnTabChange && HB_IS_BLOCK( ed->pOnTabChange ) )
    {
       PHB_ITEM pArg1 = hb_itemPutNInt( hb_itemNew(NULL), (HB_PTRUINT) ed );
@@ -3044,6 +3744,13 @@ HB_FUNC( CODEEDITORCREATE )
    int nWidth  = hb_parni(3);
    int nHeight = hb_parni(4);
 
+   /* Load Scintilla + Lexilla shared libraries */
+   if( !InitScintilla() ) {
+      fprintf( stderr, "FATAL: Cannot load libscintilla.so / liblexilla.so\n" );
+      hb_retnint( 0 );
+      return;
+   }
+
    CODEEDITOR * ed = (CODEEDITOR *) calloc( 1, sizeof(CODEEDITOR) );
 
    /* Window */
@@ -3053,14 +3760,13 @@ HB_FUNC( CODEEDITORCREATE )
    gtk_window_move( GTK_WINDOW(ed->window), nLeft, nTop );
    g_signal_connect( ed->window, "delete-event", G_CALLBACK(on_editor_delete), ed );
 
-   /* VBox: tab bar + (HBox: gutter + scrolled text view) */
+   /* VBox: tab bar + scintilla + find bar + status bar */
    GtkWidget * vbox = gtk_box_new( GTK_ORIENTATION_VERTICAL, 0 );
    gtk_container_add( GTK_CONTAINER(ed->window), vbox );
 
-   /* Tab bar using GtkNotebook (tabs only, no child pages) */
+   /* Tab bar using GtkNotebook */
    ed->tabBar = gtk_notebook_new();
    gtk_notebook_set_show_border( GTK_NOTEBOOK(ed->tabBar), FALSE );
-   /* Add initial "Project1.prg" tab */
    strncpy( ed->tabNames[0], "Project1.prg", 63 );
    ed->tabTexts[0] = strdup( "" );
    ed->nTabs = 1;
@@ -3071,68 +3777,117 @@ HB_FUNC( CODEEDITORCREATE )
    gtk_notebook_append_page( GTK_NOTEBOOK(ed->tabBar), dummyPage, tabLabel );
    gtk_box_pack_start( GTK_BOX(vbox), ed->tabBar, FALSE, FALSE, 0 );
 
-   GtkWidget * hbox = gtk_box_new( GTK_ORIENTATION_HORIZONTAL, 0 );
-   gtk_box_pack_start( GTK_BOX(vbox), hbox, TRUE, TRUE, 0 );
+   /* Create Scintilla editor widget */
+   ed->sciWidget = s_pScintillaNew();
 
-   /* Gutter (line numbers) */
-   ed->gutterView = gtk_drawing_area_new();
-   gtk_widget_set_size_request( ed->gutterView, GUTTER_WIDTH, -1 );
-   g_signal_connect( ed->gutterView, "draw", G_CALLBACK(on_gutter_draw), ed );
-   gtk_box_pack_start( GTK_BOX(hbox), ed->gutterView, FALSE, FALSE, 0 );
+   if( ed->sciWidget )
+   {
+      gtk_widget_set_hexpand( ed->sciWidget, TRUE );
+      gtk_widget_set_vexpand( ed->sciWidget, TRUE );
+      gtk_box_pack_start( GTK_BOX(vbox), ed->sciWidget, TRUE, TRUE, 0 );
 
-   /* Text buffer with syntax tags */
-   ed->buffer = gtk_text_buffer_new( NULL );
+      ConfigureScintilla( ed->sciWidget );
 
-   /* Create syntax highlighting tags - VS Code dark theme colors */
-   gtk_text_buffer_create_tag( ed->buffer, "comment",
-      "foreground", "#6A9955", NULL );
-   gtk_text_buffer_create_tag( ed->buffer, "string",
-      "foreground", "#CE9178", NULL );
-   gtk_text_buffer_create_tag( ed->buffer, "keyword",
-      "foreground", "#569CD6", "weight", PANGO_WEIGHT_BOLD, NULL );
-   gtk_text_buffer_create_tag( ed->buffer, "command",
-      "foreground", "#4EC9B0", NULL );
-   gtk_text_buffer_create_tag( ed->buffer, "preproc",
-      "foreground", "#C678DD", NULL );
+      /* Connect Scintilla notification signal */
+      g_signal_connect( ed->sciWidget, "sci-notify", G_CALLBACK(on_sci_notify), ed );
 
-   /* Text view */
-   ed->textView = gtk_text_view_new_with_buffer( ed->buffer );
-   gtk_text_view_set_left_margin( GTK_TEXT_VIEW(ed->textView), 8 );
-   gtk_text_view_set_top_margin( GTK_TEXT_VIEW(ed->textView), 4 );
+      /* Connect keyboard shortcuts */
+      g_signal_connect( ed->sciWidget, "key-press-event", G_CALLBACK(on_sci_key_press), ed );
+   }
+   else
+   {
+      fprintf( stderr, "FAILED to create Scintilla widget!\n" );
+   }
 
-   /* Monospace font + dark theme via CSS */
+   /* Find/Replace bar (initially hidden) */
+   {
+      GtkWidget * findBox = gtk_box_new( GTK_ORIENTATION_HORIZONTAL, 4 );
+      gtk_box_pack_start( GTK_BOX(vbox), findBox, FALSE, FALSE, 0 );
+      ed->findBar = findBox;
+
+      GtkWidget * lblFind = gtk_label_new( "Find:" );
+      gtk_box_pack_start( GTK_BOX(findBox), lblFind, FALSE, FALSE, 4 );
+
+      ed->findEntry = gtk_entry_new();
+      gtk_entry_set_width_chars( GTK_ENTRY(ed->findEntry), 25 );
+      gtk_box_pack_start( GTK_BOX(findBox), ed->findEntry, FALSE, FALSE, 0 );
+      g_signal_connect( ed->findEntry, "key-press-event", G_CALLBACK(on_find_entry_key), ed );
+
+      GtkWidget * btnNext = gtk_button_new_with_label( "Next" );
+      gtk_box_pack_start( GTK_BOX(findBox), btnNext, FALSE, FALSE, 0 );
+      g_signal_connect( btnNext, "clicked", G_CALLBACK(on_find_next_clicked), ed );
+
+      GtkWidget * btnPrev = gtk_button_new_with_label( "Prev" );
+      gtk_box_pack_start( GTK_BOX(findBox), btnPrev, FALSE, FALSE, 0 );
+      g_signal_connect( btnPrev, "clicked", G_CALLBACK(on_find_prev_clicked), ed );
+
+      ed->findLabel = gtk_label_new( "" );
+      gtk_box_pack_start( GTK_BOX(findBox), ed->findLabel, FALSE, FALSE, 4 );
+
+      ed->replaceEntry = gtk_entry_new();
+      gtk_entry_set_width_chars( GTK_ENTRY(ed->replaceEntry), 25 );
+      gtk_box_pack_start( GTK_BOX(findBox), ed->replaceEntry, FALSE, FALSE, 0 );
+
+      GtkWidget * btnReplace = gtk_button_new_with_label( "Replace" );
+      gtk_box_pack_start( GTK_BOX(findBox), btnReplace, FALSE, FALSE, 0 );
+      g_signal_connect( btnReplace, "clicked", G_CALLBACK(on_replace_clicked), ed );
+
+      GtkWidget * btnReplAll = gtk_button_new_with_label( "All" );
+      gtk_box_pack_start( GTK_BOX(findBox), btnReplAll, FALSE, FALSE, 0 );
+      g_signal_connect( btnReplAll, "clicked", G_CALLBACK(on_replace_all_clicked), ed );
+
+      GtkWidget * btnClose = gtk_button_new_with_label( "X" );
+      gtk_box_pack_end( GTK_BOX(findBox), btnClose, FALSE, FALSE, 0 );
+      g_signal_connect( btnClose, "clicked", G_CALLBACK(on_find_close_clicked), ed );
+
+      /* Apply dark theme CSS to find bar */
+      {
+         GtkCssProvider * provider = gtk_css_provider_new();
+         const char * css =
+            "box { background-color: #252526; }"
+            "entry { background-color: #3C3C3C; color: #D4D4D4;"
+            "  border-color: #555; }"
+            "button { background-color: #3C3C3C; color: #D4D4D4;"
+            "  border-color: #555; }"
+            "label { color: #D4D4D4; }";
+         gtk_css_provider_load_from_data( provider, css, -1, NULL );
+         GtkStyleContext * ctx = gtk_widget_get_style_context( findBox );
+         gtk_style_context_add_provider( ctx, GTK_STYLE_PROVIDER(provider),
+            GTK_STYLE_PROVIDER_PRIORITY_APPLICATION );
+         g_object_unref( provider );
+      }
+
+      /* Show all children so they're ready, then hide the bar */
+      gtk_widget_show_all( findBox );
+      gtk_widget_hide( findBox );
+      ed->bFindVisible = 0;
+   }
+
+   /* Status bar at bottom */
+   ed->statusBar = gtk_label_new( "  Ln 1, Col 1      INS      0 lines      0 chars      UTF-8" );
+   gtk_label_set_xalign( GTK_LABEL(ed->statusBar), 0.0 );
+   gtk_widget_set_size_request( ed->statusBar, -1, STATUSBAR_HEIGHT );
+   gtk_box_pack_start( GTK_BOX(vbox), ed->statusBar, FALSE, FALSE, 0 );
+
+   /* Dark theme for status bar */
    {
       GtkCssProvider * provider = gtk_css_provider_new();
       const char * css =
-         "textview text { background-color: #1E1E1E; color: #D4D4D4;"
-         "  font-family: \"Monospace\"; font-size: 13pt; }"
-         "textview { background-color: #1E1E1E; }";
+         "label { background-color: #252526; color: #B4B4B4;"
+         "  font-family: \"Monospace\"; font-size: 10pt; padding: 2px 4px; }";
       gtk_css_provider_load_from_data( provider, css, -1, NULL );
-      GtkStyleContext * ctx = gtk_widget_get_style_context( ed->textView );
+      GtkStyleContext * ctx = gtk_widget_get_style_context( ed->statusBar );
       gtk_style_context_add_provider( ctx, GTK_STYLE_PROVIDER(provider),
          GTK_STYLE_PROVIDER_PRIORITY_APPLICATION );
       g_object_unref( provider );
    }
 
-   /* Scroll view */
-   ed->scrollView = gtk_scrolled_window_new( NULL, NULL );
-   gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(ed->scrollView),
-      GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC );
-   gtk_container_add( GTK_CONTAINER(ed->scrollView), ed->textView );
-   gtk_box_pack_start( GTK_BOX(hbox), ed->scrollView, TRUE, TRUE, 0 );
-
-   /* Connect buffer change for re-highlight */
-   g_signal_connect( ed->buffer, "changed", G_CALLBACK(on_editor_buffer_changed), ed );
-
-   /* Sync gutter on scroll */
-   GtkAdjustment * vadj = gtk_scrolled_window_get_vadjustment(
-      GTK_SCROLLED_WINDOW(ed->scrollView) );
-   g_signal_connect( vadj, "value-changed", G_CALLBACK(on_editor_vadjust_changed), ed );
-
    /* Tab switch callback */
    g_signal_connect( ed->tabBar, "switch-page", G_CALLBACK(on_editor_tab_switched), ed );
 
    gtk_widget_show_all( ed->window );
+   /* Re-hide find bar after show_all */
+   gtk_widget_hide( ed->findBar );
 
    hb_retnint( (HB_PTRUINT) ed );
 }
@@ -3141,16 +3896,11 @@ HB_FUNC( CODEEDITORCREATE )
 HB_FUNC( CODEEDITORSETTEXT )
 {
    CODEEDITOR * ed = (CODEEDITOR *)(HB_PTRUINT) hb_parnint(1);
-   if( ed && ed->buffer && HB_ISCHAR(2) )
+   if( ed && ed->sciWidget && HB_ISCHAR(2) )
    {
-      g_signal_handlers_block_matched( ed->buffer, G_SIGNAL_MATCH_FUNC,
-         0, 0, NULL, (gpointer)on_editor_buffer_changed, NULL );
-      gtk_text_buffer_set_text( ed->buffer, hb_parc(2), -1 );
-      CE_HighlightCode( ed->buffer );
-      g_signal_handlers_unblock_matched( ed->buffer, G_SIGNAL_MATCH_FUNC,
-         0, 0, NULL, (gpointer)on_editor_buffer_changed, NULL );
-      if( ed->gutterView )
-         gtk_widget_queue_draw( ed->gutterView );
+      SciMsg( ed->sciWidget, SCI_SETTEXT, 0, (intptr_t) hb_parc(2) );
+      SciMsg( ed->sciWidget, SCI_EMPTYUNDOBUFFER, 0, 0 );
+      UpdateHarbourFolding( ed->sciWidget );
    }
 }
 
@@ -3158,14 +3908,13 @@ HB_FUNC( CODEEDITORSETTEXT )
 HB_FUNC( CODEEDITORGETTEXT )
 {
    CODEEDITOR * ed = (CODEEDITOR *)(HB_PTRUINT) hb_parnint(1);
-   if( ed && ed->buffer )
+   if( ed && ed->sciWidget )
    {
-      GtkTextIter start, end;
-      gtk_text_buffer_get_start_iter( ed->buffer, &start );
-      gtk_text_buffer_get_end_iter( ed->buffer, &end );
-      char * text = gtk_text_buffer_get_text( ed->buffer, &start, &end, FALSE );
-      hb_retc( text ? text : "" );
-      if( text ) g_free( text );
+      int nLen = (int) SciMsg( ed->sciWidget, SCI_GETLENGTH, 0, 0 );
+      char * buf = (char *) malloc( nLen + 1 );
+      SciMsg( ed->sciWidget, SCI_GETTEXT, nLen + 1, (intptr_t) buf );
+      hb_retclen( buf, nLen );
+      free( buf );
    }
    else
       hb_retc( "" );
@@ -3177,6 +3926,9 @@ HB_FUNC( CODEEDITORDESTROY )
    CODEEDITOR * ed = (CODEEDITOR *)(HB_PTRUINT) hb_parnint(1);
    if( ed )
    {
+      if( ed->pOnTabChange ) hb_itemRelease( ed->pOnTabChange );
+      for( int i = 0; i < ed->nTabs; i++ )
+         if( ed->tabTexts[i] ) free( ed->tabTexts[i] );
       if( ed->window ) gtk_widget_destroy( ed->window );
       free( ed );
    }
@@ -3563,16 +4315,12 @@ HB_FUNC( CODEEDITORSETTABTEXT )
    if( ed->tabTexts[nTab] ) free( ed->tabTexts[nTab] );
    ed->tabTexts[nTab] = strdup( hb_parc(3) );
 
-   /* If this is the active tab, update the editor view */
-   if( nTab == ed->nActiveTab && ed->buffer )
+   /* If this is the active tab, update Scintilla */
+   if( nTab == ed->nActiveTab && ed->sciWidget )
    {
-      g_signal_handlers_block_matched( ed->buffer, G_SIGNAL_MATCH_FUNC,
-         0, 0, NULL, (gpointer)on_editor_buffer_changed, NULL );
-      gtk_text_buffer_set_text( ed->buffer, ed->tabTexts[nTab], -1 );
-      CE_HighlightCode( ed->buffer );
-      g_signal_handlers_unblock_matched( ed->buffer, G_SIGNAL_MATCH_FUNC,
-         0, 0, NULL, (gpointer)on_editor_buffer_changed, NULL );
-      if( ed->gutterView ) gtk_widget_queue_draw( ed->gutterView );
+      SciMsg( ed->sciWidget, SCI_SETTEXT, 0, (intptr_t) ed->tabTexts[nTab] );
+      SciMsg( ed->sciWidget, SCI_EMPTYUNDOBUFFER, 0, 0 );
+      UpdateHarbourFolding( ed->sciWidget );
    }
 }
 
@@ -3583,15 +4331,14 @@ HB_FUNC( CODEEDITORGETTABTEXT )
    int nTab = hb_parni(2) - 1;
    if( !ed || nTab < 0 || nTab >= ed->nTabs ) { hb_retc(""); return; }
 
-   /* If active tab, get from editor (may have been edited) */
-   if( nTab == ed->nActiveTab && ed->buffer )
+   /* If active tab, read from Scintilla (may have been edited) */
+   if( nTab == ed->nActiveTab && ed->sciWidget )
    {
-      GtkTextIter start, end;
-      gtk_text_buffer_get_start_iter( ed->buffer, &start );
-      gtk_text_buffer_get_end_iter( ed->buffer, &end );
-      char * text = gtk_text_buffer_get_text( ed->buffer, &start, &end, FALSE );
-      hb_retc( text ? text : "" );
-      if( text ) g_free( text );
+      int nLen = (int) SciMsg( ed->sciWidget, SCI_GETLENGTH, 0, 0 );
+      char * buf = (char *) malloc( nLen + 1 );
+      SciMsg( ed->sciWidget, SCI_GETTEXT, nLen + 1, (intptr_t) buf );
+      hb_retclen( buf, nLen );
+      free( buf );
    }
    else
       hb_retc( ed->tabTexts[nTab] ? ed->tabTexts[nTab] : "" );
@@ -3635,6 +4382,9 @@ HB_FUNC( CODEEDITORCLEARTABS )
 
    ed->nTabs = 1;
    ed->nActiveTab = 0;
+
+   if( ed->sciWidget )
+      SciMsg( ed->sciWidget, SCI_SETTEXT, 0, (intptr_t) "" );
 }
 
 /* CodeEditorOnTabChange( hEditor, bBlock ) */
@@ -3652,30 +4402,22 @@ HB_FUNC( CODEEDITORONTABCHANGE )
 HB_FUNC( CODEEDITORAPPENDTEXT )
 {
    CODEEDITOR * ed = (CODEEDITOR *)(HB_PTRUINT) hb_parnint(1);
-   if( ed && ed->buffer && HB_ISCHAR(2) )
+   if( ed && ed->sciWidget && HB_ISCHAR(2) )
    {
-      const char * text = hb_parc(2);
-      GtkTextIter end;
-      gtk_text_buffer_get_end_iter( ed->buffer, &end );
-      int endOffset = gtk_text_iter_get_offset( &end );
+      int nLen = (int) SciMsg( ed->sciWidget, SCI_GETLENGTH, 0, 0 );
+      int nAppend = (int) hb_parclen(2);
 
-      g_signal_handlers_block_matched( ed->buffer, G_SIGNAL_MATCH_FUNC,
-         0, 0, NULL, (gpointer)on_editor_buffer_changed, NULL );
-      gtk_text_buffer_insert( ed->buffer, &end, text, -1 );
-      CE_HighlightCode( ed->buffer );
-      g_signal_handlers_unblock_matched( ed->buffer, G_SIGNAL_MATCH_FUNC,
-         0, 0, NULL, (gpointer)on_editor_buffer_changed, NULL );
+      /* Append at end */
+      SciMsg( ed->sciWidget, SCI_GOTOPOS, nLen, 0 );
+      SciMsg( ed->sciWidget, SCI_ADDTEXT, nAppend, (intptr_t) hb_parc(2) );
 
-      if( ed->gutterView ) gtk_widget_queue_draw( ed->gutterView );
-
-      /* Position cursor */
-      GtkTextIter cursor;
+      /* Set cursor position */
       if( HB_ISNUM(3) )
-         gtk_text_buffer_get_iter_at_offset( ed->buffer, &cursor, endOffset + hb_parni(3) );
-      else
-         gtk_text_buffer_get_end_iter( ed->buffer, &cursor );
-      gtk_text_buffer_place_cursor( ed->buffer, &cursor );
-      gtk_text_view_scroll_to_iter( GTK_TEXT_VIEW(ed->textView), &cursor, 0.1, FALSE, 0, 0 );
+      {
+         int nOfs = nLen + hb_parni(3);
+         SciMsg( ed->sciWidget, SCI_GOTOPOS, nOfs, 0 );
+         SciMsg( ed->sciWidget, SCI_SCROLLCARET, 0, 0 );
+      }
 
       /* Bring editor window to front */
       if( ed->window ) gtk_window_present( GTK_WINDOW(ed->window) );
@@ -3686,52 +4428,43 @@ HB_FUNC( CODEEDITORAPPENDTEXT )
 HB_FUNC( CODEEDITORINSERTAFTER )
 {
    CODEEDITOR * ed = (CODEEDITOR *)(HB_PTRUINT) hb_parnint(1);
-   if( !ed || !ed->buffer || !HB_ISCHAR(2) || !HB_ISCHAR(3) ) return;
+   if( !ed || !ed->sciWidget || !HB_ISCHAR(2) || !HB_ISCHAR(3) ) return;
 
    const char * search = hb_parc(2);
    const char * insert = hb_parc(3);
 
-   GtkTextIter start, end;
-   gtk_text_buffer_get_start_iter( ed->buffer, &start );
-   gtk_text_buffer_get_end_iter( ed->buffer, &end );
-   char * fullText = gtk_text_buffer_get_text( ed->buffer, &start, &end, FALSE );
-   if( !fullText ) return;
+   /* Get full text from Scintilla */
+   int nLen = (int) SciMsg( ed->sciWidget, SCI_GETLENGTH, 0, 0 );
+   char * fullText = (char *) malloc( nLen + 1 );
+   SciMsg( ed->sciWidget, SCI_GETTEXT, nLen + 1, (intptr_t) fullText );
 
    /* Case-insensitive search */
    char * found = strcasestr( fullText, search );
-   if( !found ) { g_free( fullText ); return; }
+   if( !found ) { free( fullText ); return; }
 
    /* Find end of the line containing the match */
    char * eol = strchr( found, '\n' );
    int insertOffset = eol ? (int)(eol - fullText) + 1 : (int)strlen(fullText);
-   g_free( fullText );
+   free( fullText );
 
-   /* Insert text */
-   GtkTextIter insertIter;
-   gtk_text_buffer_get_iter_at_offset( ed->buffer, &insertIter, insertOffset );
-
-   g_signal_handlers_block_matched( ed->buffer, G_SIGNAL_MATCH_FUNC,
-      0, 0, NULL, (gpointer)on_editor_buffer_changed, NULL );
-   gtk_text_buffer_insert( ed->buffer, &insertIter, insert, -1 );
-   CE_HighlightCode( ed->buffer );
-   g_signal_handlers_unblock_matched( ed->buffer, G_SIGNAL_MATCH_FUNC,
-      0, 0, NULL, (gpointer)on_editor_buffer_changed, NULL );
-   if( ed->gutterView ) gtk_widget_queue_draw( ed->gutterView );
+   /* Insert text at the offset */
+   SciMsg( ed->sciWidget, SCI_GOTOPOS, insertOffset, 0 );
+   SciMsg( ed->sciWidget, SCI_ADDTEXT, (int) strlen(insert), (intptr_t) insert );
 }
 
 /* CodeEditorGotoFunction( hEditor, cFuncName ) --> lFound */
 HB_FUNC( CODEEDITORGOTOFUNCTION )
 {
    CODEEDITOR * ed = (CODEEDITOR *)(HB_PTRUINT) hb_parnint(1);
-   if( !ed || !ed->buffer || !HB_ISCHAR(2) ) { hb_retl(0); return; }
+   if( !ed || !ed->sciWidget || !HB_ISCHAR(2) ) { hb_retl(0); return; }
 
    const char * funcName = hb_parc(2);
 
-   GtkTextIter start, end;
-   gtk_text_buffer_get_start_iter( ed->buffer, &start );
-   gtk_text_buffer_get_end_iter( ed->buffer, &end );
-   char * fullText = gtk_text_buffer_get_text( ed->buffer, &start, &end, FALSE );
-   if( !fullText ) { hb_retl(0); return; }
+   int nLen = (int) SciMsg( ed->sciWidget, SCI_GETLENGTH, 0, 0 );
+   if( nLen <= 0 ) { hb_retl(0); return; }
+
+   char * fullText = (char *) malloc( nLen + 1 );
+   SciMsg( ed->sciWidget, SCI_GETTEXT, nLen + 1, (intptr_t) fullText );
 
    /* Search for "METHOD name(" or "function name(" */
    char patterns[4][128];
@@ -3747,18 +4480,16 @@ HB_FUNC( CODEEDITORGOTOFUNCTION )
    if( found )
    {
       int offset = (int)(found - fullText);
-      /* Move 2 lines down to land inside the body */
       char * nl = strchr( found, '\n' );
       if( nl ) { nl = strchr( nl + 1, '\n' ); if( nl ) offset = (int)(nl - fullText) + 1; }
 
-      GtkTextIter cursor;
-      gtk_text_buffer_get_iter_at_offset( ed->buffer, &cursor, offset );
-      gtk_text_buffer_place_cursor( ed->buffer, &cursor );
-      gtk_text_view_scroll_to_iter( GTK_TEXT_VIEW(ed->textView), &cursor, 0.1, TRUE, 0, 0.5 );
+      SciMsg( ed->sciWidget, SCI_GOTOPOS, offset, 0 );
+      SciMsg( ed->sciWidget, SCI_SCROLLCARET, 0, 0 );
+      gtk_widget_grab_focus( ed->sciWidget );
       if( ed->window ) gtk_window_present( GTK_WINDOW(ed->window) );
    }
 
-   g_free( fullText );
+   free( fullText );
    hb_retl( found != NULL );
 }
 
@@ -3773,14 +4504,13 @@ HB_FUNC( CODEEDITORBRINGTOFRONT )
 HB_FUNC( CODEEDITORGETTEXT2 )
 {
    CODEEDITOR * ed = (CODEEDITOR *)(HB_PTRUINT) hb_parnint(1);
-   if( ed && ed->buffer )
+   if( ed && ed->sciWidget )
    {
-      GtkTextIter start, end;
-      gtk_text_buffer_get_start_iter( ed->buffer, &start );
-      gtk_text_buffer_get_end_iter( ed->buffer, &end );
-      char * text = gtk_text_buffer_get_text( ed->buffer, &start, &end, FALSE );
-      hb_retc( text ? text : "" );
-      if( text ) g_free( text );
+      int nLen = (int) SciMsg( ed->sciWidget, SCI_GETLENGTH, 0, 0 );
+      char * buf = (char *) malloc( nLen + 1 );
+      SciMsg( ed->sciWidget, SCI_GETTEXT, nLen + 1, (intptr_t) buf );
+      hb_retclen( buf, nLen );
+      free( buf );
    }
    else
       hb_retc( "" );

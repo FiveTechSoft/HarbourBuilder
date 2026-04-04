@@ -1,6 +1,84 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-03 (Session 4: Linux Scintilla Integration)
+----------------------------------------------------
+
+LINUX: Replaced GtkTextView code editor with Scintilla in gtk3_core.c
+
+  The GTK3 code editor has been completely rewritten to use Scintilla via
+  dynamically-loaded shared libraries (libscintilla.so + liblexilla.so),
+  matching the Windows Scintilla implementation from Session 3.
+
+  REPLACED (GtkTextView manual code removed):
+  - CE_HighlightCode() ........ manual token-by-token syntax highlighting
+  - on_gutter_draw() .......... manual Cairo line number rendering
+  - on_editor_buffer_changed() . re-highlight on every keystroke
+  - on_editor_vadjust_changed()  gutter sync on scroll
+  - s_keywords[] / s_commands[]  static keyword/command arrays
+  - CE_IsKeyword() / CE_IsCommand() / CE_IsWordChar()
+  - GtkTextBuffer tags (comment/string/keyword/command/preproc)
+
+  NEW - Scintilla GTK integration:
+  - InitScintilla() ........... dlopen() libscintilla.so + liblexilla.so
+                                Searches: ../resources/, ./resources/, system path
+  - ConfigureScintilla() ...... C/C++ lexer, Harbour keywords, VS Code Dark+ colors
+  - UpdateHarbourFolding() .... Harbour-aware fold levels (function/if/for/class)
+  - CE_ShowAutoComplete() ..... Ctrl+Space with all Harbour keywords + functions
+  - CE_FindNext() ............. SCI_SEARCHINTARGET with wrap-around + match count
+  - CE_ReplaceCurrent() ....... Replace current match
+  - CE_ReplaceAll() ........... Replace all matches with count
+  - CE_ShowFindBar() .......... GTK find/replace bar with dark theme
+  - UpdateStatusBar() ......... Ln/Col, INS/OVR, lines, chars, UTF-8
+  - on_sci_notify() ........... SCN_CHARADDED (auto-indent), SCN_UPDATEUI,
+                                SCN_MODIFIED (fold update), SCN_MARGINCLICK
+  - on_sci_key_press() ........ All keyboard shortcuts (Ctrl+F, Ctrl+H, Ctrl+/,
+                                Ctrl+Shift+D, Ctrl+Shift+K, Ctrl+L, Ctrl+G,
+                                Ctrl+Space, F3/Shift+F3, Esc)
+
+  FEATURES (now matching Windows):
+  - Scintilla lexer-based syntax highlighting (no manual parsing)
+  - Native line numbers margin (no Cairo drawing)
+  - Code folding with box-style markers
+  - Indentation guides
+  - Auto-indent on Enter
+  - Auto-complete popup (Ctrl+Space)
+  - Find/Replace bar with match count
+  - Status bar (Ln/Col/INS/UTF-8)
+  - All keyboard shortcuts from Windows version
+
+  ALL HB_FUNC FUNCTIONS UPDATED:
+  - CODEEDITORCREATE .......... creates Scintilla widget via scintilla_new()
+  - CODEEDITORSETTEXT ......... SCI_SETTEXT
+  - CODEEDITORGETTEXT ......... SCI_GETTEXT
+  - CODEEDITORDESTROY ......... proper cleanup with tab text free
+  - CODEEDITORADDTAB .......... (unchanged, tab management is GTK)
+  - CODEEDITORSETTABTEXT ...... SCI_SETTEXT + UpdateHarbourFolding
+  - CODEEDITORGETTABTEXT ...... SCI_GETTEXT from active, heap for others
+  - CODEEDITORSELECTTAB ....... SaveCurrentTabText + SCI_SETTEXT
+  - CODEEDITORCLEARTABS ....... SCI_SETTEXT ""
+  - CODEEDITORONTABCHANGE ..... (unchanged)
+  - CODEEDITORAPPENDTEXT ...... SCI_ADDTEXT
+  - CODEEDITORINSERTAFTER ..... SCI_GETTEXT + strcasestr + SCI_ADDTEXT
+  - CODEEDITORGOTOFUNCTION .... SCI_GOTOPOS + SCI_SCROLLCARET
+  - CODEEDITORBRINGTOFRONT .... (unchanged)
+  - CODEEDITORGETTEXT2 ........ SCI_GETTEXT
+
+  FILES MODIFIED:
+  - backends/gtk3/gtk3_core.c ... complete code editor rewrite
+  - samples/build_gtk.sh ........ updated for Scintilla .so copy + step count
+
+  FILES ADDED:
+  - build_scintilla.sh .......... downloads + builds Scintilla 5.6.1 + Lexilla 5.4.8
+                                  from source for Linux GTK3
+
+  RESOLVED FROM PENDING:
+  - Linux: compile libscintilla, replace GtkTextView in gtk3_core.c [DONE]
+
+  STILL PENDING:
+  - macOS: compile ScintillaView framework, replace NSTextView in cocoa_core.m
+
+
 2026-04-03 (Session 3: Scintilla Code Editor)
 ----------------------------------------------
 
