@@ -171,4 +171,83 @@
 #xcommand MENUSEPARATOR OF <oPopup> => ;
    <oPopup>:AddSeparator()
 
+// Report Designer commands
+#xcommand DEFINE REPORT <oRpt> ;
+      [ TITLE <cTitle> ] ;
+      [ DATASOURCE <oDS> ] ;
+   => ;
+      <oRpt> := TReport():New() ;
+      [; <oRpt>:cTitle := <cTitle> ] ;
+      [; <oRpt>:oDataSource := <oDS> ]
+
+#xcommand DEFINE BAND <oBand> NAME <cName> ;
+      [ HEIGHT <nH> ] ;
+      OF <oRpt> ;
+   => ;
+      <oBand> := TReportBand():New( <cName> ) ;
+      [; <oBand>:nHeight := <nH> ] ;
+      ; <oRpt>:AddDesignBand( <oBand> )
+
+// REPORT TEXT - static text field with font
+#xcommand REPORT TEXT <oFld> ;
+      PROMPT <cText> ;
+      AT <nTop>, <nLeft> ;
+      SIZE <nW>, <nH> ;
+      FONT <cFont>, <nFSize> ;
+      [ <bold: BOLD> ] ;
+      [ <italic: ITALIC> ] ;
+      [ ALIGN <nAlign> ] ;
+      OF <oBand> ;
+   => ;
+      <oFld> := RPT_NewTextField( <oBand>, <cText>, ;
+         <nTop>, <nLeft>, <nW>, <nH>, ;
+         <cFont>, <nFSize>, <.bold.>, <.italic.>, <nAlign> )
+
+// REPORT TEXT - static text field without font
+#xcommand REPORT TEXT <oFld> ;
+      PROMPT <cText> ;
+      AT <nTop>, <nLeft> ;
+      SIZE <nW>, <nH> ;
+      [ <bold: BOLD> ] ;
+      [ <italic: ITALIC> ] ;
+      [ ALIGN <nAlign> ] ;
+      OF <oBand> ;
+   => ;
+      <oFld> := RPT_NewTextField( <oBand>, <cText>, ;
+         <nTop>, <nLeft>, <nW>, <nH>, ;
+         nil, nil, <.bold.>, <.italic.>, <nAlign> )
+
+// REPORT DATA - data-bound field with font
+#xcommand REPORT DATA <oFld> ;
+      FIELD <cField> ;
+      AT <nTop>, <nLeft> ;
+      SIZE <nW>, <nH> ;
+      FONT <cFont>, <nFSize> ;
+      [ <bold: BOLD> ] ;
+      [ <italic: ITALIC> ] ;
+      [ ALIGN <nAlign> ] ;
+      OF <oBand> ;
+   => ;
+      <oFld> := RPT_NewDataField( <oBand>, <cField>, ;
+         <nTop>, <nLeft>, <nW>, <nH>, ;
+         <cFont>, <nFSize>, <.bold.>, <.italic.>, <nAlign> )
+
+// REPORT DATA - data-bound field without font
+#xcommand REPORT DATA <oFld> ;
+      FIELD <cField> ;
+      AT <nTop>, <nLeft> ;
+      SIZE <nW>, <nH> ;
+      [ <bold: BOLD> ] ;
+      [ <italic: ITALIC> ] ;
+      [ ALIGN <nAlign> ] ;
+      OF <oBand> ;
+   => ;
+      <oFld> := RPT_NewDataField( <oBand>, <cField>, ;
+         <nTop>, <nLeft>, <nW>, <nH>, ;
+         nil, nil, <.bold.>, <.italic.>, <nAlign> )
+
+#xcommand REPORT PREVIEW <oRpt> => <oRpt>:Preview()
+
+#xcommand REPORT PRINT <oRpt> => <oRpt>:Print()
+
 #endif

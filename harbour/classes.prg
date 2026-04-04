@@ -1760,3 +1760,38 @@ METHOD GetValue( oDataSource ) CLASS TReportField
       endif
    endif
 return xValue
+
+// Helper functions for report xcommand macros
+function RPT_NewTextField( oBand, cText, nTop, nLeft, nW, nH, cFont, nFSize, lBold, lItalic, nAlign )
+   local oFld
+
+   oFld := TReportField():New()
+   oFld:cText := cText
+   oFld:nTop := nTop
+   oFld:nLeft := nLeft
+   oFld:nWidth := nW
+   oFld:nHeight := nH
+   if cFont != nil;  oFld:cFontName := cFont;  endif
+   if nFSize != nil; oFld:nFontSize := nFSize;  endif
+   if lBold != nil;  oFld:lBold := lBold;       endif
+   if lItalic != nil; oFld:lItalic := lItalic;  endif
+   if nAlign != nil; oFld:nAlignment := nAlign;  endif
+   oBand:AddField( oFld )
+return oFld
+
+function RPT_NewDataField( oBand, cField, nTop, nLeft, nW, nH, cFont, nFSize, lBold, lItalic, nAlign )
+   local oFld
+
+   oFld := TReportField():New()
+   oFld:cFieldName := cField
+   oFld:nTop := nTop
+   oFld:nLeft := nLeft
+   oFld:nWidth := nW
+   oFld:nHeight := nH
+   if cFont != nil;  oFld:cFontName := cFont;  endif
+   if nFSize != nil; oFld:nFontSize := nFSize;  endif
+   if lBold != nil;  oFld:lBold := lBold;       endif
+   if lItalic != nil; oFld:lItalic := lItalic;  endif
+   if nAlign != nil; oFld:nAlignment := nAlign;  endif
+   oBand:AddField( oFld )
+return oFld
