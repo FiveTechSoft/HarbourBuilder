@@ -12,7 +12,12 @@
 #include "hbide.h"
 #include <string.h>
 
-/* SetDPIAware() - enable DPI awareness to prevent zoom distortion */
+/* DPI awareness - must be called before any window is created */
+/* C++ static initializer runs before main() and before Harbour VM */
+static struct _DpiInit {
+   _DpiInit() { SetProcessDPIAware(); }
+} _s_dpiInit;
+
 HB_FUNC( SETDPIAWARE )
 {
    SetProcessDPIAware();

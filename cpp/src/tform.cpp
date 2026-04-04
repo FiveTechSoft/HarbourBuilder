@@ -184,20 +184,12 @@ void TForm::CreateHandle( HWND hParent )
       else
          dwStyle = WS_POPUP | WS_CAPTION | WS_SYSMENU | DS_MODALFRAME | WS_CLIPCHILDREN;
 
-      /* Width/Height represent client area — adjust for borders */
-      {
-         RECT rcAdj = { 0, 0, FWidth, FHeight };
-         AdjustWindowRectEx( &rcAdj, dwStyle, FALSE, dwExStyle );
-         int adjW = rcAdj.right - rcAdj.left;
-         int adjH = rcAdj.bottom - rcAdj.top;
-
-         FHandle = CreateWindowExA( dwExStyle, szClass, FText,
-            dwStyle,
-            FCenter ? CW_USEDEFAULT : FLeft,
-            FCenter ? CW_USEDEFAULT : FTop,
-            adjW, adjH,
-            NULL, NULL, GetModuleHandle(NULL), NULL );
-      }
+      FHandle = CreateWindowExA( dwExStyle, szClass, FText,
+         dwStyle,
+         FCenter ? CW_USEDEFAULT : FLeft,
+         FCenter ? CW_USEDEFAULT : FTop,
+         FWidth, FHeight,
+         NULL, NULL, GetModuleHandle(NULL), NULL );
    }
 
    if( FHandle )

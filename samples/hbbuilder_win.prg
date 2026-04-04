@@ -66,12 +66,9 @@ function Main()
    nInsW    := Int( nScreenW * 0.18 )        // ~18% of screen width
 
    // === Window 1: Main Bar (full screen width) ===
-   // Scan compilers early so we can show in title
-   ScanCompilers()
-   aCI0 := GetCompilerInfo()
-   cCompLabel := iif( aCI0 != nil, aCI0[2], "No compiler" )
+   cCompLabel := "Visual IDE for Harbour"
 
-   DEFINE FORM oIDE TITLE "HbBuilder 1.0 - [" + cCompLabel + "]" ;
+   DEFINE FORM oIDE TITLE "HbBuilder 1.0 - " + cCompLabel ;
       SIZE nScreenW, nBarH FONT "Segoe UI", 9 APPBAR
 
    UI_FormSetPos( oIDE:hCpp, 0, 0 )
@@ -650,8 +647,8 @@ static function RegenerateFormCode( cName, hForm )
       cTitle := UI_GetProp( hForm, "cText" )
       nFL    := UI_GetProp( hForm, "nLeft" )
       nFT    := UI_GetProp( hForm, "nTop" )
-      nW     := UI_GetProp( hForm, "nClientWidth" )
-      nH     := UI_GetProp( hForm, "nClientHeight" )
+      nW     := UI_GetProp( hForm, "nWidth" )
+      nH     := UI_GetProp( hForm, "nHeight" )
       nClr   := UI_GetProp( hForm, "nClrPane" )
 
    else
@@ -1626,6 +1623,10 @@ static function TBRun()
 
    // Detect compiler from scanned list
    aCI := GetCompilerInfo()
+   // Update title with compiler info on first build
+   if aCI != nil
+      UI_SetProp( oIDE:hCpp, "cText", "HbBuilder 1.0 - [" + aCI[2] + "]" )
+   endif
    if aCI == nil
       MsgInfo( "No C compiler found!" + Chr(10) + Chr(10) + ;
                "Use Tools > Select C Compiler, or install:" + Chr(10) + ;
