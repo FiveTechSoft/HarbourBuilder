@@ -1475,6 +1475,14 @@ HB_FUNC( UI_TOOLBARLOADIMAGES )
       p->LoadImages( hb_parc(2) );
 }
 
+/* UI_StackToolBars( hForm ) - reposition second toolbar below first */
+HB_FUNC( UI_STACKTOOLBARS )
+{
+   TForm * pForm = GetForm(1);
+   if( pForm )
+      pForm->StackToolBars();
+}
+
 /* ======================================================================
  * Menu
  * ====================================================================== */

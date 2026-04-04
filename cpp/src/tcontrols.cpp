@@ -308,6 +308,7 @@ TToolBar::TToolBar()
    FTabStop = FALSE;
    FHeight = 28;
    FImageList = NULL;
+   FIdBase = TOOLBAR_BTN_ID_BASE;
    memset( FBtns, 0, sizeof(FBtns) );
 }
 
@@ -364,7 +365,7 @@ void TToolBar::CreateHandle( HWND hParent )
       else
       {
          tbb.iBitmap = I_IMAGENONE;
-         tbb.idCommand = TOOLBAR_BTN_ID_BASE + i;
+         tbb.idCommand = FIdBase + i;
          tbb.fsState = TBSTATE_ENABLED;
          tbb.fsStyle = BTNS_BUTTON | BTNS_AUTOSIZE | BTNS_SHOWTEXT;
          tbb.iString = (INT_PTR) FBtns[i].szText;
@@ -447,7 +448,7 @@ void TToolBar::LoadImages( const char * szBmpPath )
       else
       {
          tbb.iBitmap = imgIdx;
-         tbb.idCommand = TOOLBAR_BTN_ID_BASE + i;
+         tbb.idCommand = FIdBase + i;
          tbb.fsState = TBSTATE_ENABLED;
          tbb.fsStyle = BTNS_BUTTON;
          imgIdx++;
@@ -1241,9 +1242,11 @@ void TComponentPalette::CreateHandle( HWND hParent )
 
    if( !hParent ) return;
 
-   /* Get parent form to find toolbar width */
+   /* Get parent form to find toolbar width (max of both rows) */
    pForm = (TForm *) GetWindowLongPtr( hParent, GWLP_USERDATA );
    tbWidth = ( pForm && pForm->FToolBar ) ? pForm->FToolBar->FWidth + 4 : 0;
+   if( pForm && pForm->FToolBar2 && pForm->FToolBar2->FWidth + 4 > tbWidth )
+      tbWidth = pForm->FToolBar2->FWidth + 4;
 
    GetClientRect( hParent, &rcParent );
 

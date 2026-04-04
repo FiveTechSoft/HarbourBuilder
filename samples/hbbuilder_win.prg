@@ -58,7 +58,7 @@ function Main()
 
    // C++Builder classic proportions scaled to current screen
    // Reference: 1024x768 -> Inspector 250px (24.4%), Bar 140px
-   nBarH    := 140                           // title(23) + menu(20) + borders(8) + toolbar(36) + palette(52)
+   nBarH    := 155                           // title(23) + menu(20) + borders(8) + 2 toolbars(70) + palette(28)
    nInsW    := Int( nScreenW * 0.18 )        // ~18% of screen width
 
    // === Window 1: Main Bar (full screen width) ===
@@ -205,6 +205,12 @@ function Main()
    BUTTON "Over"  OF oTB2 TOOLTIP "Step Over (F8)"          ACTION DebugStepOver()
    BUTTON "Go"    OF oTB2 TOOLTIP "Continue (F5)"           ACTION IDE_DebugGo()
    BUTTON "Stop"  OF oTB2 TOOLTIP "Stop Debugging"          ACTION IDE_DebugStop()
+
+   // Load debug toolbar icons
+   UI_ToolBarLoadImages( oTB2:hCpp, HB_DirBase() + "..\resources\toolbar_debug.bmp" )
+
+   // Stack both toolbars vertically
+   UI_StackToolBars( oIDE:hCpp )
 
    // Component Palette (icon grid, tabbed, right of splitter)
    CreatePalette()

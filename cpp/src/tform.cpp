@@ -84,6 +84,7 @@ TForm::TForm()
 
    /* Toolbar */
    FToolBar = NULL;
+   FToolBar2 = NULL;
    FPalette = NULL;
    FStatusBar = NULL;
    FHasStatusBar = FALSE;
@@ -213,10 +214,17 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
          WORD wNotify = HIWORD(wParam);
 
          /* Toolbar button clicks */
-         if( FToolBar && wId >= TOOLBAR_BTN_ID_BASE &&
-             wId < TOOLBAR_BTN_ID_BASE + FToolBar->FBtnCount )
+         if( FToolBar && wId >= FToolBar->FIdBase &&
+             wId < FToolBar->FIdBase + FToolBar->FBtnCount )
          {
-            FToolBar->DoCommand( wId - TOOLBAR_BTN_ID_BASE );
+            FToolBar->DoCommand( wId - FToolBar->FIdBase );
+            return 0;
+         }
+         /* Second toolbar button clicks */
+         if( FToolBar2 && wId >= FToolBar2->FIdBase &&
+             wId < FToolBar2->FIdBase + FToolBar2->FBtnCount )
+         {
+            FToolBar2->DoCommand( wId - FToolBar2->FIdBase );
             return 0;
          }
 
@@ -434,10 +442,12 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
             FHeight = rcWnd.bottom - rcWnd.top;
          }
 
-         /* Resize toolbar */
+         /* Resize toolbar(s) */
          if( FToolBar && FToolBar->FHandle )
          {
             FClientTop = FToolBar->GetBarHeight();
+            if( FToolBar2 && FToolBar2->FHandle )
+               StackToolBars();
          }
          /* Resize splitter + palette to fill remaining width */
          if( FPalette && FPalette->FTabCtrl )
@@ -464,12 +474,39 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
       case WM_NOTIFY:
       {
          LPNMHDR pNMH = (LPNMHDR) lParam;
-         if( pNMH->code == TTN_GETDISPINFOA && FToolBar )
+         if( pNMH->code == TTN_GETDISPINFOA )
          {
             LPNMTTDISPINFOA pTTDI = (LPNMTTDISPINFOA) lParam;
-            int idx = (int) pTTDI->hdr.idFrom - TOOLBAR_BTN_ID_BASE;
-            if( idx >= 0 && idx < FToolBar->FBtnCount )
-               pTTDI->lpszText = FToolBar->FBtns[idx].szTooltip;
+            int idFrom = (int) pTTDI->hdr.idFrom;
+            if( FToolBar ) {
+               int idx = idFrom - FToolBar->FIdBase;
+               if( idx >= 0 && idx < FToolBar->FBtnCount )
+                  pTTDI->lpszText = FToolBar->FBtns[idx].szTooltip;
+            }
+            if( FToolBar2 ) {
+               int idx = idFrom - FToolBar2->FIdBase;
+               if( idx >= 0 && idx < FToolBar2->FBtnCount )
+                  pTTDI->lpszText = FToolBar2->FBtns[idx].szTooltip;
+            }
+         }
+         /* Custom draw for toolbar text (white on dark background) */
+         if( pNMH->code == NM_CUSTOMDRAW )
+         {
+            LPNMTBCUSTOMDRAW pCD = (LPNMTBCUSTOMDRAW) lParam;
+            if( pNMH->hwndFrom == (FToolBar2 ? FToolBar2->FHandle : NULL) ||
+                pNMH->hwndFrom == (FToolBar ? FToolBar->FHandle : NULL) )
+            {
+               switch( pCD->nmcd.dwDrawStage )
+               {
+                  case CDDS_PREPAINT:
+                     return CDRF_NOTIFYITEMDRAW;
+                  case CDDS_ITEMPREPAINT:
+                     pCD->clrText = RGB(212, 212, 212);
+                     pCD->clrBtnFace = RGB(45, 45, 48);
+                     SetBkMode( pCD->nmcd.hdc, TRANSPARENT );
+                     return TBCDRF_USECDCOLORS;
+               }
+            }
          }
          /* Tab control selection changed (component palette) */
          if( pNMH->code == TCN_SELCHANGE && FPalette &&
@@ -1025,6 +1062,13 @@ void TForm::CreateAllChildren()
       FClientTop = FToolBar->GetBarHeight();
    }
 
+   /* Create second toolbar below the first */
+   if( FToolBar2 )
+   {
+      FToolBar2->CreateHandle( FHandle );
+      StackToolBars();
+   }
+
    /* Create component palette (to the right of toolbar) */
    if( FPalette )
    {
@@ -1371,7 +1415,17 @@ void TForm::UpdateOverlay()
 
 void TForm::AttachToolBar( TToolBar * pTB )
 {
-   FToolBar = pTB;
+   if( FToolBar == NULL )
+   {
+      /* First toolbar */
+      FToolBar = pTB;
+   }
+   else
+   {
+      /* Second toolbar - stacked below the first */
+      FToolBar2 = pTB;
+      pTB->FIdBase = 500;  /* Different ID range from first toolbar */
+   }
    pTB->FCtrlParent = this;
    pTB->FParent = this;
 
@@ -1381,6 +1435,29 @@ void TForm::AttachToolBar( TToolBar * pTB )
       pTB->CreateHandle( FHandle );
       FClientTop = pTB->GetBarHeight();
    }
+}
+
+/* Reposition second toolbar below the first (called after both are created) */
+void TForm::StackToolBars()
+{
+   if( !FToolBar || !FToolBar->FHandle || !FToolBar2 || !FToolBar2->FHandle )
+      return;
+
+   int tb1H = FToolBar->GetBarHeight();
+   int tb1W = FToolBar->FWidth;
+   int tb2W = FToolBar2->FWidth;
+   int maxW = tb1W > tb2W ? tb1W : tb2W;
+
+   /* Limit first toolbar to its content width */
+   SetWindowPos( FToolBar->FHandle, NULL, 0, 0, tb1W, tb1H, SWP_NOZORDER );
+
+   /* Force second toolbar below first, same content width */
+   RECT rc2;
+   GetWindowRect( FToolBar2->FHandle, &rc2 );
+   int tb2H = rc2.bottom - rc2.top;
+   SetWindowPos( FToolBar2->FHandle, NULL, 0, tb1H - 2, tb2W, tb2H, SWP_NOZORDER );
+
+   FClientTop = tb1H + tb2H - 2;
 }
 
 /* ======================================================================

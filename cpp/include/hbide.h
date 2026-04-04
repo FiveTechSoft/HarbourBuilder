@@ -297,6 +297,7 @@ public:
 
    /* Toolbar */
    TToolBar *   FToolBar;
+   TToolBar *   FToolBar2;     /* Second toolbar row (debug buttons) */
    TComponentPalette * FPalette;
    HWND         FStatusBar;
    BOOL         FHasStatusBar;
@@ -335,6 +336,7 @@ public:
 
    /* Toolbar */
    void         AttachToolBar( TToolBar * pTB );
+   void         StackToolBars();
 
    /* Menu */
    void         CreateMenuBar();
@@ -849,6 +851,7 @@ public:
    ToolBtn     FBtns[MAX_TOOLBTNS];
    int         FBtnCount;
    HIMAGELIST  FImageList;
+   int         FIdBase;        /* Button ID base (100 for TB1, 500 for TB2) */
 
    TToolBar();
    virtual ~TToolBar();
