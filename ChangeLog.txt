@@ -1,6 +1,29 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-03 (Session 5c: Database Testing + Bug Fixes)
+-------------------------------------------------------
+
+TESTED & VERIFIED:
+  dbf_example.prg ...... PASS - creates DBF, inserts 5 records,
+                          reads all fields, shows table structure
+  sqlite_example.prg ... PASS - creates table, transactions, 5 inserts,
+                          queries with ORDER BY/WHERE, TableExists, LastInsertId
+
+BUG FIXES:
+  - LOCAL declarations moved to top of functions (Harbour requirement)
+  - Added REQUEST DBFCDX, DBFNTX for RDD driver registration
+  - Fixed sqlite3_open() to pass .T. flag (create file if not exists)
+  - Fixed sqlite3_exec() return type check (ValType guard)
+  - Simplified TSQLite:Query() to use sqlite3_column_text for all types
+  - Fixed sample code to use hb_ValToStr() instead of Str() for text columns
+
+BUILD:
+  - Added build_test.sh for compiling DB examples with GTK3 backend
+  - Updated .gitignore to exclude DB build artifacts (.o, .dbf, .sqlite, binaries)
+  - Added -lhbsqlit3 -lsddsqlt3 -lrddsql -lsqlite3 to linker
+
+
 2026-04-03 (Session 5b: Database Components + Data Controls)
 --------------------------------------------------------------
 

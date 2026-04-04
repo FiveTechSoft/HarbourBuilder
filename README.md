@@ -161,6 +161,45 @@ return nil
 - Full clipboard: **Cut / Copy / Paste / Undo / Redo** via Scintilla
 - Build & Run with F9
 
+### 🗄️ Database Components (tested and verified)
+
+Unified `TDatabase` architecture — switch backends by changing one line:
+
+```harbour
+// All backends share the same API:
+oDb := TSQLite():New()              // or TDBFTable(), TMySQL(), TPostgreSQL()...
+oDb:cDatabase := "myapp.sqlite"
+oDb:Open()
+oDb:Execute( "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)" )
+oDb:Execute( "INSERT INTO users VALUES (1, 'Alice')" )
+aRows := oDb:Query( "SELECT * FROM users" )
+oDb:Close()
+```
+
+| Component | Status | Description |
+|-----------|--------|-------------|
+| **TDBFTable** | ✅ Tested | Native DBF/NTX/CDX — GoTop, Skip, Seek, Append, Delete, FieldGet/Put, Structure, CreateIndex (20+ methods) |
+| **TSQLite** | ✅ Tested | SQLite3 — Execute, Query, CreateTable, BeginTransaction, Commit, Rollback, LastInsertId, Tables, TableExists |
+| **TMySQL** | 🔧 Stub | Needs `apt install libmysqlclient-dev` |
+| **TMariaDB** | 🔧 Stub | Wire-compatible with MySQL (inherits TMySQL) |
+| **TPostgreSQL** | 🔧 Stub | Needs `apt install libpq-dev` |
+| **TFirebird** | 🔧 Stub | Needs `apt install firebird-dev` |
+| **TSQLServer** | 🔧 Stub | Needs `apt install freetds-dev` |
+| **TOracle** | 🔧 Stub | Needs Oracle Instant Client |
+| **TMongoDB** | 🔧 Stub | Needs `apt install libmongoc-dev` |
+
+**Data Controls** (visual, bind to any TDatabase):
+- `TDataSource` — binds database to controls (MoveFirst/Prev/Next/Last/Append/Delete)
+- `TDBGrid` — scrollable data table (GtkTreeView / Win32 ListView)
+- `TDBNavigator` — navigation buttons (|< < > >| + - v)
+- `TDBEdit`, `TDBText`, `TDBComboBox`, `TDBCheckBox`, `TDBImage`
+
+**4 sample projects** in `samples/projects/database/`:
+- `dbf_example.prg` — DBF CRUD operations
+- `sqlite_example.prg` — SQL tables, transactions, queries
+- `portable_example.prg` — same API across all backends
+- `datacontrols_example.prg` — TDataSource + TDBNavigator binding
+
 ---
 
 ## 📸 Screenshots
