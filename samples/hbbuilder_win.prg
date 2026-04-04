@@ -38,6 +38,7 @@ function Main()
    local oTB, oTB2, oFile, oEdit, oSearch, oView, oProject, oRun, oFormat, oComp, oTools, oGit, oHelp
    local nBarH, nInsW, nEditorX, nEditorW, nEditorH
    local nFormX, nFormY, nInsTop, nEditorTop, nBottomY
+   local cIcoDir
 
    // Check if Harbour and BCC are installed
    CheckHarbourInstall()
@@ -197,6 +198,34 @@ function Main()
    MENUITEM "&Controls Reference"   OF oHelp ACTION W32_OpenDocs( "en/controls-standard.html" )
    MENUSEPARATOR OF oHelp
    MENUITEM "&About HbBuilder..."   OF oHelp ACTION ShowAbout()
+
+   // Menu bitmaps (16x16 from Lazarus IDE icon set)
+   cIcoDir := HB_DirBase() + "..\resources\menu_icons\"
+   // File menu
+   UI_MenuSetBitmapByPos( oFile, 0, cIcoDir + "menu_new.png" )          // New
+   UI_MenuSetBitmapByPos( oFile, 2, cIcoDir + "menu_open.png" )         // Open
+   UI_MenuSetBitmapByPos( oFile, 3, cIcoDir + "menu_save.png" )         // Save
+   UI_MenuSetBitmapByPos( oFile, 4, cIcoDir + "menu_saveas.png" )       // Save As
+   UI_MenuSetBitmapByPos( oFile, 6, cIcoDir + "menu_exit.png" )         // Exit
+   // Edit menu
+   UI_MenuSetBitmapByPos( oEdit, 0, cIcoDir + "menu_undo.png" )         // Undo
+   UI_MenuSetBitmapByPos( oEdit, 1, cIcoDir + "menu_redo.png" )         // Redo
+   UI_MenuSetBitmapByPos( oEdit, 3, cIcoDir + "menu_cut.png" )          // Cut
+   UI_MenuSetBitmapByPos( oEdit, 4, cIcoDir + "menu_copy.png" )         // Copy
+   UI_MenuSetBitmapByPos( oEdit, 5, cIcoDir + "menu_paste.png" )        // Paste
+   // Search menu
+   UI_MenuSetBitmapByPos( oSearch, 0, cIcoDir + "menu_search_find.png" )    // Find
+   UI_MenuSetBitmapByPos( oSearch, 1, cIcoDir + "menu_search_replace.png" ) // Replace
+   // View menu
+   UI_MenuSetBitmapByPos( oView, 2, cIcoDir + "menu_view_inspector.png" )   // Inspector
+   UI_MenuSetBitmapByPos( oView, 3, cIcoDir + "menu_project_inspector.png" )// Project Inspector
+   // Run menu
+   UI_MenuSetBitmapByPos( oRun, 0, cIcoDir + "menu_run.png" )           // Run
+   UI_MenuSetBitmapByPos( oRun, 4, cIcoDir + "menu_stepover.png" )      // Step Over
+   UI_MenuSetBitmapByPos( oRun, 5, cIcoDir + "menu_stepinto.png" )      // Step Into
+   UI_MenuSetBitmapByPos( oRun, 6, cIcoDir + "menu_stop.png" )          // Stop
+   // Tools menu
+   UI_MenuSetBitmapByPos( oTools, 1, cIcoDir + "menu_environment_options.png" ) // Env Options
 
    // Speedbar (toolbar with 28x28 icon-sized buttons)
    DEFINE TOOLBAR oTB OF oIDE
