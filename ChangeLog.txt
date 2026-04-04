@@ -1,6 +1,83 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-05 (Session 9: Windows IDE Polish + MSVC + Form Size Fix)
+
+  MULTI-COMPILER SUPPORT:
+  - Auto-detection: scans MSVC 2019/2022 (Community/BuildTools/Professional)
+    and BCC (bcc77c/bcc77/bcc82/bcc55) with 15 toolset versions
+  - Tools > Select C Compiler: choose between all detected compilers
+  - TBRun() uses dynamic paths from GetCompilerInfo(), no hardcoded paths
+  - Response files (.rsp) for cl.exe and link.exe (spaces in paths)
+  - Windows SDK 'shared' include dir (winapifamily.h)
+  - /NODEFAULTLIB:LIBCMT for MSVC, cw32mt.lib for BCC
+  - Compiler shown in IDE title bar on first build
+
+  FORM SIZE FIX:
+  - Root cause: SetProcessDPIAware() called too late, after GT init
+  - Fix: C++ static constructor calls SetProcessDPIAware() before main()
+  - Both IDE and UserApp get identical non-client metrics
+  - Width/Height stored as window rect (not client area)
+  - SetProp("nLeft"/"nTop") auto-disables FCenter
+
+  FORM DESIGNER:
+  - Resize works: fixed OnActivate stealing focus during NC resize
+  - WM_ACTIVATEAPP: restores IDE only when switching from other apps
+  - FSizable default TRUE (like Delphi/C++Builder)
+  - Non-visual components: auto-drop with palette icon, no resize, drag OK
+  - Inspector shows "oForm1 AS TForm1", "oTimer1 AS Timer"
+  - SubclassChildren() skip already-subclassed (was stack overflow crash)
+
+  BUILD SYSTEM:
+  - Progress dialog: 7-step ProgressBar with status text
+  - Error dialog: resizable, monospace, Copy to Clipboard button
+  - Smart rebuild: hash-based skip when code+compiler unchanged
+  - Delete old .obj/.exe before build (prevents format mismatch)
+  - Each .cpp compiled separately with explicit -o path
+  - INIT PROCEDURE _InitDPI in generated code
+  - DPI manifest resource (app.manifest) available
+
+  MENU BITMAPS:
+  - 45 Lazarus IDE icons (16x16 PNG) via GDI+ flat API
+  - LoadPngAsBitmap() + UI_MenuSetBitmapByPos()
+  - Assigned to File/Edit/Search/View/Project/Run/Tools/Git/Help
+
+  TOOLBAR:
+  - Dual toolbar: Row 1 (file/edit) + Row 2 (debug) with StackToolBars()
+  - Exit button added to debug row
+  - Removed duplicate Run button from row 2
+  - Focus on startup via W32_SetFocus (SetForegroundWindow + SetFocus)
+
+  APPBAR:
+  - SW_SHOWMAXIMIZED with WM_GETMINMAXINFO (-10px DWM compensation)
+  - WM_SYSCOMMAND blocks SC_RESTORE/SC_MOVE/SC_SIZE
+  - WM_NCLBUTTONDBLCLK blocked (prevents un-maximize)
+
+  GIT INTEGRATION:
+  - 11 backend functions: GIT_Exec, Status, Log, Diff, BranchList,
+    CurrentBranch, Blame, IsRepo, RemoteList, StashList
+  - Source Control panel: W32_GitPanel with branch, changes, commit
+  - Git menu: 17 items (Init/Clone/Status/Commit/Push/Pull/Branch/Stash/Log)
+  - Git palette tab: 10 components (CT 121-130)
+
+  NEW COMPONENTS:
+  - AI tab: Whisper (CT 110), Embeddings (CT 111) + brand-colored icons
+  - Connectivity tab: Python, Swift, Go, Node, Rust, Java, DotNet, Lua, Ruby
+    with official language logos in palette
+  - Git tab: GitRepo, GitCommit, GitBranch, GitLog, GitDiff, etc.
+  - Palette: 130 components in 16 tabs
+
+  INSPECTOR:
+  - COL_NAME_W: 95 → 145px (wider property names)
+  - InspectorOpen() calls INS_BringToFront when already open
+  - Combo format: "oForm1 AS TForm1", "oTimer1 AS Timer"
+
+  CODE GENERATION:
+  - "local oForm1  // AS TForm1" with separate New() and CreateForm()
+  - Non-visual: "// ::oTimer1 := Timer():New( Self )" (commented)
+  - SetDPIAware() via INIT PROCEDURE + C++ static constructor
+  - FontName/FontSize in generated CreateForm()
+
 2026-04-04 (Session 8c: Git Integration)
 
   GIT BACKEND (hbbridge.cpp, +11 HB_FUNC):
