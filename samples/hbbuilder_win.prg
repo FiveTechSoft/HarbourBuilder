@@ -62,14 +62,14 @@ function Main()
 
    // C++Builder classic proportions scaled to current screen
    // Reference: 1024x768 -> Inspector 250px (24.4%), Bar 140px
-   nBarH    := 141                           // title(23) + menu(20) + borders(8) + 2 toolbars(70) + palette(28) - 14
+   nBarH    := 160                           // title + menu + 2 toolbars(40+40) + palette
    nInsW    := Int( nScreenW * 0.18 )        // ~18% of screen width
 
    // === Window 1: Main Bar (full screen width) ===
    cCompLabel := "Visual IDE for Harbour"
 
    DEFINE FORM oIDE TITLE "HbBuilder 1.0 - " + cCompLabel ;
-      SIZE nScreenW, nBarH FONT "Segoe UI", 9 APPBAR
+      SIZE nScreenW, nBarH FONT "Segoe UI", 12 APPBAR
 
    UI_FormSetPos( oIDE:hCpp, 0, 0 )
    oIDE:Show()
@@ -81,8 +81,8 @@ function Main()
    // Inspector and editor: compensate DWM invisible borders (~8px each side)
    nInsTop  := W32_GetWindowBottom( UI_FormGetHwnd( oIDE:hCpp ) ) - 10
    nEditorTop := nInsTop
-   nEditorX := nInsW - 14
-   nEditorW := nScreenW - nEditorX + 24     // +24 to cover right DWM border
+   nEditorX := nInsW - 17
+   nEditorW := nScreenW - nEditorX + 9      // cover right DWM border
    nBottomY := W32_GetWorkAreaHeight() + 16  // +16 to cover bottom DWM border
    nEditorH := nBottomY - nEditorTop
 
@@ -534,7 +534,7 @@ static function CreateDesignForm( nX, nY )
    cName := "Form" + LTrim( Str( nIdx ) )
 
    // Create new empty form (like C++Builder File > New > VCL Forms Application)
-   DEFINE FORM oDesignForm TITLE cName SIZE 400, 300 FONT "Segoe UI", 9 SIZABLE
+   DEFINE FORM oDesignForm TITLE cName SIZE 400, 300 FONT "Segoe UI", 12 SIZABLE
    UI_FormSetPos( oDesignForm:hCpp, nX, nY )
 
    // Register in project form list
@@ -683,7 +683,7 @@ static function RegenerateFormCode( cName, hForm )
             case nType == 1  // Label
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' SAY ::o' + cCtrlName + ' PROMPT "' + cText + '" OF Self SIZE ' + ;
-                  LTrim(Str(nCW)) + e
+                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
             case nType == 2  // Edit
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' GET ::o' + cCtrlName + ' VAR "' + cText + '" OF Self SIZE ' + ;
@@ -1251,9 +1251,18 @@ static function MenuViewForms()
 return nil
 
 // Destroy all forms on exit
+static function RefreshIDEToolbars()
+   // Force repaint of IDE bar after running user app
+   local hWnd := UI_FormGetHwnd( oIDE:hCpp )
+   if hWnd != 0
+      W32_InvalidateWindow( hWnd )
+   endif
+return nil
+
 static function RestoreAllIDEWindows()
-   // Bring all IDE windows to front when any IDE window gets focus
+   // Bring all IDE windows to front and repaint toolbars
    W32_BringToTop( UI_FormGetHwnd( oIDE:hCpp ) )
+   W32_InvalidateWindow( UI_FormGetHwnd( oIDE:hCpp ) )
    INS_BringToFront( _InsGetData() )
    CodeEditorBringToFront( hCodeEditor )
    if oDesignForm != nil
@@ -1612,6 +1621,7 @@ static function TBRun()
    next
    if nHash == nLastHash .and. nLastHash != 0 .and. File( cBuildDir + "\UserApp.exe" )
       W32_ShellExec( 'cmd /c start "" "' + cBuildDir + '\UserApp.exe"' )
+      RefreshIDEToolbars()
       return nil
    endif
    cHbDir   := "c:\harbour"
@@ -1891,6 +1901,7 @@ static function TBRun()
    else
       nLastHash := nHash  // remember successful build hash
       W32_ShellExec( 'cmd /c start "" "' + cBuildDir + '\UserApp.exe"' )
+      RefreshIDEToolbars()
    endif
 
 return nil
@@ -2683,7 +2694,7 @@ HB_FUNC( W32_AIASSISTANTPANEL )
    hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
 
    /* Monospace font for chat */
-   lf.lfHeight = -13; lf.lfCharSet = DEFAULT_CHARSET;
+   lf.lfHeight = -18; lf.lfCharSet = DEFAULT_CHARSET;
    lf.lfPitchAndFamily = FIXED_PITCH;
    lstrcpyA(lf.lfFaceName, "Consolas");
    hMonoFont = CreateFontIndirectA(&lf);
@@ -3783,7 +3794,7 @@ static LRESULT CALLBACK AboutDlgProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM
             RECT rcText;
             HFONT hFont, hOldFont;
             LOGFONTA lf = {0};
-            lf.lfHeight = -14; lf.lfCharSet = DEFAULT_CHARSET;
+            lf.lfHeight = -18; lf.lfCharSet = DEFAULT_CHARSET;
             lstrcpyA( lf.lfFaceName, "Segoe UI" );
             hFont = CreateFontIndirectA( &lf );
             hOldFont = (HFONT) SelectObject( hDC, hFont );

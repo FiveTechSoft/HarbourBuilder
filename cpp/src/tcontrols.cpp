@@ -331,6 +331,9 @@ void TToolBar::CreateHandle( HWND hParent )
    int i, btnIdx = 0;
    TBBUTTON tbb;
 
+   /* Prevent double creation */
+   if( FHandle ) return;
+
    FHandle = CreateWindowExA( 0, TOOLBARCLASSNAME, NULL,
       WS_CHILD | WS_VISIBLE | TBSTYLE_FLAT | TBSTYLE_TOOLTIPS | TBSTYLE_LIST |
       CCS_NOPARENTALIGN | CCS_NORESIZE | CCS_NODIVIDER,
@@ -417,7 +420,7 @@ void TToolBar::LoadImages( const char * szBmpPath )
    DeleteObject( hBmp );
 
    SendMessage( FHandle, TB_SETIMAGELIST, 0, (LPARAM) FImageList );
-   SendMessage( FHandle, TB_SETBUTTONSIZE, 0, MAKELONG(36, 36) );
+   SendMessage( FHandle, TB_SETBUTTONSIZE, 0, MAKELONG(40, 40) );
    TBLog( "TB_SETIMAGELIST and TB_SETBUTTONSIZE sent" );
 
    /* Remove LIST style and MIXEDBUTTONS so buttons show only icons */
@@ -451,6 +454,7 @@ void TToolBar::LoadImages( const char * szBmpPath )
          tbb.idCommand = FIdBase + i;
          tbb.fsState = TBSTATE_ENABLED;
          tbb.fsStyle = BTNS_BUTTON;
+         tbb.iString = -1;  /* no text, icon only */
          imgIdx++;
       }
       SendMessage( FHandle, TB_ADDBUTTONS, 1, (LPARAM) &tbb );

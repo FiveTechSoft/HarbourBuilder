@@ -156,7 +156,7 @@ METHOD New( cTitle, nWidth, nHeight ) CLASS TForm
    if nWidth == nil;  nWidth := 470; endif
    if nHeight == nil; nHeight := 400; endif
 
-   ::hCpp := UI_FormNew( cTitle, nWidth, nHeight, "Segoe UI", 9 )
+   ::hCpp := UI_FormNew( cTitle, nWidth, nHeight, "Segoe UI", 12 )
 
 return Self
 

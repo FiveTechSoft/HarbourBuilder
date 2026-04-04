@@ -92,7 +92,7 @@ HB_FUNC( _INSSETDATA ) { s_insData = (HB_PTRUINT) hb_parnint(1); }
 #include <stdarg.h>
 
 #define MAX_ROWS 64
-#define COL_NAME_W 145
+#define COL_NAME_W 175
 
 /* Debug log to file */
 static void INSLOG( const char * fmt, ... )
@@ -262,7 +262,7 @@ static void InsFontPick( INSDATA * d, int nLVRow )
    lstrcpynA( lf.lfFaceName, d->rows[nReal].szValue, LF_FACESIZE );
    comma = strchr( lf.lfFaceName, ',' );
    if( comma ) { *comma = 0; lf.lfHeight = -atoi( comma + 1 ); }
-   else        lf.lfHeight = -12;
+   else        lf.lfHeight = -18;
    lf.lfCharSet = DEFAULT_CHARSET;
 
    cf.lStructSize = sizeof(cf);
@@ -288,7 +288,7 @@ static LRESULT CALLBACK InsWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
       case WM_SIZE:
       {
          int w = LOWORD(lParam), h = HIWORD(lParam);
-         int comboH = 24, tabH = 24, topY = comboH + tabH + 8;
+         int comboH = 28, tabH = 28, topY = comboH + tabH + 8;
          if( d )
          {
             if( d->hCombo ) MoveWindow( d->hCombo, 2, 2, w - 4, 200, TRUE );
@@ -937,7 +937,7 @@ HB_FUNC( INS_CREATE )
    LVCOLUMNA lvc = {0};
    TCITEMA tci = {0};
    static BOOL bReg = FALSE;
-   int comboH = 24, tabH = 24, topY;
+   int comboH = 28, tabH = 28, topY;
 
    d = (INSDATA *) malloc( sizeof(INSDATA) );
    memset( d, 0, sizeof(INSDATA) );
@@ -949,7 +949,7 @@ HB_FUNC( INS_CREATE )
    d->pOnEventDblClick = NULL;
    d->pOnPropChanged = NULL;
 
-   { LOGFONTA lf = {0}; lf.lfHeight = -12; lf.lfCharSet = DEFAULT_CHARSET;
+   { LOGFONTA lf = {0}; lf.lfHeight = -18; lf.lfCharSet = DEFAULT_CHARSET;
      lstrcpyA(lf.lfFaceName, "Segoe UI");
      d->hFont = CreateFontIndirectA(&lf);
      lf.lfWeight = FW_BOLD; d->hBold = CreateFontIndirectA(&lf); }

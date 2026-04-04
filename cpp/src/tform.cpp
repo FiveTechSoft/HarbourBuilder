@@ -547,7 +547,12 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
       case WM_ACTIVATEAPP:
          /* Fires only when switching from another application */
          if( wParam )  /* TRUE = our app is being activated */
+         {
             FireEvent( FOnActivateApp );
+            /* Force repaint of this window and all children (toolbar icons) */
+            RedrawWindow( FHandle, NULL, NULL,
+               RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN );
+         }
          break;
 
       case WM_ACTIVATE:

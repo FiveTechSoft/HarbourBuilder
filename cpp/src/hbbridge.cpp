@@ -23,6 +23,25 @@ HB_FUNC( SETDPIAWARE )
    SetProcessDPIAware();
 }
 
+/* W32_InvalidateWindow( hWnd ) - force full repaint including children */
+static BOOL CALLBACK _InvalidateChild( HWND h, LPARAM lp )
+{
+   (void)lp;
+   InvalidateRect( h, NULL, TRUE );
+   return TRUE;
+}
+
+HB_FUNC( W32_INVALIDATEWINDOW )
+{
+   HWND hWnd = (HWND)(LONG_PTR) hb_parnint(1);
+   if( hWnd )
+   {
+      InvalidateRect( hWnd, NULL, TRUE );
+      UpdateWindow( hWnd );
+      EnumChildWindows( hWnd, _InvalidateChild, 0 );
+   }
+}
+
 /* UI_MsgBox - cross-platform message box */
 HB_FUNC( UI_MSGBOX )
 {
@@ -1859,7 +1878,7 @@ HB_FUNC( W32_BUILDERRORDIALOG )
       }
    }
 
-   HFONT hMono = CreateFontA( -13, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+   HFONT hMono = CreateFontA( -18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
       DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, FIXED_PITCH | FF_MODERN, "Consolas" );
    HFONT hGui = (HFONT) GetStockObject( DEFAULT_GUI_FONT );
 
@@ -2916,7 +2935,7 @@ HB_FUNC( W32_DEBUGPANEL )
    s_dbgOutputEdit = CreateWindowExA( WS_EX_CLIENTEDGE, "EDIT", "",
       WS_CHILD | ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL,
       4, lvY, lvW, lvH, s_dbgTabCtrl, NULL, GetModuleHandle(NULL), NULL );
-   {  HFONT hMonoFont = CreateFontA( -13, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+   {  HFONT hMonoFont = CreateFontA( -18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
          DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, FIXED_PITCH | FF_MODERN, "Consolas" );
       SendMessageA( s_dbgOutputEdit, WM_SETFONT, (WPARAM)hMonoFont, TRUE );
    }
@@ -3291,7 +3310,7 @@ static void RptDesignerPaint( HWND hWnd )
    SelectObject( memDC, hPenGray );
    SetTextColor( memDC, RGB(180,180,180) );
    SetBkMode( memDC, TRANSPARENT );
-   HFONT hSmallFont = CreateFontA( -10, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+   HFONT hSmallFont = CreateFontA( -15, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
       DEFAULT_CHARSET, 0, 0, DEFAULT_QUALITY, DEFAULT_PITCH, "Segoe UI" );
    SelectObject( memDC, hSmallFont );
    for( int mm = 0; mm <= s_rptPageWidth; mm += 10 )
@@ -3307,7 +3326,7 @@ static void RptDesignerPaint( HWND hWnd )
    }
 
    /* Bands */
-   HFONT hFieldFont = CreateFontA( -12, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+   HFONT hFieldFont = CreateFontA( -17, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
       DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, DEFAULT_PITCH, "Segoe UI" );
 
    int bandY = RPT_RULER_H;
@@ -3324,7 +3343,7 @@ static void RptDesignerPaint( HWND hWnd )
 
       /* Band name in margin (vertical) */
       SetTextColor( memDC, RGB(255,255,255) );
-      HFONT hVFont = CreateFontA( -11, 0, 900, 900, FW_BOLD, FALSE, FALSE, FALSE,
+      HFONT hVFont = CreateFontA( -16, 0, 900, 900, FW_BOLD, FALSE, FALSE, FALSE,
          DEFAULT_CHARSET, 0, 0, DEFAULT_QUALITY, DEFAULT_PITCH, "Segoe UI" );
       SelectObject( memDC, hVFont );
       TextOutA( memDC, pageX + 4, bandY + bH - 4, b->cName, (int)strlen(b->cName) );
