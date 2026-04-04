@@ -203,8 +203,9 @@ struct _HBForm
    int          FRubberX1, FRubberY1, FRubberX2, FRubberY2;
    PHB_ITEM     FOnSelChange;
    GtkWidget *  FOverlay;    /* Drawing area for selection handles */
-   /* Toolbar */
-   HBControl *  FToolBar;
+   /* Toolbars (up to 4 rows) */
+   HBControl *  FToolBars[4];
+   int          FToolBarCount;
    int          FClientTop;
    /* Menu */
    GtkWidget *  FMenuBar;
@@ -1399,7 +1400,8 @@ static void HBForm_Init( HBForm * form )
    form->FSelCount = 0; form->FDragging = 0; form->FResizing = 0;
    form->FResizeHandle = -1; form->FOnSelChange = NULL;
    form->FOverlay = NULL; form->FFixed = NULL; form->FWindow = NULL;
-   form->FToolBar = NULL; form->FClientTop = 0; form->FSizable = 0; form->FAppBar = 0;
+   memset( form->FToolBars, 0, sizeof(form->FToolBars) );
+   form->FToolBarCount = 0; form->FClientTop = 0; form->FSizable = 0; form->FAppBar = 0;
    form->FMenuBar = NULL; form->FMenuItemCount = 0;
    form->FBorderStyle = 2; form->FBorderIcons = 7; form->FBorderWidth = 0;
    form->FPosition = 0; form->FWindowState = 0; form->FFormStyle = 0;
@@ -1538,51 +1540,70 @@ static void HBForm_Run( HBForm * form )
       gtk_widget_show_all( form->FMenuBar );
    }
 
-   /* Toolbar if attached */
-   if( form->FToolBar ) {
-      HBToolBar * tb = (HBToolBar *)form->FToolBar;
-      GtkWidget * toolbar = gtk_toolbar_new();
-      gtk_toolbar_set_style( GTK_TOOLBAR(toolbar), GTK_TOOLBAR_TEXT );
-      gtk_toolbar_set_icon_size( GTK_TOOLBAR(toolbar), GTK_ICON_SIZE_SMALL_TOOLBAR );
-      tb->FToolBarWidget = toolbar;
+   /* Toolbars - build all toolbar rows, stack vertically at left of palette */
+   if( form->FToolBarCount > 0 ) {
+      /* VBox to stack multiple toolbar rows */
+      GtkWidget * tbVBox = gtk_box_new( GTK_ORIENTATION_VERTICAL, 0 );
 
-      for( int i = 0; i < tb->FBtnCount; i++ ) {
-         if( tb->FBtnSeparator[i] ) {
-            GtkToolItem * sep = gtk_separator_tool_item_new();
-            gtk_toolbar_insert( GTK_TOOLBAR(toolbar), sep, -1 );
-         } else {
-            GtkToolItem * btn = gtk_tool_button_new( NULL, tb->FBtnTexts[i] );
-            gtk_tool_item_set_tooltip_text( btn, tb->FBtnTooltips[i] );
-            /* Store index in data for callback */
-            g_object_set_data( G_OBJECT(btn), "btn_idx", GINT_TO_POINTER(i) );
-            g_object_set_data( G_OBJECT(btn), "toolbar", tb );
-            g_signal_connect( btn, "clicked", G_CALLBACK(on_toolbar_btn_clicked), tb );
-            gtk_toolbar_insert( GTK_TOOLBAR(toolbar), btn, -1 );
+      /* CSS for compact toolbar buttons */
+      { GtkCssProvider * tbCss = gtk_css_provider_new();
+        gtk_css_provider_load_from_data( tbCss,
+           "toolbar { padding: 0; }"
+           "toolbar button { padding: 1px 3px; min-height: 20px; min-width: 20px; }"
+           "toolbar image { margin: 0; }", -1, NULL );
+        gtk_style_context_add_provider_for_screen( gdk_screen_get_default(),
+           GTK_STYLE_PROVIDER(tbCss), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION );
+        g_object_unref( tbCss );
+      }
+
+      int t;
+      for( t = 0; t < form->FToolBarCount; t++ )
+      {
+         HBToolBar * tb = (HBToolBar *)form->FToolBars[t];
+         GtkWidget * toolbar = gtk_toolbar_new();
+         gtk_toolbar_set_style( GTK_TOOLBAR(toolbar), GTK_TOOLBAR_TEXT );
+         gtk_toolbar_set_icon_size( GTK_TOOLBAR(toolbar), GTK_ICON_SIZE_MENU );
+         tb->FToolBarWidget = toolbar;
+
+         int i;
+         for( i = 0; i < tb->FBtnCount; i++ ) {
+            if( tb->FBtnSeparator[i] ) {
+               GtkToolItem * sep = gtk_separator_tool_item_new();
+               gtk_toolbar_insert( GTK_TOOLBAR(toolbar), sep, -1 );
+            } else {
+               GtkToolItem * btn = gtk_tool_button_new( NULL, tb->FBtnTexts[i] );
+               gtk_tool_item_set_tooltip_text( btn, tb->FBtnTooltips[i] );
+               g_object_set_data( G_OBJECT(btn), "btn_idx", GINT_TO_POINTER(i) );
+               g_object_set_data( G_OBJECT(btn), "toolbar", tb );
+               g_signal_connect( btn, "clicked", G_CALLBACK(on_toolbar_btn_clicked), tb );
+               gtk_toolbar_insert( GTK_TOOLBAR(toolbar), btn, -1 );
+            }
          }
+
+         /* Apply deferred toolbar icons (scaled smaller for compact mode) */
+         if( tb->FIconCount > 0 ) {
+            gtk_toolbar_set_style( GTK_TOOLBAR(toolbar), GTK_TOOLBAR_ICONS );
+            HBToolBar_ApplyIcons( tb );
+         }
+
+         gtk_box_pack_start( GTK_BOX(tbVBox), toolbar, FALSE, FALSE, 0 );
       }
 
-      /* Apply deferred toolbar icons */
-      if( tb->FIconCount > 0 ) {
-         gtk_toolbar_set_style( GTK_TOOLBAR(toolbar), GTK_TOOLBAR_ICONS );
-         HBToolBar_ApplyIcons( tb );
-      }
-
-      /* If palette exists, pack toolbar + palette in an hbox */
+      /* If palette exists, pack toolbars VBox + palette in an hbox */
       if( s_palData && s_palData->notebook ) {
          GtkWidget * tbHBox = gtk_box_new( GTK_ORIENTATION_HORIZONTAL, 4 );
-         gtk_box_pack_start( GTK_BOX(tbHBox), toolbar, FALSE, FALSE, 0 );
-         /* Vertical separator */
+         gtk_box_pack_start( GTK_BOX(tbHBox), tbVBox, FALSE, FALSE, 0 );
          GtkWidget * sep = gtk_separator_new( GTK_ORIENTATION_VERTICAL );
          gtk_box_pack_start( GTK_BOX(tbHBox), sep, FALSE, FALSE, 2 );
          gtk_box_pack_start( GTK_BOX(tbHBox), s_palData->notebook, TRUE, TRUE, 0 );
          gtk_box_pack_start( GTK_BOX(vbox), tbHBox, FALSE, FALSE, 0 );
          gtk_widget_show_all( tbHBox );
       } else {
-         gtk_box_pack_start( GTK_BOX(vbox), toolbar, FALSE, FALSE, 0 );
-         gtk_widget_show_all( toolbar );
+         gtk_box_pack_start( GTK_BOX(vbox), tbVBox, FALSE, FALSE, 0 );
+         gtk_widget_show_all( tbVBox );
       }
 
-      form->FClientTop = 0; /* GTK handles layout via box, no manual offset needed */
+      form->FClientTop = 0;
    }
 
    /* Use GtkOverlay to layer the fixed container and the design overlay */
@@ -2335,7 +2356,11 @@ HB_FUNC( UI_TOOLBARNEW )
    memset( p->FBtnOnClick, 0, sizeof(p->FBtnOnClick) );
    memset( p->FBtnSeparator, 0, sizeof(p->FBtnSeparator) );
    KeepAlive( &p->base );
-   if( pForm ) { pForm->FToolBar = &p->base; p->base.FCtrlParent = &pForm->base; }
+   if( pForm && pForm->FToolBarCount < 4 ) {
+      pForm->FToolBars[pForm->FToolBarCount] = &p->base;
+      pForm->FToolBarCount++;
+      p->base.FCtrlParent = &pForm->base;
+   }
    RetCtrl( &p->base );
 }
 
@@ -4097,7 +4122,7 @@ static void HBToolBar_ApplyIcons( HBToolBar * tb )
       GtkWidget * item = GTK_WIDGET( l->data );
       if( !GTK_IS_TOOL_BUTTON(item) ) continue;  /* skip separators */
 
-      GdkPixbuf * scaled = gdk_pixbuf_scale_simple( tb->FIconImages[imgIdx], 28, 28, GDK_INTERP_BILINEAR );
+      GdkPixbuf * scaled = gdk_pixbuf_scale_simple( tb->FIconImages[imgIdx], 20, 20, GDK_INTERP_BILINEAR );
       GtkWidget * img = gtk_image_new_from_pixbuf( scaled );
       g_object_unref( scaled );
 
