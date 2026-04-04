@@ -81,6 +81,8 @@ class TComponentPalette;
 #define CT_GROK       50
 #define CT_OLLAMA     51
 #define CT_TRANSFORMER 52
+#define CT_WHISPER    110
+#define CT_EMBEDDINGS 111
 /* Database components */
 #define CT_DBFTABLE   53
 #define CT_MYSQL      54

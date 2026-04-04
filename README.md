@@ -6,7 +6,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-green.svg)](#platforms)
-[![Controls](https://img.shields.io/badge/Controls-109-orange.svg)](#component-palette)
+[![Controls](https://img.shields.io/badge/Controls-111-orange.svg)](#component-palette)
 [![Docs](https://img.shields.io/badge/Docs-20%20pages-purple.svg)](docs/en/index.html)
 [![Built with Claude Code](https://img.shields.io/badge/Built%20with-Claude%20Code-blueviolet.svg)](https://claude.ai/claude-code)
 
@@ -75,7 +75,7 @@ return nil
 - **Align & Distribute** (Format menu: Left/Right/Top/Bottom, Center, Space Evenly)
 - Real-time two-way tools: design ↔ code sync
 
-### 📦 109 Components in 14 Tabs
+### 📦 111 Components in 14 Tabs
 
 | Tab | Controls | Description |
 |-----|----------|-------------|
@@ -90,7 +90,7 @@ return nil
 | **Internet** | 9 | WebView, WebServer, WebSocket, HttpClient, FtpClient, SmtpClient, TcpServer, TcpClient, UdpSocket |
 | **ERP** | 12 | Preprocessor, ScriptEngine, ReportDesigner, Barcode, PDFGenerator, ExcelExport, AuditLog, Permissions, Currency, TaxEngine, Dashboard, Scheduler |
 | **Threading** | 8 | Thread, Mutex, Semaphore, CriticalSection, ThreadPool, AtomicInt, CondVar, Channel |
-| **AI** | 7 | OpenAI, Gemini, Claude, DeepSeek, Grok, Ollama, **Transformer** |
+| **AI** | 9 | OpenAI, Gemini, Claude, DeepSeek, Grok, Ollama, Transformer, **Whisper**, **Embeddings** |
 
 ### 🔍 Object Inspector
 - Properties tab with categorized grid (Appearance, Position, Behavior, Data)
@@ -325,7 +325,7 @@ Professional HTML documentation with dark/light theme, Mermaid diagrams, and cod
 | [Data Controls](docs/en/controls-datacontrols.html) | TBrowse, DBGrid, DBNavigator... (8) |
 | [Internet](docs/en/controls-internet.html) | WebServer, WebSocket, TCP... (9) |
 | [Threading](docs/en/controls-threading.html) | Thread, Mutex, Channel... (8) |
-| [AI](docs/en/controls-ai.html) | OpenAI, Ollama, Transformer... (7) |
+| [AI](docs/en/controls-ai.html) | OpenAI, Ollama, Transformer, Whisper, Embeddings... (9) |
 | [ERP](docs/en/controls-erp.html) | Report, Barcode, PDF... (12) |
 
 ---
@@ -392,7 +392,7 @@ All three desktop platforms are **fully functional** with zero MsgInfo stubs —
 | | Undo design (50-step) | ✅ | — | ✅ |
 | | Tab Order dialog | ✅ | — | ✅ |
 | | Format > Align controls (8 modes) | ✅ | ✅ | ✅ |
-| | 109 components in 14 tabs | ✅ | ✅ | ✅ |
+| | 111 components in 14 tabs | ✅ | ✅ | ✅ |
 | **Debugger** | Debugger panel (5 tabs) | ✅ | ✅ | ✅ |
 | | Debug toolbar (Run/Step/Stop) | ✅ | ✅ | ✅ |
 | | In-process .hrb execution | ✅ | ✅ | ✅ |

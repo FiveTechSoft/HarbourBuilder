@@ -362,6 +362,8 @@ static function CreatePalette()
    oPal:AddComp( nTab, "Grk",  "Grok",         50 )
    oPal:AddComp( nTab, "Oll",  "Ollama",       51 )
    oPal:AddComp( nTab, "Tfm",  "Transformer",  52 )
+   oPal:AddComp( nTab, "Wsp",  "Whisper",     110 )
+   oPal:AddComp( nTab, "Emb",  "Embeddings",  111 )
 
    UI_PaletteLoadImages( oPal:hCpp, "../resources/palette.bmp" )
 
@@ -686,9 +688,10 @@ static function OnComponentDrop( hForm, nType, nL, nT, nW, nH )
       "AuditLog", "Permissions", "Currency", "TaxEngine", ;
       "Dashboard", "Scheduler", ;
       "Printer", "Report", "Labels", "PrintPreview", ;
-      "PageSetup", "PrintDialog", "ReportViewer", "BarcodePrinter" }
+      "PageSetup", "PrintDialog", "ReportViewer", "BarcodePrinter", ;
+      "Whisper", "Embeddings" }
 
-   if aCnt == nil; aCnt := Array(50); AFill(aCnt,0); endif
+   if aCnt == nil; aCnt := Array(120); AFill(aCnt,0); endif
    if nType < 1 .or. nType > Len(aNames) .or. Empty(aNames[nType]); return nil; endif
    aCnt[nType]++
    cName := aNames[nType] + LTrim(Str(aCnt[nType]))
