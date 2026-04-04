@@ -112,9 +112,13 @@ function Main()
    MENUITEM "Options..."           OF oProject ACTION ShowProjectOptions()
 
    DEFINE POPUP oRun PROMPT "Run" OF oIDE
-   MENUITEM "Run"           OF oRun ACTION TBRun()                 ACCEL "r"
-   MENUITEM "Step Over"     OF oRun ACTION DebugStepOver()
-   MENUITEM "Step Into"     OF oRun ACTION DebugStepInto()
+   MENUITEM "Run"             OF oRun ACTION TBRun()                 ACCEL "r"
+   MENUITEM "Debug"           OF oRun ACTION TBDebugRun()
+   MENUSEPARATOR OF oRun
+   MENUITEM "Continue"        OF oRun ACTION IDE_DebugGo()
+   MENUITEM "Step Into"       OF oRun ACTION IDE_DebugStep()
+   MENUITEM "Step Over"       OF oRun ACTION IDE_DebugStepOver()
+   MENUITEM "Stop"            OF oRun ACTION IDE_DebugStop()
    MENUSEPARATOR OF oRun
    MENUITEM "Toggle Breakpoint"  OF oRun ACTION ToggleBreakpoint()
    MENUITEM "Clear Breakpoints"  OF oRun ACTION ClearBreakpoints()
@@ -1272,16 +1276,109 @@ return nil
 
 static function ToggleBreakpoint()
    static aBreakpoints := {}
-   AAdd( aBreakpoints, { "Form1.prg", 1 } )
-   MsgInfo( "Breakpoints: " + LTrim(Str(Len(aBreakpoints))) )
+   local cFile := aForms[ nActiveForm ][ 1 ] + ".prg"
+   AAdd( aBreakpoints, { cFile, 1 } )
+   IDE_DebugAddBreakpoint( cFile, 1 )
+   MAC_DebugSetStatus( "Breakpoints: " + LTrim(Str(Len(aBreakpoints))) )
 return nil
 
 static function ClearBreakpoints()
-   MsgInfo( "All breakpoints cleared" )
+   IDE_DebugClearBreakpoints()
+   MAC_DebugSetStatus( "All breakpoints cleared" )
 return nil
 
 static function ShowDebugger()
    MAC_DebugPanel()
+return nil
+
+// === Debug Run (in-process: compile to .hrb, execute in IDE VM) ===
+
+static function TBDebugRun()
+
+   local cBuildDir, cOutput, cLog, i, lError
+   local cHbDir, cHbBin, cHbInc, cProjDir
+   local cAllPrg, cCmd
+
+   SaveActiveFormCode()
+
+   cBuildDir := "/tmp/hbbuilder_build"
+   cHbDir   := "/Users/usuario/harbour"
+   cHbBin   := cHbDir + "/bin/darwin/clang"
+   cHbInc   := cHbDir + "/include"
+   cProjDir := "/Users/usuario/HarbourBuilder"
+   cLog     := ""
+   lError   := .F.
+
+   MAC_ShellExec( "mkdir -p " + cBuildDir )
+
+   // Step 1: Save files
+   cLog += "[1] Saving project files..." + Chr(10)
+   MemoWrit( cBuildDir + "/Project1.prg", CodeEditorGetTabText( hCodeEditor, 1 ) )
+   for i := 1 to Len( aForms )
+      MemoWrit( cBuildDir + "/" + aForms[i][1] + ".prg", aForms[i][3] )
+   next
+   MAC_ShellExec( "cp " + cProjDir + "/harbour/classes.prg " + cBuildDir + "/" )
+   MAC_ShellExec( "cp " + cProjDir + "/harbour/hbbuilder.ch " + cBuildDir + "/" )
+
+   // Step 2: Assemble debug_main.prg
+   cLog += "[2] Building debug_main.prg..." + Chr(10)
+   cAllPrg := '#include "hbbuilder.ch"' + Chr(10) + Chr(10)
+   cAllPrg += StrTran( MemoRead( cBuildDir + "/Project1.prg" ), ;
+                       '#include "hbbuilder.ch"', "" ) + Chr(10)
+   for i := 1 to Len( aForms )
+      cAllPrg += MemoRead( cBuildDir + "/" + aForms[i][1] + ".prg" ) + Chr(10)
+   next
+   // Include classes.prg for self-contained .hrb
+   cAllPrg += MemoRead( cBuildDir + "/classes.prg" ) + Chr(10)
+   MemoWrit( cBuildDir + "/debug_main.prg", cAllPrg )
+
+   // Step 3: Compile to .hrb bytecode with debug info
+   cLog += "[3] Compiling to .hrb (harbour -gh -b)..." + Chr(10)
+   cCmd := cHbBin + "/harbour " + cBuildDir + "/debug_main.prg -gh -b -n -w -q" + ;
+           " -I" + cHbInc + " -I" + cBuildDir + ;
+           " -o" + cBuildDir + "/debug_main.hrb 2>&1"
+   cOutput := MAC_ShellExec( cCmd )
+   if "Error" $ cOutput
+      cLog += "    FAILED:" + Chr(10) + cOutput + Chr(10)
+      lError := .T.
+   else
+      cLog += "    OK" + Chr(10)
+   endif
+
+   if lError
+      MsgInfo( "Debug build FAILED:" + Chr(10) + Chr(10) + cLog )
+      return nil
+   endif
+
+   // Step 4: Open debugger panel and run
+   MAC_DebugPanel()
+   MAC_DebugSetStatus( "Starting debug session..." )
+
+   IDE_DebugStart( cBuildDir + "/debug_main.hrb", ;
+      { |cModule, nLine| OnDebugPause( cModule, nLine ) } )
+
+return nil
+
+// === Debug Pause Callback (called from C hook) ===
+
+static function OnDebugPause( cModule, nLine )
+   local aLocals, aStack, i
+
+   MAC_DebugSetStatus( "Paused at " + cModule + ":" + LTrim(Str(nLine)) )
+
+   // Get and display locals
+   aLocals := IDE_DebugGetLocals( 1 )
+   MAC_DebugUpdateLocals( aLocals )
+
+   // Build and display call stack
+   aStack := { { "0", ProcName(2), cModule, LTrim(Str(nLine)) } }
+   for i := 3 to 8
+      if ! Empty( ProcName(i) )
+         AAdd( aStack, { LTrim(Str(i-2)), ProcName(i), "", LTrim(Str(ProcLine(i))) } )
+      endif
+   next
+   MAC_DebugUpdateStack( aStack )
+
 return nil
 
 // === AI Assistant ===
@@ -1320,15 +1417,7 @@ return nil
 
 // === Debug Step ===
 
-static function DebugStepOver()
-   MAC_DebugPanel()
-   MsgInfo( "Step Over: start a debug session with Run > Run first" )
-return nil
-
-static function DebugStepInto()
-   MAC_DebugPanel()
-   MsgInfo( "Step Into: start a debug session with Run > Run first" )
-return nil
+// DebugStepOver/StepInto now use IDE_DebugStepOver()/IDE_DebugStep() directly from menu
 
 // === Components ===
 

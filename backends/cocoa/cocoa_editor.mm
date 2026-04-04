@@ -26,6 +26,8 @@
 #include "hbapi.h"
 #include "hbapiitm.h"
 #include "hbvm.h"
+#include "hbapidbg.h"
+#include "hbapierr.h"
 
 /* Lexilla CreateLexer (linked statically from liblexilla.a) */
 extern "C" Scintilla::ILexer5 * CreateLexer(const char *name);
@@ -1179,88 +1181,7 @@ HB_FUNC( CODEEDITORREPLACE )
       [cv performTextFinderAction:item];
 }
 
-/* -----------------------------------------------------------------------
- * Debugger Panel — singleton floating window with 5 tabs
- * ----------------------------------------------------------------------- */
-
-static NSWindow * s_debugPanel = nil;
-
-/* MAC_DebugPanel() — show/create debugger panel */
-HB_FUNC( MAC_DEBUGPANEL )
-{
-   if( s_debugPanel )
-   {
-      [s_debugPanel makeKeyAndOrderFront:nil];
-      return;
-   }
-
-   NSRect frame = NSMakeRect( 100, 200, 500, 350 );
-   s_debugPanel = [[NSWindow alloc] initWithContentRect:frame
-      styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable
-      backing:NSBackingStoreBuffered defer:NO];
-   [s_debugPanel setTitle:@"Debugger"];
-   [s_debugPanel setReleasedWhenClosed:NO];
-   [s_debugPanel setAppearance:[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua]];
-
-   /* Tab view with 5 tabs */
-   NSTabView * tabs = [[NSTabView alloc] initWithFrame:
-      [[s_debugPanel contentView] bounds]];
-   [tabs setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
-
-   NSString * tabNames[] = { @"Watch", @"Locals", @"Call Stack", @"Breakpoints", @"Output" };
-   for( int i = 0; i < 5; i++ )
-   {
-      NSTabViewItem * item = [[NSTabViewItem alloc] initWithIdentifier:
-         [NSString stringWithFormat:@"tab%d", i]];
-      [item setLabel:tabNames[i]];
-
-      if( i == 4 )
-      {
-         /* Output tab: scrollable text view */
-         NSScrollView * sv = [[NSScrollView alloc] initWithFrame:NSMakeRect(0,0,480,280)];
-         [sv setHasVerticalScroller:YES];
-         [sv setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
-         NSTextView * tv = [[NSTextView alloc] initWithFrame:NSMakeRect(0,0,480,280)];
-         [tv setEditable:NO];
-         [tv setFont:[NSFont monospacedSystemFontOfSize:12 weight:NSFontWeightRegular]];
-         [tv setBackgroundColor:[NSColor colorWithCalibratedRed:0.12 green:0.12 blue:0.12 alpha:1]];
-         [tv setTextColor:[NSColor colorWithCalibratedRed:0.83 green:0.83 blue:0.83 alpha:1]];
-         [sv setDocumentView:tv];
-         [item setView:sv];
-      }
-      else
-      {
-         /* Table view for Watch/Locals/Call Stack/Breakpoints */
-         NSScrollView * sv = [[NSScrollView alloc] initWithFrame:NSMakeRect(0,0,480,280)];
-         [sv setHasVerticalScroller:YES];
-         [sv setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
-         NSTableView * table = [[NSTableView alloc] initWithFrame:NSMakeRect(0,0,480,280)];
-
-         NSString * cols[3];
-         if( i == 0 || i == 1 ) { cols[0]=@"Name"; cols[1]=@"Value"; cols[2]=@"Type"; }
-         else if( i == 2 )      { cols[0]=@"Level"; cols[1]=@"Location"; cols[2]=nil; }
-         else                   { cols[0]=@"File"; cols[1]=@"Line"; cols[2]=@"Enabled"; }
-
-         for( int c = 0; c < 3 && cols[c]; c++ )
-         {
-            NSTableColumn * col = [[NSTableColumn alloc] initWithIdentifier:cols[c]];
-            [[col headerCell] setStringValue:cols[c]];
-            [col setWidth: c==0 ? 140 : (c==1 ? 200 : 100)];
-            [table addTableColumn:col];
-         }
-
-         [table setHeaderView:[[NSTableHeaderView alloc] init]];
-         [table setRowHeight:20];
-         [sv setDocumentView:table];
-         [item setView:sv];
-      }
-
-      [tabs addTabViewItem:item];
-   }
-
-   [[s_debugPanel contentView] addSubview:tabs];
-   [s_debugPanel makeKeyAndOrderFront:nil];
-}
+/* Debugger Panel — now implemented in the debugger section at end of file */
 
 /* -----------------------------------------------------------------------
  * AI Assistant Panel — singleton floating window with Ollama chat
@@ -1626,6 +1547,530 @@ HB_FUNC( MAC_PROJECTOPTIONSDIALOG )
 
    [alert setAccessoryView:tabs];
    [alert runModal];
+}
+
+/* ======================================================================
+ * IN-PROCESS DEBUGGER — executes user .hrb bytecode inside IDE VM
+ *
+ * Architecture:
+ *   harbour -gh -b user.prg → user.hrb (bytecode + debug info)
+ *   hb_hrbRun(user.hrb) in IDE VM
+ *   hb_dbg_SetEntry(hook) → hook called on every source line
+ *   Hook pauses at breakpoints / step commands
+ *   NSRunLoop keeps UI responsive during pause
+ * ====================================================================== */
+
+/* Debug states */
+#define DBG_IDLE      0
+#define DBG_RUNNING   1
+#define DBG_PAUSED    2
+#define DBG_STEPPING  3
+#define DBG_STEPOVER  4
+#define DBG_STOPPED   5
+
+static int    s_dbgState = DBG_IDLE;
+static int    s_dbgLine = 0;
+static int    s_dbgStepDepth = 0;
+static char   s_dbgModule[256] = "";
+static PHB_ITEM s_dbgOnPause = NULL;
+
+/* Breakpoints */
+#define DBG_MAX_BP 64
+typedef struct { char module[256]; int line; } DBGBP;
+static DBGBP  s_breakpoints[DBG_MAX_BP];
+static int    s_nBreakpoints = 0;
+
+/* Debugger UI widgets */
+static NSWindow *    s_dbgWindow = nil;
+static NSTextView *  s_dbgOutputTV = nil;
+static NSTextField * s_dbgStatusLbl = nil;
+static NSTableView * s_dbgLocalsTV = nil;
+static NSTableView * s_dbgStackTV = nil;
+static NSMutableArray * s_dbgLocalsData = nil;
+static NSMutableArray * s_dbgStackData = nil;
+
+/* -----------------------------------------------------------------------
+ * Breakpoint check
+ * ----------------------------------------------------------------------- */
+
+static int DbgIsBreakpoint( const char * module, int line )
+{
+   for( int i = 0; i < s_nBreakpoints; i++ )
+      if( s_breakpoints[i].line == line &&
+          ( s_breakpoints[i].module[0] == 0 ||
+            strcasestr( module, s_breakpoints[i].module ) ) )
+         return 1;
+   return 0;
+}
+
+/* Append text to debug output */
+static void DbgOutput( const char * text )
+{
+   if( !s_dbgOutputTV ) return;
+   dispatch_async( dispatch_get_main_queue(), ^{
+      NSString * str = [NSString stringWithUTF8String:text];
+      [[[s_dbgOutputTV textStorage] mutableString] appendString:str];
+      [s_dbgOutputTV scrollRangeToVisible:
+         NSMakeRange([[s_dbgOutputTV textStorage] length], 0)];
+   });
+}
+
+/* -----------------------------------------------------------------------
+ * Debug hook — called by Harbour VM on every source line
+ * ----------------------------------------------------------------------- */
+
+static void IDE_DebugHook( int nMode, int nLine, const char * szName,
+                            int nIndex, PHB_ITEM pFrame )
+{
+   (void)nIndex; (void)pFrame;
+
+   /* Mode 1 = HB_DBG_MODULENAME: track current module */
+   if( nMode == 1 && szName )
+   {
+      strncpy( s_dbgModule, szName, sizeof(s_dbgModule) - 1 );
+      return;
+   }
+
+   /* Only process mode 5 = HB_DBG_SHOWLINE */
+   if( nMode != 5 ) return;
+
+   s_dbgLine = nLine;
+
+   if( s_dbgState == DBG_STOPPED ) return;
+
+   /* In RUNNING mode, only pause at breakpoints */
+   if( s_dbgState == DBG_RUNNING && !DbgIsBreakpoint( s_dbgModule, nLine ) )
+      return;
+
+   /* STEPOVER: don't pause inside deeper calls */
+   if( s_dbgState == DBG_STEPOVER )
+   {
+      HB_ULONG curDepth = hb_dbg_ProcLevel();
+      if( (int)curDepth > s_dbgStepDepth ) return;
+   }
+
+   /* === PAUSE === */
+   s_dbgState = DBG_PAUSED;
+
+   /* Call Harbour callback: { |cModule, nLine| OnDebugPause(...) } */
+   if( s_dbgOnPause && HB_IS_BLOCK( s_dbgOnPause ) )
+   {
+      PHB_ITEM pMod  = hb_itemPutC( NULL, s_dbgModule );
+      PHB_ITEM pLine = hb_itemPutNI( NULL, nLine );
+      hb_itemDo( s_dbgOnPause, 2, pMod, pLine );
+      hb_itemRelease( pMod );
+      hb_itemRelease( pLine );
+   }
+
+   /* Keep UI responsive while paused — process Cocoa events */
+   while( s_dbgState == DBG_PAUSED )
+   {
+      @autoreleasepool {
+         NSEvent * event = [NSApp nextEventMatchingMask:NSEventMaskAny
+            untilDate:[NSDate dateWithTimeIntervalSinceNow:0.05]
+            inMode:NSDefaultRunLoopMode dequeue:YES];
+         if( event )
+            [NSApp sendEvent:event];
+      }
+   }
+
+   if( s_dbgState == DBG_STOPPED )
+      DbgOutput( "Debug session stopped.\n" );
+}
+
+/* -----------------------------------------------------------------------
+ * Debugger toolbar button targets
+ * ----------------------------------------------------------------------- */
+
+@interface HBDebugTarget : NSObject
+- (void)dbgRun:(id)sender;
+- (void)dbgPause:(id)sender;
+- (void)dbgStepInto:(id)sender;
+- (void)dbgStepOver:(id)sender;
+- (void)dbgStop:(id)sender;
+@end
+
+@implementation HBDebugTarget
+- (void)dbgRun:(id)sender      { (void)sender; if( s_dbgState == DBG_PAUSED ) s_dbgState = DBG_RUNNING; }
+- (void)dbgPause:(id)sender    { (void)sender; if( s_dbgState == DBG_RUNNING ) s_dbgState = DBG_PAUSED; }
+- (void)dbgStepInto:(id)sender { (void)sender; if( s_dbgState == DBG_PAUSED ) s_dbgState = DBG_STEPPING; }
+- (void)dbgStepOver:(id)sender {
+   (void)sender;
+   if( s_dbgState == DBG_PAUSED ) {
+      s_dbgStepDepth = (int) hb_dbg_ProcLevel();
+      s_dbgState = DBG_STEPOVER;
+   }
+}
+- (void)dbgStop:(id)sender     { (void)sender; if( s_dbgState != DBG_IDLE ) s_dbgState = DBG_STOPPED; }
+@end
+
+static HBDebugTarget * s_dbgTarget = nil;
+
+/* -----------------------------------------------------------------------
+ * Locals/Stack table data source
+ * ----------------------------------------------------------------------- */
+
+@interface HBDbgTableSource : NSObject <NSTableViewDataSource>
+{
+@public
+   NSMutableArray * rows;  /* Array of arrays: [ [col0, col1, col2], ... ] */
+}
+@end
+
+@implementation HBDbgTableSource
+- (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView
+{
+   (void)tableView;
+   return rows ? (NSInteger)[rows count] : 0;
+}
+- (id)tableView:(NSTableView *)tableView objectValueForTableColumn:(NSTableColumn *)col row:(NSInteger)row
+{
+   (void)tableView;
+   if( !rows || row < 0 || row >= (NSInteger)[rows count] ) return @"";
+   NSArray * r = [rows objectAtIndex:(NSUInteger)row];
+   NSInteger colIdx = [[tableView tableColumns] indexOfObject:col];
+   if( colIdx < 0 || colIdx >= (NSInteger)[r count] ) return @"";
+   return [r objectAtIndex:(NSUInteger)colIdx];
+}
+@end
+
+static HBDbgTableSource * s_dbgLocalsDS = nil;
+static HBDbgTableSource * s_dbgStackDS = nil;
+
+/* -----------------------------------------------------------------------
+ * Create debugger panel (called from Harbour or C)
+ * ----------------------------------------------------------------------- */
+
+static void CreateDebuggerPanel(void)
+{
+   if( s_dbgWindow ) {
+      [s_dbgWindow makeKeyAndOrderFront:nil];
+      return;
+   }
+
+   NSRect frame = NSMakeRect( 100, 80, 650, 420 );
+   s_dbgWindow = [[NSWindow alloc] initWithContentRect:frame
+      styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable
+      backing:NSBackingStoreBuffered defer:NO];
+   [s_dbgWindow setTitle:@"Debugger"];
+   [s_dbgWindow setReleasedWhenClosed:NO];
+   [s_dbgWindow setAppearance:[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua]];
+
+   NSView * cv = [s_dbgWindow contentView];
+   CGFloat w = [cv bounds].size.width;
+   CGFloat h = [cv bounds].size.height;
+   CGFloat tbH = 36;
+
+   /* === Toolbar with debug buttons === */
+   s_dbgTarget = [[HBDebugTarget alloc] init];
+
+   NSButton * btnRun = [NSButton buttonWithTitle:@"\u25B6 Run"
+      target:s_dbgTarget action:@selector(dbgRun:)];
+   [btnRun setFrame:NSMakeRect(5, h-tbH+4, 65, 28)];
+
+   NSButton * btnPause = [NSButton buttonWithTitle:@"\u23F8 Pause"
+      target:s_dbgTarget action:@selector(dbgPause:)];
+   [btnPause setFrame:NSMakeRect(75, h-tbH+4, 70, 28)];
+
+   NSButton * btnStep = [NSButton buttonWithTitle:@"\u2193 Step"
+      target:s_dbgTarget action:@selector(dbgStepInto:)];
+   [btnStep setFrame:NSMakeRect(150, h-tbH+4, 65, 28)];
+
+   NSButton * btnOver = [NSButton buttonWithTitle:@"\u2192 Over"
+      target:s_dbgTarget action:@selector(dbgStepOver:)];
+   [btnOver setFrame:NSMakeRect(220, h-tbH+4, 65, 28)];
+
+   NSButton * btnStop = [NSButton buttonWithTitle:@"\u25A0 Stop"
+      target:s_dbgTarget action:@selector(dbgStop:)];
+   [btnStop setFrame:NSMakeRect(290, h-tbH+4, 65, 28)];
+
+   s_dbgStatusLbl = [NSTextField labelWithString:@"Ready"];
+   [s_dbgStatusLbl setFrame:NSMakeRect(370, h-tbH+8, w-380, 20)];
+   [s_dbgStatusLbl setTextColor:[NSColor colorWithCalibratedRed:0.6 green:0.8 blue:1.0 alpha:1]];
+   [s_dbgStatusLbl setAutoresizingMask:NSViewWidthSizable | NSViewMinYMargin];
+
+   for( NSButton * b in @[btnRun, btnPause, btnStep, btnOver, btnStop] ) {
+      [b setAutoresizingMask:NSViewMinYMargin];
+      [cv addSubview:b];
+   }
+   [cv addSubview:s_dbgStatusLbl];
+
+   /* === Tab view with 5 tabs === */
+   NSTabView * tabs = [[NSTabView alloc] initWithFrame:
+      NSMakeRect(0, 0, w, h - tbH)];
+   [tabs setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
+
+   /* Helper: create table view with columns */
+   NSTableView * (^makeTable)(NSArray *cols, NSArray *widths) =
+      ^NSTableView *(NSArray *cols, NSArray *widths) {
+         NSTableView * tv = [[NSTableView alloc] initWithFrame:NSZeroRect];
+         for( NSUInteger i = 0; i < [cols count]; i++ ) {
+            NSTableColumn * c = [[NSTableColumn alloc] initWithIdentifier:cols[i]];
+            [[c headerCell] setStringValue:cols[i]];
+            [c setWidth:[widths[i] doubleValue]];
+            [tv addTableColumn:c];
+         }
+         [tv setRowHeight:18];
+         [tv setGridStyleMask:NSTableViewSolidHorizontalGridLineMask];
+         return tv;
+      };
+
+   /* Tab 0: Watch */
+   NSTabViewItem * t0 = [[NSTabViewItem alloc] initWithIdentifier:@"watch"];
+   [t0 setLabel:@"Watch"];
+   NSTableView * watchTV = makeTable(@[@"Expression",@"Value",@"Type"], @[@(180),@(200),@(100)]);
+   NSScrollView * sv0 = [[NSScrollView alloc] initWithFrame:NSMakeRect(0,0,w,h-tbH-30)];
+   [sv0 setDocumentView:watchTV]; [sv0 setHasVerticalScroller:YES];
+   [sv0 setAutoresizingMask:NSViewWidthSizable|NSViewHeightSizable];
+   [t0 setView:sv0];
+
+   /* Tab 1: Locals */
+   NSTabViewItem * t1 = [[NSTabViewItem alloc] initWithIdentifier:@"locals"];
+   [t1 setLabel:@"Locals"];
+   s_dbgLocalsTV = makeTable(@[@"Name",@"Value",@"Type"], @[@(140),@(250),@(100)]);
+   s_dbgLocalsDS = [[HBDbgTableSource alloc] init];
+   s_dbgLocalsDS->rows = [NSMutableArray array];
+   [s_dbgLocalsTV setDataSource:s_dbgLocalsDS];
+   NSScrollView * sv1 = [[NSScrollView alloc] initWithFrame:NSMakeRect(0,0,w,h-tbH-30)];
+   [sv1 setDocumentView:s_dbgLocalsTV]; [sv1 setHasVerticalScroller:YES];
+   [sv1 setAutoresizingMask:NSViewWidthSizable|NSViewHeightSizable];
+   [t1 setView:sv1];
+
+   /* Tab 2: Call Stack */
+   NSTabViewItem * t2 = [[NSTabViewItem alloc] initWithIdentifier:@"stack"];
+   [t2 setLabel:@"Call Stack"];
+   s_dbgStackTV = makeTable(@[@"#",@"Function",@"Module",@"Line"], @[@(30),@(180),@(180),@(60)]);
+   s_dbgStackDS = [[HBDbgTableSource alloc] init];
+   s_dbgStackDS->rows = [NSMutableArray array];
+   [s_dbgStackTV setDataSource:s_dbgStackDS];
+   NSScrollView * sv2 = [[NSScrollView alloc] initWithFrame:NSMakeRect(0,0,w,h-tbH-30)];
+   [sv2 setDocumentView:s_dbgStackTV]; [sv2 setHasVerticalScroller:YES];
+   [sv2 setAutoresizingMask:NSViewWidthSizable|NSViewHeightSizable];
+   [t2 setView:sv2];
+
+   /* Tab 3: Breakpoints */
+   NSTabViewItem * t3 = [[NSTabViewItem alloc] initWithIdentifier:@"bp"];
+   [t3 setLabel:@"Breakpoints"];
+   NSTableView * bpTV = makeTable(@[@"File",@"Line",@"Enabled"], @[@(200),@(60),@(60)]);
+   NSScrollView * sv3 = [[NSScrollView alloc] initWithFrame:NSMakeRect(0,0,w,h-tbH-30)];
+   [sv3 setDocumentView:bpTV]; [sv3 setHasVerticalScroller:YES];
+   [sv3 setAutoresizingMask:NSViewWidthSizable|NSViewHeightSizable];
+   [t3 setView:sv3];
+
+   /* Tab 4: Output */
+   NSTabViewItem * t4 = [[NSTabViewItem alloc] initWithIdentifier:@"output"];
+   [t4 setLabel:@"Output"];
+   NSScrollView * sv4 = [[NSScrollView alloc] initWithFrame:NSMakeRect(0,0,w,h-tbH-30)];
+   [sv4 setHasVerticalScroller:YES];
+   [sv4 setAutoresizingMask:NSViewWidthSizable|NSViewHeightSizable];
+   s_dbgOutputTV = [[NSTextView alloc] initWithFrame:NSMakeRect(0,0,w,h-tbH-30)];
+   [s_dbgOutputTV setEditable:NO];
+   [s_dbgOutputTV setFont:[NSFont monospacedSystemFontOfSize:12 weight:NSFontWeightRegular]];
+   [s_dbgOutputTV setBackgroundColor:[NSColor colorWithCalibratedRed:0.12 green:0.12 blue:0.12 alpha:1]];
+   [s_dbgOutputTV setTextColor:[NSColor colorWithCalibratedRed:0.83 green:0.83 blue:0.83 alpha:1]];
+   [sv4 setDocumentView:s_dbgOutputTV];
+   [t4 setView:sv4];
+
+   [tabs addTabViewItem:t0];
+   [tabs addTabViewItem:t1];
+   [tabs addTabViewItem:t2];
+   [tabs addTabViewItem:t3];
+   [tabs addTabViewItem:t4];
+
+   [cv addSubview:tabs];
+   [s_dbgWindow makeKeyAndOrderFront:nil];
+}
+
+/* -----------------------------------------------------------------------
+ * HB_FUNC bridges for debugger
+ * ----------------------------------------------------------------------- */
+
+/* MAC_DebugPanel() — replaces the simple 5-tab stub from before */
+HB_FUNC( MAC_DEBUGPANEL )
+{
+   CreateDebuggerPanel();
+}
+
+/* IDE_DebugStart( cHrbFile, bOnPause ) — execute .hrb with debug hook */
+HB_FUNC( IDE_DEBUGSTART )
+{
+   const char * cHrbFile = hb_parc(1);
+   PHB_ITEM pOnPause = hb_param(2, HB_IT_BLOCK);
+
+   if( !cHrbFile || s_dbgState != DBG_IDLE ) { hb_retl( HB_FALSE ); return; }
+
+   if( s_dbgOnPause ) { hb_itemRelease( s_dbgOnPause ); s_dbgOnPause = NULL; }
+   if( pOnPause ) s_dbgOnPause = hb_itemNew( pOnPause );
+
+   /* Install debug hook */
+   hb_dbg_SetEntry( IDE_DebugHook );
+
+   s_dbgState = DBG_STEPPING;
+   s_nBreakpoints = 0;
+
+   DbgOutput( "=== Debug session started ===\n" );
+
+   /* Execute user .hrb file in IDE VM */
+   {
+      PHB_ITEM pFile = hb_itemPutC( NULL, cHrbFile );
+      hb_vmPushDynSym( hb_dynsymFind( "HB_HRBRUN" ) );
+      hb_vmPushNil();
+      hb_vmPush( pFile );
+      hb_vmDo( 1 );
+      hb_itemRelease( pFile );
+   }
+
+   /* Cleanup */
+   hb_dbg_SetEntry( NULL );
+   s_dbgState = DBG_IDLE;
+   DbgOutput( "=== Debug session ended ===\n" );
+
+   if( s_dbgStatusLbl )
+      [s_dbgStatusLbl setStringValue:@"Ready"];
+
+   hb_retl( HB_TRUE );
+}
+
+/* IDE_DebugGo() */
+HB_FUNC( IDE_DEBUGGO )
+{ if( s_dbgState == DBG_PAUSED ) s_dbgState = DBG_RUNNING; }
+
+/* IDE_DebugStep() */
+HB_FUNC( IDE_DEBUGSTEP )
+{ if( s_dbgState == DBG_PAUSED ) s_dbgState = DBG_STEPPING; }
+
+/* IDE_DebugStepOver() */
+HB_FUNC( IDE_DEBUGSTEPOVER )
+{
+   if( s_dbgState == DBG_PAUSED ) {
+      s_dbgStepDepth = (int) hb_dbg_ProcLevel();
+      s_dbgState = DBG_STEPOVER;
+   }
+}
+
+/* IDE_DebugStop() */
+HB_FUNC( IDE_DEBUGSTOP )
+{ if( s_dbgState != DBG_IDLE ) s_dbgState = DBG_STOPPED; }
+
+/* IDE_DebugAddBreakpoint( cModule, nLine ) */
+HB_FUNC( IDE_DEBUGADDBREAKPOINT )
+{
+   if( s_nBreakpoints < DBG_MAX_BP && HB_ISCHAR(1) && HB_ISNUM(2) )
+   {
+      strncpy( s_breakpoints[s_nBreakpoints].module, hb_parc(1), 255 );
+      s_breakpoints[s_nBreakpoints].line = hb_parni(2);
+      s_nBreakpoints++;
+   }
+}
+
+/* IDE_DebugClearBreakpoints() */
+HB_FUNC( IDE_DEBUGCLEARBREAKPOINTS )
+{
+   s_nBreakpoints = 0;
+}
+
+/* IDE_DebugGetLocals( nLevel ) --> aLocals */
+HB_FUNC( IDE_DEBUGGETLOCALS )
+{
+   int nLevel = HB_ISNUM(1) ? hb_parni(1) : 1;
+   PHB_ITEM pArray = hb_itemArrayNew( 0 );
+
+   for( int i = 1; i <= 30; i++ )
+   {
+      PHB_ITEM pVal = hb_dbg_vmVarLGet( nLevel, i );
+      if( !pVal ) break;
+
+      PHB_ITEM pEntry = hb_itemArrayNew( 3 );
+      char szName[32], szValue[256], szType[32];
+
+      snprintf( szName, sizeof(szName), "Local_%d", i );
+
+      HB_TYPE t = hb_itemType( pVal );
+      if( t & HB_IT_STRING ) {
+         snprintf( szValue, sizeof(szValue), "\"%s\"", hb_itemGetCPtr( pVal ) );
+         strcpy( szType, "STRING" );
+      } else if( t & HB_IT_NUMERIC ) {
+         if( t & HB_IT_DOUBLE )
+            snprintf( szValue, sizeof(szValue), "%f", hb_itemGetND( pVal ) );
+         else
+            snprintf( szValue, sizeof(szValue), "%ld", (long)hb_itemGetNL( pVal ) );
+         strcpy( szType, "NUMERIC" );
+      } else if( t & HB_IT_LOGICAL ) {
+         strcpy( szValue, hb_itemGetL( pVal ) ? ".T." : ".F." );
+         strcpy( szType, "LOGICAL" );
+      } else if( t & HB_IT_NIL ) {
+         strcpy( szValue, "NIL" ); strcpy( szType, "NIL" );
+      } else if( t & HB_IT_ARRAY ) {
+         snprintf( szValue, sizeof(szValue), "Array(%lu)", (unsigned long)hb_arrayLen( pVal ) );
+         strcpy( szType, "ARRAY" );
+      } else if( t & HB_IT_BLOCK ) {
+         strcpy( szValue, "{|| ...}" ); strcpy( szType, "BLOCK" );
+      } else if( t & HB_IT_OBJECT ) {
+         strcpy( szValue, "(Object)" ); strcpy( szType, "OBJECT" );
+      } else {
+         strcpy( szValue, "?" ); strcpy( szType, "UNKNOWN" );
+      }
+
+      hb_arraySetC( pEntry, 1, szName );
+      hb_arraySetC( pEntry, 2, szValue );
+      hb_arraySetC( pEntry, 3, szType );
+      hb_arrayAdd( pArray, pEntry );
+      hb_itemRelease( pEntry );
+   }
+
+   hb_itemReturnRelease( pArray );
+}
+
+/* MAC_DebugUpdateLocals( aLocals ) — update Locals tab */
+HB_FUNC( MAC_DEBUGUPDATELOCALS )
+{
+   PHB_ITEM pArray = hb_param( 1, HB_IT_ARRAY );
+   if( !s_dbgLocalsTV || !s_dbgLocalsDS || !pArray ) return;
+
+   [s_dbgLocalsDS->rows removeAllObjects];
+   int n = (int) hb_arrayLen( pArray );
+   for( int i = 1; i <= n; i++ )
+   {
+      PHB_ITEM pEntry = hb_arrayGetItemPtr( pArray, i );
+      if( !pEntry || hb_arrayLen(pEntry) < 3 ) continue;
+      NSArray * row = @[
+         [NSString stringWithUTF8String:hb_arrayGetCPtr( pEntry, 1 )],
+         [NSString stringWithUTF8String:hb_arrayGetCPtr( pEntry, 2 )],
+         [NSString stringWithUTF8String:hb_arrayGetCPtr( pEntry, 3 )]
+      ];
+      [s_dbgLocalsDS->rows addObject:row];
+   }
+   [s_dbgLocalsTV reloadData];
+}
+
+/* MAC_DebugUpdateStack( aStack ) — update Call Stack tab */
+HB_FUNC( MAC_DEBUGUPDATESTACK )
+{
+   PHB_ITEM pArray = hb_param( 1, HB_IT_ARRAY );
+   if( !s_dbgStackTV || !s_dbgStackDS || !pArray ) return;
+
+   [s_dbgStackDS->rows removeAllObjects];
+   int n = (int) hb_arrayLen( pArray );
+   for( int i = 1; i <= n; i++ )
+   {
+      PHB_ITEM pEntry = hb_arrayGetItemPtr( pArray, i );
+      if( !pEntry || hb_arrayLen(pEntry) < 4 ) continue;
+      NSArray * row = @[
+         [NSString stringWithUTF8String:hb_arrayGetCPtr( pEntry, 1 )],
+         [NSString stringWithUTF8String:hb_arrayGetCPtr( pEntry, 2 )],
+         [NSString stringWithUTF8String:hb_arrayGetCPtr( pEntry, 3 )],
+         [NSString stringWithUTF8String:hb_arrayGetCPtr( pEntry, 4 )]
+      ];
+      [s_dbgStackDS->rows addObject:row];
+   }
+   [s_dbgStackTV reloadData];
+}
+
+/* MAC_DebugSetStatus( cText ) */
+HB_FUNC( MAC_DEBUGSETSTATUS )
+{
+   if( s_dbgStatusLbl && HB_ISCHAR(1) )
+      [s_dbgStatusLbl setStringValue:[NSString stringWithUTF8String:hb_parc(1)]];
 }
 
 } /* extern "C" */
