@@ -32,7 +32,7 @@ static nActiveForm   // Index of active form (1-based)
 
 function Main()
 
-   local oTB, oFile, oEdit, oSearch, oView, oProject, oRun, oComp, oTools, oHelp
+   local oTB, oTB2, oFile, oEdit, oSearch, oView, oProject, oRun, oComp, oTools, oHelp
    local nBarH, nInsW, nEditorX, nEditorW, nEditorH
    local nFormX, nFormY, nInsTop, nEditorTop, nBottomY
 
@@ -133,7 +133,7 @@ function Main()
    MENUSEPARATOR OF oHelp
    MENUITEM "About HbBuilder..." OF oHelp ACTION ShowAbout()
 
-   // Speedbar (toolbar with 28x28 icon-sized buttons)
+   // Row 1: File & Edit speedbar
    DEFINE TOOLBAR oTB OF oIDE
    BUTTON "New"   OF oTB TOOLTIP "New project (Ctrl+N)"  ACTION TBNew()
    BUTTON "Open"  OF oTB TOOLTIP "Open file (Ctrl+O)"    ACTION TBOpen()
@@ -145,11 +145,19 @@ function Main()
    SEPARATOR OF oTB
    BUTTON "Undo"  OF oTB TOOLTIP "Undo (Ctrl+Z)"         ACTION CodeEditorUndo( hCodeEditor )
    BUTTON "Redo"  OF oTB TOOLTIP "Redo (Ctrl+Y)"         ACTION CodeEditorRedo( hCodeEditor )
-   SEPARATOR OF oTB
-   BUTTON "Run"   OF oTB TOOLTIP "Run project (F9)"       ACTION TBRun()
 
    // Load toolbar icons (Silk icon set by famfamfam, CC BY 2.5)
    UI_ToolBarLoadImages( oTB:hCpp, "../resources/toolbar.bmp" )
+
+   // Row 2: Run & Debug speedbar
+   DEFINE TOOLBAR oTB2 OF oIDE
+   BUTTON "Run"   OF oTB2 TOOLTIP "Run project (F9)"      ACTION TBRun()
+   BUTTON "Debug" OF oTB2 TOOLTIP "Debug (F8)"             ACTION TBDebugRun()
+   SEPARATOR OF oTB2
+   BUTTON "Step"  OF oTB2 TOOLTIP "Step Into (F7)"         ACTION DebugStepInto()
+   BUTTON "Over"  OF oTB2 TOOLTIP "Step Over (F8)"         ACTION DebugStepOver()
+   BUTTON "Go"    OF oTB2 TOOLTIP "Continue (F5)"          ACTION IDE_DebugGo()
+   BUTTON "Stop"  OF oTB2 TOOLTIP "Stop Debugging"         ACTION IDE_DebugStop()
 
    // Component Palette (icon grid, tabbed, right of splitter)
    CreatePalette()
