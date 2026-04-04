@@ -1140,7 +1140,7 @@ return nil
 // Run: compile and execute the project (C++Builder F9)
 static function TBRun()
 
-   local cBuildDir, cOutput, cLog, i, lError
+   local cBuildDir, cOutput, cLog, i, lError, nErrors
    local cHbDir, cHbBin, cHbInc, cHbLib, cProjDir
    local cAllPrg, cCmd
 
@@ -1151,11 +1151,15 @@ static function TBRun()
    cHbBin   := cHbDir + "/bin/darwin/clang"
    cHbInc   := cHbDir + "/include"
    cHbLib   := cHbDir + "/lib/darwin/clang"
-   cProjDir := "/Users/usuario/hbcpp"
+   cProjDir := "/Users/usuario/HarbourBuilder"
    cLog     := ""
    lError   := .F.
 
    MAC_ShellExec( "mkdir -p " + cBuildDir )
+
+   // Clear messages panel
+   CodeEditorClearMessages( hCodeEditor )
+   CodeEditorAddMessage( hCodeEditor, "", 0, "Info", "Build started..." )
 
    // Step 1: Save files
    cLog += "[1] Saving project files..." + Chr(10)
@@ -1188,8 +1192,10 @@ static function TBRun()
       if "Error" $ cOutput
          cLog += "    FAILED:" + Chr(10) + cOutput + Chr(10)
          lError := .T.
+         CodeEditorParseErrors( hCodeEditor, cOutput )
       else
          cLog += "    OK" + Chr(10)
+         CodeEditorAddMessage( hCodeEditor, "", 0, "OK", "[3] Harbour compilation OK" )
       endif
    endif
 
@@ -1209,9 +1215,12 @@ static function TBRun()
       cCmd := "clang -c -O2 -Wno-unused-value -I" + cHbInc + ;
               " " + cBuildDir + "/main.c -o " + cBuildDir + "/main.o 2>&1"
       cOutput := MAC_ShellExec( cCmd )
-      if ! Empty( cOutput )
+      if ! Empty( cOutput ) .and. "error" $ Lower( cOutput )
          cLog += "    FAILED:" + Chr(10) + cOutput + Chr(10)
          lError := .T.
+         CodeEditorParseErrors( hCodeEditor, cOutput )
+      else
+         CodeEditorAddMessage( hCodeEditor, "", 0, "OK", "[5] C compilation OK" )
       endif
       cCmd := "clang -c -O2 -Wno-unused-value -I" + cHbInc + ;
               " " + cBuildDir + "/classes.c -o " + cBuildDir + "/classes.o 2>&1"
@@ -1259,14 +1268,16 @@ static function TBRun()
       if "error" $ Lower( cOutput )
          cLog += "    FAILED:" + Chr(10) + cOutput + Chr(10)
          lError := .T.
+         CodeEditorParseErrors( hCodeEditor, cOutput )
       else
          cLog += "    OK" + Chr(10)
+         CodeEditorAddMessage( hCodeEditor, "", 0, "OK", "[7] Linking OK" )
       endif
    endif
 
    // Result
    if lError
-      MsgInfo( "Build FAILED:" + Chr(10) + Chr(10) + cLog )
+      CodeEditorAddMessage( hCodeEditor, "", 0, "Error", "BUILD FAILED - see errors above" )
    else
       cLog += Chr(10) + "Build succeeded. Running..." + Chr(10)
       // Create .app bundle and launch (macOS needs bundle for GUI app)
@@ -1277,6 +1288,7 @@ static function TBRun()
          '<plist version="1.0"><dict>' + Chr(10) + ;
          '<key>CFBundleExecutable</key><string>UserApp</string>' + Chr(10) + ;
          '</dict></plist>' + Chr(10) )
+      CodeEditorAddMessage( hCodeEditor, "", 0, "OK", "Build succeeded. Running UserApp..." )
       MAC_ShellExec( "open " + cBuildDir + "/UserApp.app" )
    endif
 

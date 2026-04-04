@@ -62,12 +62,18 @@ typedef struct {
    ScintillaView *  sciView;
    NSSegmentedControl * tabBar;
    NSTextField *    statusBar;        /* Ln/Col/INS status label */
+   NSTableView *    msgTable;         /* Messages/errors table */
+   NSView *         msgPanel;         /* Messages panel container */
+   NSMutableArray * msgData;          /* Array of [file, line, col, type, text] */
    char           tabNames[CE_MAX_TABS][64];
    char *         tabTexts[CE_MAX_TABS];
    int            nTabs;
    int            nActiveTab;
    PHB_ITEM       pOnTabChange;
 } CODEEDITOR;
+
+/* Forward declarations for messages panel (defined at end of file) */
+static CODEEDITOR * s_msgEditor = nil;
 
 /* -----------------------------------------------------------------------
  * Harbour-aware code folding
@@ -319,6 +325,10 @@ static void CE_ConfigureScintilla( ScintillaView * sv )
    SciMsg( sv, SCI_STYLESETFORE, STYLE_BRACEBAD, SCIRGB(255,0,0) );
    SciMsg( sv, SCI_STYLESETBACK, STYLE_BRACEBAD, SCIRGB(60,30,30) );
    SciMsg( sv, SCI_STYLESETBOLD, STYLE_BRACEBAD, 1 );
+
+   /* Error marker: red background for error lines (marker 10) */
+   SciMsg( sv, SCI_MARKERDEFINE, 10, SC_MARK_BACKGROUND );
+   SciMsg( sv, 2042, 10, SCIRGB(80,20,20) );  /* SCI_MARKERSETBACK: dark red bg */
 
    /* Bookmarks: markers 0-9 using circles in margin 1 */
    SciMsg( sv, SCI_SETMARGINTYPEN, 1, SC_MARGIN_SYMBOL );
@@ -830,9 +840,37 @@ HB_FUNC( CODEEDITORCREATE )
    [ed->statusBar setTextColor:[NSColor colorWithCalibratedRed:0.6 green:0.6 blue:0.6 alpha:1]];
    [ed->statusBar setDrawsBackground:YES];
 
-   /* Scintilla view (between tab bar and status bar) */
-   NSRect sciFrame = NSMakeRect( 0, statusH, contentBounds.size.width,
-                                 contentBounds.size.height - tabBarH - statusH );
+   /* Messages panel (above status bar) — build errors, warnings */
+   CGFloat msgH = 120;
+   ed->msgData = [NSMutableArray array];
+
+   NSScrollView * msgSV = [[NSScrollView alloc] initWithFrame:
+      NSMakeRect( 0, statusH, contentBounds.size.width, msgH )];
+   [msgSV setHasVerticalScroller:YES];
+   [msgSV setAutoresizingMask:NSViewWidthSizable | NSViewMaxYMargin];
+   [msgSV setBorderType:NSBezelBorder];
+
+   ed->msgTable = [[NSTableView alloc] initWithFrame:NSMakeRect(0, 0, contentBounds.size.width, msgH)];
+   NSString * msgCols[] = { @"File", @"Line", @"Type", @"Message" };
+   CGFloat  msgWidths[] = { 120, 50, 60, 500 };
+   for( int c = 0; c < 4; c++ ) {
+      NSTableColumn * col = [[NSTableColumn alloc] initWithIdentifier:msgCols[c]];
+      [[col headerCell] setStringValue:msgCols[c]];
+      [col setWidth:msgWidths[c]];
+      [ed->msgTable addTableColumn:col];
+   }
+   [ed->msgTable setRowHeight:18];
+   [ed->msgTable setGridStyleMask:NSTableViewSolidHorizontalGridLineMask];
+   s_msgEditor = ed;
+   /* Data source set lazily when first message is added (class defined later) */
+   [msgSV setDocumentView:ed->msgTable];
+
+   ed->msgPanel = msgSV;
+
+   /* Scintilla view (between tab bar and messages panel) */
+   CGFloat sciBottom = statusH + msgH;
+   NSRect sciFrame = NSMakeRect( 0, sciBottom, contentBounds.size.width,
+                                 contentBounds.size.height - tabBarH - sciBottom );
    ed->sciView = [[ScintillaView alloc] initWithFrame:sciFrame];
    [ed->sciView setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
 
@@ -847,6 +885,7 @@ HB_FUNC( CODEEDITORCREATE )
    CE_InstallKeyMonitor( ed );
 
    [content addSubview:ed->statusBar];
+   [content addSubview:ed->msgPanel];
    [content addSubview:ed->sciView];
    [content addSubview:ed->tabBar positioned:NSWindowAbove relativeTo:nil];
 
@@ -2135,6 +2174,195 @@ HB_FUNC( MAC_DEBUGSETSTATUS )
 {
    if( s_dbgStatusLbl && HB_ISCHAR(1) )
       [s_dbgStatusLbl setStringValue:[NSString stringWithUTF8String:hb_parc(1)]];
+}
+
+/* -----------------------------------------------------------------------
+ * Messages Panel — data source + click-to-jump
+ * ----------------------------------------------------------------------- */
+
+@interface HBMsgTableSource : NSObject <NSTableViewDataSource, NSTableViewDelegate>
+@end
+
+@implementation HBMsgTableSource
+
+- (NSInteger)numberOfRowsInTableView:(NSTableView *)tv
+{
+   (void)tv;
+   return s_msgEditor && s_msgEditor->msgData ? (NSInteger)[s_msgEditor->msgData count] : 0;
+}
+
+- (id)tableView:(NSTableView *)tv objectValueForTableColumn:(NSTableColumn *)col row:(NSInteger)row
+{
+   (void)tv;
+   if( !s_msgEditor || !s_msgEditor->msgData || row < 0 ||
+       row >= (NSInteger)[s_msgEditor->msgData count] ) return @"";
+   NSArray * r = [s_msgEditor->msgData objectAtIndex:(NSUInteger)row];
+   NSString * ident = [col identifier];
+   if( [ident isEqualToString:@"File"] )    return r[0];
+   if( [ident isEqualToString:@"Line"] )    return r[1];
+   if( [ident isEqualToString:@"Type"] )    return r[2];
+   if( [ident isEqualToString:@"Message"] ) return r[3];
+   return @"";
+}
+
+/* Double-click on error row → jump to line in editor */
+- (BOOL)tableView:(NSTableView *)tv shouldSelectRow:(NSInteger)row
+{
+   (void)tv;
+   if( !s_msgEditor || !s_msgEditor->msgData || !s_msgEditor->sciView ) return YES;
+   if( row < 0 || row >= (NSInteger)[s_msgEditor->msgData count] ) return YES;
+
+   NSArray * r = [s_msgEditor->msgData objectAtIndex:(NSUInteger)row];
+   int lineNum = [r[1] intValue];
+   if( lineNum > 0 )
+   {
+      sptr_t pos = SciMsg( s_msgEditor->sciView, SCI_POSITIONFROMLINE, (uptr_t)(lineNum - 1), 0 );
+      SciMsg( s_msgEditor->sciView, SCI_GOTOPOS, (uptr_t)pos, 0 );
+      SciMsg( s_msgEditor->sciView, SCI_SCROLLCARET, 0, 0 );
+      /* Highlight the error line with a red marker */
+      SciMsg( s_msgEditor->sciView, SCI_MARKERDELETEALL, 10, 0 );  /* clear old marks */
+      SciMsg( s_msgEditor->sciView, SCI_MARKERADD, (uptr_t)(lineNum - 1), 10 );
+   }
+   return YES;
+}
+
+@end
+
+static HBMsgTableSource * s_msgDS = nil;
+
+/* Ensure messages data source is connected (lazy init) */
+static void CE_EnsureMsgDS( CODEEDITOR * ed )
+{
+   if( !s_msgDS && ed && ed->msgTable )
+   {
+      s_msgDS = [[HBMsgTableSource alloc] init];
+      [ed->msgTable setDataSource:s_msgDS];
+      [ed->msgTable setDelegate:s_msgDS];
+   }
+}
+
+/* CodeEditorClearMessages( hEditor ) */
+HB_FUNC( CODEEDITORCLEARMESSAGES )
+{
+   CODEEDITOR * ed = (CODEEDITOR *)(HB_PTRUINT) hb_parnint(1);
+   if( !ed || !ed->msgData ) return;
+   CE_EnsureMsgDS( ed );
+   [ed->msgData removeAllObjects];
+   [ed->msgTable reloadData];
+   /* Clear error line markers */
+   if( ed->sciView )
+      SciMsg( ed->sciView, SCI_MARKERDELETEALL, 10, 0 );
+}
+
+/* CodeEditorAddMessage( hEditor, cFile, nLine, cType, cMessage ) */
+HB_FUNC( CODEEDITORADDMESSAGE )
+{
+   CODEEDITOR * ed = (CODEEDITOR *)(HB_PTRUINT) hb_parnint(1);
+   if( !ed || !ed->msgData ) return;
+
+   NSString * file = HB_ISCHAR(2) ? [NSString stringWithUTF8String:hb_parc(2)] : @"";
+   NSString * line = HB_ISNUM(3) ? [NSString stringWithFormat:@"%d", hb_parni(3)] : @"";
+   NSString * type = HB_ISCHAR(4) ? [NSString stringWithUTF8String:hb_parc(4)] : @"";
+   NSString * msg  = HB_ISCHAR(5) ? [NSString stringWithUTF8String:hb_parc(5)] : @"";
+
+   [ed->msgData addObject:@[file, line, type, msg]];
+   [ed->msgTable reloadData];
+
+   /* Auto-scroll to last message */
+   NSInteger lastRow = (NSInteger)[ed->msgData count] - 1;
+   if( lastRow >= 0 )
+      [ed->msgTable scrollRowToVisible:lastRow];
+}
+
+/* CodeEditorParseErrors( hEditor, cOutput ) — parse Harbour + clang error output */
+HB_FUNC( CODEEDITORPARSEERRORS )
+{
+   CODEEDITOR * ed = (CODEEDITOR *)(HB_PTRUINT) hb_parnint(1);
+   if( !ed || !ed->msgData || !HB_ISCHAR(2) ) return;
+
+   const char * output = hb_parc(2);
+   int nErrors = 0;
+
+   /* Parse line by line */
+   const char * p = output;
+   while( *p )
+   {
+      /* Find end of line */
+      const char * eol = p;
+      while( *eol && *eol != '\n' ) eol++;
+
+      int lineLen = (int)(eol - p);
+      if( lineLen > 0 && lineLen < 1024 )
+      {
+         char line[1024];
+         memcpy( line, p, lineLen );
+         line[lineLen] = 0;
+
+         /* Pattern 1: Harbour — "file.prg(123) Error E0020  description" */
+         char * paren = strchr( line, '(' );
+         if( paren && strstr( line, "Error" ) )
+         {
+            *paren = 0;
+            int nLine = atoi( paren + 1 );
+            char * desc = strstr( paren + 1, "Error" );
+            if( desc ) {
+               NSString * file = [NSString stringWithUTF8String:line];
+               NSString * sLine = [NSString stringWithFormat:@"%d", nLine];
+               NSString * msg = [NSString stringWithUTF8String:desc];
+               [ed->msgData addObject:@[file, sLine, @"Error", msg]];
+               nErrors++;
+            }
+         }
+         /* Pattern 1b: Harbour — "file.prg(123) Warning W0001  description" */
+         else if( paren && strstr( line, "Warning" ) )
+         {
+            *paren = 0;
+            int nLine = atoi( paren + 1 );
+            char * desc = strstr( paren + 1, "Warning" );
+            if( desc ) {
+               NSString * file = [NSString stringWithUTF8String:line];
+               NSString * sLine = [NSString stringWithFormat:@"%d", nLine];
+               NSString * msg = [NSString stringWithUTF8String:desc];
+               [ed->msgData addObject:@[file, sLine, @"Warning", msg]];
+            }
+         }
+         /* Pattern 2: clang — "file.c:123:45: error: description" */
+         else if( strstr( line, ": error:" ) || strstr( line, ": warning:" ) )
+         {
+            char * colon1 = strchr( line, ':' );
+            if( colon1 ) {
+               *colon1 = 0;
+               int nLine = atoi( colon1 + 1 );
+               char * typeStr = strstr( colon1 + 1, "error:" );
+               if( !typeStr ) typeStr = strstr( colon1 + 1, "warning:" );
+               if( typeStr ) {
+                  BOOL isErr = ( typeStr[0] == 'e' );
+                  char * desc = strchr( typeStr, ':' );
+                  if( desc ) desc++;
+                  NSString * file = [NSString stringWithUTF8String:line];
+                  NSString * sLine = [NSString stringWithFormat:@"%d", nLine];
+                  NSString * msg = desc ? [NSString stringWithUTF8String:desc] : @"";
+                  [ed->msgData addObject:@[file, sLine, isErr ? @"Error" : @"Warning",
+                     [msg stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]]]];
+                  if( isErr ) nErrors++;
+               }
+            }
+         }
+      }
+
+      p = *eol ? eol + 1 : eol;
+   }
+
+   [ed->msgTable reloadData];
+
+   /* Jump to first error */
+   if( nErrors > 0 && [ed->msgData count] > 0 )
+   {
+      [ed->msgTable selectRowIndexes:[NSIndexSet indexSetWithIndex:0] byExtendingSelection:NO];
+      [ed->msgTable scrollRowToVisible:0];
+   }
+
+   hb_retni( nErrors );
 }
 
 } /* extern "C" */

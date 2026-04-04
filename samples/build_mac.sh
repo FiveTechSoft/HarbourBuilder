@@ -66,14 +66,14 @@ clang++ -o ${PROG} \
    -lscintilla -llexilla \
    -lhbvm -lhbrtl -lhbcommon -lhbcpage -lhblang \
    -lhbmacro -lhbpp -lhbrdd -lhbcplr -lhbdebug \
-   -lhbct -lhbextern \
+   -lhbct -lhbextern -lhbsqlit3 \
    -lrddntx -lrddnsx -lrddcdx -lrddfpt \
    -lhbhsx -lhbsix -lhbusrrdd \
    -lgtcgi -lgttrm -lgtstd \
    -framework Cocoa \
    -framework QuartzCore \
    -framework UniformTypeIdentifiers \
-   -lm -lpthread -lc++
+   -lm -lpthread -lc++ -lsqlite3
 
 echo ""
 echo "-- ${PROG} built successfully (with Scintilla editor) --"
