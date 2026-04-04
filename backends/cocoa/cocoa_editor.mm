@@ -221,11 +221,13 @@ static void CE_ConfigureScintilla( ScintillaView * sv )
    SciMsg( sv, SCI_STYLESETFORE, STYLE_LINENUMBER, SCIRGB(133,133,133) );
    SciMsg( sv, SCI_STYLESETBACK, STYLE_LINENUMBER, SCIRGB(37,37,38) );
 
-   /* Folding margin */
+   /* Folding margin — dark background matching editor */
    SciMsg( sv, SCI_SETMARGINTYPEN, 2, SC_MARGIN_SYMBOL );
    SciMsg( sv, SCI_SETMARGINMASKN, 2, SC_MASK_FOLDERS );
    SciMsg( sv, SCI_SETMARGINWIDTHN, 2, 16 );
    SciMsg( sv, SCI_SETMARGINSENSITIVEN, 2, 1 );
+   SciMsg( sv, SCI_SETFOLDMARGINCOLOUR, 1, SCIRGB(37,37,38) );
+   SciMsg( sv, SCI_SETFOLDMARGINHICOLOUR, 1, SCIRGB(37,37,38) );
    SciMsg( sv, SCI_SETAUTOMATICFOLD,
            SC_AUTOMATICFOLD_SHOW | SC_AUTOMATICFOLD_CLICK | SC_AUTOMATICFOLD_CHANGE, 0 );
 
