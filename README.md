@@ -216,7 +216,11 @@ Call any language from Harbour — or embed Harbour in any language:
 - Project Options dialog (Harbour / C Compiler / Linker / Directories)
 - Editor Colors dialog with presets (Dark, Light, Monokai, Solarized)
 - Full clipboard: **Cut / Copy / Paste / Undo / Redo** via Scintilla
-- **Incremental build** — only recompiles changed files (timestamp-based)
+- **Multi-compiler support**: auto-detects MSVC (2019/2022/Community/BuildTools) and BCC
+- **Tools > Select Compiler**: choose between all detected compilers, shown in title bar
+- **Smart rebuild**: hash-based skip when code + compiler unchanged
+- **Progress dialog**: 7-step build progress with status text
+- **Build error dialog**: resizable, selectable text, Copy to Clipboard button
 - Build & Run with F9, **Debug** with in-process .hrb execution
 - **Database verified**: DBF (native RDD) + SQLite (hbsqlit3) working on all platforms
 
@@ -445,6 +449,8 @@ All three desktop platforms are **fully functional** with zero MsgInfo stubs —
 | | Multi-form projects | ✅ | ✅ | ✅ |
 | | Add / Remove from project | ✅ | ✅ | ✅ |
 | | Build & Run (native compile) | ✅ | ✅ | ✅ |
+| | Multi-compiler (MSVC + BCC) | ✅ | — | — |
+| | Build progress dialog | ✅ | — | — |
 | | Build to .app bundle | — | — | ✅ |
 | **Database** | TDatabase (abstract base) | ✅ | ✅ | ✅ |
 | | TDBFTable (native DBF/CDX, 20+ methods) | ✅ | ✅ | ✅ |

@@ -33,13 +33,15 @@ static aForms        // Array of form entries
 static nActiveForm   // Index of active form (1-based)
 static lDarkMode := .T.   // Dark mode state for toggle
 static cSelectedCompiler := ""  // "", "msvc", "bcc" (empty = auto-detect)
+static nSelectedCompIdx := 0    // index into aCompilers (0 = auto)
+static aCompilers := nil        // compiler registry from ScanCompilers()
 
 function Main()
 
    local oTB, oTB2, oFile, oEdit, oSearch, oView, oProject, oRun, oFormat, oComp, oTools, oGit, oHelp
    local nBarH, nInsW, nEditorX, nEditorW, nEditorH
    local nFormX, nFormY, nInsTop, nEditorTop, nBottomY
-   local cIcoDir
+   local cIcoDir, aCI0, cCompLabel
 
    // Check if Harbour and BCC are installed
    CheckHarbourInstall()
@@ -64,7 +66,12 @@ function Main()
    nInsW    := Int( nScreenW * 0.18 )        // ~18% of screen width
 
    // === Window 1: Main Bar (full screen width) ===
-   DEFINE FORM oIDE TITLE "HbBuilder 1.0 - Visual IDE for Harbour" ;
+   // Scan compilers early so we can show in title
+   ScanCompilers()
+   aCI0 := GetCompilerInfo()
+   cCompLabel := iif( aCI0 != nil, aCI0[2], "No compiler" )
+
+   DEFINE FORM oIDE TITLE "HbBuilder 1.0 - [" + cCompLabel + "]" ;
       SIZE nScreenW, nBarH FONT "Segoe UI", 9 APPBAR
 
    UI_FormSetPos( oIDE:hCpp, 0, 0 )
@@ -171,7 +178,7 @@ function Main()
    MENUITEM "&AI Assistant..."        OF oTools ACTION ShowAIAssistant()
    MENUITEM "&Report Designer"        OF oTools ACTION OpenReportDesigner()
    MENUSEPARATOR OF oTools
-   MENUITEM "&Select Compiler..."     OF oTools ACTION SelectCompiler()
+   MENUITEM "&Select C Compiler..."     OF oTools ACTION SelectCompiler()
    MENUSEPARATOR OF oTools
    MENUITEM "&Generate Palette Icons" OF oTools ACTION ( W32_GeneratePaletteIcons( .F. ), W32_GenerateToolbarIcons( .F. ) )
 
@@ -1435,7 +1442,71 @@ static function TBSave()
 
 return nil
 
-// Detect available C compiler: "msvc" or "bcc"
+// Compiler registry: { { cId, cLabel, cClPath, cMsvcBase, cWinKitVer }, ... }
+
+static function ScanCompilers()
+
+   local aMsvcPaths, aWinKitVers, aMsvcVers, i, j, k, m, cBase, cCl, cYear, cEdition, cLabel
+   local aYears, aEditions, aProgramDirs, aBccPaths, cPDir, cMsvcVer
+
+   aCompilers := {}
+
+   // Scan MSVC installations
+   aProgramDirs := { "c:\Program Files (x86)", "c:\Program Files" }
+   aYears    := { "2022", "2019", "18" }
+   aEditions := { "Community", "BuildTools", "Professional", "Enterprise" }
+
+   // Find Windows SDK version (use newest)
+   aWinKitVers := {}
+   if File( "c:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um\windows.h" )
+      AAdd( aWinKitVers, "10.0.26100.0" )
+   endif
+   if File( "c:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\um\windows.h" )
+      AAdd( aWinKitVers, "10.0.22621.0" )
+   endif
+   if File( "c:\Program Files (x86)\Windows Kits\10\Include\10.0.19041.0\um\windows.h" )
+      AAdd( aWinKitVers, "10.0.19041.0" )
+   endif
+
+   for i := 1 to Len( aProgramDirs )
+      cPDir := aProgramDirs[i]
+      for j := 1 to Len( aYears )
+         cYear := aYears[j]
+         for k := 1 to Len( aEditions )
+            cEdition := aEditions[k]
+            // Scan for MSVC tool versions in this VS installation
+            cBase := cPDir + "\Microsoft Visual Studio\" + cYear + "\" + cEdition + "\VC\Tools\MSVC"
+            // Try known version numbers
+            aMsvcVers := { "14.50.35717", "14.44.35207", "14.43.34808", ;
+                                  "14.41.34120", "14.40.33807", "14.39.33519", ;
+                                  "14.38.33130", "14.37.32822", "14.36.32532", ;
+                                  "14.35.32215", "14.34.31933", "14.33.31629", ;
+                                  "14.29.30133", "14.29.30037", "14.28.29910" }
+            for m := 1 to Len( aMsvcVers )
+               cMsvcVer := aMsvcVers[m]
+               cCl := cBase + "\" + cMsvcVer + "\bin\Hostx86\x86\cl.exe"
+               if File( cCl )
+                  cLabel := "MSVC " + cYear + " " + cEdition + " (v" + cMsvcVer + ") 32-bit"
+                  AAdd( aCompilers, { "msvc", cLabel, cCl, ;
+                     cBase + "\" + cMsvcVer, ;
+                     iif( Len(aWinKitVers) > 0, aWinKitVers[1], "" ) } )
+               endif
+            next
+         next
+      next
+   next
+
+   // Scan BCC
+   aBccPaths := { "c:\bcc77c", "c:\bcc77", "c:\bcc82", "c:\borland\bcc55" }
+   for i := 1 to Len( aBccPaths )
+      if File( aBccPaths[i] + "\bin\bcc32.exe" )
+         AAdd( aCompilers, { "bcc", "BCC (" + aBccPaths[i] + ") 32-bit", ;
+            aBccPaths[i] + "\bin\bcc32.exe", aBccPaths[i], "" } )
+      endif
+   next
+
+return nil
+
 static function DetectCompiler()
 
    // User selected a specific compiler
@@ -1443,49 +1514,68 @@ static function DetectCompiler()
       return cSelectedCompiler
    endif
 
-   // Auto-detect: MSVC first (preferred)
-   if File( "c:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Tools\MSVC\14.29.30133\bin\Hostx86\x86\cl.exe" )
-      return "msvc"
+   // Scan if not done yet
+   if aCompilers == nil
+      ScanCompilers()
    endif
-   // Check BCC
-   if File( "c:\bcc77c\bin\bcc32.exe" )
-      return "bcc"
+
+   // Return first found (MSVC preferred, appears first)
+   if Len( aCompilers ) > 0
+      return aCompilers[1][1]
    endif
 
 return ""
 
+static function GetCompilerInfo()
+   // Return the full info array for the active compiler
+   if aCompilers == nil; ScanCompilers(); endif
+
+   // User selected a specific compiler by index
+   if nSelectedCompIdx > 0 .and. nSelectedCompIdx <= Len( aCompilers )
+      return aCompilers[ nSelectedCompIdx ]
+   endif
+
+   // Auto: return first found
+   if Len( aCompilers ) > 0
+      return aCompilers[1]
+   endif
+
+return nil
+
 static function SelectCompiler()
 
-   local aOptions := {}
-   local nSel, cCurrent
+   local aOptions := {}, i, nSel
 
-   cCurrent := DetectCompiler()
+   if aCompilers == nil; ScanCompilers(); endif
 
-   // Build list of available compilers
-   if File( "c:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Tools\MSVC\14.29.30133\bin\Hostx86\x86\cl.exe" )
-      AAdd( aOptions, "MSVC 2019 (32-bit)" + iif( cCurrent == "msvc", " [active]", "" ) )
-   endif
-   if File( "c:\bcc77c\bin\bcc32.exe" )
-      AAdd( aOptions, "BCC 7.7 (32-bit)" + iif( cCurrent == "bcc", " [active]", "" ) )
-   endif
-   AAdd( aOptions, "Auto-detect" + iif( Empty( cSelectedCompiler ), " [active]", "" ) )
+   for i := 1 to Len( aCompilers )
+      AAdd( aOptions, aCompilers[i][2] + ;
+         iif( i == 1 .and. Empty(cSelectedCompiler), " [auto]", "" ) )
+   next
+   AAdd( aOptions, "Auto-detect (use first found)" + ;
+      iif( Empty(cSelectedCompiler), " [active]", "" ) )
 
-   if Len( aOptions ) == 0
-      MsgInfo( "No compiler found" )
+   if Len( aOptions ) <= 1
+      MsgInfo( "No compiler found!" + Chr(10) + Chr(10) + ;
+               "Install:" + Chr(10) + ;
+               "- Visual Studio Build Tools (free): visualstudio.microsoft.com" + Chr(10) + ;
+               "- Embarcadero BCC: embarcadero.com" )
       return nil
    endif
 
    nSel := W32_SelectFromList( "Select C/C++ Compiler", aOptions )
 
    if nSel > 0
-      if "MSVC" $ aOptions[nSel]
-         cSelectedCompiler := "msvc"
-      elseif "BCC" $ aOptions[nSel]
-         cSelectedCompiler := "bcc"
+      if nSel <= Len( aCompilers )
+         cSelectedCompiler := aCompilers[nSel][1]
+         nSelectedCompIdx  := nSel
+         // Update IDE title bar
+         UI_SetProp( oIDE:hCpp, "cText", "HbBuilder 1.0 - [" + aCompilers[nSel][2] + "]" )
       else
-         cSelectedCompiler := ""  // auto-detect
+         cSelectedCompiler := ""
+         nSelectedCompIdx  := 0
+         UI_SetProp( oIDE:hCpp, "cText", "HbBuilder 1.0 - [Auto]" )
       endif
-      MsgInfo( "Compiler: " + iif( Empty(cSelectedCompiler), "Auto-detect", Upper(cSelectedCompiler) ) )
    endif
 
 return nil
@@ -1501,7 +1591,7 @@ static function TBRun()
    local cAllCode, nHash
    local cCompiler, cMsvcBase, cWinKit, cWinKitVer
    local cMsvcInc, cMsvcLib, cUcrtInc, cUmInc, cSharedInc, cUcrtLib, cUmLib
-   local cRsp, cRspContent
+   local cRsp, cRspContent, aCI
    static nLastHash := 0
 
    SaveActiveFormCode()
@@ -1513,6 +1603,8 @@ static function TBRun()
    for i := 1 to Len( aForms )
       cAllCode += aForms[i][3]
    next
+   // Include compiler in hash so switching compiler forces rebuild
+   cAllCode += DetectCompiler() + LTrim( Str( nSelectedCompIdx ) )
    nHash := Len( cAllCode )
    for i := 1 to Min( Len( cAllCode ), 5000 )
       nHash := nHash + Asc( SubStr( cAllCode, i, 1 ) ) * i
@@ -1528,20 +1620,22 @@ static function TBRun()
    cLog     := ""
    lError   := .F.
 
-   // Detect compiler
-   cCompiler := DetectCompiler()
-   if Empty( cCompiler )
+   // Detect compiler from scanned list
+   aCI := GetCompilerInfo()
+   if aCI == nil
       MsgInfo( "No C compiler found!" + Chr(10) + Chr(10) + ;
-               "Install one of:" + Chr(10) + ;
-               "- Visual Studio Build Tools (recommended)" + Chr(10) + ;
-               "- Embarcadero BCC (c:\bcc77c)" )
+               "Use Tools > Select C Compiler, or install:" + Chr(10) + ;
+               "- Visual Studio Build Tools (free)" + Chr(10) + ;
+               "- Embarcadero BCC" )
       return nil
    endif
 
+   cCompiler := aCI[1]  // "msvc" or "bcc"
+
    if cCompiler == "msvc"
-      cMsvcBase  := "c:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Tools\MSVC\14.29.30133"
+      cMsvcBase  := aCI[4]  // e.g. "...\MSVC\14.29.30133"
       cWinKit    := "c:\Program Files (x86)\Windows Kits\10"
-      cWinKitVer := "10.0.26100.0"
+      cWinKitVer := aCI[5]  // e.g. "10.0.26100.0"
       cCC        := cMsvcBase + '\bin\Hostx86\x86\cl.exe'
       cLinker    := cMsvcBase + '\bin\Hostx86\x86\link.exe'
       cMsvcInc   := cMsvcBase + "\include"
@@ -1553,13 +1647,13 @@ static function TBRun()
       cUmLib     := cWinKit + "\Lib\" + cWinKitVer + "\um\x86"
       cHbBin     := cHbDir + "\bin\win\msvc"
       cHbLib     := cHbDir + "\lib\win\msvc"
-      cLog += "Compiler: MSVC 2019 (32-bit)" + Chr(10)
+      cLog += "Compiler: " + aCI[2] + Chr(10)
    else
-      cCDir      := "c:\bcc77c"
+      cCDir      := aCI[4]  // e.g. "c:\bcc77c"
       cCC        := cCDir + "\bin\bcc32.exe"
       cLinker    := cCDir + "\bin\ilink32.exe"
       cHbLib     := cHbDir + "\lib\win\bcc"
-      cLog += "Compiler: BCC (32-bit)" + Chr(10)
+      cLog += "Compiler: " + aCI[2] + Chr(10)
    endif
 
    W32_ShellExec( 'cmd /c mkdir "' + cBuildDir + '" 2>nul' )
