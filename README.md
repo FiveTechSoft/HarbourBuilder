@@ -136,11 +136,14 @@ return nil
 - Dark code editor and documentation theme
 
 ### 📋 Project Management
-- New Application / Open / Save projects (.hbp files)
+- New Application / Open / Save / **Save As** projects (.hbp files)
 - Multi-form support (Form1, Form2, Form3...)
+- **Add to Project** (import .prg files) / **Remove from Project**
+- **Install Component** / **New Component** (template generator)
 - Project Inspector tree view
 - Project Options dialog (Harbour / C Compiler / Linker / Directories)
 - Editor Colors dialog with presets (Dark, Light, Monokai, Solarized)
+- Full clipboard: **Cut / Copy / Paste / Undo / Redo** via Scintilla
 - Build & Run with F9
 
 ---
