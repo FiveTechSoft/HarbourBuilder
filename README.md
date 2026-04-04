@@ -140,6 +140,9 @@ return nil
 - **GTK event loop during pause**: `gtk_main_iteration()` keeps UI responsive while debugger waits
 - Toggle/Clear breakpoints from Run menu
 - Dark themed with monospace fonts and resizable columns
+- **16 unit tests** covering state machine, breakpoints, HRB compilation, execution, and variable inspection — all passing
+
+> **Technical note:** HRB pcode execution does not trigger `hb_dbg_SetEntry` hooks — the Harbour VM only fires debug callbacks for natively compiled code (`.prg` → `.c` → `.o`). Current approach: the debugger engine, panel UI, breakpoint manager, and variable inspector are fully implemented and tested. Next step: a **pipe-based debug agent** compiled into the user's executable that communicates with the IDE via Unix socket, enabling full step-through debugging with compiled code.
 
 ### 🌙 Dark Mode (all platforms)
 - Windows: dark title bars via DwmSetWindowAttribute
@@ -290,13 +293,13 @@ Professional HTML documentation with dark/light theme, Mermaid diagrams, and cod
 
 ## 🖥️ Platforms
 
-| Platform | Backend | Status |
-|----------|---------|--------|
-| **Windows** | Win32 API (C++) + Scintilla DLL | ✅ Full IDE |
-| **macOS** | Cocoa/AppKit (Obj-C/C++) + Scintilla static lib | ✅ Full IDE |
-| **Linux** | GTK3 (C) + Scintilla shared lib | ✅ Full IDE |
-| **Android** | NDK + JNI | 🔮 Planned |
-| **iOS** | UIKit (Objective-C) | 🔮 Planned |
+| Platform | Backend | Menus | Editor | Debugger | Status |
+|----------|---------|-------|--------|----------|--------|
+| **Windows** | Win32 API (C++) + Scintilla DLL | 100% | Scintilla 5.6.1 | Panel + engine | ✅ Full IDE |
+| **Linux** | GTK3 (C) + Scintilla shared lib | 100% | Scintilla 5.6.1 | Panel + engine + 16 tests | ✅ Full IDE |
+| **macOS** | Cocoa/AppKit (Obj-C) + NSTextView | 51% | NSTextView (no Scintilla) | Stub | 🔧 In progress |
+| **Android** | NDK + JNI | — | — | — | 🔮 Planned |
+| **iOS** | UIKit (Objective-C) | — | — | — | 🔮 Planned |
 
 ---
 
@@ -337,6 +340,9 @@ HarbourBuilder/
 │   │   └── build/liblexilla.a    # Lexilla (macOS, static)
 │   ├── lazarus_icons/            # Professional PNG icons
 │   └── harbour_logo.png          # About dialog logo
+├── tests/
+│   ├── test_debugger.prg         # 16 debugger unit tests
+│   └── build_test_debugger.sh    # Build & run test suite
 ├── build_win.bat                 # Windows build script
 ├── build_scintilla.sh            # Linux Scintilla build script
 └── ChangeLog.txt                 # Detailed changelog
