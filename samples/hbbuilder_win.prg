@@ -34,7 +34,7 @@ static nActiveForm   // Index of active form (1-based)
 
 function Main()
 
-   local oTB, oFile, oEdit, oSearch, oView, oProject, oRun, oComp, oTools, oHelp
+   local oTB, oFile, oEdit, oSearch, oView, oProject, oRun, oFormat, oComp, oTools, oHelp
    local nBarH, nInsW, nEditorX, nEditorW, nEditorH
    local nFormX, nFormY, nInsTop, nEditorTop, nBottomY
 
@@ -132,6 +132,18 @@ function Main()
    MENUSEPARATOR OF oRun
    MENUITEM "&Toggle Breakpoint"  OF oRun ACTION ToggleBreakpoint()
    MENUITEM "&Clear Breakpoints"  OF oRun ACTION ClearBreakpoints()
+
+   DEFINE POPUP oFormat PROMPT "F&ormat" OF oIDE
+   MENUITEM "Align &Left"              OF oFormat ACTION AlignControls( 1 )
+   MENUITEM "Align &Right"             OF oFormat ACTION AlignControls( 2 )
+   MENUITEM "Align &Top"               OF oFormat ACTION AlignControls( 3 )
+   MENUITEM "Align &Bottom"            OF oFormat ACTION AlignControls( 4 )
+   MENUSEPARATOR OF oFormat
+   MENUITEM "Center &Horizontally"     OF oFormat ACTION AlignControls( 5 )
+   MENUITEM "Center &Vertically"       OF oFormat ACTION AlignControls( 6 )
+   MENUSEPARATOR OF oFormat
+   MENUITEM "Space Evenly Hori&zontal" OF oFormat ACTION AlignControls( 7 )
+   MENUITEM "Space Evenly Ve&rtical"   OF oFormat ACTION AlignControls( 8 )
 
    DEFINE POPUP oComp PROMPT "&Component" OF oIDE
    MENUITEM "&Install Component..." OF oComp ACTION InstallComponent()
@@ -1598,6 +1610,15 @@ static function ShowAbout()
 
    W32_AboutDialog( "About HbBuilder", cMsg, HB_DirBase() + "..\resources\harbour_logo.png" )
 
+return nil
+
+// === Format > Align Controls ===
+
+static function AlignControls( nMode )
+   if oDesignForm != nil
+      UI_FormAlignSelected( oDesignForm:hCpp, nMode )
+      SyncDesignerToCode()
+   endif
 return nil
 
 // === Save As ===

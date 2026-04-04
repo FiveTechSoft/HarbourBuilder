@@ -1258,3 +1258,283 @@ return Self
 METHOD Open() CLASS TMongoDB
    ::cLastError := "MongoDB support requires libmongoc. Install with: apt install libmongoc-dev"
 return .F.
+
+//============================================================================//
+//  PRINTING COMPONENTS (Printing tab)
+//============================================================================//
+
+CLASS TPrinter
+   DATA cPrinterName INIT ""
+   DATA nCopies      INIT 1
+   DATA lLandscape   INIT .F.
+   DATA nPaperSize   INIT 1         // 1=Letter, 9=A4
+   DATA lPreview     INIT .F.
+   DATA nPageWidth   INIT 0
+   DATA nPageHeight  INIT 0
+   METHOD New() CONSTRUCTOR
+   METHOD BeginDoc( cTitle )
+   METHOD EndDoc()
+   METHOD NewPage()
+   METHOD PrintLine( nRow, nCol, cText )
+   METHOD PrintImage( nRow, nCol, nWidth, nHeight, cFile )
+   METHOD PrintRect( nRow, nCol, nWidth, nHeight )
+ENDCLASS
+
+METHOD New() CLASS TPrinter
+return Self
+
+METHOD BeginDoc( cTitle ) CLASS TPrinter
+   HB_SYMBOL_UNUSED( cTitle )
+return nil
+
+METHOD EndDoc() CLASS TPrinter
+return nil
+
+METHOD NewPage() CLASS TPrinter
+return nil
+
+METHOD PrintLine( nRow, nCol, cText ) CLASS TPrinter
+   HB_SYMBOL_UNUSED( nRow ); HB_SYMBOL_UNUSED( nCol ); HB_SYMBOL_UNUSED( cText )
+return nil
+
+METHOD PrintImage( nRow, nCol, nWidth, nHeight, cFile ) CLASS TPrinter
+   HB_SYMBOL_UNUSED( nRow ); HB_SYMBOL_UNUSED( nCol )
+   HB_SYMBOL_UNUSED( nWidth ); HB_SYMBOL_UNUSED( nHeight )
+   HB_SYMBOL_UNUSED( cFile )
+return nil
+
+METHOD PrintRect( nRow, nCol, nWidth, nHeight ) CLASS TPrinter
+   HB_SYMBOL_UNUSED( nRow ); HB_SYMBOL_UNUSED( nCol )
+   HB_SYMBOL_UNUSED( nWidth ); HB_SYMBOL_UNUSED( nHeight )
+return nil
+
+//----------------------------------------------------------------------------//
+
+CLASS TReport
+   DATA oPrinter     INIT nil
+   DATA cTitle       INIT ""
+   DATA aBands       INIT {}        // { { "Header", bBlock }, { "Detail", bBlock }, ... }
+   DATA aColumns     INIT {}        // { { cTitle, cField, nWidth }, ... }
+   DATA oDataSource  INIT nil
+   METHOD New( oPrn ) CONSTRUCTOR
+   METHOD AddBand( cName, bBlock )
+   METHOD AddColumn( cTitle, cField, nWidth )
+   METHOD Preview()
+   METHOD Print()
+ENDCLASS
+
+METHOD New( oPrn ) CLASS TReport
+   if oPrn != nil; ::oPrinter := oPrn; endif
+return Self
+
+METHOD AddBand( cName, bBlock ) CLASS TReport
+   AAdd( ::aBands, { cName, bBlock } )
+return nil
+
+METHOD AddColumn( cTitle, cField, nWidth ) CLASS TReport
+   AAdd( ::aColumns, { cTitle, cField, nWidth } )
+return nil
+
+METHOD Preview() CLASS TReport
+return nil
+
+METHOD Print() CLASS TReport
+   local i
+   if ::oPrinter == nil; return nil; endif
+   ::oPrinter:BeginDoc( ::cTitle )
+   // Header band
+   for i := 1 to Len( ::aBands )
+      if ::aBands[i][1] == "Header" .and. ::aBands[i][2] != nil
+         Eval( ::aBands[i][2], ::oPrinter )
+      endif
+   next
+   // Detail band (iterate datasource)
+   if ::oDataSource != nil .and. ::oDataSource:oDatabase != nil
+      ::oDataSource:oDatabase:GoTop()
+      while ! ::oDataSource:oDatabase:Eof()
+         for i := 1 to Len( ::aBands )
+            if ::aBands[i][1] == "Detail" .and. ::aBands[i][2] != nil
+               Eval( ::aBands[i][2], ::oPrinter, ::oDataSource:oDatabase )
+            endif
+         next
+         ::oDataSource:oDatabase:Skip()
+      enddo
+   endif
+   // Footer band
+   for i := 1 to Len( ::aBands )
+      if ::aBands[i][1] == "Footer" .and. ::aBands[i][2] != nil
+         Eval( ::aBands[i][2], ::oPrinter )
+      endif
+   next
+   ::oPrinter:EndDoc()
+return nil
+
+//============================================================================//
+//  INTERNET COMPONENTS (Internet tab)
+//============================================================================//
+
+CLASS TWebServer
+   DATA nPort        INIT 8080
+   DATA cRoot        INIT "."       // Document root
+   DATA lRunning     INIT .F.
+   DATA bOnRequest   INIT nil       // { |cMethod, cPath, cBody| cResponse }
+   DATA aRoutes      INIT {}        // { { cMethod, cPath, bHandler }, ... }
+   METHOD New() CONSTRUCTOR
+   METHOD AddRoute( cMethod, cPath, bHandler )
+   METHOD Start()
+   METHOD Stop()
+   METHOD ServeStatic( cPath )
+ENDCLASS
+
+METHOD New() CLASS TWebServer
+return Self
+
+METHOD AddRoute( cMethod, cPath, bHandler ) CLASS TWebServer
+   AAdd( ::aRoutes, { Upper(cMethod), cPath, bHandler } )
+return nil
+
+METHOD Start() CLASS TWebServer
+   ::lRunning := .T.
+return nil
+
+METHOD Stop() CLASS TWebServer
+   ::lRunning := .F.
+return nil
+
+METHOD ServeStatic( cPath ) CLASS TWebServer
+   if File( ::cRoot + "/" + cPath )
+      return MemoRead( ::cRoot + "/" + cPath )
+   endif
+return "404 Not Found"
+
+//----------------------------------------------------------------------------//
+
+CLASS THttpClient
+   DATA cBaseUrl     INIT ""
+   DATA cLastResponse INIT ""
+   DATA nLastStatus  INIT 0
+   DATA nTimeout     INIT 30
+   DATA aHeaders     INIT {}
+   METHOD New( cUrl ) CONSTRUCTOR
+   METHOD Get( cPath )
+   METHOD Post( cPath, cBody )
+   METHOD Put( cPath, cBody )
+   METHOD Delete( cPath )
+   METHOD SetHeader( cName, cValue )
+ENDCLASS
+
+METHOD New( cUrl ) CLASS THttpClient
+   if cUrl != nil; ::cBaseUrl := cUrl; endif
+return Self
+
+METHOD Get( cPath ) CLASS THttpClient
+   local cCmd := "curl -s -m " + LTrim(Str(::nTimeout)) + ' "' + ::cBaseUrl + cPath + '" 2>/dev/null'
+   ::cLastResponse := hb_MemoRead( cCmd )
+return ::cLastResponse
+
+METHOD Post( cPath, cBody ) CLASS THttpClient
+   local cCmd := "curl -s -m " + LTrim(Str(::nTimeout)) + ;
+      " -X POST -d '" + cBody + "' " + ;
+      '"' + ::cBaseUrl + cPath + '" 2>/dev/null'
+   ::cLastResponse := hb_MemoRead( cCmd )
+return ::cLastResponse
+
+METHOD Put( cPath, cBody ) CLASS THttpClient
+   HB_SYMBOL_UNUSED( cPath ); HB_SYMBOL_UNUSED( cBody )
+return ""
+
+METHOD Delete( cPath ) CLASS THttpClient
+   HB_SYMBOL_UNUSED( cPath )
+return ""
+
+METHOD SetHeader( cName, cValue ) CLASS THttpClient
+   AAdd( ::aHeaders, { cName, cValue } )
+return nil
+
+//============================================================================//
+//  THREADING COMPONENTS (Threading tab)
+//============================================================================//
+
+CLASS TThread
+   DATA bAction      INIT nil       // Code block to execute
+   DATA lRunning     INIT .F.
+   DATA pHandle      INIT nil       // Thread handle
+   METHOD New( bAction ) CONSTRUCTOR
+   METHOD Start()
+   METHOD Stop()
+   METHOD IsRunning()
+ENDCLASS
+
+METHOD New( bAction ) CLASS TThread
+   if bAction != nil; ::bAction := bAction; endif
+return Self
+
+METHOD Start() CLASS TThread
+   if ::bAction != nil
+      ::lRunning := .T.
+      ::pHandle := hb_threadStart( ::bAction )
+   endif
+return nil
+
+METHOD Stop() CLASS TThread
+   ::lRunning := .F.
+return nil
+
+METHOD IsRunning() CLASS TThread
+return ::lRunning
+
+//----------------------------------------------------------------------------//
+
+CLASS TMutex
+   DATA pHandle INIT nil
+   METHOD New() CONSTRUCTOR
+   METHOD Lock()
+   METHOD Unlock()
+ENDCLASS
+
+METHOD New() CLASS TMutex
+   ::pHandle := hb_mutexCreate()
+return Self
+
+METHOD Lock() CLASS TMutex
+   if ::pHandle != nil; hb_mutexLock( ::pHandle ); endif
+return nil
+
+METHOD Unlock() CLASS TMutex
+   if ::pHandle != nil; hb_mutexUnlock( ::pHandle ); endif
+return nil
+
+//----------------------------------------------------------------------------//
+
+CLASS TChannel
+   DATA pMutex   INIT nil
+   DATA aBuffer  INIT {}
+   METHOD New() CONSTRUCTOR
+   METHOD Send( xValue )
+   METHOD Receive()
+   METHOD Count()
+ENDCLASS
+
+METHOD New() CLASS TChannel
+   ::pMutex := hb_mutexCreate()
+return Self
+
+METHOD Send( xValue ) CLASS TChannel
+   hb_mutexLock( ::pMutex )
+   AAdd( ::aBuffer, xValue )
+   hb_mutexUnlock( ::pMutex )
+return nil
+
+METHOD Receive() CLASS TChannel
+   local xVal := nil
+   hb_mutexLock( ::pMutex )
+   if Len( ::aBuffer ) > 0
+      xVal := ::aBuffer[1]
+      ADel( ::aBuffer, 1 )
+      ASize( ::aBuffer, Len(::aBuffer) - 1 )
+   endif
+   hb_mutexUnlock( ::pMutex )
+return xVal
+
+METHOD Count() CLASS TChannel
+return Len( ::aBuffer )

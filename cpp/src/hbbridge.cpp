@@ -1904,3 +1904,79 @@ HB_FUNC( UI_FORMONCOMPONENTDROP )
       p->FOnComponentDrop = pBlock ? hb_itemNew( pBlock ) : NULL;
    }
 }
+
+/* UI_FormAlignSelected( hForm, nMode ) - align selected controls
+ * Modes: 1=left, 2=right, 3=top, 4=bottom, 5=centerH, 6=centerV, 7=spaceH, 8=spaceV */
+HB_FUNC( UI_FORMALIGNSELECTED )
+{
+   TForm * form = GetForm(1);
+   int nMode = hb_parni(2);
+   int nSel, i;
+
+   if( !form || nMode < 1 || nMode > 8 ) return;
+   nSel = form->FSelCount;
+   if( nSel < 2 ) return;
+
+   TControl * ref = form->FSelected[0];
+   int refX = ref->FLeft, refY = ref->FTop;
+   int refR = refX + ref->FWidth, refB = refY + ref->FHeight;
+   int refCX = refX + ref->FWidth / 2, refCY = refY + ref->FHeight / 2;
+
+   int minX = refX, maxR = refR, minY = refY, maxB = refB;
+   for( i = 1; i < nSel; i++ ) {
+      TControl * c = form->FSelected[i];
+      if( c->FLeft < minX ) minX = c->FLeft;
+      if( c->FLeft + c->FWidth > maxR ) maxR = c->FLeft + c->FWidth;
+      if( c->FTop < minY ) minY = c->FTop;
+      if( c->FTop + c->FHeight > maxB ) maxB = c->FTop + c->FHeight;
+   }
+
+   for( i = 1; i < nSel; i++ )
+   {
+      TControl * c = form->FSelected[i];
+      int newX = c->FLeft, newY = c->FTop;
+
+      switch( nMode ) {
+         case 1: newX = refX; break;
+         case 2: newX = refR - c->FWidth; break;
+         case 3: newY = refY; break;
+         case 4: newY = refB - c->FHeight; break;
+         case 5: newX = refCX - c->FWidth / 2; break;
+         case 6: newY = refCY - c->FHeight / 2; break;
+         case 7: case 8:
+         {
+            int totalW = 0, totalH = 0, gap, j;
+            for( j = 0; j < nSel; j++ ) {
+               totalW += form->FSelected[j]->FWidth;
+               totalH += form->FSelected[j]->FHeight;
+            }
+            if( nMode == 7 ) {
+               gap = (nSel > 1) ? (maxR - minX - totalW) / (nSel - 1) : 0;
+               int cx = minX;
+               for( j = 0; j < nSel; j++ ) {
+                  TControl * cj = form->FSelected[j];
+                  cj->FLeft = cx;
+                  if( cj->FHandle ) SetWindowPos( cj->FHandle, NULL, cx, cj->FTop, 0, 0, SWP_NOSIZE | SWP_NOZORDER );
+                  cx += cj->FWidth + gap;
+               }
+            } else {
+               gap = (nSel > 1) ? (maxB - minY - totalH) / (nSel - 1) : 0;
+               int cy = minY;
+               for( j = 0; j < nSel; j++ ) {
+                  TControl * cj = form->FSelected[j];
+                  cj->FTop = cy;
+                  if( cj->FHandle ) SetWindowPos( cj->FHandle, NULL, cj->FLeft, cy, 0, 0, SWP_NOSIZE | SWP_NOZORDER );
+                  cy += cj->FHeight + gap;
+               }
+            }
+            if( form->FHandle ) InvalidateRect( form->FHandle, NULL, TRUE );
+            return;
+         }
+      }
+
+      c->FLeft = newX; c->FTop = newY;
+      if( c->FHandle ) SetWindowPos( c->FHandle, NULL, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER );
+   }
+
+   if( form->FHandle ) InvalidateRect( form->FHandle, NULL, TRUE );
+}
