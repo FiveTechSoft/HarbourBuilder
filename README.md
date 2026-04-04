@@ -295,34 +295,39 @@ Professional HTML documentation with dark/light theme, Mermaid diagrams, and cod
 
 All three desktop platforms are **fully functional** with zero MsgInfo stubs — every menu item, toolbar button, and dialog is implemented with native controls.
 
-| Platform | Backend | Editor | CodeEditor Funcs | Panels | Status |
-|----------|---------|--------|-----------------|--------|--------|
-| **Windows** | Win32 API (C++) + Scintilla 5.6.1 DLL | Scintilla (dynamic) | 18 | All 6 | ✅ Full IDE |
-| **Linux** | GTK3 (C) + Scintilla 5.6.1 shared lib | Scintilla (dynamic) | 22 | All 6 + debugger engine + 16 tests | ✅ Full IDE |
-| **macOS** | Cocoa/AppKit (Obj-C++) + Scintilla 5.5.3 static lib | Scintilla (static) | 27 | All 6 | ✅ Full IDE |
-| **Android** | NDK + JNI | — | — | — | 🔮 Planned |
-| **iOS** | UIKit (Objective-C) | — | — | — | 🔮 Planned |
+| Platform | Backend | Editor | CodeEditor Funcs | Menus | Debugger | Status |
+|----------|---------|--------|-----------------|-------|----------|--------|
+| **Windows** | Win32 API (C++) + Scintilla 5.6.1 DLL | Scintilla (dynamic) | 18 | 35/35 | Panel + engine | ✅ Full IDE |
+| **Linux** | GTK3 (C) + Scintilla 5.6.1 shared lib | Scintilla (dynamic) | 22 | 36/36 | Panel + engine + 16 tests | ✅ Full IDE |
+| **macOS** | Cocoa/AppKit (Obj-C++) + Scintilla 5.5.3 static lib | Scintilla (static) | 26 | 53/53 | Panel + engine | ✅ Full IDE |
+| **Android** | NDK + JNI | — | — | — | — | 🔮 Planned |
+| **iOS** | UIKit (Objective-C) | — | — | — | — | 🔮 Planned |
 
 ### Platform parity details
 
 | Feature | Windows | Linux | macOS |
 |---------|---------|-------|-------|
-| Menu items functional | 35/35 (100%) | 36/36 (100%) | 35/35 (100%) |
-| Toolbar buttons functional | 9/9 (100%) | 9/9 (100%) | 9/9 (100%) |
+| Menu items functional | 35/35 (100%) | 36/36 (100%) | 53/53 (100%) |
+| Toolbar buttons functional | 9/9 (100%) | 15/15 (100%) | 9/9 (100%) |
+| Toolbar rows | 1 | 2 (file + debug) | 1 |
 | MsgInfo stubs remaining | **0** | **0** | **0** |
 | Scintilla editor | ✅ DLL (824 KB) | ✅ .so (2.0 MB) | ✅ .a (static) |
 | Syntax highlighting | ✅ Lexilla C++ lexer | ✅ Lexilla C++ lexer | ✅ Lexilla C++ lexer |
 | Code folding | ✅ Harbour-aware | ✅ Harbour-aware | ✅ Harbour-aware |
-| Auto-complete (Ctrl+Space) | ✅ | ✅ | ✅ |
-| Find/Replace bar | ✅ | ✅ | ✅ |
+| Auto-complete (Ctrl+Space) | ✅ | ✅ | ✅ (Cmd+Space) |
+| Find/Replace bar | ✅ | ✅ | ✅ (NSTextFinder) |
 | Undo/Redo/Cut/Copy/Paste | ✅ | ✅ | ✅ |
 | Status bar (Ln/Col/INS) | ✅ | ✅ | ✅ |
 | Debugger panel | ✅ 5 tabs | ✅ 5 tabs + toolbar | ✅ 5 tabs |
+| Debugger engine (in-process) | ✅ | ✅ + 16 unit tests | ✅ |
 | AI Assistant (Ollama) | ✅ | ✅ | ✅ |
-| Project Inspector | ✅ TreeView | ✅ TreeView | ✅ TreeView |
-| Editor Colors dialog | ✅ Color picker | ✅ GtkColorButton | ✅ NSColorWell |
-| Project Options dialog | ✅ 4 tabs | ✅ 4 tabs | ✅ 4 tabs |
-| Dark Mode | ✅ Title bar | ✅ GTK theme toggle | ✅ NSAppearance |
+| Project Inspector | ✅ TreeView | ✅ TreeView | ✅ NSOutlineView |
+| Editor Colors dialog | ✅ Color picker | ✅ GtkColorButton | ✅ 4 presets |
+| Project Options dialog | ✅ 4 tabs | ✅ 4 tabs | ✅ |
+| Dark Mode | ✅ Title bar (DWM) | ✅ GTK theme toggle | ✅ NSAppearance (app-wide) |
+| Format > Align controls | — | — | ✅ 8 modes |
+| Build to .app bundle | — | — | ✅ |
+| Helper functions | 13 | 42 | 42 |
 
 ---
 
