@@ -1,6 +1,53 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-04 (Session 8c: Git Integration)
+
+  GIT BACKEND (hbbridge.cpp, +11 HB_FUNC):
+  GIT_Exec() ........... run any git command, capture stdout via CreateProcess
+  GIT_Status() ......... parse `git status --porcelain` → { {cStatus, cFile}, ... }
+  GIT_Log() ............ parse `git log --format` → { {cHash, cAuthor, cDate, cMsg}, ... }
+  GIT_Diff() ........... get unified diff output for file or all
+  GIT_BranchList() ..... list branches with current marker
+  GIT_CurrentBranch() .. get HEAD branch name
+  GIT_Blame() .......... get blame output for a file
+  GIT_IsRepo() ......... check if directory is a git repo
+  GIT_RemoteList() ..... list remotes with URLs
+  GIT_StashList() ...... list stash entries
+
+  GIT PANEL UI (hbbridge.cpp, +6 HB_FUNC):
+  W32_GitPanel() ....... dark-themed Source Control window
+  W32_GitSetBranch() ... update branch label
+  W32_GitSetChanges() .. populate changes ListView
+  W32_GitGetMessage() .. get commit message text
+  W32_GitClearMessage()  clear commit message
+  - Layout: branch label, changes ListView (St|File), commit message
+    edit with placeholder, action buttons (Refresh/Commit/Push/Pull/Stash)
+
+  GIT MENU (17 items):
+  - Init Repository, Clone
+  - Status (opens panel), Commit, Push, Pull
+  - Branch Create/Switch/Merge
+  - Stash, Stash Pop
+  - Log/History, Diff, Blame
+
+  SOURCE CONTROL PALETTE TAB (10 components, CT 121-130):
+  GitRepo, GitCommit, GitBranch, GitLog, GitDiff,
+  GitRemote, GitStash, GitTag, GitBlame, GitMerge
+
+  IDE WIRING (hbbuilder_win.prg):
+  GitRefreshPanel() ... refresh branch + changes from GIT_Status
+  GitCommit() ......... stage all + commit with message
+  GitPush/Pull() ...... push/pull with output
+  GitBranchSwitch() ... list dialog to switch branches
+  GitStash/Pop() ...... stash/pop changes
+  GitLogShow() ........ show last 30 commits
+  GitDiffShow() ....... show diff in message box
+
+  FIX: InspectorOpen() now calls INS_BringToFront (View > Inspector)
+
+  PALETTE: 120 → 130 components, 15 → 16 tabs
+
 2026-04-04 (Session 8b: Connectivity Tab + AI components)
 
   NEW COMPONENTS:

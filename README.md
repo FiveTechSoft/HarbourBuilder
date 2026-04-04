@@ -6,7 +6,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-green.svg)](#platforms)
-[![Controls](https://img.shields.io/badge/Controls-120-orange.svg)](#component-palette)
+[![Controls](https://img.shields.io/badge/Controls-130-orange.svg)](#component-palette)
 [![Docs](https://img.shields.io/badge/Docs-20%20pages-purple.svg)](docs/en/index.html)
 [![Built with Claude Code](https://img.shields.io/badge/Built%20with-Claude%20Code-blueviolet.svg)](https://claude.ai/claude-code)
 
@@ -75,7 +75,7 @@ return nil
 - **Align & Distribute** (Format menu: Left/Right/Top/Bottom, Center, Space Evenly)
 - Real-time two-way tools: design ↔ code sync
 
-### 📦 120 Components in 15 Tabs
+### 📦 130 Components in 16 Tabs
 
 | Tab | Controls | Description |
 |-----|----------|-------------|
@@ -92,6 +92,22 @@ return nil
 | **Threading** | 8 | Thread, Mutex, Semaphore, CriticalSection, ThreadPool, AtomicInt, CondVar, Channel |
 | **AI** | 9 | OpenAI, Gemini, Claude, DeepSeek, Grok, Ollama, Transformer, **Whisper**, **Embeddings** |
 | **Connectivity** | 9 | **Python**, **Swift**, **Go**, **Node**, **Rust**, **Java**, **DotNet**, **Lua**, **Ruby** |
+| **Git** | 10 | **GitRepo**, **GitCommit**, **GitBranch**, **GitLog**, **GitDiff**, **GitRemote**, **GitStash**, **GitTag**, **GitBlame**, **GitMerge** |
+
+### 🔀 Git Integration (Source Control)
+
+Full Git support built into the IDE — no external tools needed:
+
+- **Source Control panel** (Git > Status): branch label, staged/unstaged changes ListView, commit message editor, action buttons (Refresh/Commit/Push/Pull/Stash)
+- **Git menu** (17 items): Init, Clone, Status, Commit, Push, Pull, Branch Create/Switch/Merge, Stash/Pop, Log, Diff, Blame
+- **11 backend functions** wrapping `git.exe` CLI via `CreateProcess` with stdout capture:
+  - `GIT_Status()` — parses `--porcelain` into `{ { cStatus, cFile }, ... }`
+  - `GIT_Log()` — parses `--format` into `{ { cHash, cAuthor, cDate, cMsg }, ... }`
+  - `GIT_Diff()`, `GIT_Blame()`, `GIT_CurrentBranch()`, `GIT_BranchList()`
+  - `GIT_Exec()` — run any git command and capture output
+  - `GIT_IsRepo()`, `GIT_RemoteList()`, `GIT_StashList()`
+- **Branch switching** with list dialog (Git > Branch > Switch)
+- Dark-themed panel matching VS Code Source Control style
 
 ### 🔌 Connectivity (Language Interop)
 
@@ -346,6 +362,7 @@ Professional HTML documentation with dark/light theme, Mermaid diagrams, and cod
 | [Threading](docs/en/controls-threading.html) | Thread, Mutex, Channel... (8) |
 | [AI](docs/en/controls-ai.html) | OpenAI, Ollama, Transformer, Whisper, Embeddings... (9) |
 | [Connectivity](docs/en/controls-connectivity.html) | Python, Swift, Go, Node, Rust, Java, DotNet, Lua, Ruby (9) |
+| [Git](docs/en/controls-git.html) | GitRepo, GitCommit, GitBranch, GitLog, GitDiff, GitRemote... (10) |
 | [ERP](docs/en/controls-erp.html) | Report, Barcode, PDF... (12) |
 
 ---
@@ -412,7 +429,7 @@ All three desktop platforms are **fully functional** with zero MsgInfo stubs —
 | | Undo design (50-step) | ✅ | — | ✅ |
 | | Tab Order dialog | ✅ | — | ✅ |
 | | Format > Align controls (8 modes) | ✅ | ✅ | ✅ |
-| | 120 components in 15 tabs | ✅ | ✅ | ✅ |
+| | 130 components in 16 tabs | ✅ | ✅ | ✅ |
 | **Debugger** | Debugger panel (5 tabs) | ✅ | ✅ | ✅ |
 | | Debug toolbar (Run/Step/Stop) | ✅ | ✅ | ✅ |
 | | In-process .hrb execution | ✅ | ✅ | ✅ |
