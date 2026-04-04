@@ -5601,12 +5601,20 @@ HB_FUNC( IDE_DEBUGSTART )
 
    /* Execute .hrb via Harbour's hb_hrbRun() */
    {
-      PHB_ITEM pFile = hb_itemPutC( NULL, cHrbFile );
-      hb_vmPushDynSym( hb_dynsymFind( "HB_HRBRUN" ) );
-      hb_vmPushNil();
-      hb_vmPush( pFile );
-      hb_vmDo( 1 );
-      hb_itemRelease( pFile );
+      PHB_DYNS pDyn = hb_dynsymFind( "HB_HRBRUN" );
+      if( pDyn )
+      {
+         PHB_ITEM pFile = hb_itemPutC( NULL, cHrbFile );
+         hb_vmPushDynSym( pDyn );
+         hb_vmPushNil();
+         hb_vmPush( pFile );
+         hb_vmDo( 1 );
+         hb_itemRelease( pFile );
+      }
+      else
+      {
+         DbgOutput( "ERROR: HB_HRBRUN symbol not found. Link with -lhbvm.\n" );
+      }
    }
 
    hb_dbg_SetEntry( NULL );
