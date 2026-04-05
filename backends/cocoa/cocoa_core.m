@@ -16,6 +16,13 @@
 #include <stdio.h>
 #include <pthread.h>
 
+/* Suppress macOS "Wait cursor is invalid" / "Reverse arrow cursor is invalid" warnings */
+__attribute__((constructor))
+static void SuppressCursorWarnings(void)
+{
+   setenv( "OS_ACTIVITY_MODE", "disable", 0 );
+}
+
 /* Control types - must match all platforms */
 #define CT_FORM       0
 #define CT_LABEL      1
@@ -1990,7 +1997,7 @@ static HBPaletteTarget * s_palTarget = nil;
                tbWidth = (int) tbFrame.size.width;
          }
       }
-      pd->nSplitPos = tbWidth;
+      pd->nSplitPos = tbWidth + 62;
 
       /* Container view for palette area (full width, full content height) */
       CGFloat fullH = contentBounds.size.height;
@@ -2001,13 +2008,13 @@ static HBPaletteTarget * s_palTarget = nil;
       /* Splitter (8px wide for easy grabbing) */
       int splW = 8;
       HBSplitterView * sp = [[HBSplitterView alloc] initWithFrame:
-         NSMakeRect( tbWidth, 0, splW, fullH )];
+         NSMakeRect( pd->nSplitPos, 0, splW, fullH )];
       sp->palData = pd;
       pd->splitterView = sp;
       [pd->containerView addSubview:sp];
 
       /* Layout: buttons on top, tab selector at bottom of window */
-      CGFloat rightX = tbWidth + splW;
+      CGFloat rightX = pd->nSplitPos + splW;
       CGFloat rightW = contentBounds.size.width - rightX;
       CGFloat segH = 24;
 

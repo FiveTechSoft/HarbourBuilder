@@ -175,13 +175,14 @@ function Main()
 
    // Row 2: Run & Debug speedbar
    DEFINE TOOLBAR oTB2 OF oIDE
-   BUTTON "Run"   OF oTB2 TOOLTIP "Run project (F9)"       ACTION TBRun()
    BUTTON "Debug" OF oTB2 TOOLTIP "Debug (F8)"              ACTION TBDebugRun()
    SEPARATOR OF oTB2
    BUTTON "Step"  OF oTB2 TOOLTIP "Step Into (F7)"          ACTION DebugStepInto()
    BUTTON "Over"  OF oTB2 TOOLTIP "Step Over (F8)"          ACTION DebugStepOver()
    BUTTON "Go"    OF oTB2 TOOLTIP "Continue (F5)"           ACTION IDE_DebugGo()
    BUTTON "Stop"  OF oTB2 TOOLTIP "Stop Debugging"          ACTION IDE_DebugStop()
+   SEPARATOR OF oTB2
+   BUTTON "Exit"  OF oTB2 TOOLTIP "Exit IDE"                ACTION oIDE:Close()
 
    UI_ToolBarLoadImages( oTB2:hCpp, "../resources/toolbar_debug.bmp" )
 
