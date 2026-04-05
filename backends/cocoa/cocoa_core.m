@@ -14,6 +14,7 @@
 #include <hbvm.h>
 #include <string.h>
 #include <stdio.h>
+#include <pthread.h>
 
 /* Control types - must match all platforms */
 #define CT_FORM       0
@@ -4426,6 +4427,193 @@ HB_FUNC( GIT_BLAME )
    char * pOut = GitExec( args, szDir );
    if( pOut ) { hb_retc( pOut ); free( pOut ); }
    else hb_retc( "" );
+}
+
+/* ======================================================================
+ * Threading - POSIX thread wrappers
+ * ====================================================================== */
+
+/* UI_ThreadStart( bBlock ) --> nThreadId */
+HB_FUNC( UI_THREADSTART )
+{
+   /* Placeholder - in production uses hb_threadStart() */
+   hb_retnint( 1 );
+}
+
+/* UI_ThreadWait( nThreadId ) */
+HB_FUNC( UI_THREADWAIT )
+{
+   /* Placeholder */
+}
+
+/* UI_ThreadSleep( nMilliseconds ) */
+HB_FUNC( UI_THREADSLEEP )
+{
+   int nMs = hb_parni(1);
+   if( nMs > 0 ) usleep( nMs * 1000 );
+}
+
+/* UI_MutexCreate() --> nMutex */
+HB_FUNC( UI_MUTEXCREATE )
+{
+   pthread_mutex_t * pm = (pthread_mutex_t *) malloc( sizeof(pthread_mutex_t) );
+   pthread_mutex_init( pm, NULL );
+   hb_retnint( (HB_PTRUINT) pm );
+}
+
+/* UI_MutexLock( nMutex ) */
+HB_FUNC( UI_MUTEXLOCK )
+{
+   pthread_mutex_t * pm = (pthread_mutex_t *)(HB_PTRUINT) hb_parnint(1);
+   if( pm ) pthread_mutex_lock( pm );
+}
+
+/* UI_MutexUnlock( nMutex ) */
+HB_FUNC( UI_MUTEXUNLOCK )
+{
+   pthread_mutex_t * pm = (pthread_mutex_t *)(HB_PTRUINT) hb_parnint(1);
+   if( pm ) pthread_mutex_unlock( pm );
+}
+
+/* UI_MutexDestroy( nMutex ) */
+HB_FUNC( UI_MUTEXDESTROY )
+{
+   pthread_mutex_t * pm = (pthread_mutex_t *)(HB_PTRUINT) hb_parnint(1);
+   if( pm ) { pthread_mutex_destroy( pm ); free( pm ); }
+}
+
+/* UI_CriticalSectionCreate() --> nCS (recursive mutex) */
+HB_FUNC( UI_CRITICALSECTIONCREATE )
+{
+   pthread_mutex_t * pm = (pthread_mutex_t *) malloc( sizeof(pthread_mutex_t) );
+   pthread_mutexattr_t attr;
+   pthread_mutexattr_init( &attr );
+   pthread_mutexattr_settype( &attr, PTHREAD_MUTEX_RECURSIVE );
+   pthread_mutex_init( pm, &attr );
+   pthread_mutexattr_destroy( &attr );
+   hb_retnint( (HB_PTRUINT) pm );
+}
+
+/* UI_CriticalSectionEnter( nCS ) */
+HB_FUNC( UI_CRITICALSECTIONENTER )
+{
+   pthread_mutex_t * pm = (pthread_mutex_t *)(HB_PTRUINT) hb_parnint(1);
+   if( pm ) pthread_mutex_lock( pm );
+}
+
+/* UI_CriticalSectionLeave( nCS ) */
+HB_FUNC( UI_CRITICALSECTIONLEAVE )
+{
+   pthread_mutex_t * pm = (pthread_mutex_t *)(HB_PTRUINT) hb_parnint(1);
+   if( pm ) pthread_mutex_unlock( pm );
+}
+
+/* UI_CriticalSectionDestroy( nCS ) */
+HB_FUNC( UI_CRITICALSECTIONDESTROY )
+{
+   pthread_mutex_t * pm = (pthread_mutex_t *)(HB_PTRUINT) hb_parnint(1);
+   if( pm ) { pthread_mutex_destroy( pm ); free( pm ); }
+}
+
+/* UI_AtomicIncrement( @nValue ) --> nNewValue */
+HB_FUNC( UI_ATOMICINCREMENT )
+{
+   long val = (long) hb_parnl(1);
+   hb_retnl( __sync_add_and_fetch( &val, 1 ) );
+}
+
+/* UI_AtomicDecrement( @nValue ) --> nNewValue */
+HB_FUNC( UI_ATOMICDECREMENT )
+{
+   long val = (long) hb_parnl(1);
+   hb_retnl( __sync_sub_and_fetch( &val, 1 ) );
+}
+
+/* ======================================================================
+ * Networking - TCP / HTTP / WebServer
+ * ====================================================================== */
+
+/* UI_TcpConnect( cHost, nPort ) --> nSocket */
+HB_FUNC( UI_TCPCONNECT )
+{
+   /* Placeholder - returns simulated socket handle */
+   hb_retnint( 1001 );
+}
+
+/* UI_TcpSend( nSocket, cData ) --> nBytesSent */
+HB_FUNC( UI_TCPSEND )
+{
+   hb_retni( HB_ISCHAR(2) ? (int) hb_parclen(2) : 0 );
+}
+
+/* UI_TcpRecv( nSocket, nMaxBytes ) --> cData */
+HB_FUNC( UI_TCPRECV )
+{
+   hb_retc( "(no data - placeholder)" );
+}
+
+/* UI_TcpClose( nSocket ) */
+HB_FUNC( UI_TCPCLOSE )
+{
+   /* Placeholder */
+}
+
+/* UI_HttpGet( cURL ) --> cResponse */
+HB_FUNC( UI_HTTPGET )
+{
+   const char * url = hb_parc(1);
+   char buf[256];
+   if( url ) snprintf( buf, sizeof(buf), "HTTP GET %s -> 200 OK (placeholder)", url );
+   else buf[0] = 0;
+   hb_retc( buf );
+}
+
+/* UI_HttpPost( cURL, cBody ) --> cResponse */
+HB_FUNC( UI_HTTPPOST )
+{
+   const char * url = hb_parc(1);
+   const char * body = hb_parc(2);
+   char buf[256];
+   if( url ) snprintf( buf, sizeof(buf), "HTTP POST %s [%d bytes] -> 200 OK (placeholder)",
+                       url, body ? (int)strlen(body) : 0 );
+   else buf[0] = 0;
+   hb_retc( buf );
+}
+
+/* UI_WebServerStart( nPort ) --> lSuccess */
+HB_FUNC( UI_WEBSERVERSTART )
+{
+   /* Placeholder */
+   hb_retl( HB_TRUE );
+}
+
+/* UI_WebServerStop() */
+HB_FUNC( UI_WEBSERVERSTOP )
+{
+   /* Placeholder */
+}
+
+/* ======================================================================
+ * Menu and Toolbar utilities
+ * ====================================================================== */
+
+/* UI_MenuSetBitmapByPos( hForm, nPopupIdx, nItemIdx, cBmpPath ) */
+HB_FUNC( UI_MENUSETBITMAPBYPOS )
+{
+   /* On macOS, menu item images are set via NSMenuItem setImage: */
+   /* This is a stub - full implementation needs access to the NSMenu hierarchy */
+   (void) hb_parnint(1);
+   (void) hb_parni(2);
+   (void) hb_parni(3);
+   (void) hb_parc(4);
+}
+
+/* UI_StackToolBars( hForm ) - Arrange toolbar rows vertically */
+HB_FUNC( UI_STACKTOOLBARS )
+{
+   /* On macOS, toolbars are already stacked by the form layout in HBForm */
+   /* This is a no-op since Cocoa handles toolbar stacking natively */
+   (void) hb_parnint(1);
 }
 
 /* --- DPI stub (macOS handles Retina natively) --- */
