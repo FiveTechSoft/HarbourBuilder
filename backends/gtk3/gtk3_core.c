@@ -4827,6 +4827,14 @@ HB_FUNC( CODEEDITORGETTEXT2 )
       hb_retc( "" );
 }
 
+/* CodeEditorShowFindBar( hEditor, lReplace ) — show/focus find bar */
+HB_FUNC( CODEEDITORSHOWFINDBAR )
+{
+   CODEEDITOR * ed = (CODEEDITOR *)(HB_PTRUINT) hb_parnint(1);
+   int bReplace = HB_ISLOG(2) ? hb_parl(2) : 0;
+   if( ed ) CE_ShowFindBar( ed, 1, bReplace );
+}
+
 /* ======================================================================
  * Platform dialogs & utilities (GTK3 equivalents of MAC_*)
  * ====================================================================== */
