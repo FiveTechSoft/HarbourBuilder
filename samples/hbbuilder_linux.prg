@@ -35,6 +35,7 @@ function Main()
    local oTB, oTB2, oFile, oEdit, oSearch, oView, oProject, oRun, oFormat, oComp, oTools, oHelp
    local nBarH, nInsW, nEditorX, nEditorW, nEditorH
    local nFormX, nFormY, nInsTop, nEditorTop, nBottomY
+   local cIcoDir
 
    nScreenW := GTK_GetScreenWidth()
    nScreenH := GTK_GetScreenHeight()
@@ -44,7 +45,7 @@ function Main()
 
    // C++Builder classic proportions scaled to current screen
    nBarH    := 72                            // toolbar(36) + tabs(24) + margins(12)
-   nInsW    := Int( nScreenW * 0.18 )        // ~18% of screen width
+   nInsW    := Int( nScreenW * 0.18 ) + 20    // ~18% of screen width + 20px
 
    // === Window 1: Main Bar (full screen width) ===
    DEFINE FORM oIDE TITLE "HbBuilder 1.0 - Visual IDE for Harbour" ;
@@ -158,6 +159,61 @@ function Main()
    MENUSEPARATOR OF oHelp
    MENUITEM "About HbBuilder..." OF oHelp ACTION ShowAbout()
 
+   // Menu bitmaps (16x16 from Lazarus IDE icon set)
+   cIcoDir := "../resources/menu_icons/"
+
+   UI_MenuSetBitmapByPos( oFile:hPopup, 0, cIcoDir + "menu_new.png" )
+   UI_MenuSetBitmapByPos( oFile:hPopup, 1, cIcoDir + "menu_new_form.png" )
+   UI_MenuSetBitmapByPos( oFile:hPopup, 3, cIcoDir + "menu_open.png" )
+   UI_MenuSetBitmapByPos( oFile:hPopup, 4, cIcoDir + "menu_save.png" )
+   UI_MenuSetBitmapByPos( oFile:hPopup, 5, cIcoDir + "menu_saveas.png" )
+   UI_MenuSetBitmapByPos( oFile:hPopup, 7, cIcoDir + "menu_exit.png" )
+
+   UI_MenuSetBitmapByPos( oEdit:hPopup, 0, cIcoDir + "menu_undo.png" )
+   UI_MenuSetBitmapByPos( oEdit:hPopup, 1, cIcoDir + "menu_redo.png" )
+   UI_MenuSetBitmapByPos( oEdit:hPopup, 3, cIcoDir + "menu_cut.png" )
+   UI_MenuSetBitmapByPos( oEdit:hPopup, 4, cIcoDir + "menu_copy.png" )
+   UI_MenuSetBitmapByPos( oEdit:hPopup, 5, cIcoDir + "menu_paste.png" )
+   UI_MenuSetBitmapByPos( oEdit:hPopup, 7, cIcoDir + "menu_edit_undo_design.png" )
+   UI_MenuSetBitmapByPos( oEdit:hPopup, 8, cIcoDir + "menu_copy_controls.png" )
+   UI_MenuSetBitmapByPos( oEdit:hPopup, 9, cIcoDir + "menu_paste.png" )
+
+   UI_MenuSetBitmapByPos( oSearch:hPopup, 0, cIcoDir + "menu_search_find.png" )
+   UI_MenuSetBitmapByPos( oSearch:hPopup, 1, cIcoDir + "menu_search_replace.png" )
+   UI_MenuSetBitmapByPos( oSearch:hPopup, 3, cIcoDir + "menu_search_findnext.png" )
+   UI_MenuSetBitmapByPos( oSearch:hPopup, 4, cIcoDir + "menu_search_findprev.png" )
+   UI_MenuSetBitmapByPos( oSearch:hPopup, 6, cIcoDir + "menu_autocomplete.png" )
+
+   UI_MenuSetBitmapByPos( oView:hPopup, 0, cIcoDir + "menu_view_forms.png" )
+   UI_MenuSetBitmapByPos( oView:hPopup, 1, cIcoDir + "menu_view_editor.png" )
+   UI_MenuSetBitmapByPos( oView:hPopup, 2, cIcoDir + "menu_view_inspector.png" )
+   UI_MenuSetBitmapByPos( oView:hPopup, 3, cIcoDir + "menu_project_inspector.png" )
+   UI_MenuSetBitmapByPos( oView:hPopup, 4, cIcoDir + "menu_view_debug.png" )
+
+   UI_MenuSetBitmapByPos( oProject:hPopup, 0, cIcoDir + "menu_project_add.png" )
+   UI_MenuSetBitmapByPos( oProject:hPopup, 1, cIcoDir + "menu_project_remove.png" )
+   UI_MenuSetBitmapByPos( oProject:hPopup, 3, cIcoDir + "menu_project_options.png" )
+
+   UI_MenuSetBitmapByPos( oRun:hPopup, 0, cIcoDir + "menu_run.png" )
+   UI_MenuSetBitmapByPos( oRun:hPopup, 1, cIcoDir + "menu_debug.png" )
+   UI_MenuSetBitmapByPos( oRun:hPopup, 3, cIcoDir + "menu_stepover.png" )
+   UI_MenuSetBitmapByPos( oRun:hPopup, 4, cIcoDir + "menu_stepinto.png" )
+   UI_MenuSetBitmapByPos( oRun:hPopup, 5, cIcoDir + "menu_continue.png" )
+   UI_MenuSetBitmapByPos( oRun:hPopup, 6, cIcoDir + "menu_stop.png" )
+   UI_MenuSetBitmapByPos( oRun:hPopup, 8, cIcoDir + "menu_breakpoint.png" )
+
+   UI_MenuSetBitmapByPos( oFormat:hPopup, 0, cIcoDir + "menu_align.png" )
+   UI_MenuSetBitmapByPos( oFormat:hPopup, 10, cIcoDir + "menu_taborder.png" )
+
+   UI_MenuSetBitmapByPos( oTools:hPopup, 0, cIcoDir + "menu_editor_colors.png" )
+   UI_MenuSetBitmapByPos( oTools:hPopup, 1, cIcoDir + "menu_environment_options.png" )
+   UI_MenuSetBitmapByPos( oTools:hPopup, 2, cIcoDir + "menu_darkmode.png" )
+   UI_MenuSetBitmapByPos( oTools:hPopup, 4, cIcoDir + "menu_ai.png" )
+   UI_MenuSetBitmapByPos( oTools:hPopup, 6, cIcoDir + "menu_report.png" )
+
+   UI_MenuSetBitmapByPos( oHelp:hPopup, 0, cIcoDir + "menu_help_docs.png" )
+   UI_MenuSetBitmapByPos( oHelp:hPopup, 4, cIcoDir + "menu_about.png" )
+
    // Row 1: File & Edit speedbar
    DEFINE TOOLBAR oTB OF oIDE
    BUTTON "New"   OF oTB TOOLTIP "New project (Ctrl+N)"  ACTION TBNew()
@@ -170,19 +226,22 @@ function Main()
    SEPARATOR OF oTB
    BUTTON "Undo"  OF oTB TOOLTIP "Undo (Ctrl+Z)"         ACTION CodeEditorUndo( hCodeEditor )
    BUTTON "Redo"  OF oTB TOOLTIP "Redo (Ctrl+Y)"         ACTION CodeEditorRedo( hCodeEditor )
+   SEPARATOR OF oTB
+   BUTTON "Run"   OF oTB TOOLTIP "Run project (F9)"      ACTION TBRun()
 
    // Load toolbar icons (Lazarus IDE icon set)
    UI_ToolBarLoadImages( oTB:hCpp, "../resources/toolbar.bmp" )
 
-   // Row 2: Run & Debug speedbar
+   // Row 2: Debug speedbar
    DEFINE TOOLBAR oTB2 OF oIDE
-   BUTTON "Run"   OF oTB2 TOOLTIP "Run project (F9)"      ACTION TBRun()
    BUTTON "Debug" OF oTB2 TOOLTIP "Debug (F8)"             ACTION TBDebugRun()
    SEPARATOR OF oTB2
    BUTTON "Step"  OF oTB2 TOOLTIP "Step Into (F7)"         ACTION DebugStepInto()
    BUTTON "Over"  OF oTB2 TOOLTIP "Step Over (F8)"         ACTION DebugStepOver()
    BUTTON "Go"    OF oTB2 TOOLTIP "Continue (F5)"          ACTION IDE_DebugGo()
    BUTTON "Stop"  OF oTB2 TOOLTIP "Stop Debugging"         ACTION IDE_DebugStop()
+   SEPARATOR OF oTB2
+   BUTTON "Exit"  OF oTB2 TOOLTIP "Exit IDE"               ACTION oIDE:Close()
 
    UI_ToolBarLoadImages( oTB2:hCpp, "../resources/toolbar_debug.bmp" )
 
@@ -853,7 +912,7 @@ static function MenuNewForm()
       aForms[ nActiveForm ][ 2 ]:Close()
    endif
 
-   nInsW := Int( nScreenW * 0.18 )
+   nInsW := Int( nScreenW * 0.18 ) + 20
    nInsTop := GTK_GetWindowBottom( oIDE:hCpp )
    nEditorTop := nInsTop + 1
    nEditorX := nInsW
@@ -918,7 +977,7 @@ static function TBNew()
    aForms := {}
    nActiveForm := 0
 
-   nInsW := Int( nScreenW * 0.18 )
+   nInsW := Int( nScreenW * 0.18 ) + 20
    nInsTop := GTK_GetWindowBottom( oIDE:hCpp )
    nEditorTop := nInsTop + 1
    nEditorX := nInsW
@@ -971,7 +1030,7 @@ static function TBOpen()
 
    CodeEditorClearTabs( hCodeEditor )
 
-   nInsW := Int( nScreenW * 0.18 )
+   nInsW := Int( nScreenW * 0.18 ) + 20
    nInsTop := GTK_GetWindowBottom( oIDE:hCpp )
    nEditorTop := nInsTop + 1
    nEditorX := nInsW

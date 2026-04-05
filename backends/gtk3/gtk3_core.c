@@ -334,6 +334,35 @@ static HBControl ** s_allControls = NULL;
 static int s_nControls = 0;
 static int s_nCapacity = 0;
 
+/* Returns 1 if the control type is non-visual (fixed 28x28 icon, no resize) */
+static int IsNonVisualControl( int t )
+{
+   switch( t ) {
+      case CT_TIMER: case CT_OPENDIALOG: case CT_SAVEDIALOG:
+      case CT_FONTDIALOG: case CT_COLORDIALOG: case CT_FINDDIALOG: case CT_REPLACEDIALOG:
+      case CT_OPENAI: case CT_GEMINI: case CT_CLAUDE: case CT_DEEPSEEK:
+      case CT_GROK: case CT_OLLAMA: case CT_TRANSFORMER:
+      case CT_DBFTABLE: case CT_MYSQL: case CT_MARIADB: case CT_POSTGRESQL:
+      case CT_SQLITE: case CT_FIREBIRD: case CT_SQLSERVER: case CT_ORACLE: case CT_MONGODB:
+      case CT_THREAD: case CT_MUTEX: case CT_SEMAPHORE: case CT_CRITICALSECTION:
+      case CT_THREADPOOL: case CT_ATOMICINT: case CT_CONDVAR: case CT_CHANNEL:
+      case CT_WEBSERVER: case CT_WEBSOCKET: case CT_HTTPCLIENT: case CT_FTPCLIENT:
+      case CT_SMTPCLIENT: case CT_TCPSERVER: case CT_TCPCLIENT: case CT_UDPSOCKET:
+      case CT_PREPROCESSOR: case CT_SCRIPTENGINE: case CT_REPORTDESIGNER:
+      case CT_BARCODE: case CT_PDFGENERATOR: case CT_EXCELEXPORT:
+      case CT_AUDITLOG: case CT_PERMISSIONS: case CT_CURRENCY: case CT_TAXENGINE:
+      case CT_PRINTER: case CT_REPORT: case CT_LABELS: case CT_PAGESETUP:
+      case CT_PRINTDIALOG: case CT_BARCODEPRINTER:
+         return 1;
+      default:
+         return 0;
+   }
+}
+
+/* Palette icon cache: indexed by control type, used for non-visual component icons on form */
+#define MAX_ICON_CACHE 256
+static GdkPixbuf * s_paletteIcons[MAX_ICON_CACHE];
+
 static void KeepAlive( HBControl * p )
 {
    if( s_nControls >= s_nCapacity )
@@ -640,24 +669,27 @@ static gboolean on_overlay_draw( GtkWidget * widget, cairo_t * cr, gpointer data
       cairo_stroke( cr );
       cairo_set_dash( cr, NULL, 0, 0 );
 
-      /* 8 handles */
-      int px = l, py = t, pw = w, ph = h;
-      int hx[8], hy[8];
-      hx[0]=px-3; hy[0]=py-3; hx[1]=px+pw/2-3; hy[1]=py-3;
-      hx[2]=px+pw-3; hy[2]=py-3; hx[3]=px+pw-3; hy[3]=py+ph/2-3;
-      hx[4]=px+pw-3; hy[4]=py+ph-3; hx[5]=px+pw/2-3; hy[5]=py+ph-3;
-      hx[6]=px-3; hy[6]=py+ph-3; hx[7]=px-3; hy[7]=py+ph/2-3;
-
-      for( int j = 0; j < 8; j++ )
+      /* 8 resize handles (skip for non-visual controls) */
+      if( ! IsNonVisualControl( ctrl->FControlType ) )
       {
-         /* White fill */
-         cairo_set_source_rgb( cr, 1.0, 1.0, 1.0 );
-         cairo_rectangle( cr, hx[j], hy[j], 7, 7 );
-         cairo_fill( cr );
-         /* Blue border */
-         cairo_set_source_rgb( cr, 0.0, 0.47, 0.84 );
-         cairo_rectangle( cr, hx[j], hy[j], 7, 7 );
-         cairo_stroke( cr );
+         int px = l, py = t, pw = w, ph = h;
+         int hx[8], hy[8];
+         hx[0]=px-3; hy[0]=py-3; hx[1]=px+pw/2-3; hy[1]=py-3;
+         hx[2]=px+pw-3; hy[2]=py-3; hx[3]=px+pw-3; hy[3]=py+ph/2-3;
+         hx[4]=px+pw-3; hy[4]=py+ph-3; hx[5]=px+pw/2-3; hy[5]=py+ph-3;
+         hx[6]=px-3; hy[6]=py+ph-3; hx[7]=px-3; hy[7]=py+ph/2-3;
+
+         for( int j = 0; j < 8; j++ )
+         {
+            /* White fill */
+            cairo_set_source_rgb( cr, 1.0, 1.0, 1.0 );
+            cairo_rectangle( cr, hx[j], hy[j], 7, 7 );
+            cairo_fill( cr );
+            /* Blue border */
+            cairo_set_source_rgb( cr, 0.0, 0.47, 0.84 );
+            cairo_rectangle( cr, hx[j], hy[j], 7, 7 );
+            cairo_stroke( cr );
+         }
       }
    }
 
@@ -688,6 +720,8 @@ static int HBForm_HitTestHandle( HBForm * form, int mx, int my )
    for( int i = 0; i < form->FSelCount; i++ )
    {
       HBControl * p = form->FSelected[i];
+      /* Non-visual controls have no resize handles */
+      if( IsNonVisualControl( p->FControlType ) ) continue;
       int px=p->FLeft, py=p->FTop, pw=p->FWidth, ph=p->FHeight;
       int hx[8], hy[8];
       hx[0]=px-3; hy[0]=py-3; hx[1]=px+pw/2-3; hy[1]=py-3;
@@ -831,6 +865,12 @@ static gboolean on_overlay_motion( GtkWidget * widget, GdkEventMotion * event, g
 
    if( form->FResizing && form->FSelCount > 0 )
    {
+      /* Non-visual controls cannot be resized */
+      if( IsNonVisualControl( form->FSelected[0]->FControlType ) )
+      {
+         form->FResizing = 0;
+         return TRUE;
+      }
       int dx = mx - form->FDragStartX, dy = my - form->FDragStartY;
       HBControl * p = form->FSelected[0];
       int nl = p->FLeft, nt = p->FTop, nw = p->FWidth, nh = p->FHeight;
@@ -1174,6 +1214,59 @@ static void HBDBImage_CreateWidget( HBControl * p, GtkWidget * container )
    HBGeneric_CreateWidget( p, container, frame );
 }
 
+/* Non-visual component: 28x28 palette icon on form */
+static gboolean on_nonvisual_draw( GtkWidget * w, cairo_t * cr, gpointer data )
+{
+   HBControl * p = (HBControl *)data;
+   int sz = 28;
+   int ct = p->FControlType;
+
+   /* Try to draw the cached palette icon */
+   if( ct > 0 && ct < MAX_ICON_CACHE && s_paletteIcons[ct] )
+   {
+      GdkPixbuf * scaled = gdk_pixbuf_scale_simple( s_paletteIcons[ct], sz, sz, GDK_INTERP_BILINEAR );
+      gdk_cairo_set_source_pixbuf( cr, scaled, 0, 0 );
+      cairo_paint( cr );
+      g_object_unref( scaled );
+   }
+   else
+   {
+      /* Fallback: white box with class abbreviation */
+      cairo_set_source_rgb( cr, 1.0, 1.0, 1.0 );
+      cairo_rectangle( cr, 0, 0, sz, sz );
+      cairo_fill( cr );
+
+      const char * name = p->FClassName;
+      if( name[0] == 'T' ) name++;
+      char abbr[5];
+      strncpy( abbr, name, 4 ); abbr[4] = 0;
+
+      cairo_select_font_face( cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD );
+      cairo_set_font_size( cr, 9 );
+      cairo_text_extents_t ext;
+      cairo_text_extents( cr, abbr, &ext );
+      cairo_set_source_rgb( cr, 0.15, 0.15, 0.45 );
+      cairo_move_to( cr, (sz - ext.width) / 2 - ext.x_bearing,
+                         (sz - ext.height) / 2 - ext.y_bearing );
+      cairo_show_text( cr, abbr );
+   }
+
+   return TRUE;
+}
+
+static void HBNonVisual_CreateWidget( HBControl * p, GtkWidget * container )
+{
+   p->FWidth = 28;
+   p->FHeight = 28;
+
+   GtkWidget * da = gtk_drawing_area_new();
+   gtk_widget_set_size_request( da, 28, 28 );
+   g_signal_connect( da, "draw", G_CALLBACK(on_nonvisual_draw), p );
+   gtk_fixed_put( GTK_FIXED(container), da, p->FLeft, p->FTop );
+   p->FWidget = da;
+   gtk_widget_show( da );
+}
+
 static void HBControl_CreateWidget( HBControl * child, GtkWidget * fixed, const char * fontDesc )
 {
    strcpy( child->FFontDesc, fontDesc );
@@ -1223,6 +1316,10 @@ static void HBControl_CreateWidget( HBControl * child, GtkWidget * fixed, const 
       case CT_DBCOMBOBOX:  HBDBComboBox_CreateWidget( child, fixed ); break;
       case CT_DBCHECKBOX:  HBDBCheckBox_CreateWidget( child, fixed ); break;
       case CT_DBIMAGE:     HBDBImage_CreateWidget( child, fixed ); break;
+      default:
+         if( IsNonVisualControl( child->FControlType ) )
+            HBNonVisual_CreateWidget( child, fixed );
+         break;
    }
 }
 
@@ -1431,12 +1528,16 @@ static gboolean on_overlay_button_release( GtkWidget * widget, GdkEventButton * 
          if( form->FWindow )
             gdk_window_set_cursor( gtk_widget_get_window(form->FWindow), NULL );
 
-         /* Enforce minimum size */
-         if( rw < 20 ) rw = 80;
-         if( rh < 10 ) rh = 24;
          /* Snap to 8-pixel grid */
          rx1 = (rx1 / 8) * 8;
          ry1 = (ry1 / 8) * 8;
+         /* Non-visual: fixed 28x28, visual: enforce minimum */
+         if( IsNonVisualControl( ctrlType ) ) {
+            rw = 28; rh = 28;
+         } else {
+            if( rw < 20 ) rw = 80;
+            if( rh < 10 ) rh = 24;
+         }
 
          HBControl * newCtrl = HBForm_CreateControlOfType( form, ctrlType, rx1, ry1, rw, rh );
 
@@ -1668,7 +1769,7 @@ static void HBForm_Run( HBForm * form )
    gtk_window_set_title( GTK_WINDOW(form->FWindow), form->base.FText );
    gtk_window_set_default_size( GTK_WINDOW(form->FWindow), form->base.FWidth, form->base.FHeight );
    gtk_window_set_resizable( GTK_WINDOW(form->FWindow),
-      (form->FSizable && !form->FAppBar) ? TRUE : FALSE );
+      (form->FDesignMode || (form->FSizable && !form->FAppBar)) ? TRUE : FALSE );
    g_signal_connect( form->FWindow, "destroy", G_CALLBACK(on_window_destroy), form );
    g_signal_connect( form->FWindow, "configure-event", G_CALLBACK(on_window_configure), form );
 
@@ -1753,6 +1854,8 @@ static void HBForm_Run( HBForm * form )
       /* If palette exists, pack toolbars VBox + palette in an hbox */
       if( s_palData && s_palData->notebook ) {
          GtkWidget * tbHBox = gtk_box_new( GTK_ORIENTATION_HORIZONTAL, 4 );
+         /* Ensure toolbar has enough width for all buttons (Run must be visible) */
+         gtk_widget_set_size_request( tbVBox, 308, -1 );
          gtk_box_pack_start( GTK_BOX(tbHBox), tbVBox, FALSE, FALSE, 0 );
          GtkWidget * sep = gtk_separator_new( GTK_ORIENTATION_VERTICAL );
          gtk_box_pack_start( GTK_BOX(tbHBox), sep, FALSE, FALSE, 2 );
@@ -1828,7 +1931,7 @@ static void HBForm_Show( HBForm * form )
    gtk_window_set_title( GTK_WINDOW(form->FWindow), form->base.FText );
    gtk_window_set_default_size( GTK_WINDOW(form->FWindow), form->base.FWidth, form->base.FHeight );
    gtk_window_set_resizable( GTK_WINDOW(form->FWindow),
-      (form->FSizable && !form->FAppBar) ? TRUE : FALSE );
+      (form->FDesignMode || (form->FSizable && !form->FAppBar)) ? TRUE : FALSE );
    g_signal_connect( form->FWindow, "destroy", G_CALLBACK(on_window_destroy), form );
    g_signal_connect( form->FWindow, "configure-event", G_CALLBACK(on_window_configure), form );
 
@@ -1906,6 +2009,9 @@ static void HBForm_SetDesignMode( HBForm * form, int design )
 {
    form->FDesignMode = design;
    HBForm_ClearSelection( form );
+   /* In design mode, form must always be resizable */
+   if( design && form->FWindow )
+      gtk_window_set_resizable( GTK_WINDOW(form->FWindow), TRUE );
 }
 
 /* ======================================================================
@@ -2898,6 +3004,57 @@ HB_FUNC( UI_MENUSEPADD )
    }
 }
 
+/* UI_MenuSetBitmapByPos( hPopup, nPos, cPngPath ) — set 16x16 icon on menu item */
+HB_FUNC( UI_MENUSETBITMAPBYPOS )
+{
+   GtkWidget * popup = (GtkWidget *)(HB_PTRUINT) hb_parnint(1);
+   int nPos = hb_parni(2);
+   const char * szPath = hb_parc(3);
+
+   if( !popup || !szPath ) return;
+
+   /* Get the menu item at position nPos */
+   GList * children = gtk_container_get_children( GTK_CONTAINER(popup) );
+   GtkWidget * item = (GtkWidget *) g_list_nth_data( children, nPos );
+   g_list_free( children );
+
+   if( !item || !GTK_IS_MENU_ITEM(item) ) return;
+
+   /* Load the PNG as a 16x16 pixbuf */
+   GdkPixbuf * pb = gdk_pixbuf_new_from_file( szPath, NULL );
+   if( !pb ) return;
+   GdkPixbuf * scaled = gdk_pixbuf_scale_simple( pb, 16, 16, GDK_INTERP_BILINEAR );
+   g_object_unref( pb );
+   if( !scaled ) return;
+
+   GtkWidget * img = gtk_image_new_from_pixbuf( scaled );
+   g_object_unref( scaled );
+
+   /* Copy the label text BEFORE removing the child (it gets destroyed) */
+   const char * label = gtk_menu_item_get_label( GTK_MENU_ITEM(item) );
+   char labelCopy[256];
+   if( label )
+      strncpy( labelCopy, label, 255 );
+   else
+      labelCopy[0] = 0;
+   labelCopy[255] = 0;
+
+   /* Replace contents: remove old child, add hbox with image + label */
+   GtkWidget * oldChild = gtk_bin_get_child( GTK_BIN(item) );
+   if( oldChild )
+      gtk_container_remove( GTK_CONTAINER(item), oldChild );
+
+   GtkWidget * hbox = gtk_box_new( GTK_ORIENTATION_HORIZONTAL, 6 );
+   gtk_box_pack_start( GTK_BOX(hbox), img, FALSE, FALSE, 0 );
+
+   GtkWidget * lbl = gtk_label_new_with_mnemonic( labelCopy );
+   gtk_label_set_xalign( GTK_LABEL(lbl), 0.0 );
+   gtk_box_pack_start( GTK_BOX(hbox), lbl, TRUE, TRUE, 0 );
+
+   gtk_container_add( GTK_CONTAINER(item), hbox );
+   gtk_widget_show_all( hbox );
+}
+
 HB_FUNC( UI_FORMSETSIZABLE )
 {
    HBForm * p = GetForm(1);
@@ -2978,13 +3135,58 @@ static void on_palette_btn_clicked( GtkButton * button, gpointer data )
    HBForm * targetForm = s_designForm;
    if( targetForm && targetForm->FDesignMode && nType > 0 )
    {
-      targetForm->FPendingControlType = nType;
-      if( targetForm->FWindow )
+      if( IsNonVisualControl( nType ) )
       {
-         GdkCursor * cursor = gdk_cursor_new_from_name(
-            gdk_display_get_default(), "crosshair" );
-         gdk_window_set_cursor( gtk_widget_get_window(targetForm->FWindow), cursor );
-         if( cursor ) g_object_unref( cursor );
+         /* Non-visual: place immediately at next free slot (bottom of form) */
+         int nL = 8, nT = 8;
+         /* Find a free position: scan existing non-visual children */
+         for( int i = 0; i < targetForm->base.FChildCount; i++ )
+         {
+            HBControl * c = targetForm->base.FChildren[i];
+            if( IsNonVisualControl( c->FControlType ) )
+            {
+               if( c->FLeft >= nL && c->FLeft < nL + 32 &&
+                   c->FTop >= nT && c->FTop < nT + 32 )
+               {
+                  nL += 36;
+                  if( nL + 28 > targetForm->base.FWidth )
+                  {
+                     nL = 8;
+                     nT += 36;
+                  }
+               }
+            }
+         }
+
+         HBControl * newCtrl = HBForm_CreateControlOfType( targetForm, nType, nL, nT, 28, 28 );
+
+         if( newCtrl && targetForm->FOnComponentDrop && HB_IS_BLOCK( targetForm->FOnComponentDrop ) )
+         {
+            PHB_ITEM args[6];
+            args[0] = hb_itemPutNInt( hb_itemNew(NULL), (HB_PTRUINT) targetForm );
+            args[1] = hb_itemPutNI( hb_itemNew(NULL), nType );
+            args[2] = hb_itemPutNI( hb_itemNew(NULL), nL );
+            args[3] = hb_itemPutNI( hb_itemNew(NULL), nT );
+            args[4] = hb_itemPutNI( hb_itemNew(NULL), 28 );
+            args[5] = hb_itemPutNI( hb_itemNew(NULL), 28 );
+            hb_itemDo( targetForm->FOnComponentDrop, 6, args[0], args[1], args[2], args[3], args[4], args[5] );
+            for( int a = 0; a < 6; a++ ) hb_itemRelease( args[a] );
+         }
+
+         if( targetForm->FOverlay )
+            gtk_widget_queue_draw( targetForm->FOverlay );
+      }
+      else
+      {
+         /* Visual: enter rubber band mode with crosshair cursor */
+         targetForm->FPendingControlType = nType;
+         if( targetForm->FWindow )
+         {
+            GdkCursor * cursor = gdk_cursor_new_from_name(
+               gdk_display_get_default(), "crosshair" );
+            gdk_window_set_cursor( gtk_widget_get_window(targetForm->FWindow), cursor );
+            if( cursor ) g_object_unref( cursor );
+         }
       }
    }
 
@@ -4723,9 +4925,15 @@ HB_FUNC( UI_PALETTELOADIMAGES )
       g_list_free( children );
    }
 
-   /* Free icon pixbufs */
-   for( int i = 0; i < nIcons; i++ )
-      if( icons[i] ) g_object_unref( icons[i] );
+   /* Cache icon pixbufs (indexed by control type, 1-based) for non-visual component icons */
+   for( int i = 0; i < nIcons && i < MAX_ICON_CACHE; i++ )
+   {
+      if( icons[i] )
+      {
+         if( s_paletteIcons[i + 1] ) g_object_unref( s_paletteIcons[i + 1] );
+         s_paletteIcons[i + 1] = icons[i];  /* keep ref, don't unref */
+      }
+   }
    free( icons );
 }
 
