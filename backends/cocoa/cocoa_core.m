@@ -2403,6 +2403,7 @@ HB_FUNC( UI_FORMSETDESIGN ) { HBForm * p = GetForm(1); if( p ) [p setDesignMode:
 HB_FUNC( UI_FORMRUN )       { HBForm * p = GetForm(1); if( p ) [p run]; }
 HB_FUNC( UI_FORMSHOW )      { HBForm * p = GetForm(1); if( p ) [p showOnly]; }
 HB_FUNC( UI_FORMCLOSE )     { HBForm * p = GetForm(1); if( p ) [p close]; }
+HB_FUNC( UI_FORMHIDE )      { HBForm * p = GetForm(1); if( p && p->FWindow ) [p->FWindow orderOut:nil]; }
 HB_FUNC( UI_FORMDESTROY )   { HBForm * p = GetForm(1); if( p ) [s_allControls removeObject:p]; }
 HB_FUNC( UI_FORMRESULT )    { HBForm * p = GetForm(1); hb_retni( p ? p->FModalResult : 0 ); }
 
@@ -2414,6 +2415,19 @@ HB_FUNC( UI_LABELNEW )
    if( HB_ISCHAR(2) ) [p setText:hb_parc(2)];
    if( HB_ISNUM(3) ) p->FLeft = hb_parni(3);   if( HB_ISNUM(4) ) p->FTop = hb_parni(4);
    if( HB_ISNUM(5) ) p->FWidth = hb_parni(5);  if( HB_ISNUM(6) ) p->FHeight = hb_parni(6);
+   if( pForm ) [pForm addChild:p]; RetCtrl( p );
+}
+
+/* UI_MemoNew( hParent, cText, nLeft, nTop, nWidth, nHeight ) --> hCtrl */
+HB_FUNC( UI_MEMONEW )
+{
+   HBForm * pForm = GetForm(1); HBControl * p = [[HBControl alloc] init];
+   p->FControlType = CT_MEMO;
+   if( HB_ISCHAR(2) ) [p setText:hb_parc(2)];
+   if( HB_ISNUM(3) ) p->FLeft = hb_parni(3);   if( HB_ISNUM(4) ) p->FTop = hb_parni(4);
+   if( HB_ISNUM(5) ) p->FWidth = hb_parni(5);  if( HB_ISNUM(6) ) p->FHeight = hb_parni(6);
+   if( p->FWidth < 1 ) p->FWidth = 180;  if( p->FHeight < 1 ) p->FHeight = 80;
+   strncpy( p->FClassName, "TMemo", sizeof(p->FClassName) - 1 );
    if( pForm ) [pForm addChild:p]; RetCtrl( p );
 }
 

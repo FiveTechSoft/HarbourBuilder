@@ -105,6 +105,14 @@
       [; <oCtrl>:Default := <.default.> ] ;
       [; <oCtrl>:Cancel := <.cancel.> ]
 
+// Memo
+#xcommand @ <nTop>, <nLeft> MEMO <oCtrl> ;
+      [ VAR <cVar> ] ;
+      [ OF <oParent> ] ;
+      [ SIZE <nWidth>, <nHeight> ] ;
+   => ;
+      <oCtrl> := TMemo():New( <oParent>, <cVar>, <nLeft>, <nTop>, <nWidth>, <nHeight> )
+
 // CheckBox
 #xcommand @ <nTop>, <nLeft> CHECKBOX <oCtrl> ;
       PROMPT <cText> ;

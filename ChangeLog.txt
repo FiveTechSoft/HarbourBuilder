@@ -1,6 +1,20 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-05 (Session 10e: Project Save/Load, TMemo support)
+
+  PROJECT SAVE/LOAD:
+  - RestoreFormFromCode() parser: recreates visual controls from .prg code
+    (Button, Label, Edit, CheckBox, ComboBox, GroupBox, ListBox, RadioButton, Memo)
+  - Non-visual components serialize as COMPONENT TYPE n, restore via UI_DropNonVisual
+  - TBOpen() properly closes existing design forms before loading (UI_FormHide)
+
+  TMEMO:
+  - New TMemo class in classes.prg with UI_MemoNew() in cocoa_core.m
+  - MEMO command in hbbuilder.ch for xBase-style creation
+  - RegenerateFormCode serializes Memo controls (was falling to comment)
+  - RestoreFormFromCode parses MEMO lines on project load
+
 2026-04-05 (Session 10d: Bundle Run/Debug fixes, Inspector UX)
 
   RUN/DEBUG FROM BUNDLE:

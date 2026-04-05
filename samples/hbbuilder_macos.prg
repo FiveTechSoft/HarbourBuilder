@@ -634,10 +634,19 @@ static function RegenerateFormCode( cName, hForm )
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' GROUPBOX ::o' + cCtrlName + ' PROMPT "' + cText + '" OF Self SIZE ' + ;
                   LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
+            case nType == 24  // Memo
+               cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
+                  ' MEMO ::o' + cCtrlName + ' OF Self SIZE ' + ;
+                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
             otherwise
-               cCreate += '   // ::o' + cCtrlName + ' (' + cCtrlClass + ') at ' + ;
-                  LTrim(Str(nL)) + ',' + LTrim(Str(nT)) + ' SIZE ' + ;
-                  LTrim(Str(nCW)) + ',' + LTrim(Str(nCH)) + e
+               if nType >= 38  // Non-visual component
+                  cCreate += '   COMPONENT ::o' + cCtrlName + ' TYPE ' + ;
+                     LTrim(Str(nType)) + ' OF Self  // ' + cCtrlClass + e
+               else
+                  cCreate += '   // ::o' + cCtrlName + ' (' + cCtrlClass + ') at ' + ;
+                     LTrim(Str(nL)) + ',' + LTrim(Str(nT)) + ' SIZE ' + ;
+                     LTrim(Str(nCW)) + ',' + LTrim(Str(nCH)) + e
+               endif
          endcase
 
          // Scan for event handlers matching this control
@@ -718,6 +727,139 @@ static function RegenerateFormCode( cName, hForm )
    cCode += cSep
 
 return cCode
+
+// Restore visual controls on a design form by parsing the form .prg code
+static function RestoreFormFromCode( hForm, cCode )
+
+   local aLines, cLine, cTrim, i, nType
+   local nT, nL, nW, nH, cText, cName, hCtrl
+   local nPos, nPos2, cTitle
+
+   if Empty( cCode ) .or. hForm == 0
+      return nil
+   endif
+
+   aLines := HB_ATokens( cCode, Chr(10) )
+
+   for i := 1 to Len( aLines )
+      cLine := aLines[i]
+      cTrim := AllTrim( cLine )
+
+      // Parse form properties: ::Title, ::Width, ::Height, ::Left, ::Top
+      if '::Title' $ cTrim .and. ':=' $ cTrim
+         nPos := At( '"', cTrim )
+         nPos2 := RAt( '"', cTrim )
+         if nPos > 0 .and. nPos2 > nPos
+            cTitle := SubStr( cTrim, nPos + 1, nPos2 - nPos - 1 )
+            UI_SetProp( hForm, "cText", cTitle )
+         endif
+         loop
+      endif
+      if '::Width' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
+         UI_SetProp( hForm, "nWidth", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
+         loop
+      endif
+      if '::Height' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
+         UI_SetProp( hForm, "nHeight", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
+         loop
+      endif
+
+      // Parse non-visual components: COMPONENT ::oName TYPE nType OF Self
+      if Left( Upper( cTrim ), 10 ) == "COMPONENT "
+         nPos := At( "::o", cTrim )
+         if nPos > 0
+            cName := SubStr( cTrim, nPos + 3 )
+            nPos2 := At( " ", cName )
+            if nPos2 > 0; cName := Left( cName, nPos2 - 1 ); endif
+            nPos := At( "TYPE ", Upper( cTrim ) )
+            if nPos > 0
+               nType := Val( SubStr( cTrim, nPos + 5 ) )
+               if nType >= 38
+                  hCtrl := UI_DropNonVisual( hForm, nType, cName )
+               endif
+            endif
+         endif
+         loop
+      endif
+
+      // Parse control creation lines: @ nT, nL KEYWORD ::oName ...
+      if ! ( Left( cTrim, 2 ) == "@ " )
+         loop
+      endif
+
+      // Extract coordinates: @ nT, nL
+      nT := Val( SubStr( cTrim, 3 ) )
+      nPos := At( ",", cTrim )
+      if nPos == 0; loop; endif
+      nL := Val( SubStr( cTrim, nPos + 1 ) )
+
+      // Extract control name from ::oName
+      nPos := At( "::o", cTrim )
+      if nPos == 0; loop; endif
+      cName := SubStr( cTrim, nPos + 3 )
+      nPos2 := At( " ", cName )
+      if nPos2 > 0; cName := Left( cName, nPos2 - 1 ); endif
+
+      // Extract text from PROMPT "..."
+      cText := ""
+      nPos := At( 'PROMPT "', cTrim )
+      if nPos > 0
+         nPos2 := At( '"', SubStr( cTrim, nPos + 8 ) )
+         if nPos2 > 0
+            cText := SubStr( cTrim, nPos + 8, nPos2 - 1 )
+         endif
+      endif
+
+      // Extract SIZE w, h  or  SIZE w
+      nW := 80
+      nH := 24
+      nPos := At( "SIZE ", cTrim )
+      if nPos > 0
+         nW := Val( SubStr( cTrim, nPos + 5 ) )
+         nPos2 := At( ",", SubStr( cTrim, nPos + 5 ) )
+         if nPos2 > 0
+            nH := Val( SubStr( cTrim, nPos + 5 + nPos2 ) )
+         endif
+      endif
+      if nH < 1; nH := 24; endif
+
+      // Determine control type and create it
+      hCtrl := 0
+      do case
+         case " SAY " $ Upper( cTrim )
+            hCtrl := UI_LabelNew( hForm, cText, nL, nT, nW, nH )
+         case " BUTTON " $ Upper( cTrim )
+            hCtrl := UI_ButtonNew( hForm, cText, nL, nT, nW, nH )
+         case " GET " $ Upper( cTrim )
+            // Extract VAR "..."
+            cText := ""
+            nPos := At( 'VAR "', cTrim )
+            if nPos > 0
+               nPos2 := At( '"', SubStr( cTrim, nPos + 5 ) )
+               if nPos2 > 0; cText := SubStr( cTrim, nPos + 5, nPos2 - 1 ); endif
+            endif
+            hCtrl := UI_EditNew( hForm, cText, nL, nT, nW, nH )
+         case " CHECKBOX " $ Upper( cTrim )
+            hCtrl := UI_CheckBoxNew( hForm, cText, nL, nT, nW, nH )
+         case " COMBOBOX " $ Upper( cTrim )
+            hCtrl := UI_ComboBoxNew( hForm, nL, nT, nW, nH )
+         case " GROUPBOX " $ Upper( cTrim )
+            hCtrl := UI_GroupBoxNew( hForm, cText, nL, nT, nW, nH )
+         case " LISTBOX " $ Upper( cTrim )
+            hCtrl := UI_ListBoxNew( hForm, nL, nT, nW, nH )
+         case " RADIOBUTTON " $ Upper( cTrim )
+            hCtrl := UI_RadioButtonNew( hForm, cText, nL, nT, nW, nH )
+         case " MEMO " $ Upper( cTrim )
+            hCtrl := UI_MemoNew( hForm, "", nL, nT, nW, nH )
+      endcase
+
+      // Set the control name
+      if hCtrl != 0
+         UI_SetProp( hCtrl, "cName", cName )
+      endif
+   next
+
+return nil
 
 // Build full editor text: Project1.prg + active form's code
 static function BuildFullCode()
@@ -1112,12 +1254,14 @@ static function TBOpen()
    // Project dir
    cDir := Left( cFile, RAt( "/", cFile ) )
 
-   // Destroy current forms
+   // Destroy current forms (hide windows + remove from control list)
    for i := 1 to Len( aForms )
+      UI_FormHide( aForms[i][2]:hCpp )
       aForms[i][2]:Destroy()
    next
    aForms := {}
    nActiveForm := 0
+   oDesignForm := nil
 
    // Clear editor tabs
    CodeEditorClearTabs( hCodeEditor )
@@ -1153,8 +1297,9 @@ static function TBOpen()
       nFormX := nEditorX + Int( ( nEditorW - 400 ) / 2 ) + ( Len(aForms) ) * 20
       nFormY := nEditorTop + Int( ( nEditorH - 300 ) * 0.35 ) + ( Len(aForms) ) * 20
 
-      // Create design form
+      // Create design form and restore controls from code
       CreateDesignForm( nFormX, nFormY )
+      RestoreFormFromCode( oDesignForm:hCpp, cFormCode )
       oDesignForm:SetDesign( .t. )
       oDesignForm:Show()
 
