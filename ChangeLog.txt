@@ -1,6 +1,20 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-05 (Session 10d: Bundle Run/Debug fixes, Inspector UX)
+
+  RUN/DEBUG FROM BUNDLE:
+  - Fix path resolution for backends, scintilla, framework files when running
+    from .app bundle (detect Resources/ vs source tree layout)
+  - Fix debug build: hbbuilder.ch not found in bundle (same path issue)
+  - Remove gtgui.o dependency (gtgui.c not in Harbour install)
+  - Use HB_GT_NUL_DEFAULT instead of HB_GT_GUI_DEFAULT for user apps
+
+  INSPECTOR:
+  - Inspector window brings all IDE windows to front (NSWindowDelegate)
+  - Event double-click: cursor now lands at correct line and column (indent)
+  - Fix CRLF vs LF mismatch in generated handler code on macOS
+
 2026-04-05 (Session 10c: macOS .app Bundle)
 
   APP BUNDLE:

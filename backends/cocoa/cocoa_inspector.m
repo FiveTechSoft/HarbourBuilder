@@ -155,7 +155,7 @@ static HBFontPickerTarget * s_fontTarget = nil;
  * Inspector delegate
  * ====================================================================== */
 
-@interface HBInspectorDelegate : NSObject <NSTableViewDataSource, NSTableViewDelegate>
+@interface HBInspectorDelegate : NSObject <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate>
 {
 @public
    INSDATA * d;
@@ -163,6 +163,18 @@ static HBFontPickerTarget * s_fontTarget = nil;
 @end
 
 @implementation HBInspectorDelegate
+
+- (void)windowDidBecomeKey:(NSNotification *)notification
+{
+   /* When inspector comes to front, bring all IDE windows to front */
+   for( NSWindow * w in [NSApp windows] )
+   {
+      if( [w isVisible] && ![w isMiniaturized] )
+         [w orderFront:nil];
+   }
+   /* Re-focus the inspector itself */
+   [notification.object makeKeyAndOrderFront:nil];
+}
 
 - (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView
 {
@@ -1064,6 +1076,7 @@ HB_FUNC( INS_CREATE )
    [d->tabCtrl setTarget:s_delegate];
    [d->tabCtrl setAction:@selector(tabChanged:)];
 
+   [d->window setDelegate:s_delegate];
    [d->window orderFront:nil];
 
    hb_retnint( (HB_PTRUINT) d );

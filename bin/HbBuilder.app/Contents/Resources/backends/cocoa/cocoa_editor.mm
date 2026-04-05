@@ -1043,6 +1043,7 @@ HB_FUNC( CODEEDITORGOTOFUNCTION )
    {
       sptr_t line = SciMsg( ed->sciView, SCI_LINEFROMPOSITION, (uptr_t)found, 0 );
       sptr_t pos = SciMsg( ed->sciView, SCI_POSITIONFROMLINE, (uptr_t)(line + 2), 0 );
+      pos += 3;  /* skip "   " indent */
       SciMsg( ed->sciView, SCI_GOTOPOS, (uptr_t)pos, 0 );
       SciMsg( ed->sciView, SCI_SCROLLCARET, 0, 0 );
       [ed->window makeKeyAndOrderFront:nil];

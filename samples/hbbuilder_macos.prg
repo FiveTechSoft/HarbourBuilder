@@ -753,7 +753,7 @@ static function OnEventDblClick( hCtrl, cEvent )
    local cName, cClass, cHandler, cCode, cDecl, e, cSep, nCursorOfs
    local cEditorText
 
-   e := Chr(13) + Chr(10)
+   e := Chr(10)
    cSep := "//" + Replicate( "-", 68 ) + e
 
    // Get component name and class
@@ -793,6 +793,9 @@ static function OnEventDblClick( hCtrl, cEvent )
 
    // Regenerate CreateForm to include event wiring (preserves METHOD implementations)
    SyncDesignerToCode()
+
+   // Re-position cursor on the new handler (SyncDesignerToCode may have moved it)
+   CodeEditorGotoFunction( hCodeEditor, cHandler )
 
    // Refresh inspector to show handler name in Events tab
    InspectorRefresh( hCtrl )
@@ -1225,6 +1228,7 @@ static function TBRun()
    local cBuildDir, cOutput, cLog, i, lError, nErrors
    local cHbDir, cHbBin, cHbInc, cHbLib, cProjDir
    local cAllPrg, cCmd, cAllCode, nHash
+   local cResDir, cBackends, cSciInc, cSciCocoa, cLexInc, cSciLib
    static nLastHash := 0
 
    SaveActiveFormCode()
@@ -1235,6 +1239,24 @@ static function TBRun()
    cProjDir := HB_DirBase() + ".."
    cLog     := ""
    lError   := .F.
+
+   // Resolve paths for bundle vs source tree
+   cResDir := HB_DirBase() + "../Resources"
+   if hb_DirExists( cResDir + "/backends" )
+      // Running from .app bundle
+      cBackends := cResDir + "/backends/cocoa"
+      cSciInc   := cResDir + "/scintilla/include"
+      cSciCocoa := cResDir + "/scintilla/cocoa"
+      cLexInc   := cResDir + "/scintilla/lexilla"
+      cSciLib   := cResDir + "/scintilla/build"
+   else
+      // Running from source tree
+      cBackends := cProjDir + "/backends/cocoa"
+      cSciInc   := cProjDir + "/resources/scintilla_src/scintilla/include"
+      cSciCocoa := cProjDir + "/resources/scintilla_src/scintilla/cocoa"
+      cLexInc   := cProjDir + "/resources/scintilla_src/lexilla/include"
+      cSciLib   := cProjDir + "/resources/scintilla_src/build"
+   endif
 
    // Auto-download and build Harbour if not installed
    if ! File( cHbDir + "/bin/harbour" ) .and. ! File( cHbDir + "/bin/darwin/clang/harbour" )
@@ -1292,14 +1314,20 @@ static function TBRun()
       MemoWrit( cBuildDir + "/" + aForms[i][1] + ".prg", aForms[i][3] )
       cLog += "    " + aForms[i][1] + ".prg" + Chr(10)
    next
-   MAC_ShellExec( "cp " + cProjDir + "/harbour/classes.prg " + cBuildDir + "/" )
-   MAC_ShellExec( "cp " + cProjDir + "/harbour/hbbuilder.ch " + cBuildDir + "/" )
+   // Copy framework files (bundle Resources/ or source tree harbour/)
+   if File( HB_DirBase() + "../Resources/classes.prg" )
+      MAC_ShellExec( "cp " + HB_DirBase() + "../Resources/classes.prg " + cBuildDir + "/" )
+      MAC_ShellExec( "cp " + HB_DirBase() + "../Resources/hbbuilder.ch " + cBuildDir + "/" )
+   else
+      MAC_ShellExec( "cp " + cProjDir + "/harbour/classes.prg " + cBuildDir + "/" )
+      MAC_ShellExec( "cp " + cProjDir + "/harbour/hbbuilder.ch " + cBuildDir + "/" )
+   endif
 
    // Step 2: Assemble main.prg
    MAC_ProgressStep( 2, "Assembling main.prg..." )
    cLog += "[2] Building main.prg..." + Chr(10)
    cAllPrg := '#include "hbbuilder.ch"' + Chr(10)
-   cAllPrg += "REQUEST HB_GT_GUI_DEFAULT" + Chr(10) + Chr(10)
+   cAllPrg += "REQUEST HB_GT_NUL_DEFAULT" + Chr(10) + Chr(10)
    cAllPrg += StrTran( MemoRead( cBuildDir + "/Project1.prg" ), ;
                        '#include "hbbuilder.ch"', "" ) + Chr(10)
    for i := 1 to Len( aForms )
@@ -1358,22 +1386,18 @@ static function TBRun()
       MAC_ProgressStep( 6, "Compiling Cocoa backend..." )
       cLog += "[6] Compiling Cocoa backend..." + Chr(10)
       cCmd := "clang -c -O2 -fobjc-arc -I" + cHbInc + ;
-              " " + cProjDir + "/backends/cocoa/cocoa_core.m" + ;
+              " " + cBackends + "/cocoa_core.m" + ;
               " -o " + cBuildDir + "/cocoa_core.o 2>&1"
       MAC_ShellExec( cCmd )
       cCmd := "clang++ -c -O2 -std=c++17 -fobjc-arc -I" + cHbInc + ;
-              " -I" + cProjDir + "/resources/scintilla_src/scintilla/include" + ;
-              " -I" + cProjDir + "/resources/scintilla_src/scintilla/cocoa" + ;
-              " -I" + cProjDir + "/resources/scintilla_src/lexilla/include" + ;
-              " " + cProjDir + "/backends/cocoa/cocoa_editor.mm" + ;
+              " -I" + cSciInc + ;
+              " -I" + cSciCocoa + ;
+              " -I" + cLexInc + ;
+              " " + cBackends + "/cocoa_editor.mm" + ;
               " -o " + cBuildDir + "/cocoa_editor.o 2>&1"
       MAC_ShellExec( cCmd )
       cCmd := "clang -c -O2 -I" + cHbInc + ;
-              " " + cHbDir + "/src/rtl/gtgui/gtgui.c" + ;
-              " -o " + cBuildDir + "/gtgui.o 2>&1"
-      MAC_ShellExec( cCmd )
-      cCmd := "clang -c -O2 -I" + cHbInc + ;
-              " " + cProjDir + "/backends/cocoa/gt_dummy.c" + ;
+              " " + cBackends + "/gt_dummy.c" + ;
               " -o " + cBuildDir + "/gt_dummy.o 2>&1"
       MAC_ShellExec( cCmd )
       cLog += "    OK" + Chr(10)
@@ -1388,10 +1412,9 @@ static function TBRun()
               " " + cBuildDir + "/classes.o" + ;
               " " + cBuildDir + "/cocoa_core.o" + ;
               " " + cBuildDir + "/cocoa_editor.o" + ;
-              " " + cBuildDir + "/gtgui.o" + ;
               " " + cBuildDir + "/gt_dummy.o" + ;
-              " " + cProjDir + "/resources/scintilla_src/build/libscintilla.a" + ;
-              " " + cProjDir + "/resources/scintilla_src/build/liblexilla.a" + ;
+              " " + cSciLib + "/libscintilla.a" + ;
+              " " + cSciLib + "/liblexilla.a" + ;
               " -L" + cHbLib + ;
               " -lhbvm -lhbrtl -lhbcommon -lhbcpage -lhblang" + ;
               " -lhbmacro -lhbpp -lhbrdd -lhbcplr -lhbdebug" + ;
@@ -1488,8 +1511,14 @@ static function TBDebugRun()
    for i := 1 to Len( aForms )
       MemoWrit( cBuildDir + "/" + aForms[i][1] + ".prg", aForms[i][3] )
    next
-   MAC_ShellExec( "cp " + cProjDir + "/harbour/classes.prg " + cBuildDir + "/" )
-   MAC_ShellExec( "cp " + cProjDir + "/harbour/hbbuilder.ch " + cBuildDir + "/" )
+   // Copy framework files (bundle Resources/ or source tree harbour/)
+   if File( HB_DirBase() + "../Resources/classes.prg" )
+      MAC_ShellExec( "cp " + HB_DirBase() + "../Resources/classes.prg " + cBuildDir + "/" )
+      MAC_ShellExec( "cp " + HB_DirBase() + "../Resources/hbbuilder.ch " + cBuildDir + "/" )
+   else
+      MAC_ShellExec( "cp " + cProjDir + "/harbour/classes.prg " + cBuildDir + "/" )
+      MAC_ShellExec( "cp " + cProjDir + "/harbour/hbbuilder.ch " + cBuildDir + "/" )
+   endif
 
    // Step 2: Assemble debug_main.prg
    cLog += "[2] Building debug_main.prg..." + Chr(10)
