@@ -2295,6 +2295,69 @@ HB_FUNC( UI_BEVELNEW )
    if( pForm ) [pForm addChild:p]; RetCtrl( p );
 }
 
+HB_FUNC( UI_LISTBOXNEW )
+{
+   HBForm * pForm = GetForm(1); HBControl * p = [[HBControl alloc] init];
+   p->FControlType = CT_LISTBOX;
+   if( HB_ISNUM(2) ) p->FLeft = hb_parni(2);   if( HB_ISNUM(3) ) p->FTop = hb_parni(3);
+   if( HB_ISNUM(4) ) p->FWidth = hb_parni(4);  if( HB_ISNUM(5) ) p->FHeight = hb_parni(5);
+   if( pForm ) [pForm addChild:p]; RetCtrl( p );
+}
+
+HB_FUNC( UI_RADIOBUTTONNEW )
+{
+   HBForm * pForm = GetForm(1); HBControl * p = [[HBControl alloc] init];
+   p->FControlType = CT_RADIO;
+   if( HB_ISNUM(2) ) p->FLeft = hb_parni(2);   if( HB_ISNUM(3) ) p->FTop = hb_parni(3);
+   if( HB_ISNUM(4) ) p->FWidth = hb_parni(4);  if( HB_ISNUM(5) ) p->FHeight = hb_parni(5);
+   if( pForm ) [pForm addChild:p]; RetCtrl( p );
+}
+
+HB_FUNC( UI_PROGRESSBARNEW )
+{
+   HBForm * pForm = GetForm(1); HBControl * p = [[HBControl alloc] init];
+   p->FControlType = CT_PROGRESSBAR;
+   if( HB_ISNUM(2) ) p->FLeft = hb_parni(2);   if( HB_ISNUM(3) ) p->FTop = hb_parni(3);
+   if( HB_ISNUM(4) ) p->FWidth = hb_parni(4);  if( HB_ISNUM(5) ) p->FHeight = hb_parni(5);
+   if( pForm ) [pForm addChild:p]; RetCtrl( p );
+}
+
+HB_FUNC( UI_TREEVIEWNEW )
+{
+   HBForm * pForm = GetForm(1); HBControl * p = [[HBControl alloc] init];
+   p->FControlType = CT_TREEVIEW;
+   if( HB_ISNUM(2) ) p->FLeft = hb_parni(2);   if( HB_ISNUM(3) ) p->FTop = hb_parni(3);
+   if( HB_ISNUM(4) ) p->FWidth = hb_parni(4);  if( HB_ISNUM(5) ) p->FHeight = hb_parni(5);
+   if( pForm ) [pForm addChild:p]; RetCtrl( p );
+}
+
+HB_FUNC( UI_LISTVIEWNEW )
+{
+   HBForm * pForm = GetForm(1); HBControl * p = [[HBControl alloc] init];
+   p->FControlType = CT_LISTVIEW;
+   if( HB_ISNUM(2) ) p->FLeft = hb_parni(2);   if( HB_ISNUM(3) ) p->FTop = hb_parni(3);
+   if( HB_ISNUM(4) ) p->FWidth = hb_parni(4);  if( HB_ISNUM(5) ) p->FHeight = hb_parni(5);
+   if( pForm ) [pForm addChild:p]; RetCtrl( p );
+}
+
+HB_FUNC( UI_BITBTNNEW )
+{
+   HBForm * pForm = GetForm(1); HBControl * p = [[HBControl alloc] init];
+   p->FControlType = CT_BITBTN;
+   if( HB_ISNUM(2) ) p->FLeft = hb_parni(2);   if( HB_ISNUM(3) ) p->FTop = hb_parni(3);
+   if( HB_ISNUM(4) ) p->FWidth = hb_parni(4);  if( HB_ISNUM(5) ) p->FHeight = hb_parni(5);
+   if( pForm ) [pForm addChild:p]; RetCtrl( p );
+}
+
+HB_FUNC( UI_RICHEDITNEW )
+{
+   HBForm * pForm = GetForm(1); HBControl * p = [[HBControl alloc] init];
+   p->FControlType = CT_RICHEDIT;
+   if( HB_ISNUM(2) ) p->FLeft = hb_parni(2);   if( HB_ISNUM(3) ) p->FTop = hb_parni(3);
+   if( HB_ISNUM(4) ) p->FWidth = hb_parni(4);  if( HB_ISNUM(5) ) p->FHeight = hb_parni(5);
+   if( pForm ) [pForm addChild:p]; RetCtrl( p );
+}
+
 /* --- Property access --- */
 
 HB_FUNC( UI_SETPROP )
