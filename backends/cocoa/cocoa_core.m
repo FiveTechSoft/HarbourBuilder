@@ -125,6 +125,35 @@
 #define MENU_ID_BASE        1000
 #define MAX_MENUITEMS       128
 
+/* --- TBrowse data grid structures --- */
+#define MAX_BROWSE_COLS  64
+#define MAX_BROWSE_ROWS  10000
+
+@class HBControl;
+
+typedef struct {
+    char szTitle[64];
+    char szFieldName[64];
+    int  nWidth;
+    int  nAlign;  /* 0=left, 1=center, 2=right */
+    char szFooterText[64];
+} BrowseCol;
+
+typedef struct {
+    HBControl * __unsafe_unretained pCtrl;  /* back-pointer to HBControl */
+    NSTableView * tableView;
+    NSScrollView * scrollView;
+    BrowseCol cols[MAX_BROWSE_COLS];
+    int nColCount;
+    NSMutableArray * rowData;    /* Array of arrays of NSString */
+    PHB_ITEM FOnCellClick, FOnCellDblClick, FOnHeaderClick;
+    PHB_ITEM FOnRowSelect, FOnKeyDown;
+} BrowseData;
+
+#define MAX_BROWSES 32
+static BrowseData s_browses[MAX_BROWSES];
+static int s_nBrowses = 0;
+
 /* LONG_PTR equivalent for macOS */
 typedef long LONG_PTR_MAC;
 #define LONG_PTR LONG_PTR_MAC
@@ -132,7 +161,6 @@ typedef long LONG_PTR_MAC;
 /* Forward declarations */
 @class HBToolBar;
 @class HBSplitterView;
-@class HBControl;
 static void KeepAlive( HBControl * p );
 
 /* Component Palette data (forward declared for use in HBForm) */
@@ -467,6 +495,14 @@ void EnsureNSApp( void )
 }
 @end
 
+/* --- HBBrowseDelegate (data source/delegate for TBrowse NSTableView) --- */
+@interface HBBrowseDelegate : NSObject <NSTableViewDataSource, NSTableViewDelegate>
+{
+@public
+    int browseIdx;  /* index into s_browses */
+}
+@end
+
 /* ======================================================================
  * ALL @implementation sections
  * ====================================================================== */
@@ -628,6 +664,33 @@ void EnsureNSApp( void )
          NSDatePicker * dp = [[NSDatePicker alloc] initWithFrame:NSMakeRect(FLeft,FTop,FWidth,FHeight)];
          [dp setDatePickerStyle:NSClockAndCalendarDatePickerStyle];
          [dp setDatePickerElements:NSYearMonthDayDatePickerElementFlag]; v = dp; break;
+      }
+      case CT_BROWSE: {
+         if( s_nBrowses >= MAX_BROWSES ) { v = nil; break; }
+         int bi = s_nBrowses++;
+         memset( (void*)&s_browses[bi], 0, sizeof(BrowseData) );
+         s_browses[bi].pCtrl = self;
+         s_browses[bi].rowData = [[NSMutableArray alloc] init];
+
+         NSScrollView * sv = [[NSScrollView alloc] initWithFrame:NSMakeRect(FLeft,FTop,FWidth,FHeight)];
+         NSTableView * tv = [[NSTableView alloc] initWithFrame:NSMakeRect(0,0,FWidth,FHeight)];
+         [tv setUsesAlternatingRowBackgroundColors:YES];
+         [tv setGridStyleMask:NSTableViewSolidHorizontalGridLineMask|NSTableViewSolidVerticalGridLineMask];
+         [tv setAllowsColumnReordering:YES];
+         [tv setAllowsColumnResizing:YES];
+
+         HBBrowseDelegate * del = [[HBBrowseDelegate alloc] init];
+         del->browseIdx = bi;
+         [tv setDataSource:del];
+         [tv setDelegate:del];
+
+         s_browses[bi].tableView = tv;
+         s_browses[bi].scrollView = sv;
+         [sv setDocumentView:tv];
+         [sv setHasVerticalScroller:YES];
+         [sv setHasHorizontalScroller:YES];
+         [sv setBorderType:NSBezelBorder];
+         v = sv; break;
       }
       default: {
          /* Non-visual (Timer, Dialogs) or unknown: create a small placeholder */
@@ -2144,6 +2207,33 @@ static HBPaletteTarget * s_palTarget = nil;
 @end
 
 /* ======================================================================
+ * HBBrowseDelegate implementation
+ * ====================================================================== */
+
+@implementation HBBrowseDelegate
+- (NSInteger)numberOfRowsInTableView:(NSTableView *)tv {
+    if( browseIdx < 0 || browseIdx >= s_nBrowses ) return 0;
+    return [s_browses[browseIdx].rowData count];
+}
+- (id)tableView:(NSTableView *)tv objectValueForTableColumn:(NSTableColumn *)col row:(NSInteger)row {
+    if( browseIdx < 0 || browseIdx >= s_nBrowses ) return @"";
+    BrowseData * bd = &s_browses[browseIdx];
+    NSInteger colIdx = [[col identifier] integerValue];
+    if( row < 0 || row >= (NSInteger)[bd->rowData count] ) return @"";
+    NSArray * rowArr = [bd->rowData objectAtIndex:row];
+    if( colIdx < 0 || colIdx >= (NSInteger)[rowArr count] ) return @"";
+    return [rowArr objectAtIndex:colIdx];
+}
+@end
+
+static BrowseData * FindBrowse( HBControl * p )
+{
+    for( int i = 0; i < s_nBrowses; i++ )
+        if( s_browses[i].pCtrl == p ) return &s_browses[i];
+    return NULL;
+}
+
+/* ======================================================================
  * HB_FUNC Bridge functions
  * ====================================================================== */
 
@@ -2356,6 +2446,121 @@ HB_FUNC( UI_RICHEDITNEW )
    if( HB_ISNUM(2) ) p->FLeft = hb_parni(2);   if( HB_ISNUM(3) ) p->FTop = hb_parni(3);
    if( HB_ISNUM(4) ) p->FWidth = hb_parni(4);  if( HB_ISNUM(5) ) p->FHeight = hb_parni(5);
    if( pForm ) [pForm addChild:p]; RetCtrl( p );
+}
+
+/* --- TBrowse data grid --- */
+
+/* UI_BrowseNew( hForm, nLeft, nTop, nWidth, nHeight ) --> hBrowse */
+HB_FUNC( UI_BROWSENEW )
+{
+   HBForm * pForm = GetForm(1); HBControl * p = [[HBControl alloc] init];
+   p->FControlType = CT_BROWSE;
+   if( HB_ISNUM(2) ) p->FLeft = hb_parni(2);   if( HB_ISNUM(3) ) p->FTop = hb_parni(3);
+   if( HB_ISNUM(4) ) p->FWidth = hb_parni(4);  if( HB_ISNUM(5) ) p->FHeight = hb_parni(5);
+   if( pForm ) [pForm addChild:p]; RetCtrl( p );
+}
+
+/* UI_BrowseAddCol( hBrowse, cTitle, cField, nWidth, nAlign ) --> nColIdx */
+HB_FUNC( UI_BROWSEADDCOL )
+{
+   HBControl * p = GetCtrl(1);
+   BrowseData * bd = p ? FindBrowse(p) : NULL;
+   if( !bd || bd->nColCount >= MAX_BROWSE_COLS ) { hb_retni(-1); return; }
+
+   int idx = bd->nColCount++;
+   strncpy( bd->cols[idx].szTitle, hb_parc(2) ? hb_parc(2) : "", 63 );
+   strncpy( bd->cols[idx].szFieldName, HB_ISCHAR(3) ? hb_parc(3) : "", 63 );
+   bd->cols[idx].nWidth = HB_ISNUM(4) ? hb_parni(4) : 100;
+   bd->cols[idx].nAlign = HB_ISNUM(5) ? hb_parni(5) : 0;
+
+   /* Add NSTableColumn */
+   NSString * ident = [NSString stringWithFormat:@"%d", idx];
+   NSTableColumn * col = [[NSTableColumn alloc] initWithIdentifier:ident];
+   [col setWidth:bd->cols[idx].nWidth];
+   [[col headerCell] setStringValue:[NSString stringWithUTF8String:bd->cols[idx].szTitle]];
+   [bd->tableView addTableColumn:col];
+
+   hb_retni( idx );
+}
+
+/* UI_BrowseSetCell( hBrowse, nRow, nCol, cText ) */
+HB_FUNC( UI_BROWSESETCELL )
+{
+   HBControl * p = GetCtrl(1);
+   BrowseData * bd = p ? FindBrowse(p) : NULL;
+   if( !bd || !HB_ISCHAR(4) ) return;
+
+   int nRow = hb_parni(2);
+   int nCol = hb_parni(3);
+   NSString * text = [NSString stringWithUTF8String:hb_parc(4)];
+
+   /* Ensure rows exist */
+   while( (int)[bd->rowData count] <= nRow ) {
+       NSMutableArray * row = [[NSMutableArray alloc] init];
+       for( int c = 0; c < bd->nColCount; c++ ) [row addObject:@""];
+       [bd->rowData addObject:row];
+   }
+
+   NSMutableArray * rowArr = [bd->rowData objectAtIndex:nRow];
+   /* Ensure columns exist in row */
+   while( (int)[rowArr count] <= nCol ) [rowArr addObject:@""];
+   [rowArr replaceObjectAtIndex:nCol withObject:text];
+}
+
+/* UI_BrowseGetCell( hBrowse, nRow, nCol ) --> cText */
+HB_FUNC( UI_BROWSEGETCELL )
+{
+   HBControl * p = GetCtrl(1);
+   BrowseData * bd = p ? FindBrowse(p) : NULL;
+   if( !bd ) { hb_retc(""); return; }
+
+   int nRow = hb_parni(2);
+   int nCol = hb_parni(3);
+   if( nRow < 0 || nRow >= (int)[bd->rowData count] ) { hb_retc(""); return; }
+   NSArray * rowArr = [bd->rowData objectAtIndex:nRow];
+   if( nCol < 0 || nCol >= (int)[rowArr count] ) { hb_retc(""); return; }
+   hb_retc( [[rowArr objectAtIndex:nCol] UTF8String] );
+}
+
+/* UI_BrowseSetFooter( hBrowse, nCol, cText ) */
+HB_FUNC( UI_BROWSESETFOOTER )
+{
+   HBControl * p = GetCtrl(1);
+   BrowseData * bd = p ? FindBrowse(p) : NULL;
+   if( !bd || !HB_ISCHAR(3) ) return;
+   int nCol = hb_parni(2);
+   if( nCol >= 0 && nCol < bd->nColCount )
+       strncpy( bd->cols[nCol].szFooterText, hb_parc(3), 63 );
+}
+
+/* UI_BrowseRefresh( hBrowse ) */
+HB_FUNC( UI_BROWSEREFRESH )
+{
+   HBControl * p = GetCtrl(1);
+   BrowseData * bd = p ? FindBrowse(p) : NULL;
+   if( bd && bd->tableView ) [bd->tableView reloadData];
+}
+
+/* UI_BrowseOnEvent( hBrowse, cEvent, bBlock ) */
+HB_FUNC( UI_BROWSEONEVENT )
+{
+   HBControl * p = GetCtrl(1);
+   BrowseData * bd = p ? FindBrowse(p) : NULL;
+   const char * ev = hb_parc(2);
+   PHB_ITEM blk = hb_param(3, HB_IT_BLOCK);
+   if( !bd || !ev || !blk ) return;
+
+   PHB_ITEM * ppTarget = NULL;
+   if( strcasecmp(ev,"OnCellClick")==0 )         ppTarget = &bd->FOnCellClick;
+   else if( strcasecmp(ev,"OnCellDblClick")==0 ) ppTarget = &bd->FOnCellDblClick;
+   else if( strcasecmp(ev,"OnHeaderClick")==0 )  ppTarget = &bd->FOnHeaderClick;
+   else if( strcasecmp(ev,"OnRowSelect")==0 )    ppTarget = &bd->FOnRowSelect;
+   else if( strcasecmp(ev,"OnKeyDown")==0 )      ppTarget = &bd->FOnKeyDown;
+
+   if( ppTarget ) {
+       if( *ppTarget ) hb_itemRelease( *ppTarget );
+       *ppTarget = hb_itemNew( blk );
+   }
 }
 
 /* --- Property access --- */
