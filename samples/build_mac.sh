@@ -5,13 +5,34 @@
 
 set -e
 
-HBDIR="/Users/usuario/harbour"
-HBBIN="$HBDIR/bin/darwin/clang"
-HBINC="$HBDIR/include"
-HBLIB="$HBDIR/lib/darwin/clang"
+HBDIR="${HBDIR:-$HOME/harbour}"
 PROJDIR="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="hbbuilder_macos"
 PROG="HbBuilder"
+
+cd "$(dirname "$0")"
+
+# Check Harbour is installed
+if [ ! -d "$HBDIR/include" ]; then
+   echo "ERROR: Harbour not found at $HBDIR"
+   echo "Run HbBuilder and press F9 — it will download Harbour automatically."
+   echo "Or install manually: git clone https://github.com/harbour/core /tmp/harbour-src"
+   echo "  cd /tmp/harbour-src && HB_INSTALL_PREFIX=$HBDIR make install"
+   exit 1
+fi
+
+# Detect Harbour directory layout (bin/darwin/clang/ vs bin/)
+if [ -f "$HBDIR/bin/darwin/clang/harbour" ]; then
+   HBBIN="$HBDIR/bin/darwin/clang"
+   HBLIB="$HBDIR/lib/darwin/clang"
+elif [ -f "$HBDIR/bin/harbour" ]; then
+   HBBIN="$HBDIR/bin"
+   HBLIB="$HBDIR/lib"
+else
+   echo "ERROR: harbour binary not found in $HBDIR/bin"
+   exit 1
+fi
+HBINC="$HBDIR/include"
 
 # Scintilla paths
 SCIDIR="$PROJDIR/resources/scintilla_src"
@@ -19,8 +40,6 @@ SCIBUILD="$SCIDIR/build"
 SCIINC="$SCIDIR/scintilla/include"
 SCICOCOA="$SCIDIR/scintilla/cocoa"
 LEXINC="$SCIDIR/lexilla/include"
-
-cd "$(dirname "$0")"
 
 # Build Scintilla static libraries if not present
 if [ ! -f "$SCIBUILD/libscintilla.a" ] || [ ! -f "$SCIBUILD/liblexilla.a" ]; then

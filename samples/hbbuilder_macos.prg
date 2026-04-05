@@ -1230,13 +1230,39 @@ static function TBRun()
    SaveActiveFormCode()
 
    cBuildDir := "/tmp/hbbuilder_build"
-   cHbDir   := "/Users/usuario/harbour"
-   cHbBin   := cHbDir + "/bin/darwin/clang"
+   cHbDir   := GetEnv( "HOME" ) + "/harbour"
    cHbInc   := cHbDir + "/include"
-   cHbLib   := cHbDir + "/lib/darwin/clang"
-   cProjDir := "/Users/usuario/HarbourBuilder"
+   cProjDir := HB_DirBase() + ".."
    cLog     := ""
    lError   := .F.
+
+   // Auto-download and build Harbour if not installed
+   if ! File( cHbDir + "/bin/harbour" ) .and. ! File( cHbDir + "/bin/darwin/clang/harbour" )
+      MAC_ProgressOpen( "HbBuilder Setup — Installing Harbour Compiler", 0 )
+      MAC_ShellExec( "rm -rf /tmp/harbour-src" )
+      MAC_ShellExecLive( "git clone --depth 1 https://github.com/harbour/core.git /tmp/harbour-src 2>&1", ;
+         "Downloading Harbour compiler from GitHub..." )
+      MAC_ShellExecLive( "cd /tmp/harbour-src && HB_INSTALL_PREFIX=" + cHbDir + ;
+         " make -j$(sysctl -n hw.ncpu) install 2>&1", ;
+         "Building Harbour compiler (this may take a few minutes)..." )
+      MAC_ProgressClose()
+      if ! File( cHbBin + "/harbour" )
+         MAC_BuildErrorDialog( "Setup Failed", "Could not build Harbour compiler." + Chr(10) + ;
+            "Please install manually:" + Chr(10) + ;
+            "  git clone https://github.com/harbour/core /tmp/harbour-src" + Chr(10) + ;
+            "  cd /tmp/harbour-src && HB_INSTALL_PREFIX=" + cHbDir + " make install" )
+         return nil
+      endif
+   endif
+
+   // Detect Harbour directory layout
+   if File( cHbDir + "/bin/darwin/clang/harbour" )
+      cHbBin := cHbDir + "/bin/darwin/clang"
+      cHbLib := cHbDir + "/lib/darwin/clang"
+   else
+      cHbBin := cHbDir + "/bin"
+      cHbLib := cHbDir + "/lib"
+   endif
 
    // Quick check: if nothing changed since last successful build, just run
    cAllCode := CodeEditorGetTabText( hCodeEditor, 1 )
@@ -1441,12 +1467,18 @@ static function TBDebugRun()
    SaveActiveFormCode()
 
    cBuildDir := "/tmp/hbbuilder_build"
-   cHbDir   := "/Users/usuario/harbour"
-   cHbBin   := cHbDir + "/bin/darwin/clang"
+   cHbDir   := GetEnv( "HOME" ) + "/harbour"
    cHbInc   := cHbDir + "/include"
-   cProjDir := "/Users/usuario/HarbourBuilder"
+   cProjDir := HB_DirBase() + ".."
    cLog     := ""
    lError   := .F.
+
+   // Detect Harbour directory layout
+   if File( cHbDir + "/bin/darwin/clang/harbour" )
+      cHbBin := cHbDir + "/bin/darwin/clang"
+   else
+      cHbBin := cHbDir + "/bin"
+   endif
 
    MAC_ShellExec( "mkdir -p " + cBuildDir )
 

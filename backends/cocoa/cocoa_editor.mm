@@ -1792,7 +1792,7 @@ HB_FUNC( MAC_BUILDERRORDIALOG )
  * Progress Dialog
  * ----------------------------------------------------------------------- */
 
-/* MAC_ProgressOpen( cTitle, nMax ) */
+/* MAC_ProgressOpen( cTitle, nMax ) — nMax=0 for indeterminate */
 HB_FUNC( MAC_PROGRESSOPEN )
 {
    const char * title = HB_ISCHAR(1) ? hb_parc(1) : "Working...";
@@ -1803,7 +1803,7 @@ HB_FUNC( MAC_PROGRESSOPEN )
       return;
    }
 
-   NSRect frame = NSMakeRect(400, 400, 360, 100);
+   NSRect frame = NSMakeRect(400, 400, 480, 100);
    s_progressWin = [[NSWindow alloc] initWithContentRect:frame
       styleMask:NSWindowStyleMaskTitled
       backing:NSBackingStoreBuffered defer:NO];
@@ -1813,18 +1813,23 @@ HB_FUNC( MAC_PROGRESSOPEN )
 
    NSView * cv = [s_progressWin contentView];
 
-   s_progressLbl = [[NSTextField alloc] initWithFrame:NSMakeRect(20, 55, 320, 20)];
+   s_progressLbl = [[NSTextField alloc] initWithFrame:NSMakeRect(20, 55, 440, 20)];
    [s_progressLbl setStringValue:@""];
    [s_progressLbl setEditable:NO]; [s_progressLbl setBezeled:NO]; [s_progressLbl setDrawsBackground:NO];
    [s_progressLbl setTextColor:[NSColor colorWithCalibratedRed:0.83 green:0.83 blue:0.83 alpha:1]];
    [cv addSubview:s_progressLbl];
 
-   s_progressBar = [[NSProgressIndicator alloc] initWithFrame:NSMakeRect(20, 25, 320, 20)];
+   s_progressBar = [[NSProgressIndicator alloc] initWithFrame:NSMakeRect(20, 25, 440, 20)];
    [s_progressBar setStyle:NSProgressIndicatorStyleBar];
-   [s_progressBar setIndeterminate:NO];
-   [s_progressBar setMinValue:0.0];
-   [s_progressBar setMaxValue:nMax];
-   [s_progressBar setDoubleValue:0.0];
+   if( nMax <= 0 ) {
+      [s_progressBar setIndeterminate:YES];
+      [s_progressBar startAnimation:nil];
+   } else {
+      [s_progressBar setIndeterminate:NO];
+      [s_progressBar setMinValue:0.0];
+      [s_progressBar setMaxValue:nMax];
+      [s_progressBar setDoubleValue:0.0];
+   }
    [cv addSubview:s_progressBar];
 
    [s_progressWin center];
@@ -1834,9 +1839,54 @@ HB_FUNC( MAC_PROGRESSOPEN )
 /* MAC_ProgressStep( nValue, [cMessage] ) */
 HB_FUNC( MAC_PROGRESSSTEP )
 {
-   if( s_progressBar ) [s_progressBar setDoubleValue:hb_parnd(1)];
+   if( s_progressBar ) {
+      if( [s_progressBar isIndeterminate] )
+         [s_progressBar animate:nil];
+      else
+         [s_progressBar setDoubleValue:hb_parnd(1)];
+   }
    if( s_progressLbl && HB_ISCHAR(2) )
       [s_progressLbl setStringValue:[NSString stringWithUTF8String:hb_parc(2)]];
+   /* Flush UI so the user sees the update */
+   [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
+}
+
+/* MAC_ShellExecLive( cCmd, [cProgressMsg] ) -> cOutput
+ * Run a shell command while keeping the UI responsive (progress dialog updates) */
+HB_FUNC( MAC_SHELLEXECLIVE )
+{
+   const char * szCmd = hb_parc(1);
+   if( !szCmd ) { hb_retc(""); return; }
+
+   /* Update label if provided */
+   if( s_progressLbl && HB_ISCHAR(2) )
+      [s_progressLbl setStringValue:[NSString stringWithUTF8String:hb_parc(2)]];
+
+   FILE * fp = popen( szCmd, "r" );
+   if( !fp ) { hb_retc(""); return; }
+
+   size_t bufSize = 8192, total = 0;
+   char * buf = (char *) malloc( bufSize );
+   buf[0] = 0;
+
+   while( !feof(fp) )
+   {
+      size_t n = fread( buf + total, 1, 1024, fp );
+      total += n;
+      if( total >= bufSize - 1024 ) {
+         bufSize *= 2;
+         buf = (char *) realloc( buf, bufSize );
+      }
+      /* Pump the run loop so UI stays alive */
+      if( s_progressBar && [s_progressBar isIndeterminate] )
+         [s_progressBar animate:nil];
+      [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
+   }
+   buf[total] = 0;
+   pclose( fp );
+
+   hb_retc( buf );
+   free( buf );
 }
 
 /* MAC_ProgressClose() */

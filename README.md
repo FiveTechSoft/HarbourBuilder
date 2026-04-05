@@ -328,10 +328,25 @@ build_win.bat
 ```
 
 ### macOS
+
+**Prerequisites:**
+1. Install Xcode Command Line Tools: `xcode-select --install`
+2. That's it! Harbour and Scintilla are downloaded and built automatically
+
 ```bash
 cd samples
-./build_mac.sh
+./build_mac.sh        # builds HbBuilder (auto-downloads Harbour + Scintilla on first run)
+cp HbBuilder ../bin/  # copy to bin/
+../bin/HbBuilder      # run
 ```
+
+On first run, the build script will:
+- Clone and compile [Harbour](https://github.com/harbour/core) to `~/harbour` (if not found)
+- Build Scintilla 5.5.3 + Lexilla static libraries from source
+
+To use a custom Harbour installation: `HBDIR=/path/to/harbour ./build_mac.sh`
+
+> **Apple Silicon (M1/M2/M3/M4):** The current build produces x86_64 binaries which run via Rosetta 2 on ARM Macs. For native ARM builds, recompile Harbour for `darwin/clang/arm64` and update `HBDIR` in `build_mac.sh`.
 
 ### Linux
 ```bash
@@ -342,7 +357,7 @@ cd samples
 ### Requirements
 - [Harbour 3.2](https://harbour.github.io/) compiler
 - Windows: [BCC 7.7](https://www.embarcadero.com/) (free) or MSVC
-- macOS: Xcode Command Line Tools
+- macOS: Xcode Command Line Tools (`xcode-select --install`)
 - Linux: GCC + GTK3 dev (`apt install libgtk-3-dev`)
 
 ---

@@ -53,6 +53,18 @@ HarbourBuilder - Cross-platform visual IDE for Harbour
 
   macOS IDE brought to full feature parity with Windows (217 vs 162 HB_FUNC).
 
+  AUTO-SETUP:
+  - Auto-downloads and builds Harbour from GitHub on first Run (F9)
+  - Progress dialog with animated bar during download and build
+  - MAC_ShellExecLive: runs shell commands while keeping UI responsive
+  - Detects both Harbour layouts (bin/darwin/clang/ and bin/)
+  - No hardcoded paths: uses $HOME/harbour and HB_DirBase()
+  - Error dialog with manual install instructions if setup fails
+
+  MENU ICONS:
+  - 44 PNG menu item bitmaps matching Windows (File, Edit, Search, etc.)
+  - UI_MENUSETBITMAPBYPOS fully implemented (was stub)
+
   NEW NATIVE CONTROLS (10 constructors):
   - UI_IMAGENEW, UI_SHAPENEW, UI_BEVELNEW
   - UI_LISTBOXNEW, UI_RADIOBUTTONNEW, UI_PROGRESSBARNEW
