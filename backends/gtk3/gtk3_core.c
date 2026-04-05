@@ -7716,3 +7716,142 @@ HB_FUNC( UI_FORMGETCLIPCOUNT )
    hb_retni( s_clipCount );
 }
 
+/* ======================================================================
+ * Tab Order Dialog
+ * ====================================================================== */
+
+HB_FUNC( UI_FORMTABORDERDIALOG )
+{
+   HBForm * pForm = GetForm(1);
+   if( !pForm || pForm->base.FChildCount == 0 ) return;
+
+   EnsureGTK();
+
+   int n = pForm->base.FChildCount;
+   int * order = (int *) malloc( n * sizeof(int) );
+   for( int i = 0; i < n; i++ ) order[i] = i;
+
+   GtkWidget * dialog = gtk_dialog_new_with_buttons( "Tab Order",
+      pForm->FWindow ? GTK_WINDOW(pForm->FWindow) : NULL,
+      GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+      "OK", GTK_RESPONSE_OK,
+      "Cancel", GTK_RESPONSE_CANCEL,
+      NULL );
+
+   GtkWidget * content = gtk_dialog_get_content_area( GTK_DIALOG(dialog) );
+
+   GtkListStore * store = gtk_list_store_new( 2, G_TYPE_INT, G_TYPE_STRING );
+   GtkWidget * tree = gtk_tree_view_new_with_model( GTK_TREE_MODEL(store) );
+
+   GtkCellRenderer * ren = gtk_cell_renderer_text_new();
+   gtk_tree_view_append_column( GTK_TREE_VIEW(tree),
+      gtk_tree_view_column_new_with_attributes( "Control (Tab Order)", ren, "text", 1, NULL ) );
+
+   /* Populate list */
+   for( int i = 0; i < n; i++ )
+   {
+      HBControl * c = pForm->base.FChildren[order[i]];
+      char buf[128];
+      snprintf( buf, sizeof(buf), "%d.  %s  (%s)", i + 1, c->FName, c->FClassName );
+      GtkTreeIter iter;
+      gtk_list_store_append( store, &iter );
+      gtk_list_store_set( store, &iter, 0, i, 1, buf, -1 );
+   }
+
+   GtkWidget * scroll = gtk_scrolled_window_new( NULL, NULL );
+   gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(scroll),
+      GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC );
+   gtk_widget_set_size_request( scroll, 350, 250 );
+   gtk_container_add( GTK_CONTAINER(scroll), tree );
+
+   GtkWidget * hbox = gtk_box_new( GTK_ORIENTATION_HORIZONTAL, 4 );
+   GtkWidget * btnUp = gtk_button_new_with_label( "Move Up" );
+   GtkWidget * btnDown = gtk_button_new_with_label( "Move Down" );
+   gtk_box_pack_start( GTK_BOX(hbox), btnUp, FALSE, FALSE, 4 );
+   gtk_box_pack_start( GTK_BOX(hbox), btnDown, FALSE, FALSE, 4 );
+
+   gtk_box_pack_start( GTK_BOX(content), scroll, TRUE, TRUE, 4 );
+   gtk_box_pack_start( GTK_BOX(content), hbox, FALSE, FALSE, 4 );
+   gtk_widget_show_all( content );
+
+   /* Add custom response buttons for Up/Down */
+   gtk_dialog_add_button( GTK_DIALOG(dialog), "Up", 100 );
+   gtk_dialog_add_button( GTK_DIALOG(dialog), "Down", 101 );
+
+   int done = 0;
+   while( !done )
+   {
+      gint resp = gtk_dialog_run( GTK_DIALOG(dialog) );
+      if( resp == GTK_RESPONSE_OK )
+      {
+         /* Apply the new order */
+         HBControl * temp[MAX_CHILDREN];
+         for( int i = 0; i < n; i++ )
+            temp[i] = pForm->base.FChildren[order[i]];
+         for( int i = 0; i < n; i++ )
+            pForm->base.FChildren[i] = temp[i];
+         done = 1;
+      }
+      else if( resp == 100 ) /* Up */
+      {
+         GtkTreeSelection * sel = gtk_tree_view_get_selection( GTK_TREE_VIEW(tree) );
+         GtkTreeIter iter;
+         if( gtk_tree_selection_get_selected( sel, NULL, &iter ) )
+         {
+            GtkTreePath * path = gtk_tree_model_get_path( GTK_TREE_MODEL(store), &iter );
+            int idx = gtk_tree_path_get_indices( path )[0];
+            gtk_tree_path_free( path );
+            if( idx > 0 )
+            {
+               int tmp = order[idx]; order[idx] = order[idx-1]; order[idx-1] = tmp;
+               gtk_list_store_clear( store );
+               for( int i = 0; i < n; i++ )
+               {
+                  HBControl * c = pForm->base.FChildren[order[i]];
+                  char buf[128];
+                  snprintf( buf, sizeof(buf), "%d.  %s  (%s)", i + 1, c->FName, c->FClassName );
+                  GtkTreeIter it;
+                  gtk_list_store_append( store, &it );
+                  gtk_list_store_set( store, &it, 0, i, 1, buf, -1 );
+                  if( i == idx - 1 )
+                     gtk_tree_selection_select_iter( sel, &it );
+               }
+            }
+         }
+      }
+      else if( resp == 101 ) /* Down */
+      {
+         GtkTreeSelection * sel = gtk_tree_view_get_selection( GTK_TREE_VIEW(tree) );
+         GtkTreeIter iter;
+         if( gtk_tree_selection_get_selected( sel, NULL, &iter ) )
+         {
+            GtkTreePath * path = gtk_tree_model_get_path( GTK_TREE_MODEL(store), &iter );
+            int idx = gtk_tree_path_get_indices( path )[0];
+            gtk_tree_path_free( path );
+            if( idx < n - 1 )
+            {
+               int tmp = order[idx]; order[idx] = order[idx+1]; order[idx+1] = tmp;
+               gtk_list_store_clear( store );
+               for( int i = 0; i < n; i++ )
+               {
+                  HBControl * c = pForm->base.FChildren[order[i]];
+                  char buf[128];
+                  snprintf( buf, sizeof(buf), "%d.  %s  (%s)", i + 1, c->FName, c->FClassName );
+                  GtkTreeIter it;
+                  gtk_list_store_append( store, &it );
+                  gtk_list_store_set( store, &it, 0, i, 1, buf, -1 );
+                  if( i == idx + 1 )
+                     gtk_tree_selection_select_iter( sel, &it );
+               }
+            }
+         }
+      }
+      else
+         done = 1;
+   }
+
+   free( order );
+   g_object_unref( store );
+   gtk_widget_destroy( dialog );
+}
+

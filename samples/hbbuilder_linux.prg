@@ -135,6 +135,8 @@ function Main()
    MENUSEPARATOR OF oFormat
    MENUITEM "Space Evenly Horizontal" OF oFormat ACTION AlignControls( 7 )
    MENUITEM "Space Evenly Vertical"   OF oFormat ACTION AlignControls( 8 )
+   MENUSEPARATOR OF oFormat
+   MENUITEM "Tab Order..."            OF oFormat ACTION ShowTabOrder()
 
    DEFINE POPUP oComp PROMPT "Component" OF oIDE
    MENUITEM "Install Component..." OF oComp ACTION InstallComponent()
@@ -1417,6 +1419,14 @@ static function AlignControls( nMode )
       UI_FormUndoPush( oDesignForm:hCpp )
       UI_FormAlignSelected( oDesignForm:hCpp, nMode )
       SyncDesignerToCode()
+   endif
+return nil
+
+// === Tab Order ===
+
+static function ShowTabOrder()
+   if oDesignForm != nil
+      UI_FormTabOrderDialog( oDesignForm:hCpp )
    endif
 return nil
 
