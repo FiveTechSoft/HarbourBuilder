@@ -1533,6 +1533,171 @@ HB_FUNC( MAC_PROJECTINSPECTOR )
 }
 
 /* -----------------------------------------------------------------------
+ * Git Panel (Source Control) — singleton floating window
+ * ----------------------------------------------------------------------- */
+
+/* Git panel */
+static NSWindow     * s_gitPanel = nil;
+static NSTextField  * s_gitBranchLbl = nil;
+static NSTableView  * s_gitChangesTV = nil;
+static NSTextView   * s_gitMsgEdit = nil;
+static NSMutableArray * s_gitChanges = nil;  /* array of arrays: { status, filename } */
+
+@interface HBGitChangesSource : NSObject <NSTableViewDataSource>
+@end
+@implementation HBGitChangesSource
+- (NSInteger)numberOfRowsInTableView:(NSTableView *)tv {
+    return s_gitChanges ? (NSInteger)[s_gitChanges count] : 0;
+}
+- (id)tableView:(NSTableView *)tv objectValueForTableColumn:(NSTableColumn *)col row:(NSInteger)row {
+    if( !s_gitChanges || row < 0 || row >= (NSInteger)[s_gitChanges count] ) return @"";
+    NSArray * entry = [s_gitChanges objectAtIndex:row];
+    if( [[col identifier] isEqualToString:@"status"] )
+        return [entry count] > 0 ? [entry objectAtIndex:0] : @"";
+    return [entry count] > 1 ? [entry objectAtIndex:1] : @"";
+}
+@end
+
+static HBGitChangesSource * s_gitChangesDS = nil;
+
+HB_FUNC( MAC_GITPANEL )
+{
+   if( s_gitPanel ) {
+      [s_gitPanel makeKeyAndOrderFront:nil];
+      return;
+   }
+
+   s_gitChanges = [[NSMutableArray alloc] init];
+   s_gitChangesDS = [[HBGitChangesSource alloc] init];
+
+   NSRect frame = NSMakeRect(80, 100, 380, 520);
+   s_gitPanel = [[NSWindow alloc] initWithContentRect:frame
+      styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable
+      backing:NSBackingStoreBuffered defer:NO];
+   [s_gitPanel setTitle:@"Source Control"];
+   [s_gitPanel setReleasedWhenClosed:NO];
+   [s_gitPanel setAppearance:[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua]];
+
+   NSView * cv = [s_gitPanel contentView];
+   CGFloat w = [cv bounds].size.width;
+   CGFloat h = [cv bounds].size.height;
+
+   /* Branch label */
+   s_gitBranchLbl = [[NSTextField alloc] initWithFrame:NSMakeRect(10, h-30, w-20, 22)];
+   [s_gitBranchLbl setStringValue:@"Branch: (none)"];
+   [s_gitBranchLbl setEditable:NO]; [s_gitBranchLbl setBezeled:NO];
+   [s_gitBranchLbl setDrawsBackground:NO];
+   [s_gitBranchLbl setTextColor:[NSColor colorWithCalibratedRed:0.83 green:0.83 blue:0.83 alpha:1]];
+   [s_gitBranchLbl setFont:[NSFont systemFontOfSize:13 weight:NSFontWeightMedium]];
+   [s_gitBranchLbl setAutoresizingMask:NSViewWidthSizable | NSViewMinYMargin];
+   [cv addSubview:s_gitBranchLbl];
+
+   /* Changes table (Status + File columns) */
+   NSScrollView * sv = [[NSScrollView alloc] initWithFrame:NSMakeRect(10, 110, w-20, h-150)];
+   [sv setHasVerticalScroller:YES];
+   [sv setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
+   [sv setBorderType:NSBezelBorder];
+
+   s_gitChangesTV = [[NSTableView alloc] initWithFrame:NSMakeRect(0, 0, w-20, h-150)];
+   NSTableColumn * colSt = [[NSTableColumn alloc] initWithIdentifier:@"status"];
+   [colSt setWidth:40]; [[colSt headerCell] setStringValue:@"St"];
+   [s_gitChangesTV addTableColumn:colSt];
+   NSTableColumn * colFile = [[NSTableColumn alloc] initWithIdentifier:@"file"];
+   [colFile setWidth:300]; [[colFile headerCell] setStringValue:@"File"];
+   [s_gitChangesTV addTableColumn:colFile];
+   [s_gitChangesTV setDataSource:s_gitChangesDS];
+   [s_gitChangesTV setUsesAlternatingRowBackgroundColors:YES];
+   [sv setDocumentView:s_gitChangesTV];
+   [cv addSubview:sv];
+
+   /* Commit message */
+   NSScrollView * msgSV = [[NSScrollView alloc] initWithFrame:NSMakeRect(10, 40, w-20, 60)];
+   [msgSV setHasVerticalScroller:YES];
+   [msgSV setAutoresizingMask:NSViewWidthSizable | NSViewMinYMargin];
+   s_gitMsgEdit = [[NSTextView alloc] initWithFrame:NSMakeRect(0, 0, w-20, 60)];
+   [s_gitMsgEdit setEditable:YES];
+   [s_gitMsgEdit setFont:[NSFont monospacedSystemFontOfSize:12 weight:NSFontWeightRegular]];
+   [s_gitMsgEdit setBackgroundColor:[NSColor colorWithCalibratedRed:0.15 green:0.15 blue:0.15 alpha:1]];
+   [s_gitMsgEdit setTextColor:[NSColor colorWithCalibratedRed:0.83 green:0.83 blue:0.83 alpha:1]];
+   [msgSV setDocumentView:s_gitMsgEdit];
+   [cv addSubview:msgSV];
+
+   /* Label above message */
+   NSTextField * msgLbl = [[NSTextField alloc] initWithFrame:NSMakeRect(10, 102, 200, 16)];
+   [msgLbl setStringValue:@"Commit Message:"]; [msgLbl setEditable:NO]; [msgLbl setBezeled:NO];
+   [msgLbl setDrawsBackground:NO];
+   [msgLbl setTextColor:[NSColor colorWithCalibratedRed:0.7 green:0.7 blue:0.7 alpha:1]];
+   [msgLbl setFont:[NSFont systemFontOfSize:11]];
+   [cv addSubview:msgLbl];
+
+   /* Buttons */
+   NSButton * refreshBtn = [NSButton buttonWithTitle:@"Refresh" target:nil action:nil];
+   [refreshBtn setFrame:NSMakeRect(10, 6, 80, 28)];
+   [refreshBtn setAutoresizingMask:NSViewMaxXMargin | NSViewMaxYMargin];
+   [cv addSubview:refreshBtn];
+
+   NSButton * commitBtn = [NSButton buttonWithTitle:@"Commit" target:nil action:nil];
+   [commitBtn setFrame:NSMakeRect(96, 6, 80, 28)];
+   [commitBtn setAutoresizingMask:NSViewMaxXMargin | NSViewMaxYMargin];
+   [cv addSubview:commitBtn];
+
+   NSButton * pushBtn = [NSButton buttonWithTitle:@"Push" target:nil action:nil];
+   [pushBtn setFrame:NSMakeRect(182, 6, 80, 28)];
+   [pushBtn setAutoresizingMask:NSViewMaxXMargin | NSViewMaxYMargin];
+   [cv addSubview:pushBtn];
+
+   NSButton * pullBtn = [NSButton buttonWithTitle:@"Pull" target:nil action:nil];
+   [pullBtn setFrame:NSMakeRect(268, 6, 80, 28)];
+   [pullBtn setAutoresizingMask:NSViewMaxXMargin | NSViewMaxYMargin];
+   [cv addSubview:pullBtn];
+
+   [s_gitPanel makeKeyAndOrderFront:nil];
+}
+
+/* MAC_GitSetBranch( cBranchName ) */
+HB_FUNC( MAC_GITSETBRANCH )
+{
+   if( s_gitBranchLbl && HB_ISCHAR(1) ) {
+      NSString * txt = [NSString stringWithFormat:@"Branch: %s", hb_parc(1)];
+      [s_gitBranchLbl setStringValue:txt];
+   }
+}
+
+/* MAC_GitSetChanges( aChanges ) — array of { cStatus, cFile } */
+HB_FUNC( MAC_GITSETCHANGES )
+{
+   PHB_ITEM pArr = hb_param(1, HB_IT_ARRAY);
+   if( !pArr || !s_gitChanges ) return;
+   [s_gitChanges removeAllObjects];
+   int n = (int)hb_arrayLen(pArr);
+   for( int i = 1; i <= n; i++ ) {
+      PHB_ITEM pEntry = hb_arrayGetItemPtr(pArr, i);
+      if( HB_IS_ARRAY(pEntry) && hb_arrayLen(pEntry) >= 2 ) {
+         NSString * st = [NSString stringWithUTF8String:hb_arrayGetCPtr(pEntry, 1)];
+         NSString * fn = [NSString stringWithUTF8String:hb_arrayGetCPtr(pEntry, 2)];
+         [s_gitChanges addObject:@[st, fn]];
+      }
+   }
+   if( s_gitChangesTV ) [s_gitChangesTV reloadData];
+}
+
+/* MAC_GitGetMessage() -> cText */
+HB_FUNC( MAC_GITGETMESSAGE )
+{
+   if( s_gitMsgEdit ) {
+      NSString * txt = [[s_gitMsgEdit textStorage] string];
+      hb_retc( [txt UTF8String] );
+   } else hb_retc( "" );
+}
+
+/* MAC_GitClearMessage() */
+HB_FUNC( MAC_GITCLEARMESSAGE )
+{
+   if( s_gitMsgEdit )
+      [s_gitMsgEdit setString:@""];
+}
+
+/* -----------------------------------------------------------------------
  * Editor Colors Dialog — modal dialog to configure Scintilla colors
  * ----------------------------------------------------------------------- */
 
