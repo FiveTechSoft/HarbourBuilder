@@ -479,6 +479,18 @@ static function CreateDesignForm( nX, nY )
    AAdd( aForms, { cName, oDesignForm, GenerateFormCode( cName ), nX, nY } )
    nActiveForm := Len( aForms )
 
+   // When form window is selected, switch editor to its tab
+   UI_OnEvent( oDesignForm:hCpp, "OnActivate", ;
+      &( "{ || OnDesignFormActivate( " + LTrim( Str( nIdx ) ) + " ) }" ) )
+
+return nil
+
+static function OnDesignFormActivate( nFormIdx )
+
+   if nFormIdx > 0 .and. nFormIdx <= Len( aForms ) .and. nFormIdx != nActiveForm
+      SwitchToForm( nFormIdx )
+   endif
+
 return nil
 
 static function OnComboSelect( nSel )

@@ -158,13 +158,17 @@ static function BuildLocals( cTargetFunc )
    END SEQUENCE
 
    // LOCAL variables
-   OutErr( "PROCLEVEL: " + LTrim(Str(__dbgProcLevel())) + " FRAME: " + LTrim(Str(nFrame)) + Chr(10) )
    if nFrame > 0 .and. nFrame <= __dbgProcLevel()
-      // __dbgVmLocalList returns local values (not names in this Harbour build)
-      // Send values with index-based names; IDE maps real names from source
       aLocals := __dbgVmLocalList( nFrame )
       if ValType( aLocals ) == "A" .and. Len( aLocals ) > 0
          cOut += " [LOCAL]"
+         // If inside a method, add Self as first entry
+         if ":" $ ProcName( nFrame )
+            xVal := __dbgVmVarLGet( nFrame, 0 )
+            if ValType( xVal ) == "O"
+               cOut += " Self=" + DbgValStr( xVal )
+            endif
+         endif
          for j := 1 to Len( aLocals )
             xVal := aLocals[j]
             cOut += " local" + LTrim(Str(j)) + "=" + DbgValStr( xVal )

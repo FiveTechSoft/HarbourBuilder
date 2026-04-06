@@ -70,4 +70,14 @@
 
 - [x] Framework auto-step: `OnDebugPause` retorna `.F.` para código del framework (nTab==0), el IDE envía STEP automáticamente sin pausar.
 
+- [x] Debug frame detection: `BuildLocals()` recibe `cProcName` del C hook para encontrar el frame exacto en el stack (antes usaba heurística que fallaba con métodos de framework en el stack, ej. oApp desaparecía al asignar `TApplication():New()`). C hook pasa procName como 3er argumento al block.
+
+- [x] User class debugging: el filtro del C hook (`dbghook.c`) e `IsFrameworkFunc` ahora distinguen clases del framework (TForm, TButton — sin dígitos) de clases del usuario (TForm1, TForm2 — con dígitos). Antes filtraba todas las funciones T* y no se podía debuggear código de formularios.
+
+- [x] Self en debug locals: cuando el debugger está dentro de un METHOD (ProcName contiene `:`), se añade `Self` a la sección [LOCAL] usando `__dbgVmVarLGet(nFrame, 0)`.
+
+- [x] Nombres de clase legibles: `DbgValStr` para objetos muestra `TApplication` en vez de `{TAPPLICATION}` — proper-case via `Left+Upper+Lower`.
+
+- [x] Design form → editor tab sync: al hacer click en una ventana de diseño, el editor cambia automáticamente al tab del código fuente de ese formulario. `OnActivate` event en `CreateDesignForm()` llama `OnDesignFormActivate(nFormIdx)` → `SwitchToForm()`.
+
 ## Open
