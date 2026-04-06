@@ -1,20 +1,18 @@
 // dbgclient.prg — Socket-based debug client for HbBuilder
 //
-// When concatenated into debug_main.prg, module-level STATIC declarations
-// would cause E0004 ("STATIC follows executable"). To avoid this, all state
-// is stored in a persistent array returned by DbgState().
+// State stored in a static array via DbgState() to avoid Harbour E0004.
+// Uses DbgHookInstall() from dbghook.c for the C-level VM hook.
 
 #include "hbsocket.ch"
 
 #define DBG_SOCKET    1
 #define DBG_CONNECTED 2
-#define DBG_MODULE    3
-#define DBG_READY     4
+#define DBG_READY     3
 
 static function DbgState()
    static s_aState := nil
    if s_aState == nil
-      s_aState := { nil, .f., "", .f. }  // socket, connected, module, ready
+      s_aState := { nil, .f., .f. }
    endif
 return s_aState
 
@@ -26,13 +24,11 @@ function DbgClientStart( nPort )
 
    hSocket := hb_socketOpen( HB_SOCKET_AF_INET, 1 /* SOCK_STREAM */, 0 )
    if Empty( hSocket )
-      OutErr( "DBG CLIENT: socket open failed" + Chr(10) )
       return .f.
    endif
 
    aAddr := { HB_SOCKET_AF_INET, "127.0.0.1", nPort }
    if ! hb_socketConnect( hSocket, aAddr )
-      OutErr( "DBG CLIENT: connect failed" + Chr(10) )
       hb_socketClose( hSocket )
       return .f.
    endif
@@ -41,57 +37,33 @@ function DbgClientStart( nPort )
    aS[ DBG_SOCKET ] := hSocket
    aS[ DBG_CONNECTED ] := .t.
 
-   OutErr( "DBG CLIENT: connected on port " + LTrim(Str(nPort)) + Chr(10) )
+   // Install C-level debug hook — block receives ( nLine, cModule )
+   DbgHookInstall( { |nLine, cModule| DbgHook( nLine, cModule ) } )
 
-   OutErr( "DBG-CLI: installing C hook via DbgHookInstall" + Chr(10) )
-
-   // Install C-level debug hook (dbghook.c) that forwards to our Harbour function
-   DbgHookInstall( { |nMode, nLine, cName| ;
-      DbgHook( nMode, nLine, cName, nil, nil ) } )
-
-   OutErr( "DBG-CLI: sending HELLO" + Chr(10) )
-   // Send hello
+   // Handshake: send HELLO, wait for STEP
    DbgSend( "HELLO " + ProcFile(2) )
-
-   // Wait for first STEP command from IDE before continuing
-   OutErr( "DBG-CLI: waiting for initial STEP..." + Chr(10) )
    cReply := DbgRecv()
-   OutErr( "DBG-CLI: got reply='" + If( cReply != nil, cReply, "(nil)" ) + "'" + Chr(10) )
 
-   // Now enable the hook — from this point, every Harbour line will trigger PAUSE
-   aS := DbgState()
+   // Enable hook
    aS[ DBG_READY ] := .t.
-   OutErr( "DBG-CLI: hook READY" + Chr(10) )
 
 return .t.
 
-static function DbgHook( nMode, nLine, cName, nIndex, xFrame )
+// Called from C hook on each source line — receives ( nLine, cModule )
+
+static function DbgHook( nLine, cModule )
 
    local cCmd, aS := DbgState()
-
-   HB_SYMBOL_UNUSED( nIndex )
-   HB_SYMBOL_UNUSED( xFrame )
 
    if ! aS[ DBG_CONNECTED ] .or. ! aS[ DBG_READY ]
       return nil
    endif
 
-   if nMode == 1 .and. cName != nil
-      aS[ DBG_MODULE ] := cName
-      OutErr( "DBG-CLI: module=" + cName + Chr(10) )
-      return nil
-   endif
-
-   if nMode != 5
-      return nil
-   endif
-
-   OutErr( "DBG-CLI: PAUSE " + aS[ DBG_MODULE ] + ":" + LTrim( Str( nLine ) ) + Chr(10) )
-   DbgSend( "PAUSE " + aS[ DBG_MODULE ] + ":" + LTrim( Str( nLine ) ) )
+   // Send PAUSE and wait for IDE command
+   DbgSend( "PAUSE " + cModule + ":" + LTrim( Str( nLine ) ) )
 
    do while aS[ DBG_CONNECTED ]
       cCmd := DbgRecv()
-      OutErr( "DBG-CLI: recv='" + If( cCmd != nil, cCmd, "(nil)" ) + "'" + Chr(10) )
       if cCmd == nil
          aS[ DBG_CONNECTED ] := .f.
          return nil
@@ -119,25 +91,39 @@ return nil
 
 static function DbgSendLocals()
 
-   local aLocals, i, cOut, cName, xVal, cType
+   local i, j, cOut, cName, xVal, cType, aLocals, nFrame
 
    cOut := "LOCALS"
-   BEGIN SEQUENCE
-      aLocals := __dbgVmLocalList( 4 )  // skip DbgSendLocals+DbgHook+C_hook+caller
-      if ValType( aLocals ) == "A"
-         for i := 1 to Len( aLocals )
-            cName := aLocals[i]
-            if ValType( cName ) != "C"; loop; endif
-            BEGIN SEQUENCE
-               xVal := __dbgVmVarLGet( 4, i )
-            RECOVER
-               xVal := "(error)"
-            END SEQUENCE
-            cType := ValType( xVal )
-            cOut += " " + cName + "=" + hb_ValToStr( xVal ) + "(" + cType + ")"
-         next
+   nFrame := 0
+
+   // Walk the call stack to find the user's frame
+   for i := 1 to 30
+      cName := ProcName( i )
+      if Empty( cName ); exit; endif
+      if ! ( "DBGSEND" $ Upper(cName) .or. "DBGHOOK" $ Upper(cName) .or. ;
+             "(B)" $ Upper(cName) .or. "DBGCLIENT" $ Upper(cName) )
+         nFrame := i
+         exit
       endif
-   END SEQUENCE
+   next
+
+   if nFrame > 0
+      BEGIN SEQUENCE
+         aLocals := __dbgVmLocalList( nFrame )
+         if ValType( aLocals ) == "A"
+            for j := 1 to Len( aLocals )
+               if ValType( aLocals[j] ) != "C"; loop; endif
+               BEGIN SEQUENCE
+                  xVal := __dbgVmVarLGet( nFrame, j )
+               RECOVER
+                  xVal := "?"
+               END SEQUENCE
+               cType := ValType( xVal )
+               cOut += " " + aLocals[j] + "=" + hb_ValToStr( xVal ) + "(" + cType + ")"
+            next
+         endif
+      END SEQUENCE
+   endif
 
    DbgSend( cOut )
 
@@ -145,12 +131,18 @@ return nil
 
 static function DbgSendStack()
 
-   local i, cOut
+   local i, cOut, cName
 
    cOut := "STACK"
-   for i := 3 to 25
-      if Empty( ProcName( i ) ); exit; endif
-      cOut += " " + ProcName( i ) + "(" + LTrim( Str( ProcLine( i ) ) ) + ")"
+   for i := 1 to 25
+      cName := ProcName( i )
+      if Empty( cName ); exit; endif
+      // Skip internal debug frames
+      if "DBGSEND" $ Upper(cName) .or. "DBGHOOK" $ Upper(cName) .or. ;
+         "(B)" $ Upper(cName) .or. "DBGCLIENT" $ Upper(cName)
+         loop
+      endif
+      cOut += " " + cName + "(" + LTrim( Str( ProcLine( i ) ) ) + ")"
    next
 
    DbgSend( cOut )
