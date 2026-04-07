@@ -1877,6 +1877,24 @@ struct _BatchThreadData {
    HANDLE hProcess;  /* child process handle for cancel */
 };
 
+/* WndProc for batch progress dialog — catches Cancel button click */
+static volatile LONG s_batchCancelClicked = FALSE;
+
+static LRESULT CALLBACK _BatchDlgProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
+{
+   if( msg == WM_COMMAND && LOWORD(wParam) == IDCANCEL )
+   {
+      InterlockedExchange( &s_batchCancelClicked, TRUE );
+      return 0;
+   }
+   if( msg == WM_CLOSE )
+   {
+      InterlockedExchange( &s_batchCancelClicked, TRUE );
+      return 0;
+   }
+   return DefWindowProcA( hWnd, msg, wParam, lParam );
+}
+
 static DWORD WINAPI _BatchThreadProc( LPVOID pArg )
 {
    _BatchThreadData * td = (_BatchThreadData *)pArg;
@@ -1983,13 +2001,14 @@ HB_FUNC( W32_RUNBATCHWITHPROGRESS )
    td.bCancelled = FALSE;
    td.hProcess = NULL;
    InitializeCriticalSection( &td.cs );
+   InterlockedExchange( &s_batchCancelClicked, FALSE );
 
    /* Create progress dialog with output log */
    static BOOL bRegBatch = FALSE;
    if( !bRegBatch )
    {
       WNDCLASSEXA wc = { sizeof(WNDCLASSEXA) };
-      wc.lpfnWndProc = DefWindowProcA;
+      wc.lpfnWndProc = _BatchDlgProc;
       wc.hInstance = GetModuleHandle(NULL);
       wc.lpszClassName = "HbBatchProgressDlg";
       wc.hCursor = LoadCursor( NULL, IDC_ARROW );
@@ -2082,39 +2101,37 @@ HB_FUNC( W32_RUNBATCHWITHPROGRESS )
          MSG m;
          while( PeekMessage( &m, NULL, 0, 0, PM_REMOVE ) )
          {
-            /* Handle Cancel button, dialog close, or IDE exit */
-            if( ( m.message == WM_COMMAND && LOWORD(m.wParam) == IDCANCEL ) ||
-                m.message == WM_QUIT ||
-                ( m.message == WM_CLOSE && m.hwnd == hDlg ) )
+            /* IDE exit — cancel and re-post WM_QUIT */
+            if( m.message == WM_QUIT )
             {
-               InterlockedExchange( &td.bCancelled, TRUE );
-               /* Kill the child process tree */
-               if( td.hProcess )
-               {
-                  TerminateProcess( td.hProcess, 1 );
-               }
-               /* Append cancel notice to output */
-               EnterCriticalSection( &td.cs );
-               if( td.pOutput )
-               {
-                  const char * msg = "\r\n\r\n*** Cancelled by user ***\r\n";
-                  DWORD msgLen = lstrlenA( msg );
-                  if( td.dwOutputLen + msgLen + 1 > td.dwOutputCap )
-                  {
-                     td.dwOutputCap = td.dwOutputLen + msgLen + 64;
-                     td.pOutput = (char *)HeapReAlloc( GetProcessHeap(), 0, td.pOutput, td.dwOutputCap );
-                  }
-                  CopyMemory( td.pOutput + td.dwOutputLen, msg, msgLen + 1 );
-                  td.dwOutputLen += msgLen;
-               }
-               LeaveCriticalSection( &td.cs );
-               /* Re-post WM_QUIT so the IDE shuts down properly */
-               if( m.message == WM_QUIT )
-                  PostQuitMessage( (int)m.wParam );
-               goto batch_done;
+               InterlockedExchange( &s_batchCancelClicked, TRUE );
+               PostQuitMessage( (int)m.wParam );
             }
             TranslateMessage( &m );
             DispatchMessage( &m );
+         }
+
+         /* Check if Cancel was clicked (set by _BatchDlgProc) */
+         if( s_batchCancelClicked )
+         {
+            InterlockedExchange( &td.bCancelled, TRUE );
+            if( td.hProcess )
+               TerminateProcess( td.hProcess, 1 );
+            EnterCriticalSection( &td.cs );
+            if( td.pOutput )
+            {
+               const char * cmsg = "\r\n\r\n*** Cancelled by user ***\r\n";
+               DWORD msgLen = lstrlenA( cmsg );
+               if( td.dwOutputLen + msgLen + 1 > td.dwOutputCap )
+               {
+                  td.dwOutputCap = td.dwOutputLen + msgLen + 64;
+                  td.pOutput = (char *)HeapReAlloc( GetProcessHeap(), 0, td.pOutput, td.dwOutputCap );
+               }
+               CopyMemory( td.pOutput + td.dwOutputLen, cmsg, msgLen + 1 );
+               td.dwOutputLen += msgLen;
+            }
+            LeaveCriticalSection( &td.cs );
+            goto batch_done;
          }
 
          /* Bounce animation every 40ms */
