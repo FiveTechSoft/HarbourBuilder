@@ -1144,9 +1144,9 @@ static function MenuNewForm()
    // Save current form code
    SaveActiveFormCode()
 
-   // Hide current form
+   // Hide current form (use Hide, not Close — Close stops the run loop)
    if nActiveForm > 0
-      aForms[ nActiveForm ][ 2 ]:Close()
+      UI_FormHide( aForms[ nActiveForm ][ 2 ]:hCpp )
    endif
 
    // Calculate position (same as initial form, offset a bit)

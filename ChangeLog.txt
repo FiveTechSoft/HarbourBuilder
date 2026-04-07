@@ -1,6 +1,15 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-07 (Session 13: New Form crash fix)
+
+  BUG FIX:
+  - Fixed crash when selecting File > New Form. MenuNewForm() was calling
+    :Close() on the current design form, which triggers windowWillClose:
+    → [NSApp stop:nil], killing the run loop. Changed to UI_FormHide()
+    (orderOut:nil) which simply hides the window without stopping the app.
+  - Added Hide() method to TForm class (INLINE UI_FormHide).
+
 2026-04-07 (Session 12c: Debugger UX polish)
 
   DEBUGGER FIXES:

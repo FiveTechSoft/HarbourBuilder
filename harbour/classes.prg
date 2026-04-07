@@ -139,6 +139,7 @@ CLASS TForm INHERIT TControl
    METHOD New( cTitle, nWidth, nHeight )
    METHOD Activate()
    METHOD Show()       INLINE UI_FormShow( ::hCpp )
+   METHOD Hide()       INLINE UI_FormHide( ::hCpp )
    METHOD Close()      INLINE UI_FormClose( ::hCpp )
    METHOD Destroy()    INLINE UI_FormDestroy( ::hCpp )
    METHOD SetDesign(l) INLINE UI_FormSetDesign( ::hCpp, l )
