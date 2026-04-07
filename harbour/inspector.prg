@@ -1287,15 +1287,23 @@ static void InsAddEventCat( INSDATA * d, int nRow, const char * szCat )
 }
 
 /* Add one event row to the Events ListView (indented under category) */
-static void InsAddEvent( INSDATA * d, int nRow, const char * szEvent, const char * szHandler )
+/* szCtrlName: control name for building handler (e.g. "Form1")
+ * szEvent: event name (e.g. "OnClick") — handler = szCtrlName + szEvent[2..] */
+static void InsAddEvent2( INSDATA * d, int nRow, const char * szEvent, const char * szCtrlName )
 {
    LVITEMA lvi;
-   char buf[128];
+   char buf[128], handler[128];
    int nInserted;
+
+   /* Build handler name: CtrlName + event suffix (skip "On") */
+   if( szCtrlName && szCtrlName[0] && lstrlenA(szEvent) > 2 )
+      wsprintfA( handler, "%s%s", szCtrlName, szEvent + 2 );
+   else
+      handler[0] = 0;
 
    /* Column 0: event name (indented) */
    ZeroMemory( &lvi, sizeof(lvi) );
-   sprintf( buf, "      %s", szEvent );
+   wsprintfA( buf, "      %s", szEvent );
    lvi.mask = LVIF_TEXT | LVIF_PARAM;
    lvi.iItem = nRow;
    lvi.iSubItem = 0;
@@ -1303,14 +1311,14 @@ static void InsAddEvent( INSDATA * d, int nRow, const char * szEvent, const char
    lvi.lParam = 0;
    nInserted = (int) SendMessageA( d->hEventList, LVM_INSERTITEMA, 0, (LPARAM) &lvi );
 
-   /* Column 1: handler name — use actual inserted index */
+   /* Column 1: handler name */
    if( nInserted >= 0 )
    {
       ZeroMemory( &lvi, sizeof(lvi) );
       lvi.mask = LVIF_TEXT;
       lvi.iItem = nInserted;
       lvi.iSubItem = 1;
-      lvi.pszText = (char *)( szHandler && szHandler[0] ? szHandler : "" );
+      lvi.pszText = handler;
       SendMessageA( d->hEventList, LVM_SETITEMA, 0, (LPARAM) &lvi );
    }
 }
@@ -1348,10 +1356,10 @@ static void InsPopulateEvents( INSDATA * d )
    pDyn = hb_dynsymFindName( "UI_GETTYPE" );
    if( !pDyn ) {
       InsLog("  -> UI_GETTYPE not found, using fallback");
-      InsAddEvent( d, 0, "OnClick", NULL );
-      InsAddEvent( d, 1, "OnChange", NULL );
-      InsAddEvent( d, 2, "OnInit", NULL );
-      InsAddEvent( d, 3, "OnClose", NULL );
+      InsAddEvent2( d, 0, "OnClick", NULL );
+      InsAddEvent2( d, 1, "OnChange", NULL );
+      InsAddEvent2( d, 2, "OnInit", NULL );
+      InsAddEvent2( d, 3, "OnClose", NULL );
       return;
    }
 
@@ -1365,51 +1373,49 @@ static void InsPopulateEvents( INSDATA * d )
    }
    { char tb[64]; sprintf(tb,"  -> nType = %d",nType); InsLog(tb); }
 
-   /* Helper: build handler name and add event row */
-   #define ADD_EV(ev) { \
-      char _h[128]; sprintf(_h, "%s%s", szCtrlName, (ev)+2); \
-      InsAddEvent(d, n++, ev, _h); }
+   /* Shorthand: add event row with auto-generated handler name */
+   #define AE(ev) InsAddEvent2(d, n++, ev, szCtrlName)
 
    /* Show events based on control type */
    switch( nType )
    {
       case 0: /* CT_FORM */
          InsAddEventCat(d, n++, "Action");
-         ADD_EV("OnClick");
-         ADD_EV("OnDblClick");
+         AE("OnClick");
+         AE("OnDblClick");
          InsAddEventCat(d, n++, "Lifecycle");
-         ADD_EV("\1");
-         ADD_EV("\1");
-         ADD_EV("\1");
-         ADD_EV("\1");
-         ADD_EV("\1");
-         ADD_EV("\1");
-         ADD_EV("\1");
-         ADD_EV("\1");
+         AE("OnCreate");
+         AE("OnDestroy");
+         AE("OnShow");
+         AE("OnHide");
+         AE("OnClose");
+         AE("OnCloseQuery");
+         AE("OnActivate");
+         AE("OnDeactivate");
          InsAddEventCat(d, n++, "Layout");
-         ADD_EV("\1");
-         ADD_EV("\1");
+         AE("OnResize");
+         AE("OnPaint");
          InsAddEventCat(d, n++, "Keyboard");
-         ADD_EV("\1");
-         ADD_EV("\1");
-         ADD_EV("\1");
+         AE("OnKeyDown");
+         AE("OnKeyUp");
+         AE("OnKeyPress");
          InsAddEventCat(d, n++, "Mouse");
-         ADD_EV("\1");
-         ADD_EV("\1");
-         ADD_EV("\1");
-         ADD_EV("\1");
+         AE("OnMouseDown");
+         AE("OnMouseUp");
+         AE("OnMouseMove");
+         AE("OnMouseWheel");
          break;
       case 3: /* CT_BUTTON */
       case 12: /* CT_BITBTN */
          InsAddEventCat(d, n++, "Action");
-         ADD_EV("OnClick");
+         AE("OnClick");
          InsAddEventCat(d, n++, "Focus");
-         ADD_EV("\1");
-         ADD_EV("\1");
+         AE("OnEnter");
+         AE("OnExit");
          InsAddEventCat(d, n++, "Keyboard");
-         ADD_EV("\1");
+         AE("OnKeyDown");
          InsAddEventCat(d, n++, "Mouse");
-         ADD_EV("\1");
+         AE("OnMouseDown");
          break;
       case 2: /* CT_EDIT */
       case 24: /* CT_MEMO */
@@ -1417,147 +1423,149 @@ static void InsPopulateEvents( INSDATA * d )
       case 28: /* CT_MASKEDIT */
       case 32: /* CT_LABELEDEDIT */
          InsAddEventCat(d, n++, "Action");
-         ADD_EV("OnChange");
-         ADD_EV("OnClick");
+         AE("OnChange");
+         AE("OnClick");
          InsAddEventCat(d, n++, "Focus");
-         ADD_EV("\1");
-         ADD_EV("\1");
+         AE("OnEnter");
+         AE("OnExit");
          InsAddEventCat(d, n++, "Keyboard");
-         ADD_EV("\1");
-         ADD_EV("\1");
+         AE("OnKeyDown");
+         AE("OnKeyUp");
          InsAddEventCat(d, n++, "Mouse");
-         ADD_EV("\1");
+         AE("OnMouseDown");
          break;
       case 4: /* CT_CHECKBOX */
       case 8: /* CT_RADIO */
          InsAddEventCat(d, n++, "Action");
-         ADD_EV("OnClick");
+         AE("OnClick");
          InsAddEventCat(d, n++, "Focus");
-         ADD_EV("\1");
-         ADD_EV("\1");
+         AE("OnEnter");
+         AE("OnExit");
          break;
       case 5: /* CT_COMBOBOX */
          InsAddEventCat(d, n++, "Action");
-         ADD_EV("OnChange");
-         ADD_EV("OnClick");
+         AE("OnChange");
+         AE("OnClick");
          InsAddEventCat(d, n++, "Focus");
-         ADD_EV("\1");
-         ADD_EV("\1");
+         AE("OnEnter");
+         AE("OnExit");
          InsAddEventCat(d, n++, "Keyboard");
-         ADD_EV("\1");
+         AE("OnKeyDown");
          break;
       case 1: /* CT_LABEL */
       case 31: /* CT_STATICTEXT */
          InsAddEventCat(d, n++, "Action");
-         ADD_EV("OnClick");
-         ADD_EV("OnDblClick");
+         AE("OnClick");
+         AE("OnDblClick");
          InsAddEventCat(d, n++, "Mouse");
-         ADD_EV("\1");
+         AE("OnMouseDown");
          break;
       case 6: /* CT_GROUPBOX */
       case 25: /* CT_PANEL */
          InsAddEventCat(d, n++, "Action");
-         ADD_EV("OnClick");
-         ADD_EV("OnDblClick");
+         AE("OnClick");
+         AE("OnDblClick");
          InsAddEventCat(d, n++, "Layout");
-         ADD_EV("\1");
+         AE("OnResize");
          InsAddEventCat(d, n++, "Mouse");
-         ADD_EV("\1");
+         AE("OnMouseDown");
          break;
       case 7: /* CT_LISTBOX */
          InsAddEventCat(d, n++, "Action");
-         ADD_EV("OnClick");
-         ADD_EV("OnDblClick");
-         ADD_EV("OnChange");
+         AE("OnClick");
+         AE("OnDblClick");
+         AE("OnChange");
          InsAddEventCat(d, n++, "Focus");
-         ADD_EV("\1");
-         ADD_EV("\1");
+         AE("OnEnter");
+         AE("OnExit");
          InsAddEventCat(d, n++, "Keyboard");
-         ADD_EV("\1");
+         AE("OnKeyDown");
          break;
       case 20: /* CT_TREEVIEW */
          InsAddEventCat(d, n++, "Action");
-         ADD_EV("OnClick");
-         ADD_EV("OnDblClick");
-         ADD_EV("OnChange");
-         ADD_EV("\1");
-         ADD_EV("\1");
+         AE("OnClick");
+         AE("OnDblClick");
+         AE("OnChange");
+         AE("OnExpand");
+         AE("OnCollapse");
          InsAddEventCat(d, n++, "Keyboard");
-         ADD_EV("\1");
+         AE("OnKeyDown");
          break;
       case 21: /* CT_LISTVIEW */
          InsAddEventCat(d, n++, "Action");
-         ADD_EV("OnClick");
-         ADD_EV("OnDblClick");
-         ADD_EV("OnChange");
-         ADD_EV("\1");
+         AE("OnClick");
+         AE("OnDblClick");
+         AE("OnChange");
+         AE("OnColumnClick");
          InsAddEventCat(d, n++, "Keyboard");
-         ADD_EV("\1");
+         AE("OnKeyDown");
          break;
       case 79: case 80: /* CT_BROWSE, CT_DBGRID */
          InsAddEventCat(d, n++, "Action");
-         ADD_EV("\1");
-         ADD_EV("\1");
-         ADD_EV("\1");
-         ADD_EV("\1");
-         ADD_EV("\1");
-         ADD_EV("\1");
+         AE("OnCellClick");
+         AE("OnCellDblClick");
+         AE("OnHeaderClick");
+         AE("OnSort");
+         AE("OnScroll");
+         AE("OnRowSelect");
          InsAddEventCat(d, n++, "Data");
-         ADD_EV("\1");
+         AE("OnCellEdit");
          InsAddEventCat(d, n++, "Layout");
-         ADD_EV("\1");
+         AE("OnColumnResize");
          InsAddEventCat(d, n++, "Keyboard");
-         ADD_EV("\1");
+         AE("OnKeyDown");
          break;
       case 39: /* CT_PAINTBOX */
          InsAddEventCat(d, n++, "Action");
-         ADD_EV("\1");
-         ADD_EV("OnClick");
+         AE("OnPaint");
+         AE("OnClick");
          InsAddEventCat(d, n++, "Mouse");
-         ADD_EV("\1");
-         ADD_EV("\1");
-         ADD_EV("\1");
+         AE("OnMouseDown");
+         AE("OnMouseUp");
+         AE("OnMouseMove");
          InsAddEventCat(d, n++, "Layout");
-         ADD_EV("\1");
+         AE("OnResize");
          break;
       case 38: /* CT_TIMER */
          InsAddEventCat(d, n++, "Action");
-         ADD_EV("\1");
+         AE("OnTimer");
          break;
       case 22: /* CT_PROGRESSBAR */
          break; /* no user events */
       case 34: /* CT_TRACKBAR */
       case 26: /* CT_SCROLLBAR */
          InsAddEventCat(d, n++, "Action");
-         ADD_EV("OnChange");
-         ADD_EV("\1");
+         AE("OnChange");
+         AE("OnScroll");
          break;
       case 33: /* CT_TABCONTROL */
       case 35: /* CT_UPDOWN */
       case 36: /* CT_DATETIMEPICKER */
       case 37: /* CT_MONTHCALENDAR */
          InsAddEventCat(d, n++, "Action");
-         ADD_EV("OnChange");
-         ADD_EV("OnClick");
+         AE("OnChange");
+         AE("OnClick");
          break;
       case 14: /* CT_IMAGE */
          InsAddEventCat(d, n++, "Action");
-         ADD_EV("OnClick");
-         ADD_EV("OnDblClick");
+         AE("OnClick");
+         AE("OnDblClick");
          InsAddEventCat(d, n++, "Mouse");
-         ADD_EV("\1");
+         AE("OnMouseDown");
          break;
       default:
          /* Generic events for all other controls */
          InsAddEventCat(d, n++, "Action");
-         ADD_EV("OnClick");
-         ADD_EV("OnChange");
+         AE("OnClick");
+         AE("OnChange");
          InsAddEventCat(d, n++, "Keyboard");
-         ADD_EV("\1");
+         AE("OnKeyDown");
          InsAddEventCat(d, n++, "Mouse");
-         ADD_EV("\1");
+         AE("OnMouseDown");
          break;
    }
+
+   #undef AE
 }
 
 /* Update the combo selection to match the currently inspected control.
