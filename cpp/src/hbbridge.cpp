@@ -2006,7 +2006,7 @@ HB_FUNC( W32_RUNBATCHWITHPROGRESS )
    int logH = dlgH - logTop - btnH - margin * 3 - GetSystemMetrics( SM_CYCAPTION );
    int x = (sw - dlgW) / 2, y = (sh - dlgH) / 2;
 
-   HWND hDlg = CreateWindowExA( WS_EX_DLGMODALFRAME | WS_EX_TOPMOST,
+   HWND hDlg = CreateWindowExA( WS_EX_DLGMODALFRAME,
       "HbBatchProgressDlg", cTitle,
       WS_POPUP | WS_CAPTION | WS_VISIBLE,
       x, y, dlgW, dlgH, NULL, NULL, GetModuleHandle(NULL), NULL );
