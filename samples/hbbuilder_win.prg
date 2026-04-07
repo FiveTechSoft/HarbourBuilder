@@ -1899,15 +1899,26 @@ static function TBRun()
       cSharedInc := cWinKit + "\Include\" + cWinKitVer + "\shared"
       cUcrtLib   := cWinKit + "\Lib\" + cWinKitVer + "\ucrt\x86"
       cUmLib     := cWinKit + "\Lib\" + cWinKitVer + "\um\x86"
-      cHbBin     := cHbDir + "\bin\win\msvc"
-      cHbLib     := cHbDir + "\lib\win\msvc"
+      // Detect actual Harbour bin/lib layout
+      if File( cHbDir + "\bin\win\msvc\harbour.exe" )
+         cHbBin  := cHbDir + "\bin\win\msvc"
+         cHbLib  := cHbDir + "\lib\win\msvc"
+      else
+         cHbBin  := cHbDir + "\bin"
+         cHbLib  := cHbDir + "\lib"
+      endif
       cLog += "Compiler: " + aCI[2] + Chr(10)
    else
       cCDir      := aCI[4]  // e.g. "c:\bcc77c"
       cCC        := cCDir + "\bin\bcc32.exe"
       cLinker    := cCDir + "\bin\ilink32.exe"
-      cHbBin     := cHbDir + "\bin\win\bcc"
-      cHbLib     := cHbDir + "\lib\win\bcc"
+      if File( cHbDir + "\bin\win\bcc\harbour.exe" )
+         cHbBin  := cHbDir + "\bin\win\bcc"
+         cHbLib  := cHbDir + "\lib\win\bcc"
+      else
+         cHbBin  := cHbDir + "\bin"
+         cHbLib  := cHbDir + "\lib"
+      endif
       cLog += "Compiler: " + aCI[2] + Chr(10)
    endif
 
@@ -2342,14 +2353,24 @@ static function TBDebugRun()
       cSharedInc := cWinKit + "\Include\" + cWinKitVer + "\shared"
       cUcrtLib   := cWinKit + "\Lib\" + cWinKitVer + "\ucrt\x86"
       cUmLib     := cWinKit + "\Lib\" + cWinKitVer + "\um\x86"
-      cHbBin     := cHbDir + "\bin\win\msvc"
-      cHbLib     := cHbDir + "\lib\win\msvc"
+      if File( cHbDir + "\bin\win\msvc\harbour.exe" )
+         cHbBin  := cHbDir + "\bin\win\msvc"
+         cHbLib  := cHbDir + "\lib\win\msvc"
+      else
+         cHbBin  := cHbDir + "\bin"
+         cHbLib  := cHbDir + "\lib"
+      endif
    else
       cCDir      := aCI[4]
       cCC        := cCDir + "\bin\bcc32.exe"
       cLinker    := cCDir + "\bin\ilink32.exe"
-      cHbBin     := cHbDir + "\bin\win\bcc"
-      cHbLib     := cHbDir + "\lib\win\bcc"
+      if File( cHbDir + "\bin\win\bcc\harbour.exe" )
+         cHbBin  := cHbDir + "\bin\win\bcc"
+         cHbLib  := cHbDir + "\lib\win\bcc"
+      else
+         cHbBin  := cHbDir + "\bin"
+         cHbLib  := cHbDir + "\lib"
+      endif
    endif
 
    W32_ShellExec( 'cmd /c mkdir "' + cBuildDir + '" 2>nul' )
@@ -2743,7 +2764,8 @@ static function FindHarbour( cCompiler )
 
    for i := 1 to Len( aPaths )
       cPath := aPaths[i]
-      if File( cPath + "\" + cSub + "\harbour.exe" )
+      if File( cPath + "\" + cSub + "\harbour.exe" ) .or. ;
+         File( cPath + "\bin\harbour.exe" )
          return cPath
       endif
    next
@@ -2752,7 +2774,7 @@ return ""
 
 static function EnsureHarbour( cCompiler, aCI )
 
-   local cHbDir, cHbSrc, cOutput, cCmd, cCDir
+   local cHbDir, cHbSrc, cOutput, cCmd, cCDir, cDiag
    local cMsvcBase, cWinKit, cWinKitVer
    local cZipFile, cBatFile, lHasGit, lOk
    local cTmp := GetEnv( "TEMP" )
@@ -2883,14 +2905,17 @@ static function EnsureHarbour( cCompiler, aCI )
       "Building Harbour...", ;
       "Compiling with " + aCI[2] + " (this may take several minutes)..." )
 
-   // Step 4: Verify
-   if cCompiler == "msvc"
-      lOk := File( cHbDir + "\bin\win\msvc\harbour.exe" )
-   else
-      lOk := File( cHbDir + "\bin\win\bcc\harbour.exe" )
-   endif
-
    lBusy := .F.
+
+   // Step 4: Verify — check multiple possible locations
+   lOk := .F.
+   if cCompiler == "msvc"
+      lOk := File( cHbDir + "\bin\win\msvc\harbour.exe" ) .or. ;
+             File( cHbDir + "\bin\harbour.exe" )
+   else
+      lOk := File( cHbDir + "\bin\win\bcc\harbour.exe" ) .or. ;
+             File( cHbDir + "\bin\harbour.exe" )
+   endif
 
    if lOk
       MsgInfo( "Harbour installed successfully!" + Chr(10) + Chr(10) + ;
@@ -2898,10 +2923,27 @@ static function EnsureHarbour( cCompiler, aCI )
       return cHbDir
    endif
 
-   W32_BuildErrorDialog( "Harbour Build Failed", ;
-      "Harbour compilation failed." + Chr(10) + ;
-      "Compiler: " + aCI[2] + Chr(10) + Chr(10) + ;
-      "Build output:" + Chr(10) + cOutput )
+   // Build diagnostic info for the error dialog
+   cDiag := "Harbour build did not produce the expected files." + Chr(10)
+   cDiag += "Compiler: " + aCI[2] + Chr(10)
+   cDiag += "Install prefix: " + cHbDir + Chr(10)
+   cDiag += "Source dir: " + cHbSrc + Chr(10) + Chr(10)
+   cDiag += "Expected:" + Chr(10)
+   if cCompiler == "msvc"
+      cDiag += "  " + cHbDir + "\bin\win\msvc\harbour.exe" + Chr(10)
+   else
+      cDiag += "  " + cHbDir + "\bin\win\bcc\harbour.exe" + Chr(10)
+   endif
+   cDiag += Chr(10) + "Checked paths:" + Chr(10)
+   cDiag += "  bin\win\msvc\harbour.exe -> " + iif( File( cHbDir + "\bin\win\msvc\harbour.exe" ), "FOUND", "not found" ) + Chr(10)
+   cDiag += "  bin\win\bcc\harbour.exe  -> " + iif( File( cHbDir + "\bin\win\bcc\harbour.exe" ), "FOUND", "not found" ) + Chr(10)
+   cDiag += "  bin\harbour.exe          -> " + iif( File( cHbDir + "\bin\harbour.exe" ), "FOUND", "not found" ) + Chr(10)
+   cDiag += "  include\hbapi.h          -> " + iif( File( cHbDir + "\include\hbapi.h" ), "FOUND", "not found" ) + Chr(10)
+   cDiag += "  lib\win\msvc\hbvm.lib    -> " + iif( File( cHbDir + "\lib\win\msvc\hbvm.lib" ), "FOUND", "not found" ) + Chr(10)
+   cDiag += "  lib\win\bcc\hbvm.lib     -> " + iif( File( cHbDir + "\lib\win\bcc\hbvm.lib" ), "FOUND", "not found" ) + Chr(10)
+   cDiag += Chr(10) + "Build output (last 2000 chars):" + Chr(10) + Right( cOutput, 2000 )
+
+   W32_BuildErrorDialog( "Harbour Build Failed", cDiag )
 
 return ""
 
