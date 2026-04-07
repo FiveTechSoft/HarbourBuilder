@@ -174,6 +174,7 @@ void TForm::CreateHandle( HWND hParent )
    s_nFormCount++;
    sprintf( szClass, "HbIdeForm%d", s_nFormCount );
 
+   wc.style          = CS_DBLCLKS;
    wc.lpfnWndProc   = TControl::WndProc;
    wc.hInstance      = GetModuleHandle(NULL);
    wc.hCursor        = LoadCursor(NULL, IDC_ARROW);
@@ -1177,6 +1178,11 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
             }
             return 0;
          }
+
+         /* Runtime mode: fire OnClick event */
+         if( !FDesignMode && FOnClick )
+            FireEvent( FOnClick );
+
          break;
       }
 
