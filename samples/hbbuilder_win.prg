@@ -1856,9 +1856,6 @@ static function TBRun()
       RefreshIDEToolbars()
       return nil
    endif
-   cHbDir   := "c:\harbour"
-   cHbBin   := cHbDir + "\bin\win\bcc"
-   cHbInc   := cHbDir + "\include"
    cProjDir := "c:\HarbourBuilder"
    cLog     := ""
    lError   := .F.
@@ -1878,6 +1875,16 @@ static function TBRun()
    endif
 
    cCompiler := aCI[1]  // "msvc" or "bcc"
+
+   // Find Harbour installation (search multiple paths)
+   cHbDir := FindHarbour( cCompiler )
+   if Empty( cHbDir )
+      cHbDir := EnsureHarbour( cCompiler, aCI )
+      if Empty( cHbDir )
+         return nil
+      endif
+   endif
+   cHbInc := cHbDir + "\include"
 
    if cCompiler == "msvc"
       cMsvcBase  := aCI[4]  // e.g. "...\MSVC\14.29.30133"
@@ -1899,15 +1906,9 @@ static function TBRun()
       cCDir      := aCI[4]  // e.g. "c:\bcc77c"
       cCC        := cCDir + "\bin\bcc32.exe"
       cLinker    := cCDir + "\bin\ilink32.exe"
+      cHbBin     := cHbDir + "\bin\win\bcc"
       cHbLib     := cHbDir + "\lib\win\bcc"
       cLog += "Compiler: " + aCI[2] + Chr(10)
-   endif
-
-   // Ensure Harbour is installed for the selected compiler
-   if ! File( cHbBin + "\harbour.exe" )
-      if ! EnsureHarbour( cCompiler, aCI )
-         return nil
-      endif
    endif
 
    W32_ShellExec( 'cmd /c mkdir "' + cBuildDir + '" 2>nul' )
@@ -2199,19 +2200,37 @@ return nil
 static function ShowProjectOptions()
 
    // Project settings stored as statics
-   static cHarbourDir   := "c:\harbour"
-   static cCompilerDir  := "c:\bcc77c"
+   static cHarbourDir   := ""
+   static cCompilerDir  := ""
    static cProjectDir   := "c:\HarbourBuilder"
    static cOutputDir    := ""
    static cHbFlags      := "/n /w /q"
-   static cCFlags       := "-c -O2 -tW"
-   static cLinkFlags    := "-Gn -aa -Tpe"
+   static cCFlags       := ""
+   static cLinkFlags    := ""
    static cIncludePaths := ""
    static cLibPaths     := ""
    static cLibraries    := ""
    static lDebugInfo    := .F.
    static lWarnings     := .T.
    static lOptimize     := .T.
+   local aCI
+
+   // Auto-detect paths from current compiler on first open
+   if Empty( cHarbourDir )
+      aCI := GetCompilerInfo()
+      if aCI != nil
+         cCompilerDir := aCI[4]
+         if aCI[1] == "msvc"
+            cCFlags    := "/c /O2 /W0 /EHsc"
+            cLinkFlags := "/SUBSYSTEM:WINDOWS"
+         else
+            cCFlags    := "-c -O2 -tW"
+            cLinkFlags := "-Gn -aa -Tpe"
+         endif
+      endif
+      cHarbourDir := FindHarbour( iif( aCI != nil, aCI[1], "bcc" ) )
+      if Empty( cHarbourDir ); cHarbourDir := "c:\harbour"; endif
+   endif
 
    W32_ProjectOptionsDialog( ;
       cHarbourDir, cCompilerDir, cProjectDir, cOutputDir, ;
@@ -2284,8 +2303,6 @@ static function TBDebugRun()
    W32_SetWaitCursor( .T. )
 
    cBuildDir := "c:\hbbuilder_debug"
-   cHbDir    := "c:\harbour"
-   cHbInc    := cHbDir + "\include"
    cProjDir  := "c:\HarbourBuilder"
    cLog      := ""
    lError    := .F.
@@ -2301,6 +2318,16 @@ static function TBDebugRun()
    endif
 
    cCompiler := aCI[1]
+
+   // Find Harbour installation (search multiple paths)
+   cHbDir := FindHarbour( cCompiler )
+   if Empty( cHbDir )
+      cHbDir := EnsureHarbour( cCompiler, aCI )
+      if Empty( cHbDir )
+         return nil
+      endif
+   endif
+   cHbInc := cHbDir + "\include"
 
    if cCompiler == "msvc"
       cMsvcBase  := aCI[4]
@@ -2323,13 +2350,6 @@ static function TBDebugRun()
       cLinker    := cCDir + "\bin\ilink32.exe"
       cHbBin     := cHbDir + "\bin\win\bcc"
       cHbLib     := cHbDir + "\lib\win\bcc"
-   endif
-
-   // Ensure Harbour is installed for the selected compiler
-   if ! File( cHbBin + "\harbour.exe" )
-      if ! EnsureHarbour( cCompiler, aCI )
-         return nil
-      endif
    endif
 
    W32_ShellExec( 'cmd /c mkdir "' + cBuildDir + '" 2>nul' )
@@ -2701,15 +2721,50 @@ static function ShowAIAssistant()
 
 return nil
 
-// === Harbour Auto-Install ===
+// === Harbour Detection & Auto-Install ===
+
+static function FindHarbour( cCompiler )
+
+   local aPaths, cSub, i, cPath
+   local cUserProfile := GetEnv( "USERPROFILE" )
+
+   cSub := iif( cCompiler == "msvc", "bin\win\msvc", "bin\win\bcc" )
+
+   aPaths := { ;
+      "c:\harbour", ;
+      cUserProfile + "\harbour", ;
+      "c:\hb32", ;
+      "c:\hb", ;
+      HB_DirBase() + "..\harbour", ;
+      "c:\Program Files\harbour", ;
+      "c:\Program Files (x86)\harbour", ;
+      cUserProfile + "\.harbour", ;
+      "d:\harbour" }
+
+   for i := 1 to Len( aPaths )
+      cPath := aPaths[i]
+      if File( cPath + "\" + cSub + "\harbour.exe" )
+         return cPath
+      endif
+   next
+
+return ""
 
 static function EnsureHarbour( cCompiler, aCI )
 
-   local cHbDir   := "c:\harbour"
-   local cHbSrc   := "c:\harbour_src"
-   local cOutput, cCmd, cCC, cCDir
+   local cHbDir, cHbSrc, cOutput, cCmd, cCDir
    local cMsvcBase, cWinKit, cWinKitVer
-   local lOk
+   local cZipFile, cBatContent, lHasGit, lOk
+
+   // First try to find an existing Harbour installation
+   cHbDir := FindHarbour( cCompiler )
+   if ! Empty( cHbDir )
+      return cHbDir
+   endif
+
+   // Harbour not found anywhere — offer to download & build
+   cHbDir := "c:\harbour"
+   cHbSrc := "c:\harbour_src"
 
    if ! MsgYesNo( "Harbour compiler not found!" + Chr(10) + ;
                   Chr(10) + ;
@@ -2718,22 +2773,57 @@ static function EnsureHarbour( cCompiler, aCI )
                   "Download from GitHub and build it now?" + Chr(10) + ;
                   "(This may take several minutes)", ;
                   "Harbour Not Found" )
-      return .F.
+      return ""
    endif
 
-   // Step 1: Clone Harbour source (with animated progress)
+   // Step 1: Download Harbour source
    if ! File( cHbSrc + "\config\global.mk" )
-      MemoWrit( cHbSrc + "_clone.bat", ;
-         "@echo off" + Chr(10) + ;
-         'git clone --depth 1 https://github.com/harbour/core.git "' + cHbSrc + '"' + Chr(10) )
-      cOutput := W32_RunBatchWithProgress( cHbSrc + "_clone.bat", ;
-         "Downloading Harbour...", ;
-         "Cloning https://github.com/harbour/core.git ..." )
+      // Check if git is available
+      lHasGit := File( "c:\Program Files\Git\cmd\git.exe" ) .or. ;
+                 File( "c:\Program Files (x86)\Git\cmd\git.exe" )
+      if ! lHasGit
+         // Also check PATH
+         cOutput := W32_ShellExec( "cmd /c where git 2>&1" )
+         lHasGit := "git" $ Lower( cOutput ) .and. ! ( "not found" $ Lower( cOutput ) )
+      endif
+
+      if lHasGit
+         // Use git clone (faster, shallow)
+         MemoWrit( cHbSrc + "_dl.bat", ;
+            "@echo off" + Chr(10) + ;
+            'git clone --depth 1 https://github.com/harbour/core.git "' + cHbSrc + '"' + Chr(10) )
+         cOutput := W32_RunBatchWithProgress( cHbSrc + "_dl.bat", ;
+            "Downloading Harbour...", ;
+            "Cloning harbour/core from GitHub..." )
+      else
+         // No git — download zip via PowerShell
+         cZipFile := cHbSrc + ".zip"
+         MemoWrit( cHbSrc + "_dl.bat", ;
+            "@echo off" + Chr(10) + ;
+            "powershell -NoProfile -Command " + Chr(34) + ;
+               "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; " + ;
+               "Invoke-WebRequest -Uri " + Chr(39) + "https://github.com/harbour/core/archive/refs/heads/master.zip" + Chr(39) + " " + ;
+               "-OutFile " + Chr(39) + cZipFile + Chr(39) + ;
+            Chr(34) + Chr(10) + ;
+            "if not exist " + Chr(34) + cZipFile + Chr(34) + " exit /b 1" + Chr(10) + ;
+            "powershell -NoProfile -Command " + Chr(34) + ;
+               "Expand-Archive -Path " + Chr(39) + cZipFile + Chr(39) + " " + ;
+               "-DestinationPath " + Chr(39) + cHbSrc + "_tmp" + Chr(39) + " -Force" + ;
+            Chr(34) + Chr(10) + ;
+            "move " + Chr(34) + cHbSrc + "_tmp\core-master" + Chr(34) + " " + Chr(34) + cHbSrc + Chr(34) + Chr(10) + ;
+            "rd /s /q " + Chr(34) + cHbSrc + "_tmp" + Chr(34) + " 2>nul" + Chr(10) + ;
+            "del " + Chr(34) + cZipFile + Chr(34) + " 2>nul" + Chr(10) )
+         cOutput := W32_RunBatchWithProgress( cHbSrc + "_dl.bat", ;
+            "Downloading Harbour...", ;
+            "Downloading harbour/core.zip from GitHub..." )
+      endif
+
       if ! File( cHbSrc + "\config\global.mk" )
-         MsgInfo( "Failed to download Harbour source." + Chr(10) + Chr(10) + ;
-                  "Make sure git is installed and you have internet access." + Chr(10) + ;
-                  Chr(10) + cOutput, "Download Failed" )
-         return .F.
+         W32_BuildErrorDialog( "Download Failed", ;
+            "Failed to download Harbour source." + Chr(10) + Chr(10) + ;
+            "Check your internet connection and try again." + Chr(10) + ;
+            Chr(10) + "Output:" + Chr(10) + cOutput )
+         return ""
       endif
    endif
 
@@ -2786,13 +2876,15 @@ static function EnsureHarbour( cCompiler, aCI )
    if lOk
       MsgInfo( "Harbour installed successfully!" + Chr(10) + Chr(10) + ;
                "Location: " + cHbDir, "Installation Complete" )
-   else
-      MsgInfo( "Harbour build failed." + Chr(10) + Chr(10) + ;
-               "Build output:" + Chr(10) + Left( cOutput, 1000 ), ;
-               "Build Failed" )
+      return cHbDir
    endif
 
-return lOk
+   W32_BuildErrorDialog( "Harbour Build Failed", ;
+      "Harbour compilation failed." + Chr(10) + ;
+      "Compiler: " + aCI[2] + Chr(10) + Chr(10) + ;
+      "Build output:" + Chr(10) + cOutput )
+
+return ""
 
 // === Dark Mode Toggle ===
 
