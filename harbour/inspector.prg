@@ -1298,9 +1298,15 @@ static void InsAddEvent( INSDATA * d, int nRow, const char * szEvent, const char
    lvi.pszText = buf;
    lvi.lParam = 0;  /* 0 = event row */
    SendMessageA( d->hEventList, LVM_INSERTITEMA, 0, (LPARAM) &lvi );
-   lvi.iSubItem = 1;
-   lvi.pszText = (char *)( szHandler ? szHandler : "" );
-   SendMessageA( d->hEventList, LVM_SETITEMA, 0, (LPARAM) &lvi );
+   /* Set handler name in column 2 */
+   {
+      LVITEMA lvi2 = {0};
+      lvi2.mask = LVIF_TEXT;
+      lvi2.iItem = nRow;
+      lvi2.iSubItem = 1;
+      lvi2.pszText = (char *)( szHandler ? szHandler : "" );
+      SendMessageA( d->hEventList, LVM_SETITEMA, 0, (LPARAM) &lvi2 );
+   }
 }
 
 static void InsPopulateEvents( INSDATA * d )
