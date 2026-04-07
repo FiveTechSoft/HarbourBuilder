@@ -2899,7 +2899,6 @@ static function EnsureHarbour( cCompiler, aCI )
          "set LIB=" + cMsvcBase + "\lib\x86;" + ;
             cWinKit + "\Lib\" + cWinKitVer + "\ucrt\x86;" + ;
             cWinKit + "\Lib\" + cWinKitVer + "\um\x86" + Chr(10) + ;
-         "set HB_BUILD_CONTRIBS=no" + Chr(10) + ;
          "set HB_INSTALL_PREFIX=" + cHbDir + Chr(10) + ;
          "win-make.exe install" + Chr(10) )
    else
@@ -2909,7 +2908,6 @@ static function EnsureHarbour( cCompiler, aCI )
          "cd /d " + cHbSrc + Chr(10) + ;
          "set PATH=" + cCDir + "\bin;%PATH%" + Chr(10) + ;
          "set HB_COMPILER=bcc" + Chr(10) + ;
-         "set HB_BUILD_CONTRIBS=no" + Chr(10) + ;
          "set HB_INSTALL_PREFIX=" + cHbDir + Chr(10) + ;
          "win-make.exe install" + Chr(10) )
    endif
