@@ -578,8 +578,10 @@ static LRESULT CALLBACK SplitterWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPA
             HPEN hShadow = CreatePen( PS_SOLID, 1, GetSysColor( COLOR_3DSHADOW ) );
             HPEN hOld;
             int y;
-            /* Fill background */
-            FillRect( hDC, &rc, (HBRUSH)(COLOR_BTNFACE + 1) );
+            /* Fill background (dark) */
+            { HBRUSH hbr = CreateSolidBrush( RGB(45,45,48) );
+              FillRect( hDC, &rc, hbr );
+              DeleteObject( hbr ); }
             /* Draw grip dots */
             hOld = (HPEN) SelectObject( hDC, hShadow );
             for( y = 4; y < rc.bottom - 4; y += 4 )
@@ -1204,6 +1206,56 @@ static void PalLog( const char * fmt, ... )
 
 static LRESULT CALLBACK PaletteTabSubProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 {
+   if( msg == WM_ERASEBKGND )
+   {
+      HDC hdc = (HDC) wParam;
+      RECT rc;
+      HBRUSH hbr = CreateSolidBrush( RGB(45, 45, 48) );
+      GetClientRect( hWnd, &rc );
+      FillRect( hdc, &rc, hbr );
+      DeleteObject( hbr );
+      return 1;
+   }
+   if( msg == WM_CTLCOLORBTN )
+   {
+      static HBRUSH s_hDarkBtnBrush = NULL;
+      if( !s_hDarkBtnBrush ) s_hDarkBtnBrush = CreateSolidBrush( RGB(45, 45, 48) );
+      return (LRESULT) s_hDarkBtnBrush;
+   }
+   /* Owner-draw palette icon buttons */
+   if( msg == WM_DRAWITEM )
+   {
+      DRAWITEMSTRUCT * di = (DRAWITEMSTRUCT *) lParam;
+      if( di && di->CtlType == ODT_BUTTON )
+      {
+         TComponentPalette * pal = (TComponentPalette *) GetWindowLongPtr( hWnd, GWLP_USERDATA );
+         int imgIdx = (int) GetWindowLongPtr( di->hwndItem, GWLP_USERDATA );
+         BOOL isHot = ( di->itemState & ODS_SELECTED );
+         HBRUSH hbr = CreateSolidBrush( isHot ? RGB(70,70,70) : RGB(50,50,53) );
+         FillRect( di->hDC, &di->rcItem, hbr );
+         DeleteObject( hbr );
+         /* Draw icon centered */
+         if( pal && pal->FPalImageList )
+         {
+            int iconW = 24, iconH = 24;
+            int cx = di->rcItem.left + (di->rcItem.right - di->rcItem.left - iconW) / 2;
+            int cy = di->rcItem.top + (di->rcItem.bottom - di->rcItem.top - iconH) / 2;
+            ImageList_Draw( pal->FPalImageList, imgIdx, di->hDC, cx, cy, ILD_TRANSPARENT );
+         }
+         /* Subtle border */
+         {
+            HPEN hPen = CreatePen( PS_SOLID, 1, RGB(65,65,65) );
+            HPEN hOld = (HPEN) SelectObject( di->hDC, hPen );
+            HBRUSH hNull = (HBRUSH) GetStockObject( NULL_BRUSH );
+            HBRUSH hOldBr = (HBRUSH) SelectObject( di->hDC, hNull );
+            Rectangle( di->hDC, di->rcItem.left, di->rcItem.top, di->rcItem.right, di->rcItem.bottom );
+            SelectObject( di->hDC, hOld );
+            SelectObject( di->hDC, hOldBr );
+            DeleteObject( hPen );
+         }
+         return TRUE;
+      }
+   }
    if( msg == WM_COMMAND )
    {
       WORD wId = LOWORD(wParam);
@@ -1268,7 +1320,7 @@ void TComponentPalette::CreateHandle( HWND hParent )
 
    /* Create tab control to the right of the splitter */
    FTabCtrl = CreateWindowExA( 0, WC_TABCONTROLA, NULL,
-      WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | TCS_TABS,
+      WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | TCS_TABS | TCS_OWNERDRAWFIXED,
       FSplitPos + 6, 0,
       rcParent.right - FSplitPos - 6, rcParent.bottom,
       hParent, NULL, GetModuleHandle(NULL), NULL );
@@ -1278,6 +1330,7 @@ void TComponentPalette::CreateHandle( HWND hParent )
 
    /* Subclass TabControl to forward button WM_COMMAND to the form */
    s_oldTabProc = (WNDPROC) SetWindowLongPtr( FTabCtrl, GWLP_WNDPROC, (LONG_PTR) PaletteTabSubProc );
+   SetWindowLongPtr( FTabCtrl, GWLP_USERDATA, (LONG_PTR) this );
 
    /* Apply the exact same font as the toolbar for visual consistency */
    if( pForm && pForm->FToolBar && pForm->FToolBar->FHandle )
@@ -1359,18 +1412,17 @@ void TComponentPalette::ShowTab( int nTab )
       {
          if( FPalImageList )
          {
-            /* Icon button (BS_ICON style with image from ImageList) */
+            /* Owner-draw icon button for dark mode support */
             FBtns[i] = CreateWindowExA( 0, "BUTTON", NULL,
-               WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_FLAT | BS_ICON,
+               WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
                xPos, y, btnSize, btnSize,
                FTabCtrl, (HMENU)(LONG_PTR)(200 + i),
                GetModuleHandle(NULL), NULL );
 
             if( FBtns[i] )
             {
-               HICON hIcon = ImageList_GetIcon( FPalImageList, imgBase + i, ILD_TRANSPARENT );
-               if( hIcon )
-                  SendMessage( FBtns[i], BM_SETIMAGE, IMAGE_ICON, (LPARAM) hIcon );
+               /* Store image index in window user data for WM_DRAWITEM */
+               SetWindowLongPtr( FBtns[i], GWLP_USERDATA, (LONG_PTR)(imgBase + i) );
             }
          }
          else

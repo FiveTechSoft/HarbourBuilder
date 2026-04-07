@@ -1,6 +1,63 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-07 (Session 12: Windows socket debugger + full dark mode)
+
+  SOCKET DEBUGGER PORT TO WINDOWS (macOS/Linux parity):
+  - Ported socket-based debugger from macOS/Linux to Windows
+  - Winsock TCP server on port 19800 in hbbridge.cpp: DbgServerStart/Accept/
+    Recv/Send/Stop using select() + PeekMessage for non-blocking I/O
+  - IDE_DebugStart2: socket command loop with PAUSE/STEP/GO/QUIT protocol,
+    CreateProcessA to launch DebugApp.exe, 30s accept timeout
+  - TBDebugRun: assembles debug_main.prg (Project1 + forms + classes +
+    dbgclient.prg + INIT PROCEDURE __DbgInit), compiles native exe with
+    both MSVC and BCC support, links with hbdebug.lib + ws2_32.lib + iphlpapi.lib
+  - CodeEditorShowDebugLine: Scintilla marker 11 (yellow bg) for current
+    execution line, with scroll-to-line and editor bring-to-front
+  - W32_DebugUpdateLocalsStr/StackStr: parse VARS/STACK strings from socket
+    protocol into debug panel ListViews (categories, name=value(type) format)
+  - OnDebugPause: 4-param callback (cFunc, nLine, cLocals, cStack) with line
+    offset mapping (aDbgOffsets), framework auto-skip, DbgMapLocalNames for
+    real variable names, DbgFixStackLines for editor tab coordinates
+  - dbghook.c: static buffers to prevent stack overflow in debug hook callback,
+    Windows _strnicmp compat (#define strncasecmp _strnicmp)
+  - Platform stubs injected into debug_main.prg: UI_MEMONEW,
+    MAC_RUNTIMEERRORDIALOG, MAC_APPTERMINATE (also in TBRun main.prg)
+  - Removed legacy .hrb in-process debugger, removed W32_DebugPanel() call
+
+  FULL DARK MODE (Windows 10/11):
+  - IDE bar: dark background RGB(45,45,48) via UI_FormSetBgColor
+  - Menu bar: dark via WM_NCPAINT/WM_NCACTIVATE painting over menu bar rect
+    with GetWindowDC + GetMenuBarInfo, drawing items with DrawTextA
+  - Menu popups: dark via SetPreferredAppMode(ForceDark) from uxtheme.dll
+    ordinal 135, called in C++ static initializer before any window creation
+  - Title bars: dark via DwmSetWindowAttribute(DWMWA_USE_IMMERSIVE_DARK_MODE)
+    in TForm::Show() for all form windows, dynamic loading for BCC compat
+  - AllowDarkModeForWindow (uxtheme ordinal 133) + RefreshImmersiveColorPolicyState
+    (ordinal 104) for each window
+  - Toolbars: text RGB(212,212,212) on RGB(45,45,48) via NM_CUSTOMDRAW
+  - Inspector: dark background RGB(30,30,30), ListViews with dark alternating
+    rows, category headers RGB(50,50,50), owner-draw tabs (TCS_OWNERDRAWFIXED),
+    tab background subclass WM_ERASEBKGND, dark title bar, combo/edit dark
+    via WM_CTLCOLOREDIT/WM_CTLCOLORLISTBOX/WM_CTLCOLORSTATIC
+  - Code editor: owner-draw dark tabs, dark tab background subclass,
+    dark title bar, dark status bar
+  - Design form: dark background RGB(45,45,45), grid dots RGB(90,90,90),
+    dark title bar via SetDarkTitleBar() dynamic loading
+  - Component palette: owner-draw dark tabs (TCS_OWNERDRAWFIXED), dark
+    tab background WM_ERASEBKGND, owner-draw icon buttons (BS_OWNERDRAW)
+    with dark background + centered ImageList icons, dark splitter
+  - View > Dark Mode toggle: saves DarkMode=1|0 to hbbuilder.ini,
+    reads on startup, restart required to apply
+
+  BUILD SYSTEM:
+  - build_win.bat: auto-detects BCC, MSVC x86, MinGW compilers with
+    user selection prompt when multiple found. Full build paths for all 3.
+  - winsock2.h/winsock.h conflict resolved: _WINSOCKAPI_ define in
+    hbbridge.cpp prevents windows.h from including winsock.h
+  - dwmapi.h removed from tform.cpp (BCC doesn't have it), replaced
+    with dynamic LoadLibrary("dwmapi.dll") + GetProcAddress
+
 2026-04-06 (Session 11: Linux socket-based debugger)
 
   SOCKET DEBUGGER PORT TO LINUX (macOS parity):

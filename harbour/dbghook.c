@@ -8,18 +8,30 @@
 #include "hbvm.h"
 #include "hbapidbg.h"
 #include <string.h>
+#include <stdio.h>
+
+/* Windows uses _strnicmp instead of POSIX strncasecmp */
+#ifdef _WIN32
+   #define strncasecmp _strnicmp
+#endif
 
 static PHB_ITEM s_pDbgBlock = NULL;
 static int s_nReentrancy = 0;
 static char s_szModule[256] = "";
+static int s_nHookCalls = 0;
+
+static void DbgHookTrace( const char * msg )
+{
+   FILE * f = fopen( "c:\\hbbuilder_debug\\dbghook_trace.log", "a" );
+   if( f ) { fprintf( f, "%s\n", msg ); fclose( f ); }
+}
 
 static void DbgHookC( int nMode, int nLine, const char * szName,
                        int nIndex, PHB_ITEM pFrame )
 {
    (void)nIndex; (void)pFrame;
 
-   /* Mode 1 = module name — only track when NOT in re-entrancy
-    * (otherwise internal debug functions overwrite the user's module name) */
+   /* Mode 1 = module name — only track when NOT in re-entrancy */
    if( nMode == 1 && szName && s_nReentrancy == 0 )
    {
       strncpy( s_szModule, szName, sizeof(s_szModule) - 1 );
@@ -36,11 +48,15 @@ static void DbgHookC( int nMode, int nLine, const char * szName,
 
    if( s_pDbgBlock && HB_IS_BLOCK( s_pDbgBlock ) )
    {
-      /* Build module string from s_szModule + current ProcName for accurate function info */
-      char szFull[512];
-      char procBuf[128] = "";
+      /* Use STATIC buffers to avoid stack overflow in debug hook callback */
+      static char szFull[256];
+      static char procBuf[128];
+      const char * procName;
+
+      procBuf[0] = 0;
       hb_procinfo( 0, procBuf, NULL, NULL );
-      const char * procName = procBuf;
+      procName = procBuf;
+
       snprintf( szFull, sizeof(szFull), "%s:%s",
                 s_szModule[0] ? s_szModule : "?",
                 procName ? procName : "?" );
@@ -50,10 +66,14 @@ static void DbgHookC( int nMode, int nLine, const char * szName,
       if( procName && procName[0] == 'T' && strlen(procName) > 3 )
       {
          int hasDigit = 0, k;
-         /* Check chars before ':' (class name part) for digits */
          for( k = 0; procName[k] && procName[k] != ':'; k++ )
             if( procName[k] >= '0' && procName[k] <= '9' ) { hasDigit = 1; break; }
-         if( !hasDigit ) return;
+         if( !hasDigit ) {
+            static int s_nTSkip = 0;
+            if( s_nTSkip < 3 ) { char t[128]; snprintf(t,sizeof(t),"SKIP T-class: '%s'", procName); DbgHookTrace(t); }
+            s_nTSkip++;
+            return;
+         }
       }
       if( procName && (
           strncasecmp(procName, "DBGSTATE", 8) == 0 ||
@@ -63,25 +83,40 @@ static void DbgHookC( int nMode, int nLine, const char * szName,
           strncasecmp(procName, "BUILDSTACK", 10) == 0 ||
           strncasecmp(procName, "__DBGINIT", 9) == 0 ||
           strncasecmp(procName, "SETDPIAWARE", 11) == 0 ||
+          strncasecmp(procName, "_INITDPI", 8) == 0 ||
           strncasecmp(procName, "APPSHOWERROR", 12) == 0 ||
           strncasecmp(procName, "VALTOSTR", 8) == 0 ||
           strncasecmp(procName, "ISFRAMEWORKFUNC", 15) == 0 ||
           strncasecmp(procName, "DBGVALSTR", 9) == 0 ||
           strncasecmp(procName, "DBGSEND", 7) == 0 ||
           strncasecmp(procName, "DBGRECV", 7) == 0 ||
+          strncasecmp(procName, "DBGLOG", 6) == 0 ||
           strncasecmp(procName, "MSGINFO", 7) == 0 ) )
          return;
+
+      /* Trace: we passed all filters, about to call block */
+      {
+         static int s_nPassCount = 0;
+         if( s_nPassCount < 5 ) {
+            char t[256];
+            snprintf(t, sizeof(t), "PASS #%d: '%s' line %d", s_nPassCount, szFull, nLine);
+            DbgHookTrace(t);
+         }
+         s_nPassCount++;
+      }
 
       s_nReentrancy++;
 
       /* Call block with ( nLine, cModule, cProcName ) */
-      PHB_ITEM pLine = hb_itemPutNI( NULL, nLine );
-      PHB_ITEM pModule = hb_itemPutC( NULL, szFull );
-      PHB_ITEM pProc = hb_itemPutC( NULL, procName ? procName : "" );
-      hb_itemDo( s_pDbgBlock, 3, pLine, pModule, pProc );
-      hb_itemRelease( pLine );
-      hb_itemRelease( pModule );
-      hb_itemRelease( pProc );
+      {
+         PHB_ITEM pLine = hb_itemPutNI( NULL, nLine );
+         PHB_ITEM pModule = hb_itemPutC( NULL, szFull );
+         PHB_ITEM pProc = hb_itemPutC( NULL, procName ? procName : "" );
+         hb_itemDo( s_pDbgBlock, 3, pLine, pModule, pProc );
+         hb_itemRelease( pLine );
+         hb_itemRelease( pModule );
+         hb_itemRelease( pProc );
+      }
 
       s_nReentrancy--;
    }
@@ -92,13 +127,22 @@ static void DbgHookC( int nMode, int nLine, const char * szName,
 HB_FUNC( DBGHOOKINSTALL )
 {
    PHB_ITEM pBlock = hb_param( 1, HB_IT_BLOCK );
+   /* Clear trace log */
+   { FILE * f = fopen("c:\\hbbuilder_debug\\dbghook_trace.log","w"); if(f) fclose(f); }
+   s_nHookCalls = 0;
+   DbgHookTrace( "DbgHookInstall called" );
    if( pBlock )
    {
+      DbgHookTrace( "Block is valid, storing..." );
       if( s_pDbgBlock )
          hb_itemRelease( s_pDbgBlock );
       s_pDbgBlock = hb_itemNew( pBlock );
+      DbgHookTrace( "Calling hb_dbg_SetEntry..." );
       hb_dbg_SetEntry( DbgHookC );
+      DbgHookTrace( "hb_dbg_SetEntry OK" );
    }
+   else
+      DbgHookTrace( "Block is NULL!" );
 }
 
 /* DbgHookRemove() — remove the debug hook */

@@ -9,13 +9,36 @@
  *   UI_FormRun( hForm )
  */
 
+/* Prevent windows.h from including old winsock.h (we need winsock2.h) */
+#define _WINSOCKAPI_
 #include "hbide.h"
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <string.h>
 
-/* DPI awareness - must be called before any window is created */
+#pragma comment(lib, "ws2_32.lib")
+
+/* DPI awareness + dark mode - must be called before any window is created */
 /* C++ static initializer runs before main() and before Harbour VM */
 static struct _DpiInit {
-   _DpiInit() { SetProcessDPIAware(); }
+   _DpiInit() {
+      SetProcessDPIAware();
+      /* Enable dark menus/scrollbars on Win10 1903+ / Win11 */
+      HMODULE hUx = LoadLibraryA("uxtheme.dll");
+      if( hUx ) {
+         /* SetPreferredAppMode: 0=Default, 1=AllowDark, 2=ForceDark, 3=ForceLight */
+         typedef int (WINAPI *fnSPAM)(int);
+         fnSPAM pfn = (fnSPAM) GetProcAddress(hUx, MAKEINTRESOURCEA(135));
+         if( pfn ) pfn( 2 ); /* ForceDark */
+
+         /* RefreshImmersiveColorPolicyState */
+         typedef void (WINAPI *fnRefresh)(void);
+         fnRefresh pfnR = (fnRefresh) GetProcAddress(hUx, MAKEINTRESOURCEA(104));
+         if( pfnR ) pfnR();
+
+         FreeLibrary( hUx );
+      }
+   }
 } _s_dpiInit;
 
 HB_FUNC( SETDPIAWARE )
@@ -1526,6 +1549,19 @@ HB_FUNC( UI_MENUBARCREATE )
    if( p ) p->CreateMenuBar();
 }
 
+/* UI_MenuBarSetDark( hForm ) — convert menu bar items to owner-draw dark */
+extern void DarkifyMenuBar( HMENU hMenu );
+HB_FUNC( UI_MENUBARSETDARK )
+{
+   TForm * p = GetForm(1);
+   if( p && p->FMenuBar && p->FHandle )
+   {
+      DarkifyMenuBar( p->FMenuBar );
+      SetMenu( p->FHandle, p->FMenuBar );
+      DrawMenuBar( p->FHandle );
+   }
+}
+
 /* UI_MenuPopupAdd( hForm, cText ) --> hPopup (as number) */
 HB_FUNC( UI_MENUPOPUPADD )
 {
@@ -2114,6 +2150,22 @@ HB_FUNC( UI_FORMSETPOS )
    }
 }
 
+/* UI_FormSetBgColor( hForm, nRGB ) - set background color */
+HB_FUNC( UI_FORMSETBGCOLOR )
+{
+   TForm * p = GetForm(1);
+   if( p )
+   {
+      COLORREF clr = (COLORREF) hb_parnl(2);
+      p->FClrPane = clr;
+      if( p->FBkBrush ) DeleteObject( p->FBkBrush );
+      p->FBkBrush = CreateSolidBrush( clr );
+      /* Invalidate cached grid bitmap so it's rebuilt with new bg */
+      if( p->FGridBmp ) { SelectObject( p->FGridDC, NULL ); DeleteObject( p->FGridBmp ); DeleteDC( p->FGridDC ); p->FGridBmp = NULL; }
+      if( p->FHandle ) InvalidateRect( p->FHandle, NULL, TRUE );
+   }
+}
+
 /* UI_FormGetHwnd( hForm ) --> nHwnd */
 HB_FUNC( UI_FORMGETHWND )
 {
@@ -2471,6 +2523,148 @@ static HWND s_dbgOutputEdit = NULL;
 static HWND s_dbgStatusLbl = NULL;
 static HWND s_dbgToolbar = NULL;
 
+/* Socket-based debugger (port 19800) — matches macOS/Linux architecture */
+static SOCKET       s_dbgServerSock = INVALID_SOCKET;
+static SOCKET       s_dbgClientSock = INVALID_SOCKET;
+static char         s_dbgRecvBuf[8192];
+static int          s_dbgRecvLen = 0;
+static BOOL         s_wsaInited = FALSE;
+
+static void DbgWsaInit(void)
+{
+   if( !s_wsaInited ) {
+      WSADATA wsa;
+      WSAStartup( MAKEWORD(2,2), &wsa );
+      s_wsaInited = TRUE;
+   }
+}
+
+static int DbgServerStart( int port )
+{
+   struct sockaddr_in addr;
+   int yes = 1;
+
+   DbgWsaInit();
+
+   s_dbgServerSock = socket( AF_INET, SOCK_STREAM, IPPROTO_TCP );
+   if( s_dbgServerSock == INVALID_SOCKET ) return -1;
+
+   setsockopt( s_dbgServerSock, SOL_SOCKET, SO_REUSEADDR, (const char *)&yes, sizeof(yes) );
+
+   memset( &addr, 0, sizeof(addr) );
+   addr.sin_family = AF_INET;
+   addr.sin_addr.s_addr = htonl( INADDR_LOOPBACK );
+   addr.sin_port = htons( (u_short)port );
+
+   if( bind( s_dbgServerSock, (struct sockaddr *)&addr, sizeof(addr) ) == SOCKET_ERROR ||
+       listen( s_dbgServerSock, 1 ) == SOCKET_ERROR )
+   {
+      closesocket( s_dbgServerSock );
+      s_dbgServerSock = INVALID_SOCKET;
+      return -1;
+   }
+   return 0;
+}
+
+static int DbgServerAccept( double timeoutSec )
+{
+   fd_set fds;
+   struct timeval tv;
+   double elapsed = 0;
+   MSG winMsg;
+
+   while( elapsed < timeoutSec )
+   {
+      FD_ZERO( &fds );
+      FD_SET( s_dbgServerSock, &fds );
+      tv.tv_sec = 0; tv.tv_usec = 200000;
+
+      if( select( 0, &fds, NULL, NULL, &tv ) > 0 )
+      {
+         s_dbgClientSock = accept( s_dbgServerSock, NULL, NULL );
+         if( s_dbgClientSock != INVALID_SOCKET ) return 0;
+      }
+
+      /* Pump Win32 messages while waiting */
+      while( PeekMessage( &winMsg, NULL, 0, 0, PM_REMOVE ) )
+      {
+         TranslateMessage( &winMsg );
+         DispatchMessage( &winMsg );
+      }
+      if( s_dbgState == DBG_STOPPED ) return -1;
+      elapsed += 0.25;
+   }
+   return -1;
+}
+
+static void DbgServerSend( const char * cmd )
+{
+   char buf[512];
+   if( s_dbgClientSock == INVALID_SOCKET ) return;
+   snprintf( buf, sizeof(buf), "%s\n", cmd );
+   send( s_dbgClientSock, buf, (int)strlen(buf), 0 );
+}
+
+/* Receive one complete line from the debug client (line-buffered).
+ * Returns length of line (without \n), or -1 on disconnect. */
+static int DbgServerRecv( char * buf, int bufSize )
+{
+   fd_set fds;
+   struct timeval tv;
+   MSG winMsg;
+
+   if( s_dbgClientSock == INVALID_SOCKET ) return -1;
+
+   while(1) {
+      /* Check if we already have a complete line in the buffer */
+      int i;
+      for( i = 0; i < s_dbgRecvLen; i++ )
+      {
+         if( s_dbgRecvBuf[i] == '\n' )
+         {
+            int lineLen = i;
+            while( lineLen > 0 && s_dbgRecvBuf[lineLen-1] == '\r' ) lineLen--;
+            if( lineLen >= bufSize ) lineLen = bufSize - 1;
+            memcpy( buf, s_dbgRecvBuf, (size_t)lineLen );
+            buf[lineLen] = 0;
+            int consumed = i + 1;
+            s_dbgRecvLen -= consumed;
+            if( s_dbgRecvLen > 0 )
+               memmove( s_dbgRecvBuf, s_dbgRecvBuf + consumed, (size_t)s_dbgRecvLen );
+            return lineLen;
+         }
+      }
+
+      /* No complete line yet — read more data */
+      FD_ZERO( &fds );
+      FD_SET( s_dbgClientSock, &fds );
+      tv.tv_sec = 0; tv.tv_usec = 100000;
+      int r = select( 0, &fds, NULL, NULL, &tv );
+      if( r > 0 ) {
+         int space = (int)sizeof(s_dbgRecvBuf) - s_dbgRecvLen - 1;
+         if( space <= 0 ) { s_dbgRecvLen = 0; continue; }
+         int n = recv( s_dbgClientSock, s_dbgRecvBuf + s_dbgRecvLen, space, 0 );
+         if( n <= 0 ) return -1;
+         s_dbgRecvLen += n;
+      }
+
+      /* Pump Win32 messages while waiting */
+      while( PeekMessage( &winMsg, NULL, 0, 0, PM_REMOVE ) )
+      {
+         TranslateMessage( &winMsg );
+         DispatchMessage( &winMsg );
+      }
+      if( s_dbgState == DBG_STOPPED ) return -1;
+   }
+}
+
+static void DbgServerStop(void)
+{
+   if( s_dbgClientSock != INVALID_SOCKET ) { closesocket( s_dbgClientSock ); s_dbgClientSock = INVALID_SOCKET; }
+   if( s_dbgServerSock != INVALID_SOCKET ) { closesocket( s_dbgServerSock ); s_dbgServerSock = INVALID_SOCKET; }
+   s_dbgRecvLen = 0;
+}
+
 static int DbgIsBreakpoint( const char * module, int line )
 {
    int i;
@@ -2701,6 +2895,241 @@ HB_FUNC( IDE_DEBUGGETLOCALS )
       hb_itemRelease( pEntry );
    }
    hb_itemReturnRelease( pArray );
+}
+
+/* Debug trace log */
+static void DbgTrace( const char * msg )
+{
+   FILE * f = fopen( "c:\\hbbuilder_debug\\dbg_trace_c.log", "a" );
+   if( f ) { fprintf( f, "%s\n", msg ); fclose( f ); }
+}
+
+/* IDE_DebugStart2( cExePath, bOnPause ) — socket-based debug session
+ * Mirrors the macOS/Linux implementation: starts TCP server on port 19800,
+ * launches user exe as separate process, communicates via socket protocol. */
+HB_FUNC( IDE_DEBUGSTART2 )
+{
+   const char * cExePath = hb_parc(1);
+   PHB_ITEM pOnPause = hb_param(2, HB_IT_BLOCK);
+
+   /* Clear trace log */
+   { FILE * f = fopen("c:\\hbbuilder_debug\\dbg_trace_c.log","w"); if(f) fclose(f); }
+
+   { char t[512]; snprintf(t,sizeof(t),"IDE_DebugStart2: exe='%s' block=%p state=%d", cExePath?cExePath:"(null)", pOnPause, s_dbgState); DbgTrace(t); }
+
+   if( !cExePath || s_dbgState != DBG_IDLE ) { DbgTrace("REJECTED: null exe or state != IDLE"); hb_retl( HB_FALSE ); return; }
+
+   /* Clean up any previous debug session */
+   DbgServerStop();
+   /* Kill any leftover DebugApp */
+   system( "taskkill /F /IM DebugApp.exe >nul 2>&1" );
+
+   if( s_dbgOnPause ) { hb_itemRelease( s_dbgOnPause ); s_dbgOnPause = NULL; }
+   if( pOnPause ) s_dbgOnPause = hb_itemNew( pOnPause );
+
+   /* Start TCP server */
+   DbgTrace("Starting TCP server on port 19800...");
+   if( DbgServerStart( 19800 ) != 0 )
+   {
+      DbgTrace("DbgServerStart FAILED");
+      DbgOutput( "ERROR: Could not start debug server on port 19800\r\n" );
+      hb_retl( HB_FALSE );
+      return;
+   }
+   DbgTrace("TCP server started OK");
+
+   s_dbgState = DBG_STEPPING;
+   s_nBreakpoints = 0;
+   DbgOutput( "=== Debug session started (socket) ===\r\n" );
+   DbgOutput( "Listening on port 19800...\r\n" );
+
+   /* Launch user executable as separate process */
+   {
+      STARTUPINFOA si;
+      PROCESS_INFORMATION pi;
+      char cmd[1024];
+      snprintf( cmd, sizeof(cmd), "\"%s\"", cExePath );
+      memset( &si, 0, sizeof(si) );
+      si.cb = sizeof(si);
+      si.dwFlags = STARTF_USESHOWWINDOW;
+      si.wShowWindow = SW_SHOW;
+      memset( &pi, 0, sizeof(pi) );
+      { char t[1024]; snprintf(t,sizeof(t),"CreateProcessA cmd='%s'", cmd); DbgTrace(t); }
+      if( !CreateProcessA( NULL, cmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi ) )
+      {
+         char err[512];
+         snprintf( err, sizeof(err), "ERROR: Could not launch %s (GetLastError=%lu)\r\n", cExePath, GetLastError() );
+         DbgTrace( err );
+         DbgOutput( err );
+         DbgServerStop();
+         s_dbgState = DBG_IDLE;
+         hb_retl( HB_FALSE );
+         return;
+      }
+      DbgTrace("CreateProcessA OK");
+      if( pi.hProcess ) CloseHandle( pi.hProcess );
+      if( pi.hThread ) CloseHandle( pi.hThread );
+   }
+   DbgOutput( "Launched debug process. Waiting for connection...\r\n" );
+
+   if( s_dbgStatusLbl )
+      SetWindowTextA( s_dbgStatusLbl, "Waiting for debug client..." );
+
+   /* Accept connection */
+   DbgTrace("Waiting for client connection (30s timeout)...");
+   if( DbgServerAccept( 30.0 ) != 0 )
+   {
+      DbgTrace("DbgServerAccept FAILED (timeout or stopped)");
+      DbgOutput( "ERROR: Client did not connect within 30s\r\n" );
+      DbgServerStop();
+      s_dbgState = DBG_IDLE;
+      hb_retl( HB_FALSE );
+      return;
+   }
+   DbgTrace("Client connected!");
+   DbgOutput( "Client connected.\r\n" );
+
+   /* Command loop */
+   char recvBuf[4096];
+   s_dbgState = DBG_PAUSED;
+   DbgTrace("Entering command loop...");
+
+   while( s_dbgState != DBG_IDLE && s_dbgState != DBG_STOPPED )
+   {
+      int n = DbgServerRecv( recvBuf, sizeof(recvBuf) );
+      { char t[256]; snprintf(t,sizeof(t),"recv n=%d buf='%.80s'", n, n>0?recvBuf:""); DbgTrace(t); }
+      if( n <= 0 ) {
+         DbgTrace("Client disconnected (n<=0)");
+         DbgOutput( "Client disconnected.\r\n" );
+         break;
+      }
+
+      if( strncmp( recvBuf, "HELLO", 5 ) == 0 )
+      {
+         DbgOutput( recvBuf ); DbgOutput( "\r\n" );
+         DbgServerSend( "STEP" );
+         s_dbgState = DBG_PAUSED;
+         continue;
+      }
+
+      if( strncmp( recvBuf, "PAUSE ", 6 ) == 0 )
+      {
+         /* Format: PAUSE filepath:FUNCNAME:line|VARS ...|STACK ... */
+         char localsStr[4096] = "VARS";
+         char stackStr[4096] = "STACK";
+
+         char * pipe1 = strchr( recvBuf, '|' );
+         if( pipe1 ) {
+            *pipe1 = 0;
+            char * pipe2 = strchr( pipe1 + 1, '|' );
+            if( pipe2 ) {
+               *pipe2 = 0;
+               strncpy( localsStr, pipe1 + 1, sizeof(localsStr) - 1 );
+               strncpy( stackStr, pipe2 + 1, sizeof(stackStr) - 1 );
+            } else {
+               strncpy( localsStr, pipe1 + 1, sizeof(localsStr) - 1 );
+            }
+         }
+
+         /* Parse PAUSE filepath:FUNCNAME:line */
+         char * lastColon = strrchr( recvBuf + 6, ':' );
+         if( !lastColon ) continue;
+         int line = atoi( lastColon + 1 );
+         *lastColon = 0;
+
+         char * funcColon = strrchr( recvBuf + 6, ':' );
+         const char * funcName = "";
+         if( funcColon ) {
+            funcName = funcColon + 1;
+         }
+
+         s_dbgLine = line;
+
+         /* In RUNNING mode, skip pause */
+         if( s_dbgState == DBG_RUNNING )
+         {
+            DbgServerSend( "GO" );
+            continue;
+         }
+
+         /* === STEPPING/PAUSED: show state and wait for user === */
+         s_dbgState = DBG_PAUSED;
+
+         /* Call Harbour callback: ( cFuncName, nLine, cLocals, cStack )
+          * Returns .T. if user code (should pause), .F. if framework (auto-step). */
+         HB_BOOL shouldPause = HB_TRUE;
+         if( s_dbgOnPause && HB_IS_BLOCK( s_dbgOnPause ) )
+         {
+            PHB_ITEM pFunc   = hb_itemPutC( NULL, funcName );
+            PHB_ITEM pLine   = hb_itemPutNI( NULL, line );
+            PHB_ITEM pLocals = hb_itemPutC( NULL, localsStr );
+            PHB_ITEM pStack  = hb_itemPutC( NULL, stackStr );
+            PHB_ITEM pResult = hb_itemDo( s_dbgOnPause, 4, pFunc, pLine, pLocals, pStack );
+            if( pResult && HB_IS_LOGICAL( pResult ) )
+               shouldPause = hb_itemGetL( pResult );
+            else
+               shouldPause = HB_TRUE;
+            hb_itemRelease( pFunc );
+            hb_itemRelease( pLine );
+            hb_itemRelease( pLocals );
+            hb_itemRelease( pStack );
+            if( pResult ) hb_itemRelease( pResult );
+         }
+
+         /* Framework code — auto-step */
+         if( !shouldPause )
+         {
+            DbgServerSend( "STEP" );
+            s_dbgState = DBG_PAUSED;
+            continue;
+         }
+
+         /* Update status */
+         if( s_dbgStatusLbl ) {
+            char status[512];
+            snprintf(status, sizeof(status), "Paused at %s() line %d", funcName, line);
+            SetWindowTextA( s_dbgStatusLbl, status );
+         }
+
+         /* Wait for user action (Step/Go/Stop via debug panel buttons) */
+         {
+            MSG winMsg;
+            while( s_dbgState == DBG_PAUSED )
+            {
+               if( PeekMessage( &winMsg, NULL, 0, 0, PM_REMOVE ) )
+               {
+                  TranslateMessage( &winMsg );
+                  DispatchMessage( &winMsg );
+               }
+               else
+                  Sleep( 10 );
+            }
+         }
+
+         /* Send command based on new state */
+         if( s_dbgState == DBG_STEPPING || s_dbgState == DBG_STEPOVER )
+         {
+            DbgServerSend( "STEP" );
+            s_dbgState = DBG_PAUSED;
+         }
+         else if( s_dbgState == DBG_RUNNING )
+            DbgServerSend( "GO" );
+         else if( s_dbgState == DBG_STOPPED )
+            DbgServerSend( "QUIT" );
+      }
+   }
+
+   /* Cleanup */
+   DbgServerSend( "QUIT" );
+   DbgServerStop();
+
+   /* Kill any remaining DebugApp process */
+   system( "taskkill /F /IM DebugApp.exe >nul 2>&1" );
+
+   s_dbgState = DBG_IDLE;
+   s_dbgRecvLen = 0;
+
+   hb_retl( HB_TRUE );
 }
 
 /* ================================================================
@@ -3000,6 +3429,155 @@ HB_FUNC( W32_DEBUGSETSTATUS )
 {
    if( s_dbgStatusLbl && HB_ISCHAR(1) )
       SetWindowTextA( s_dbgStatusLbl, hb_parc(1) );
+}
+
+/* W32_DebugUpdateLocalsStr( cVars ) - parse VARS string and populate Locals ListView
+ * Format: "VARS [PUBLIC] name=val(T) [PRIVATE] ... [LOCAL] ..." */
+HB_FUNC( W32_DEBUGUPDATELOCALSSTR )
+{
+   const char * cVars = HB_ISCHAR(1) ? hb_parc(1) : "";
+   if( !s_dbgLocalsLV ) return;
+
+   ListView_DeleteAllItems( s_dbgLocalsLV );
+
+   const char * p = cVars;
+   if( strncmp( p, "VARS", 4 ) == 0 ) p += 4;
+   char category[64] = "";
+   int row = 0;
+
+   while( *p )
+   {
+      while( *p == ' ' ) p++;
+      if( !*p ) break;
+
+      /* Check for [CATEGORY] header */
+      if( *p == '[' ) {
+         const char * end = strchr( p, ']' );
+         if( end ) {
+            int len = (int)(end - p - 1);
+            if( len > 63 ) len = 63;
+            strncpy( category, p + 1, len );
+            category[len] = 0;
+
+            /* Insert category header row */
+            LVITEMA item = { 0 };
+            item.mask = LVIF_TEXT;
+            item.iItem = row;
+            item.pszText = (LPSTR)category;
+            ListView_InsertItem( s_dbgLocalsLV, &item );
+            ListView_SetItemText( s_dbgLocalsLV, row, 1, (LPSTR)"" );
+            ListView_SetItemText( s_dbgLocalsLV, row, 2, (LPSTR)"---" );
+            row++;
+
+            p = end + 1;
+            continue;
+         }
+      }
+
+      /* Parse name=value(type) token */
+      char name[128] = "", value[256] = "", type[32] = "";
+      const char * eq = strchr( p, '=' );
+      if( !eq ) break;
+
+      int nLen = (int)(eq - p);
+      if( nLen > 127 ) nLen = 127;
+      strncpy( name, p, nLen ); name[nLen] = 0;
+      p = eq + 1;
+
+      /* Value extends until '(' for type or next space */
+      const char * paren = NULL;
+      const char * sp = NULL;
+      {
+         int depth = 0;
+         const char * scan = p;
+         while( *scan && !(*scan == ' ' && depth == 0) ) {
+            if( *scan == '(' ) { if( depth == 0 ) paren = scan; depth++; }
+            else if( *scan == ')' ) depth--;
+            scan++;
+         }
+         sp = scan;
+      }
+
+      if( paren && paren < sp ) {
+         int vLen = (int)(paren - p);
+         if( vLen > 255 ) vLen = 255;
+         strncpy( value, p, vLen ); value[vLen] = 0;
+         int tLen = (int)(sp - paren - 2);
+         if( tLen > 0 ) {
+            if( tLen > 31 ) tLen = 31;
+            strncpy( type, paren + 1, tLen ); type[tLen] = 0;
+         }
+      } else {
+         int vLen = (int)(sp - p);
+         if( vLen > 255 ) vLen = 255;
+         strncpy( value, p, vLen ); value[vLen] = 0;
+      }
+      p = sp;
+
+      LVITEMA item = { 0 };
+      item.mask = LVIF_TEXT;
+      item.iItem = row;
+      item.pszText = (LPSTR)name;
+      ListView_InsertItem( s_dbgLocalsLV, &item );
+      ListView_SetItemText( s_dbgLocalsLV, row, 1, (LPSTR)value );
+      ListView_SetItemText( s_dbgLocalsLV, row, 2, (LPSTR)type );
+      row++;
+   }
+}
+
+/* W32_DebugUpdateStackStr( cStack ) - parse STACK string and populate Call Stack ListView
+ * Format: "STACK FUNC(line) FUNC2(line2) ..." */
+HB_FUNC( W32_DEBUGUPDATESTACKSTR )
+{
+   const char * cStack = HB_ISCHAR(1) ? hb_parc(1) : "";
+   if( !s_dbgStackLV ) return;
+
+   ListView_DeleteAllItems( s_dbgStackLV );
+
+   const char * p = cStack;
+   if( strncmp( p, "STACK", 5 ) == 0 ) p += 5;
+   int row = 0;
+
+   while( *p )
+   {
+      while( *p == ' ' ) p++;
+      if( !*p ) break;
+
+      char token[256] = "";
+      const char * sp = strchr( p, ' ' );
+      if( !sp ) sp = p + strlen(p);
+      int tLen = (int)(sp - p);
+      if( tLen > 255 ) tLen = 255;
+      strncpy( token, p, tLen ); token[tLen] = 0;
+      p = sp;
+
+      /* Parse FUNC(line) */
+      char func[128] = "", lineStr[32] = "";
+      char * paren = strchr( token, '(' );
+      if( paren ) {
+         *paren = 0;
+         strncpy( func, token, 127 );
+         char * endP = strchr( paren + 1, ')' );
+         if( endP ) {
+            *endP = 0;
+            strncpy( lineStr, paren + 1, 31 );
+         }
+      } else {
+         strncpy( func, token, 127 );
+      }
+
+      char numStr[16];
+      snprintf( numStr, sizeof(numStr), "%d", row + 1 );
+
+      LVITEMA item = { 0 };
+      item.mask = LVIF_TEXT;
+      item.iItem = row;
+      item.pszText = (LPSTR)numStr;
+      ListView_InsertItem( s_dbgStackLV, &item );
+      ListView_SetItemText( s_dbgStackLV, row, 1, (LPSTR)func );
+      ListView_SetItemText( s_dbgStackLV, row, 2, (LPSTR)lineStr );
+      row++;
+   }
 }
 
 /* ================================================================

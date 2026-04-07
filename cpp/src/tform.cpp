@@ -4,6 +4,22 @@
 
 #include "hbide.h"
 #include <string.h>
+/* Owner-draw dark menu item data */
+struct DARKMENUITM { char szText[64]; };
+
+/* Dark mode helper: DwmSetWindowAttribute via dynamic loading (BCC has no dwmapi.h) */
+static void SetDarkTitleBar( HWND hWnd, BOOL bDark )
+{
+   typedef long (WINAPI *pfnDwm)(HWND,DWORD,const void *,DWORD);
+   static pfnDwm s_fn = NULL;
+   static int s_tried = 0;
+   if( !s_tried ) {
+      HMODULE h = LoadLibraryA("dwmapi.dll");
+      if( h ) s_fn = (pfnDwm) GetProcAddress(h, "DwmSetWindowAttribute");
+      s_tried = 1;
+   }
+   if( s_fn ) { BOOL val = bDark; s_fn(hWnd, 20, &val, sizeof(val)); }
+}
 
 /* Global pointer to the current design form (set by UI_SetDesignForm) */
 extern TForm * g_designForm;
@@ -475,7 +491,7 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
                FillRect( FGridDC, &rc, FBkBrush );
                for( y = FClientTop + 8; y < FGridH; y += 8 )
                   for( x = 8; x < FGridW; x += 8 )
-                     SetPixel( FGridDC, x, y, RGB(200, 200, 200) );
+                     SetPixel( FGridDC, x, y, RGB(90, 90, 90) );
             }
             BitBlt( hDC, 0, 0, FGridW, FGridH, FGridDC, 0, 0, SRCCOPY );
          }
@@ -502,6 +518,92 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
          }
          SetBkMode( (HDC) wParam, TRANSPARENT );
          return (LRESULT) FBkBrush;
+      }
+
+      case WM_NCACTIVATE:
+      case WM_NCPAINT:
+      {
+         LRESULT lr = DefWindowProc( FHandle, msg, wParam, lParam );
+         /* Paint dark menu bar background + items directly on non-client DC */
+         if( FMenuBar )
+         {
+            MENUBARINFO mbi;
+            memset( &mbi, 0, sizeof(mbi) );
+            mbi.cbSize = sizeof(mbi);
+            if( GetMenuBarInfo( FHandle, OBJID_MENU, 0, &mbi ) &&
+                mbi.rcBar.right > mbi.rcBar.left )
+            {
+               RECT rcWin, rcBar;
+               HDC hdc;
+               GetWindowRect( FHandle, &rcWin );
+               hdc = GetWindowDC( FHandle );
+               if( hdc )
+               {
+                  int i, n;
+                  HFONT hFont = (HFONT) GetStockObject( DEFAULT_GUI_FONT );
+                  HFONT hOld = (HFONT) SelectObject( hdc, hFont );
+                  HBRUSH hbr;
+
+                  /* Fill entire menu bar with dark color */
+                  rcBar.left   = mbi.rcBar.left - rcWin.left;
+                  rcBar.top    = mbi.rcBar.top  - rcWin.top;
+                  rcBar.right  = mbi.rcBar.right - rcWin.left;
+                  rcBar.bottom = mbi.rcBar.bottom - rcWin.top;
+                  hbr = CreateSolidBrush( RGB(45,45,48) );
+                  FillRect( hdc, &rcBar, hbr );
+                  DeleteObject( hbr );
+
+                  /* Draw each menu item */
+                  SetBkMode( hdc, TRANSPARENT );
+                  n = GetMenuItemCount( FMenuBar );
+                  for( i = 0; i < n; i++ )
+                  {
+                     MENUBARINFO mbItem;
+                     RECT rcItem;
+                     char txt[64];
+                     MENUITEMINFOA mii;
+                     UINT state;
+
+                     memset( &mbItem, 0, sizeof(mbItem) );
+                     mbItem.cbSize = sizeof(mbItem);
+                     if( !GetMenuBarInfo( FHandle, OBJID_MENU, i + 1, &mbItem ) )
+                        continue;
+
+                     rcItem.left   = mbItem.rcBar.left - rcWin.left;
+                     rcItem.top    = mbItem.rcBar.top  - rcWin.top;
+                     rcItem.right  = mbItem.rcBar.right - rcWin.left;
+                     rcItem.bottom = mbItem.rcBar.bottom - rcWin.top;
+
+                     /* Get item text */
+                     memset( &mii, 0, sizeof(mii) );
+                     mii.cbSize = sizeof(mii);
+                     mii.fMask = MIIM_STRING | MIIM_STATE;
+                     mii.dwTypeData = txt;
+                     mii.cch = sizeof(txt);
+                     txt[0] = 0;
+                     GetMenuItemInfoA( FMenuBar, i, TRUE, &mii );
+                     state = mii.fState;
+
+                     /* Highlight if selected/hot */
+                     if( state & MFS_HILITE )
+                     {
+                        hbr = CreateSolidBrush( RGB(65,65,65) );
+                        FillRect( hdc, &rcItem, hbr );
+                        DeleteObject( hbr );
+                        SetTextColor( hdc, RGB(255,255,255) );
+                     }
+                     else
+                        SetTextColor( hdc, RGB(200,200,200) );
+
+                     DrawTextA( hdc, txt, -1, &rcItem,
+                        DT_CENTER | DT_VCENTER | DT_SINGLELINE );
+                  }
+                  SelectObject( hdc, hOld );
+                  ReleaseDC( FHandle, hdc );
+               }
+            }
+         }
+         return lr;
       }
 
       case WM_DRAWITEM:
@@ -540,6 +642,32 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
                   return TRUE;
                }
             }
+         }
+         /* Dark mode: owner-draw palette tabs */
+         if( pDIS && pDIS->CtlType == ODT_TAB && FPalette &&
+             pDIS->hwndItem == FPalette->FTabCtrl )
+         {
+            char txt[64] = "";
+            TCITEMA tci = {0};
+            HBRUSH hbr;
+            int isSel = ( TabCtrl_GetCurSel( pDIS->hwndItem ) == (int)pDIS->itemID );
+            tci.mask = TCIF_TEXT;
+            tci.pszText = txt;
+            tci.cchTextMax = sizeof(txt);
+            SendMessageA( pDIS->hwndItem, TCM_GETITEMA, pDIS->itemID, (LPARAM)&tci );
+
+            hbr = CreateSolidBrush( isSel ? RGB(60,60,60) : RGB(45,45,48) );
+            FillRect( pDIS->hDC, &pDIS->rcItem, hbr );
+            DeleteObject( hbr );
+
+            SetTextColor( pDIS->hDC, isSel ? RGB(255,255,255) : RGB(160,160,160) );
+            SetBkMode( pDIS->hDC, TRANSPARENT );
+            {
+               HFONT hFont = (HFONT) SendMessage( pDIS->hwndItem, WM_GETFONT, 0, 0 );
+               if( hFont ) SelectObject( pDIS->hDC, hFont );
+            }
+            DrawTextA( pDIS->hDC, txt, -1, &pDIS->rcItem, DT_CENTER | DT_VCENTER | DT_SINGLELINE );
+            return TRUE;
          }
          break;
       }
@@ -1185,6 +1313,9 @@ void TForm::Run()
    if( FCenter )
       Center();
 
+   /* Dark title bar on Windows 10 1809+ / Windows 11 */
+   SetDarkTitleBar( FHandle, TRUE );
+
    ShowWindow( FHandle, SW_SHOW );
    UpdateWindow( FHandle );
 
@@ -1210,6 +1341,24 @@ void TForm::Run()
 void TForm::Show()
 {
    CreateHandle( NULL );
+
+   /* Apply dark mode to every form window (title bar + menus) */
+   if( FHandle )
+   {
+      /* Dark title bar */
+      SetDarkTitleBar( FHandle, TRUE );
+      /* AllowDarkModeForWindow - uxtheme ordinal 133 */
+      {
+         HMODULE hUx = GetModuleHandleA("uxtheme.dll");
+         if( !hUx ) hUx = LoadLibraryA("uxtheme.dll");
+         if( hUx ) {
+            typedef BOOL (WINAPI *fnADMFW)(HWND, BOOL);
+            fnADMFW fn = (fnADMFW) GetProcAddress(hUx, MAKEINTRESOURCEA(133));
+            if( fn ) fn( FHandle, TRUE );
+         }
+      }
+   }
+
    CreateAllChildren();
 
    if( FDesignMode )
@@ -1223,6 +1372,10 @@ void TForm::Show()
    else
       ShowWindow( FHandle, SW_SHOW );
    UpdateWindow( FHandle );
+
+   /* Menu bar dark mode is applied later via UI_MenuBarSetDark
+    * because menus are created after Show() */
+
    FRunning = TRUE;
 }
 
@@ -1689,6 +1842,40 @@ void TForm::CreateMenuBar()
 {
    if( !FMenuBar )
       FMenuBar = CreateMenu();
+}
+
+/* Dark menu bar: convert top-level items to owner-draw */
+void DarkifyMenuBar( HMENU hMenu )
+{
+   int i, n;
+   MENUITEMINFOA mii;
+   char buf[64];
+   struct DARKMENUITM * dm;
+
+   if( !hMenu ) return;
+   n = GetMenuItemCount( hMenu );
+   for( i = 0; i < n; i++ )
+   {
+      memset( &mii, 0, sizeof(mii) );
+      mii.cbSize = sizeof(mii);
+      mii.fMask = MIIM_TYPE | MIIM_DATA;
+      mii.dwTypeData = buf;
+      mii.cch = sizeof(buf);
+      buf[0] = 0;
+      GetMenuItemInfoA( hMenu, i, TRUE, &mii );
+
+      dm = (struct DARKMENUITM *) malloc( sizeof(struct DARKMENUITM) );
+      strncpy( dm->szText, buf, 63 );
+      dm->szText[63] = 0;
+
+      memset( &mii, 0, sizeof(mii) );
+      mii.cbSize = sizeof(mii);
+      mii.fMask = MIIM_FTYPE | MIIM_DATA;
+      mii.fType = MFT_OWNERDRAW;
+      mii.dwItemData = (ULONG_PTR) dm;
+      SetMenuItemInfoA( hMenu, i, TRUE, &mii );
+   }
+
 }
 
 HMENU TForm::AddMenuPopup( const char * szText )

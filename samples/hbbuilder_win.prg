@@ -35,6 +35,7 @@ static lDarkMode := .T.   // Dark mode state for toggle
 static cSelectedCompiler := ""  // "", "msvc", "bcc" (empty = auto-detect)
 static nSelectedCompIdx := 0    // index into aCompilers (0 = auto)
 static aCompilers := nil        // compiler registry from ScanCompilers()
+static aDbgOffsets              // Line offset map for debug_main.prg → editor tabs
 
 function Main()
 
@@ -42,6 +43,14 @@ function Main()
    local nBarH, nInsW, nEditorX, nEditorW, nEditorH
    local nFormX, nFormY, nInsTop, nEditorTop, nBottomY
    local cIcoDir, aCI0, cCompLabel
+
+   // Load dark mode preference from INI
+   lDarkMode := ( IniRead( "IDE", "DarkMode", "1" ) == "1" )
+
+   // Apply dark mode to system (menus, scrollbars) — must be before any window
+   if lDarkMode
+      W32_SetAppDarkMode( .T. )
+   endif
 
    // Check if Harbour and BCC are installed
    CheckHarbourInstall()
@@ -75,8 +84,11 @@ function Main()
    oIDE:Show()
    W32_BringToTop( UI_FormGetHwnd( oIDE:hCpp ) )
 
-   // Enable dark mode for all IDE windows (Windows 10/11)
-   W32_SetDarkMode( UI_FormGetHwnd( oIDE:hCpp ), .T. )
+   // Enable dark mode for IDE windows (Windows 10/11)
+   if lDarkMode
+      W32_SetWindowDarkMode( UI_FormGetHwnd( oIDE:hCpp ), .T. )
+      UI_FormSetBgColor( oIDE:hCpp, 45 + 45 * 256 + 48 * 65536 )
+   endif
 
    // Inspector and editor: compensate DWM invisible borders (~8px each side)
    nInsTop  := W32_GetWindowBottom( UI_FormGetHwnd( oIDE:hCpp ) ) - 10
@@ -130,6 +142,8 @@ function Main()
    MENUITEM "&Inspector"       OF oView ACTION InspectorOpen()
    MENUITEM "&Project Inspector" OF oView ACTION ShowProjectInspector()
    MENUITEM "&Debugger"          OF oView ACTION W32_DebugPanel()
+   MENUSEPARATOR OF oView
+   MENUITEM "&Dark Mode"           OF oView ACTION ToggleDarkMode()
 
    DEFINE POPUP oProject PROMPT "&Project" OF oIDE
    MENUITEM "&Add to Project..."    OF oProject ACTION AddToProject()
@@ -261,6 +275,8 @@ function Main()
    UI_MenuSetBitmapByPos( oGit:hPopup, 14, cIcoDir + "menu_git_log.png" )
    // Help menu (0:Docs, 1:QuickStart, 2:Controls, -sep-, 4:About)
    UI_MenuSetBitmapByPos( oHelp:hPopup, 4, cIcoDir + "menu_about.png" )
+
+   // Dark menu bar is painted via WM_NCPAINT in tform.cpp
 
    // Speedbar (toolbar with 28x28 icon-sized buttons)
    DEFINE TOOLBAR oTB OF oIDE
@@ -536,6 +552,9 @@ static function CreateDesignForm( nX, nY )
    // Create new empty form (like C++Builder File > New > VCL Forms Application)
    DEFINE FORM oDesignForm TITLE cName SIZE 650, 421 FONT "Segoe UI", 12 SIZABLE
    UI_FormSetPos( oDesignForm:hCpp, nX, nY )
+   if lDarkMode
+      UI_FormSetBgColor( oDesignForm:hCpp, 45 + 45 * 256 + 45 * 65536 )
+   endif
 
    // Register in project form list
    // { cName, oForm, cCode, nX, nY }
@@ -1706,6 +1725,13 @@ static function TBRun()
    cAllPrg += "INIT PROCEDURE _InitDPI()" + Chr(10)
    cAllPrg += "   SetDPIAware()" + Chr(10)
    cAllPrg += "return" + Chr(10)
+   // Platform stubs for macOS/Linux functions referenced by classes.prg
+   cAllPrg += '#pragma BEGINDUMP' + Chr(10)
+   cAllPrg += '#include <hbapi.h>' + Chr(10)
+   cAllPrg += 'HB_FUNC( UI_MEMONEW )        { hb_retnint( 0 ); }' + Chr(10)
+   cAllPrg += 'HB_FUNC( MAC_RUNTIMEERRORDIALOG ) { hb_retni( 0 ); }' + Chr(10)
+   cAllPrg += 'HB_FUNC( MAC_APPTERMINATE )  { }' + Chr(10)
+   cAllPrg += '#pragma ENDDUMP' + Chr(10)
    MemoWrit( cBuildDir + "\main.prg", cAllPrg )
 
    // Step 3: Compile user code with Harbour
@@ -1853,7 +1879,7 @@ static function TBRun()
          cRspContent += "gtwin.lib gtwvt.lib gtgui.lib" + Chr(10)
          cRspContent += "user32.lib gdi32.lib comctl32.lib comdlg32.lib shell32.lib" + Chr(10)
          cRspContent += "ole32.lib oleaut32.lib advapi32.lib ws2_32.lib winmm.lib" + Chr(10)
-         cRspContent += "msimg32.lib gdiplus.lib ucrt.lib vcruntime.lib msvcrt.lib" + Chr(10)
+         cRspContent += "msimg32.lib gdiplus.lib iphlpapi.lib ucrt.lib vcruntime.lib msvcrt.lib" + Chr(10)
          MemoWrit( cRsp, cRspContent )
          cCmd := 'cmd /S /c ""' + cLinker + '" @"' + cRsp + '" 2>&1"'
       else
@@ -1871,7 +1897,7 @@ static function TBRun()
                  " hbdebug.lib hbpcre.lib hbzlib.lib" + ;
                  " hbsqlit3.lib sqlite3.lib" + ;
                  " gtwin.lib gtwvt.lib gtgui.lib" + ;
-                 " cw32mt.lib import32.lib ws2_32.lib winmm.lib" + ;
+                 " cw32mt.lib import32.lib ws2_32.lib winmm.lib iphlpapi.lib" + ;
                  " user32.lib gdi32.lib comctl32.lib comdlg32.lib shell32.lib" + ;
                  " ole32.lib oleaut32.lib uuid.lib advapi32.lib" + ;
                  " msimg32.lib gdiplus.lib,,"
@@ -2003,83 +2029,384 @@ static function ClearBreakpoints()
 return nil
 
 static function DebugStepOver()
-   local nState := IDE_DebugGetState()
-   if nState == 2  // DBG_PAUSED
+   if IDE_DebugGetState() == 2  // DBG_PAUSED
       IDE_DebugStepOver()
    else
-      W32_DebugPanel()
+      MsgInfo( "Start debug first with Debug button" )
    endif
 return nil
 
 static function DebugStepInto()
-   local nState := IDE_DebugGetState()
-   if nState == 2  // DBG_PAUSED
+   if IDE_DebugGetState() == 2  // DBG_PAUSED
       IDE_DebugStep()
    else
-      W32_DebugPanel()
+      MsgInfo( "Start debug first with Debug button" )
    endif
 return nil
 
-static function ShowDebugPanel()
-   W32_DebugPanel()
-return nil
-
-// === Debug Run (compile .hrb and launch debugger) ===
+// === Debug Run (socket-based, native exe — matches macOS/Linux) ===
 
 static function TBDebugRun()
 
-   local cProjDir, cBuildDir, cCmd, cOutput
+   local cBuildDir, cOutput, cLog, i, lError
+   local cHbDir, cHbBin, cHbInc, cHbLib
+   local cCDir, cCC, cLinker
+   local cProjDir, cAllPrg, cCmd, cSection
+   local cCompiler, cMsvcBase, cWinKit, cWinKitVer
+   local cMsvcInc, cMsvcLib, cUcrtInc, cUmInc, cSharedInc, cUcrtLib, cUmLib
+   local cRsp, cRspContent, aCI, cObjs
+   local cMainPrg, nCurLine, cCppBase, k
+   local aCppFiles
 
-   cProjDir  := SubStr( HB_DirBase(), 1, Len(HB_DirBase()) - 5 )  // strip "bin\"
-   cBuildDir := cProjDir + "build"
+   SaveActiveFormCode()
 
-   W32_DebugPanel()
-   W32_DebugSetStatus( "Compiling..." )
+   cBuildDir := "c:\hbbuilder_debug"
+   cHbDir    := "c:\harbour"
+   cHbInc    := cHbDir + "\include"
+   cProjDir  := "c:\HarbourBuilder"
+   cLog      := ""
+   lError    := .F.
 
-   // Save current code
-   MemoWrit( cBuildDir + "\Project1.prg", CodeEditorGetTabText( hCodeEditor, 1 ) )
-   if Len( aForms ) > 0
-      MemoWrit( cBuildDir + "\" + aForms[1][1] + ".prg", ;
-         CodeEditorGetTabText( hCodeEditor, 2 ) )
-   endif
-
-   // Copy support files
-   W32_ShellExec( 'cmd /c mkdir "' + cBuildDir + '" 2>nul' )
-   W32_ShellExec( 'cmd /c copy "' + cProjDir + 'harbour\classes.prg" "' + cBuildDir + '\" >nul 2>&1' )
-   W32_ShellExec( 'cmd /c copy "' + cProjDir + 'harbour\hbbuilder.ch" "' + cBuildDir + '\" >nul 2>&1' )
-
-   // Compile to .hrb (portable bytecode for in-process execution)
-   cCmd := 'cmd /c "c:\harbour\bin\win\bcc\harbour.exe -gh -n -q -I"' + ;
-           cBuildDir + '" "' + cBuildDir + '\Project1.prg" 2>&1"'
-   cOutput := W32_ShellExec( cCmd )
-
-   if ! File( cBuildDir + "\Project1.hrb" )
-      W32_DebugSetStatus( "Compile FAILED" )
-      MsgInfo( "Debug compile failed:" + Chr(10) + cOutput )
+   // Detect compiler
+   aCI := GetCompilerInfo()
+   if aCI == nil
+      MsgInfo( "No C compiler found!" + Chr(10) + Chr(10) + ;
+               "Use Tools > Select C Compiler, or install:" + Chr(10) + ;
+               "- Visual Studio Build Tools (free)" + Chr(10) + ;
+               "- Embarcadero BCC" )
       return nil
    endif
 
-   W32_DebugSetStatus( "Running (debugger active)..." )
+   cCompiler := aCI[1]
 
-   // Start debug session with pause callback
-   IDE_DebugStart( cBuildDir + "\Project1.hrb", ;
-      { |cModule, nLine| OnDebugPause( cModule, nLine ) } )
+   if cCompiler == "msvc"
+      cMsvcBase  := aCI[4]
+      cWinKit    := "c:\Program Files (x86)\Windows Kits\10"
+      cWinKitVer := aCI[5]
+      cCC        := cMsvcBase + '\bin\Hostx86\x86\cl.exe'
+      cLinker    := cMsvcBase + '\bin\Hostx86\x86\link.exe'
+      cMsvcInc   := cMsvcBase + "\include"
+      cMsvcLib   := cMsvcBase + "\lib\x86"
+      cUcrtInc   := cWinKit + "\Include\" + cWinKitVer + "\ucrt"
+      cUmInc     := cWinKit + "\Include\" + cWinKitVer + "\um"
+      cSharedInc := cWinKit + "\Include\" + cWinKitVer + "\shared"
+      cUcrtLib   := cWinKit + "\Lib\" + cWinKitVer + "\ucrt\x86"
+      cUmLib     := cWinKit + "\Lib\" + cWinKitVer + "\um\x86"
+      cHbBin     := cHbDir + "\bin\win\msvc"
+      cHbLib     := cHbDir + "\lib\win\msvc"
+   else
+      cCDir      := aCI[4]
+      cCC        := cCDir + "\bin\bcc32.exe"
+      cLinker    := cCDir + "\bin\ilink32.exe"
+      cHbBin     := cHbDir + "\bin\win\bcc"
+      cHbLib     := cHbDir + "\lib\win\bcc"
+   endif
 
+   W32_ShellExec( 'cmd /c mkdir "' + cBuildDir + '" 2>nul' )
+   W32_ShellExec( 'cmd /c del "' + cBuildDir + '\DebugApp.exe" 2>nul' )
+   W32_ShellExec( 'cmd /c del "' + cBuildDir + '\*.obj" 2>nul' )
+
+   W32_DebugSetStatus( "Compiling debug build..." )
+
+   // Step 1: Save user code + copy framework
+   cLog += "[1] Saving files..." + Chr(10)
+   MemoWrit( cBuildDir + "\Project1.prg", CodeEditorGetTabText( hCodeEditor, 1 ) )
+   for i := 1 to Len( aForms )
+      MemoWrit( cBuildDir + "\" + aForms[i][1] + ".prg", ;
+         CodeEditorGetTabText( hCodeEditor, i + 1 ) )
+   next
+   W32_ShellExec( 'cmd /c copy "' + cProjDir + '\harbour\classes.prg" "' + cBuildDir + '\" >nul 2>&1' )
+   W32_ShellExec( 'cmd /c copy "' + cProjDir + '\harbour\hbbuilder.ch" "' + cBuildDir + '\" >nul 2>&1' )
+   W32_ShellExec( 'cmd /c copy "' + cProjDir + '\harbour\dbgclient.prg" "' + cBuildDir + '\" >nul 2>&1' )
+
+   // Step 2: Assemble debug_main.prg (tracking line offsets for each section)
+   cLog += "[2] Assembling debug_main.prg..." + Chr(10)
+
+   cAllPrg := '#include "hbbuilder.ch"' + Chr(10)
+   cAllPrg += "REQUEST HB_GT_GUI_DEFAULT" + Chr(10)
+   cAllPrg += "INIT PROCEDURE __DbgInit" + Chr(10)
+   cAllPrg += "   DbgClientStart( 19800 )" + Chr(10)
+   cAllPrg += "return" + Chr(10) + Chr(10)
+   // DPI awareness
+   cAllPrg += "INIT PROCEDURE _InitDPI()" + Chr(10)
+   cAllPrg += "   SetDPIAware()" + Chr(10)
+   cAllPrg += "return" + Chr(10) + Chr(10)
+   nCurLine := 11
+
+   aDbgOffsets := {}
+
+   // Project1.prg
+   AAdd( aDbgOffsets, { nCurLine, "Project1.prg", 1, 1 } )
+   cMainPrg := CodeEditorGetTabText( hCodeEditor, 1 )
+   cMainPrg := StrTran( cMainPrg, '#include "hbbuilder.ch"', "" )
+   cAllPrg += cMainPrg + Chr(10)
+   nCurLine += NumLines( cMainPrg ) + 1
+
+   // Form files
+   for i := 1 to Len( aForms )
+      AAdd( aDbgOffsets, { nCurLine, aForms[i][1] + ".prg", i + 1, 2 } )
+      cSection := MemoRead( cBuildDir + "\" + aForms[i][1] + ".prg" )
+      cAllPrg += cSection + Chr(10)
+      nCurLine += NumLines( cSection ) + 1
+   next
+
+   // classes.prg (framework — not in editor)
+   AAdd( aDbgOffsets, { nCurLine, "classes.prg", 0, 0 } )
+   cSection := MemoRead( cBuildDir + "\classes.prg" )
+   cAllPrg += cSection + Chr(10)
+   nCurLine += NumLines( cSection ) + 1
+
+   // dbgclient.prg (debug client — not in editor)
+   AAdd( aDbgOffsets, { nCurLine, "dbgclient.prg", 0, 0 } )
+   cAllPrg += MemoRead( cBuildDir + "\dbgclient.prg" ) + Chr(10)
+
+   // Platform stubs for macOS/Linux functions referenced by classes.prg
+   cAllPrg += '#pragma BEGINDUMP' + Chr(10)
+   cAllPrg += '#include <hbapi.h>' + Chr(10)
+   cAllPrg += 'HB_FUNC( UI_MEMONEW )        { hb_retnint( 0 ); }' + Chr(10)
+   cAllPrg += 'HB_FUNC( MAC_RUNTIMEERRORDIALOG ) { hb_retni( 0 ); }' + Chr(10)
+   cAllPrg += 'HB_FUNC( MAC_APPTERMINATE )  { }' + Chr(10)
+   cAllPrg += '#pragma ENDDUMP' + Chr(10)
+
+   MemoWrit( cBuildDir + "\debug_main.prg", cAllPrg )
+
+   // Step 3: Harbour compile → C
+   cLog += "[3] Harbour compile..." + Chr(10)
+   cCmd := cHbBin + '\harbour.exe ' + cBuildDir + '\debug_main.prg /b /n /w /q' + ;
+           " /i" + cHbInc + " /i" + cBuildDir + ;
+           " /o" + cBuildDir + "\debug_main.c"
+   cOutput := W32_ShellExec( cCmd )
+   if "Error" $ cOutput
+      cLog += cOutput + Chr(10)
+      lError := .T.
+   else
+      cLog += "    OK" + Chr(10)
+   endif
+
+   // Step 4: Compile C sources (debug_main.c)
+   if ! lError
+      cLog += "[4] C compile..." + Chr(10)
+      if cCompiler == "msvc"
+         cRspContent := "/c /Od /Zi /W0 /EHsc" + Chr(10)
+         cRspContent += '/I"' + cHbInc + '"' + Chr(10)
+         cRspContent += '/I"' + cMsvcInc + '"' + Chr(10)
+         cRspContent += '/I"' + cUcrtInc + '"' + Chr(10)
+         cRspContent += '/I"' + cUmInc + '"' + Chr(10)
+         cRspContent += '/I"' + cSharedInc + '"' + Chr(10)
+         cRspContent += '/I"' + cProjDir + '\cpp\include"' + Chr(10)
+         cRsp := cBuildDir + "\cl_dbg.rsp"
+         MemoWrit( cRsp, cRspContent + '"' + cBuildDir + '\debug_main.c"' + Chr(10) + '/Fo"' + cBuildDir + '\debug_main.obj"' )
+         cCmd := 'cmd /S /c ""' + cCC + '" @"' + cRsp + '" 2>&1"'
+      else
+         cCmd := cCC + ' -c -O0 -tW -w- -I' + cHbInc + ;
+                 " -I" + cCDir + "\include" + ;
+                 " -I" + cProjDir + "\cpp\include" + ;
+                 " " + cBuildDir + "\debug_main.c" + ;
+                 " -o" + cBuildDir + "\debug_main.obj"
+      endif
+      cOutput := W32_ShellExec( cCmd )
+      if "error" $ Lower( cOutput )
+         cLog += cOutput + Chr(10)
+         lError := .T.
+      else
+         cLog += "    OK" + Chr(10)
+      endif
+   endif
+
+   // Step 5: Compile dbghook.c
+   if ! lError
+      cLog += "[5] Compiling dbghook.c..." + Chr(10)
+      if cCompiler == "msvc"
+         cRsp := cBuildDir + "\cl_hook.rsp"
+         MemoWrit( cRsp, cRspContent + '"' + cProjDir + '\harbour\dbghook.c"' + Chr(10) + '/Fo"' + cBuildDir + '\dbghook.obj"' )
+         cCmd := 'cmd /S /c ""' + cCC + '" @"' + cRsp + '" 2>&1"'
+      else
+         cCmd := cCC + ' -c -O2 -tW -w- -I' + cHbInc + ;
+                 " -I" + cCDir + "\include" + ;
+                 " " + cProjDir + "\harbour\dbghook.c" + ;
+                 " -o" + cBuildDir + "\dbghook.obj"
+      endif
+      cOutput := W32_ShellExec( cCmd )
+      if "error" $ Lower( cOutput ) .or. ! File( cBuildDir + "\dbghook.obj" )
+         cLog += "    FAILED:" + Chr(10) + cOutput + Chr(10)
+         lError := .T.
+      else
+         cLog += "    OK" + Chr(10)
+      endif
+   endif
+
+   // Step 6: Compile C++ core (same as TBRun)
+   if ! lError
+      cLog += "[6] Compiling C++ core..." + Chr(10)
+      aCppFiles := { "tcontrol", "tform", "tcontrols", "hbbridge" }
+      if cCompiler == "msvc"
+         cCppBase := "/c /Od /Zi /W0 /EHsc" + Chr(10) + ;
+                 '/I"' + cHbInc + '"' + Chr(10) + ;
+                 '/I"' + cMsvcInc + '"' + Chr(10) + ;
+                 '/I"' + cUcrtInc + '"' + Chr(10) + ;
+                 '/I"' + cUmInc + '"' + Chr(10) + ;
+                 '/I"' + cSharedInc + '"' + Chr(10) + ;
+                 '/I"' + cProjDir + '\cpp\include"' + Chr(10)
+      else
+         cCppBase := " -c -O2 -tW -w- -I" + cHbInc + ;
+                 " -I" + cCDir + "\include" + ;
+                 " -I" + cProjDir + "\cpp\include "
+      endif
+      for k := 1 to Len( aCppFiles )
+         if cCompiler == "msvc"
+            cRsp := cBuildDir + "\cl_" + aCppFiles[k] + ".rsp"
+            MemoWrit( cRsp, cCppBase + '"' + cProjDir + "\cpp\src\" + aCppFiles[k] + '.cpp"' + Chr(10) + ;
+                     '/Fo"' + cBuildDir + "\" + aCppFiles[k] + '.obj"' )
+            cCmd := 'cmd /S /c ""' + cCC + '" @"' + cRsp + '" 2>&1"'
+         else
+            cCmd := cCC + cCppBase + ;
+                    cProjDir + "\cpp\src\" + aCppFiles[k] + ".cpp" + ;
+                    " -o" + cBuildDir + "\" + aCppFiles[k] + ".obj"
+         endif
+         cOutput := W32_ShellExec( cCmd )
+         if "error" $ Lower( cOutput )
+            cLog += "    FAILED (" + aCppFiles[k] + "):" + Chr(10) + cOutput + Chr(10)
+            lError := .T.
+            exit
+         endif
+      next
+      if ! lError; cLog += "    OK" + Chr(10); endif
+   endif
+
+   // Step 7: Link native executable (DebugApp.exe)
+   if ! lError
+      cLog += "[7] Linking DebugApp.exe..." + Chr(10)
+      cObjs := cBuildDir + "\debug_main.obj " + ;
+               cBuildDir + "\dbghook.obj " + ;
+               cBuildDir + "\tcontrol.obj " + ;
+               cBuildDir + "\tform.obj " + ;
+               cBuildDir + "\tcontrols.obj " + ;
+               cBuildDir + "\hbbridge.obj"
+      if cCompiler == "msvc"
+         cRsp := cBuildDir + "\link_dbg.rsp"
+         cRspContent := ""
+         cRspContent += "/NOLOGO /SUBSYSTEM:WINDOWS /NODEFAULTLIB:LIBCMT" + Chr(10)
+         cRspContent += '/OUT:"' + cBuildDir + '\DebugApp.exe"' + Chr(10)
+         cRspContent += '/LIBPATH:"' + cMsvcLib + '"' + Chr(10)
+         cRspContent += '/LIBPATH:"' + cUcrtLib + '"' + Chr(10)
+         cRspContent += '/LIBPATH:"' + cUmLib + '"' + Chr(10)
+         cRspContent += '/LIBPATH:"' + cHbLib + '"' + Chr(10)
+         cRspContent += cObjs + Chr(10)
+         cRspContent += "hbrtl.lib hbvm.lib hbcpage.lib hblang.lib hbrdd.lib" + Chr(10)
+         cRspContent += "hbmacro.lib hbpp.lib hbcommon.lib hbcplr.lib hbct.lib" + Chr(10)
+         cRspContent += "hbhsx.lib hbsix.lib hbusrrdd.lib" + Chr(10)
+         cRspContent += "rddntx.lib rddnsx.lib rddcdx.lib rddfpt.lib" + Chr(10)
+         cRspContent += "hbdebug.lib hbpcre.lib hbzlib.lib" + Chr(10)
+         cRspContent += "hbsqlit3.lib sqlite3.lib" + Chr(10)
+         cRspContent += "gtwin.lib gtwvt.lib gtgui.lib" + Chr(10)
+         cRspContent += "user32.lib gdi32.lib comctl32.lib comdlg32.lib shell32.lib" + Chr(10)
+         cRspContent += "ole32.lib oleaut32.lib advapi32.lib ws2_32.lib winmm.lib" + Chr(10)
+         cRspContent += "msimg32.lib gdiplus.lib iphlpapi.lib ucrt.lib vcruntime.lib msvcrt.lib" + Chr(10)
+         MemoWrit( cRsp, cRspContent )
+         cCmd := 'cmd /S /c ""' + cLinker + '" @"' + cRsp + '" 2>&1"'
+      else
+         cObjs := "c0w32.obj " + cObjs
+         cCmd := cLinker + ' -Gn -aa -Tpe' + ;
+                 " -L" + cCDir + "\lib" + ;
+                 " -L" + cCDir + "\lib\psdk" + ;
+                 " -L" + cHbLib + ;
+                 " " + cObjs + "," + ;
+                 " " + cBuildDir + "\DebugApp.exe,," + ;
+                 " hbrtl.lib hbvm.lib hbcpage.lib hblang.lib hbrdd.lib" + ;
+                 " hbmacro.lib hbpp.lib hbcommon.lib hbcplr.lib hbct.lib" + ;
+                 " hbhsx.lib hbsix.lib hbusrrdd.lib" + ;
+                 " rddntx.lib rddnsx.lib rddcdx.lib rddfpt.lib" + ;
+                 " hbdebug.lib hbpcre.lib hbzlib.lib" + ;
+                 " hbsqlit3.lib sqlite3.lib" + ;
+                 " gtwin.lib gtwvt.lib gtgui.lib" + ;
+                 " cw32mt.lib import32.lib ws2_32.lib winmm.lib iphlpapi.lib" + ;
+                 " user32.lib gdi32.lib comctl32.lib comdlg32.lib shell32.lib" + ;
+                 " ole32.lib oleaut32.lib uuid.lib advapi32.lib" + ;
+                 " msimg32.lib gdiplus.lib,,"
+      endif
+      cOutput := W32_ShellExec( cCmd )
+      if ! File( cBuildDir + "\DebugApp.exe" )
+         cLog += "    FAILED:" + Chr(10) + cOutput + Chr(10)
+         lError := .T.
+      else
+         cLog += "    OK" + Chr(10)
+      endif
+   endif
+
+   if lError
+      W32_BuildErrorDialog( "Debug Build Failed", cLog )
+      return nil
+   endif
+
+   // Step 8: Launch socket-based debug session
+   cLog += "[8] Launching socket debugger..." + Chr(10)
+   cLog += "    Exe: " + cBuildDir + "\DebugApp.exe" + Chr(10)
+   cLog += "    Exists: " + iif( File( cBuildDir + "\DebugApp.exe" ), "YES", "NO" ) + Chr(10)
+   MemoWrit( cBuildDir + "\debug_trace.log", cLog )
+
+   W32_DebugSetStatus( "Launching debugger..." )
+   W32_ProcessEvents()
+   CodeEditorSelectTab( hCodeEditor, 1 )  // switch to Project1.prg
+   W32_ProcessEvents()
+
+   MemoWrit( cBuildDir + "\debug_trace.log", cLog + "    Calling IDE_DebugStart2..." + Chr(10) )
+
+   IDE_DebugStart2( cBuildDir + "\DebugApp.exe", ;
+      { |cFunc, nLine, cLocals, cStack| OnDebugPause( cFunc, nLine, cLocals, cStack ) } )
+
+   MemoWrit( cBuildDir + "\debug_trace.log", cLog + "    IDE_DebugStart2 returned." + Chr(10) )
+
+   // Restore: clear debug marker
+   CodeEditorShowDebugLine( hCodeEditor, 0 )
    W32_DebugSetStatus( "Ready" )
 
 return nil
 
-static function OnDebugPause( cModule, nLine )
+// === Debug Pause Callback (called from socket command loop) ===
 
-   local aLocals
+static function OnDebugPause( cFunc, nLine, cLocals, cStack )
 
-   W32_DebugSetStatus( "Paused at " + cModule + ":" + LTrim(Str(nLine)) )
+   local i, nTab, nTabLine
 
-   // Update locals display
-   aLocals := IDE_DebugGetLocals( 1 )
-   W32_DebugUpdateLocals( aLocals )
+   // Map debug_main.prg line number to the correct editor tab and line
+   nTab := 0
+   nTabLine := 0
+   if aDbgOffsets != nil
+      for i := Len( aDbgOffsets ) to 1 step -1
+         if nLine >= aDbgOffsets[i][1]
+            nTab := aDbgOffsets[i][3]
+            nTabLine := nLine - aDbgOffsets[i][1] + aDbgOffsets[i][4]
+            exit
+         endif
+      next
+   endif
 
-return nil
+   // Framework code (nTab == 0) — skip, don't pause, don't update
+   if nTab == 0
+      return .f.
+   endif
+
+   // Select the tab and highlight the line
+   if nTabLine > 0
+      CodeEditorSelectTab( hCodeEditor, nTab )
+      CodeEditorShowDebugLine( hCodeEditor, nTabLine )
+   endif
+
+   // Map local index names to real names from source code
+   if cLocals != nil .and. nTab > 0
+      cLocals := DbgMapLocalNames( cLocals, cFunc, nTab )
+   endif
+
+   // Update debug panel with locals and call stack
+   W32_DebugSetStatus( "Paused at " + cFunc + "() line " + LTrim(Str(nTabLine)) )
+   if cLocals != nil
+      W32_DebugUpdateLocalsStr( cLocals )
+   endif
+   if cStack != nil
+      W32_DebugUpdateStackStr( DbgFixStackLines( cStack ) )
+   endif
+
+return .t.  // pause here — user code
 
 // === AI Assistant (Ollama / LM Studio) ===
 
@@ -2138,6 +2465,206 @@ static function CheckHarbourInstall()
    endif
 
 return nil
+
+// === Dark Mode Toggle ===
+
+static function ToggleDarkMode()
+
+   lDarkMode := ! lDarkMode
+
+   // Save to INI
+   IniWrite( "IDE", "DarkMode", iif( lDarkMode, "1", "0" ) )
+
+   MsgInfo( "Dark mode: " + iif( lDarkMode, "ON", "OFF" ) + Chr(10) + ;
+            Chr(10) + ;
+            "Restart HbBuilder to apply the change.", ;
+            "Theme Changed" )
+
+return nil
+
+static function IniWrite( cSection, cKey, cValue )
+
+   local cFile := HB_DirBase() + "..\hbbuilder.ini"
+   local cContent, cLine, aLines, i, lFound, cSearch
+
+   cContent := MemoRead( cFile )
+   if Empty( cContent )
+      cContent := ""
+   endif
+
+   aLines := HB_ATokens( cContent, Chr(10) )
+   cSearch := Lower( cKey ) + "="
+   lFound := .f.
+
+   for i := 1 to Len( aLines )
+      if Lower( AllTrim( aLines[i] ) ) == Lower( cKey ) + "=" + Lower( cValue )
+         return nil  // already set
+      endif
+      if Left( Lower( AllTrim( aLines[i] ) ), Len( cSearch ) ) == cSearch
+         aLines[i] := cKey + "=" + cValue
+         lFound := .t.
+         exit
+      endif
+   next
+
+   if ! lFound
+      AAdd( aLines, cKey + "=" + cValue )
+   endif
+
+   cContent := ""
+   for i := 1 to Len( aLines )
+      cContent += aLines[i]
+      if i < Len( aLines )
+         cContent += Chr(10)
+      endif
+   next
+
+   MemoWrit( cFile, cContent )
+
+return nil
+
+static function IniRead( cSection, cKey, cDefault )
+
+   local cFile := HB_DirBase() + "..\hbbuilder.ini"
+   local cContent, aLines, i, cSearch
+
+   cContent := MemoRead( cFile )
+   if Empty( cContent )
+      return cDefault
+   endif
+
+   aLines := HB_ATokens( cContent, Chr(10) )
+   cSearch := Lower( cKey ) + "="
+
+   for i := 1 to Len( aLines )
+      if Left( Lower( AllTrim( aLines[i] ) ), Len( cSearch ) ) == cSearch
+         return SubStr( AllTrim( aLines[i] ), Len( cSearch ) + 1 )
+      endif
+   next
+
+return cDefault
+
+// === Debug Helper Functions ===
+
+// Convert stack line numbers from debug_main.prg to editor tab line numbers
+static function DbgFixStackLines( cStack )
+   local cOut := "STACK", cToken, nPos, nLine, nTabLine, i, nP1, nP2
+
+   cStack := AllTrim( cStack )
+   if Left( cStack, 5 ) == "STACK"; cStack := SubStr( cStack, 6 ); endif
+
+   do while ! Empty( cStack )
+      cStack := LTrim( cStack )
+      nPos := At( " ", cStack )
+      if nPos == 0
+         cToken := cStack
+         cStack := ""
+      else
+         cToken := Left( cStack, nPos - 1 )
+         cStack := SubStr( cStack, nPos + 1 )
+      endif
+
+      nP1 := At( "(", cToken )
+      nP2 := At( ")", cToken )
+      if nP1 > 0 .and. nP2 > nP1
+         nLine := Val( SubStr( cToken, nP1 + 1, nP2 - nP1 - 1 ) )
+         nTabLine := nLine
+         if aDbgOffsets != nil
+            for i := Len( aDbgOffsets ) to 1 step -1
+               if nLine >= aDbgOffsets[i][1] .and. aDbgOffsets[i][3] > 0
+                  nTabLine := nLine - aDbgOffsets[i][1] + aDbgOffsets[i][4]
+                  exit
+               endif
+            next
+         endif
+         cOut += " " + Left( cToken, nP1 ) + LTrim( Str( nTabLine ) ) + ")"
+      else
+         cOut += " " + cToken
+      endif
+   enddo
+
+return cOut
+
+// Replace "localN" with real variable names from source code
+static function DbgMapLocalNames( cVars, cFunc, nTab )
+   local cCode, aLines, cLine, i, aNames, nPos, cName, cTrim, lInFunc, c
+   local cTag, nP, nEnd
+
+   cCode := CodeEditorGetTabText( hCodeEditor, nTab )
+   if Empty( cCode ); return cVars; endif
+
+   aLines := HB_ATokens( cCode, Chr(10) )
+   aNames := {}
+   lInFunc := .f.
+
+   for i := 1 to Len( aLines )
+      cTrim := Upper( AllTrim( aLines[i] ) )
+      if ! lInFunc
+         if ( "PROCEDURE " $ cTrim .or. "FUNCTION " $ cTrim .or. "METHOD " $ cTrim ) .and. ;
+            Upper( cFunc ) $ cTrim
+            lInFunc := .t.
+         endif
+         loop
+      endif
+      if Left( cTrim, 6 ) == "LOCAL "
+         cLine := AllTrim( SubStr( AllTrim( aLines[i] ), 7 ) )
+         do while ! Empty( cLine )
+            cLine := LTrim( cLine )
+            cName := ""
+            nPos := 1
+            do while nPos <= Len( cLine )
+               c := SubStr( cLine, nPos, 1 )
+               if c == "," .or. c == " " .or. c == ":" .or. c == Chr(13) .or. c == Chr(10)
+                  exit
+               endif
+               cName += c
+               nPos++
+            enddo
+            if ! Empty( cName )
+               AAdd( aNames, cName )
+            endif
+            nPos := At( ",", cLine )
+            if nPos > 0
+               cLine := SubStr( cLine, nPos + 1 )
+            else
+               exit
+            endif
+         enddo
+      elseif ! Empty( cTrim ) .and. Left( cTrim, 2 ) != "//" .and. ;
+             Left( cTrim, 6 ) != "LOCAL " .and. Left( cTrim, 7 ) != "STATIC "
+         exit
+      endif
+   next
+
+   // Replace "localN" with real names
+   for i := 1 to Len( aNames )
+      cVars := StrTran( cVars, "local" + LTrim(Str(i)) + "=", aNames[i] + "=" )
+   next
+
+   // Remove unmapped extras
+   for i := Len( aNames ) + 1 to 30
+      cTag := " local" + LTrim(Str(i)) + "="
+      nP := At( cTag, cVars )
+      if nP > 0
+         nEnd := At( " ", SubStr( cVars, nP + 1 ) )
+         if nEnd > 0
+            cVars := Left( cVars, nP - 1 ) + SubStr( cVars, nP + nEnd )
+         else
+            cVars := Left( cVars, nP - 1 )
+         endif
+      else
+         exit
+      endif
+   next
+
+return cVars
+
+static function NumLines( cText )
+   local n := 1, i
+   for i := 1 to Len( cText )
+      if SubStr( cText, i, 1 ) == Chr(10); n++; endif
+   next
+return n
 
 // === Git Integration ===
 
@@ -2309,13 +2836,6 @@ static function OpenReportDesigner()
       RPT_AddBand( "Footer", 40 )
    endif
 
-return nil
-
-// === Dark Mode Toggle ===
-
-static function ToggleDarkMode()
-   lDarkMode := ! lDarkMode
-   W32_SetDarkMode( UI_FormGetHwnd( oIDE:hCpp ), lDarkMode )
 return nil
 
 // === Form Designer: Undo, Copy, Paste, Tab Order ===
@@ -4171,6 +4691,10 @@ static void ConfigureScintilla( HWND hSci )
      }
    }
 
+   /* Debug execution line marker (marker 11) - yellow background */
+   SciMsg( hSci, SCI_MARKERDEFINE, 11, 22 );    /* SC_MARK_BACKGROUND = 22 */
+   SciMsg( hSci, 2042, 11, RGB(60,60,0) );       /* SCI_MARKERSETBACK */
+
    /* Enable folding property */
    SciMsg( hSci, SCI_SETPROPERTY, (WPARAM) "fold", (LPARAM) "1" );
    SciMsg( hSci, SCI_SETPROPERTY, (WPARAM) "fold.compact", (LPARAM) "0" );
@@ -4746,6 +5270,23 @@ static void UpdateStatusBar( CODEEDITOR * ed )
    SetWindowTextA( ed->hStatusBar, szStatus );
 }
 
+/* Subclass for editor tab: dark background */
+static WNDPROC s_oldEdTabProc = NULL;
+static LRESULT CALLBACK EdTabSubProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
+{
+   if( msg == WM_ERASEBKGND )
+   {
+      HDC hdc = (HDC) wParam;
+      RECT rc;
+      HBRUSH hbr = CreateSolidBrush( RGB(30,30,30) );
+      GetClientRect( hWnd, &rc );
+      FillRect( hdc, &rc, hbr );
+      DeleteObject( hbr );
+      return 1;
+   }
+   return CallWindowProc( s_oldEdTabProc, hWnd, msg, wParam, lParam );
+}
+
 static LRESULT CALLBACK CodeEdWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 {
    CODEEDITOR * ed = (CODEEDITOR *) GetWindowLongPtr( hWnd, GWLP_USERDATA );
@@ -4766,6 +5307,32 @@ static LRESULT CALLBACK CodeEdWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARA
                   h - TAB_HEIGHT - (ed->hStatusBar ? STATUSBAR_HEIGHT : 0), TRUE );
          }
          return 0;
+      }
+
+      case WM_DRAWITEM:
+      {
+         DRAWITEMSTRUCT * di = (DRAWITEMSTRUCT *) lParam;
+         if( di && di->CtlType == ODT_TAB && ed && di->hwndItem == ed->hTab )
+         {
+            char txt[128] = "";
+            TCITEMA tci2 = {0};
+            HBRUSH hbr;
+            int isSel = ( TabCtrl_GetCurSel( di->hwndItem ) == (int)di->itemID );
+            tci2.mask = TCIF_TEXT;
+            tci2.pszText = txt;
+            tci2.cchTextMax = sizeof(txt);
+            SendMessageA( di->hwndItem, TCM_GETITEMA, di->itemID, (LPARAM)&tci2 );
+
+            hbr = CreateSolidBrush( isSel ? RGB(50,50,50) : RGB(30,30,30) );
+            FillRect( di->hDC, &di->rcItem, hbr );
+            DeleteObject( hbr );
+
+            SetTextColor( di->hDC, isSel ? RGB(255,255,255) : RGB(140,140,140) );
+            SetBkMode( di->hDC, TRANSPARENT );
+            DrawTextA( di->hDC, txt, -1, &di->rcItem, DT_CENTER | DT_VCENTER | DT_SINGLELINE );
+            return TRUE;
+         }
+         break;
       }
 
       case WM_NOTIFY:
@@ -4987,13 +5554,14 @@ HB_FUNC( CODEEDITORCREATE )
 
    /* Tab control */
    ed->hTab = CreateWindowExA( 0, WC_TABCONTROLA, NULL,
-      WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
+      WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | TCS_OWNERDRAWFIXED,
       0, 0, nWidth, TAB_HEIGHT,
       ed->hWnd, NULL, GetModuleHandle(NULL), NULL );
    {
       HFONT hTabFont = (HFONT) GetStockObject( DEFAULT_GUI_FONT );
       SendMessage( ed->hTab, WM_SETFONT, (WPARAM) hTabFont, TRUE );
    }
+   s_oldEdTabProc = (WNDPROC) SetWindowLongPtr( ed->hTab, GWLP_WNDPROC, (LONG_PTR) EdTabSubProc );
 
    /* First tab: "Project1.prg" */
    memset( &tci, 0, sizeof(tci) );
@@ -5035,6 +5603,17 @@ HB_FUNC( CODEEDITORCREATE )
    {
       HFONT hSbFont = (HFONT) GetStockObject( DEFAULT_GUI_FONT );
       SendMessage( ed->hStatusBar, WM_SETFONT, (WPARAM) hSbFont, TRUE );
+   }
+
+   /* Dark title bar for code editor window */
+   {
+      HMODULE hDwm = LoadLibraryA("dwmapi.dll");
+      if( hDwm ) {
+         typedef HRESULT (WINAPI *pDwmFn)(HWND,DWORD,LPCVOID,DWORD);
+         pDwmFn fn = (pDwmFn) GetProcAddress(hDwm,"DwmSetWindowAttribute");
+         if( fn ) { BOOL val = TRUE; fn(ed->hWnd, 20, &val, sizeof(val)); }
+         FreeLibrary(hDwm);
+      }
    }
 
    ShowWindow( ed->hWnd, SW_SHOW );
@@ -5364,5 +5943,127 @@ HB_FUNC( CODEEDITORAUTOCOMPLETE )
    CODEEDITOR * ed = (CODEEDITOR *) (HB_PTRUINT) hb_parnint(1);
    if( ed ) CE_ShowAutoComplete( ed );
 }
+
+/* CodeEditorShowDebugLine( hEditor, nLine ) — highlight execution line
+ * Clears previous marker, sets marker 11 on nLine, scrolls to it.
+ * nLine is 1-based (Harbour convention). Pass 0 to clear. */
+static int s_dbgPrevLine = -1;
+
+HB_FUNC( CODEEDITORSHOWDEBUGLINE )
+{
+   CODEEDITOR * ed = (CODEEDITOR *) (HB_PTRUINT) hb_parnint(1);
+   int nLine = hb_parni(2) - 1;  /* convert to 0-based */
+   if( !ed || !ed->hEdit ) return;
+
+   /* Delete previous marker explicitly, then delete all as safety net */
+   if( s_dbgPrevLine >= 0 )
+      SciMsg( ed->hEdit, 2002, (WPARAM)s_dbgPrevLine, 11 );  /* SCI_MARKERDELETE */
+   SciMsg( ed->hEdit, 2003, 11, 0 );  /* SCI_MARKERDELETEALL */
+
+   if( nLine >= 0 )
+   {
+      SciMsg( ed->hEdit, 2043, (WPARAM)nLine, 11 );  /* SCI_MARKERADD */
+      s_dbgPrevLine = nLine;
+
+      SciMsg( ed->hEdit, 2024, (WPARAM)nLine, 0 );   /* SCI_GOTOLINE */
+      SciMsg( ed->hEdit, 2613,                         /* SCI_SETFIRSTVISIBLELINE */
+              (WPARAM)(nLine > 5 ? nLine - 5 : 0), 0 );
+
+      if( ed->hWnd ) {
+         ShowWindow( ed->hWnd, SW_SHOW );
+         SetForegroundWindow( ed->hWnd );
+      }
+   }
+   else
+   {
+      s_dbgPrevLine = -1;
+   }
+
+   /* Force Scintilla to fully repaint */
+   {
+      LRESULT len = SciMsg( ed->hEdit, 2006, 0, 0 );  /* SCI_GETLENGTH */
+      SciMsg( ed->hEdit, 4003, 0, len );               /* SCI_COLOURISE */
+   }
+   InvalidateRect( ed->hEdit, NULL, FALSE );
+}
+
+/* W32_SetAppDarkMode( lDark ) — enable/disable dark menus+scrollbars (Win10 1903+) */
+HB_FUNC( W32_SETAPPDARKMODE )
+{
+   HMODULE hUx = LoadLibraryA("uxtheme.dll");
+   if( hUx ) {
+      /* SetPreferredAppMode = ordinal 135: 0=Default, 1=AllowDark, 2=ForceDark, 3=ForceLight */
+      typedef int (WINAPI *fnSetPreferredAppMode)(int);
+      fnSetPreferredAppMode fn = (fnSetPreferredAppMode) GetProcAddress(hUx, MAKEINTRESOURCEA(135));
+      if( fn ) fn( hb_parl(1) ? 1 : 0 ); /* AllowDark or Default */
+
+      /* FlushMenuThemes = ordinal 136 — forces menus to refresh */
+      typedef void (WINAPI *fnFlushMenuThemes)(void);
+      fnFlushMenuThemes fn2 = (fnFlushMenuThemes) GetProcAddress(hUx, MAKEINTRESOURCEA(136));
+      if( fn2 ) fn2();
+
+      FreeLibrary( hUx );
+   }
+}
+
+/* W32_SetWindowDarkMode( hWnd, lDark ) — dark title bar + menu bar for a specific window */
+HB_FUNC( W32_SETWINDOWDARKMODE )
+{
+   HWND hWnd = (HWND)(LONG_PTR) hb_parnint(1);
+   BOOL bDark = hb_parl(2);
+   HMODULE hUx, hDwm;
+
+   if( !hWnd ) return;
+
+   /* 1. DwmSetWindowAttribute for dark title bar */
+   hDwm = LoadLibraryA("dwmapi.dll");
+   if( hDwm ) {
+      typedef HRESULT (WINAPI *pDwmFn)(HWND,DWORD,LPCVOID,DWORD);
+      pDwmFn fn = (pDwmFn) GetProcAddress(hDwm, "DwmSetWindowAttribute");
+      if( fn ) { BOOL val = bDark; fn(hWnd, 20, &val, sizeof(val)); }
+      FreeLibrary(hDwm);
+   }
+
+   /* 2. AllowDarkModeForWindow (uxtheme ordinal 133) — needed for menu bar */
+   hUx = LoadLibraryA("uxtheme.dll");
+   if( hUx ) {
+      typedef BOOL (WINAPI *fnAllowDarkModeForWindow)(HWND, BOOL);
+      fnAllowDarkModeForWindow fn133 = (fnAllowDarkModeForWindow) GetProcAddress(hUx, MAKEINTRESOURCEA(133));
+      if( fn133 ) fn133(hWnd, bDark);
+
+      /* RefreshImmersiveColorPolicyState (ordinal 104) — apply the policy */
+      typedef void (WINAPI *fnRefresh)(void);
+      fnRefresh fn104 = (fnRefresh) GetProcAddress(hUx, MAKEINTRESOURCEA(104));
+      if( fn104 ) fn104();
+
+      /* FlushMenuThemes (ordinal 136) — refresh menu visuals */
+      typedef void (WINAPI *fnFlush)(void);
+      fnFlush fn136 = (fnFlush) GetProcAddress(hUx, MAKEINTRESOURCEA(136));
+      if( fn136 ) fn136();
+
+      FreeLibrary(hUx);
+   }
+
+   /* 3. Force redraw of non-client area (menu bar) */
+   SetWindowPos(hWnd, NULL, 0,0,0,0,
+      SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+   DrawMenuBar(hWnd);
+}
+
+/* W32_ProcessEvents() — pump pending Win32 messages (like GTK_ProcessEvents) */
+HB_FUNC( W32_PROCESSEVENTS )
+{
+   MSG msg;
+   while( PeekMessage( &msg, NULL, 0, 0, PM_REMOVE ) )
+   {
+      TranslateMessage( &msg );
+      DispatchMessage( &msg );
+   }
+}
+
+/* Stubs for macOS/Linux functions referenced from classes.prg */
+HB_FUNC( UI_MEMONEW )        { hb_retnint( 0 ); }
+HB_FUNC( MAC_RUNTIMEERRORDIALOG ) { hb_retni( 0 ); }
+HB_FUNC( MAC_APPTERMINATE )  { }
 
 #pragma ENDDUMP

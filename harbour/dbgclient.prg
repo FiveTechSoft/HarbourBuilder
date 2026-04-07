@@ -23,32 +23,57 @@ function DbgClientStart( nPort )
 
    if nPort == nil; nPort := 19800; endif
 
+   DbgLog( "DbgClientStart port=" + LTrim(Str(nPort)) )
+
    hSocket := hb_socketOpen( HB_SOCKET_AF_INET, 1 /* SOCK_STREAM */, 0 )
    if Empty( hSocket )
+      DbgLog( "hb_socketOpen FAILED" )
       return .f.
    endif
+   DbgLog( "hb_socketOpen OK" )
 
    aAddr := { HB_SOCKET_AF_INET, "127.0.0.1", nPort }
    if ! hb_socketConnect( hSocket, aAddr )
+      DbgLog( "hb_socketConnect FAILED err=" + LTrim(Str(hb_socketGetError())) )
       hb_socketClose( hSocket )
       return .f.
    endif
+   DbgLog( "hb_socketConnect OK" )
 
    aS := DbgState()
    aS[ DBG_SOCKET ] := hSocket
    aS[ DBG_CONNECTED ] := .t.
 
    // Install C-level debug hook — block receives ( nLine, cModule, cProcName )
+   DbgLog( "Installing debug hook..." )
    DbgHookInstall( { |nLine, cModule, cProc| DbgHook( nLine, cModule, cProc ) } )
+   DbgLog( "Debug hook installed" )
 
    // Handshake: send HELLO, wait for STEP
+   DbgLog( "Sending HELLO..." )
    DbgSend( "HELLO " + ProcFile(2) )
+   DbgLog( "Waiting for STEP reply..." )
    cReply := DbgRecv()
+   DbgLog( "Got reply: " + iif( cReply != nil, cReply, "(nil)" ) )
 
    // Enable hook
    aS[ DBG_READY ] := .t.
+   DbgLog( "DbgClientStart done, hook ready" )
 
 return .t.
+
+static function DbgLog( cMsg )
+   local nH := FOpen( "c:\hbbuilder_debug\dbgclient_trace.log", 1 + 16 )  // FO_WRITE + FO_SHARED
+   if nH == -1
+      nH := FCreate( "c:\hbbuilder_debug\dbgclient_trace.log" )
+   else
+      FSeek( nH, 0, 2 )  // seek to end
+   endif
+   if nH >= 0
+      FWrite( nH, cMsg + Chr(13) + Chr(10) )
+      FClose( nH )
+   endif
+return nil
 
 // Called from C hook on each source line — receives ( nLine, cModule )
 
