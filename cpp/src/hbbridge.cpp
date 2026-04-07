@@ -1979,7 +1979,7 @@ HB_FUNC( W32_RUNBATCHWITHPROGRESS )
 
    int sw = GetSystemMetrics( SM_CXSCREEN );
    int sh = GetSystemMetrics( SM_CYSCREEN );
-   int dlgW = 460, dlgH = 130;
+   int dlgW = 500, dlgH = 150;
    int x = (sw - dlgW) / 2, y = (sh - dlgH) / 2;
 
    HWND hDlg = CreateWindowExA( WS_EX_DLGMODALFRAME | WS_EX_TOPMOST,
