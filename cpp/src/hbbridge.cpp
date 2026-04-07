@@ -2025,10 +2025,11 @@ HB_FUNC( W32_RUNBATCHWITHPROGRESS )
    int logH = dlgH - logTop - btnH - margin * 3 - GetSystemMetrics( SM_CYCAPTION );
    int x = (sw - dlgW) / 2, y = (sh - dlgH) / 2;
 
+   HWND hOwner = GetActiveWindow();
    HWND hDlg = CreateWindowExA( WS_EX_APPWINDOW,
       "HbBatchProgressDlg", cTitle,
       WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_VISIBLE,
-      x, y, dlgW, dlgH, NULL, NULL, GetModuleHandle(NULL), NULL );
+      x, y, dlgW, dlgH, hOwner, NULL, GetModuleHandle(NULL), NULL );
 
    /* Dark title bar */
    {  typedef HRESULT (WINAPI *PFN)(HWND, DWORD, LPCVOID, DWORD);
