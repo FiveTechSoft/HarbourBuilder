@@ -1,6 +1,34 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-08 (Session 24: Windows — MinGW 32-bit compiler support)
+
+  MINGW SUPPORT:
+  - Full MinGW 32-bit compiler support (build_win.bat + IDE)
+  - ScanCompilers() detects MinGW in c:\gcc85, c:\mingw, c:\mingw32,
+    c:\msys64\mingw32/64, c:\TDM-GCC-32/64
+  - TBRun() and TBDebugRun(): gcc/g++ compilation (.o files),
+    g++ linking with -l flags, -mwindows, and -static
+  - Use -Wl,--start-group/--end-group for Harbour lib circular deps
+  - FindHarbour() handles "mingw" type (libhbrtl.a instead of hbrtl.lib)
+  - Static linking: no libgcc/libstdc++/libwinpthread DLLs needed
+
+  COMPILER WARNINGS FIXED:
+  - hbide.h: removed duplicate #defines (CT_SPEEDBTN, CT_STRINGGRID,
+    CT_SCROLLBOX) — kept original values 13, 17, 19
+  - tform.cpp: extern "C" { } block for g_bDarkIDE (fixes GCC warning
+    and MSVC linker error)
+  - hbbridge.cpp: include winsock2.h before windows.h
+  - tcontrols.cpp: cast string literal to LPSTR for ListView
+  - hbbuilder_win.prg: C89 declaration fixes for BCC32 (8 errors)
+  - Wrapped #pragma comment(lib) with #ifndef __GNUC__ guards
+
+  UI:
+  - Select Compiler dialog: symmetric 12px margins, centered buttons
+  - ShowNoCompilerDialog: added MinGW/TDM-GCC as install option
+
+  Verified: builds clean (0 warnings) with BCC, MSVC x86, and MinGW.
+
 2026-04-08 (Session 23: Windows — Source folder restructuring)
 
   BUILD SCRIPT (build_win.bat):
