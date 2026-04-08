@@ -1,6 +1,17 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-08 (Session 19: Linux — EnsureHarbour auto-install)
+
+  HARBOUR AUTO-INSTALL (LINUX):
+  - Extracted inline Harbour download/build code from TBRun() into a
+    dedicated EnsureHarbour(cHbDir) function, matching macOS pattern.
+  - Shows UI_MsgYesNo confirmation before downloading (re-entry protected).
+  - Downloads via git clone --depth 1, builds with make -j$(nproc).
+  - Verifies download (config/global.mk) and install (bin/harbour or
+    bin/linux/gcc/harbour) with detailed error diagnostics on failure.
+  - Added EnsureHarbour check to TBDebugRun() (was missing entirely).
+
 2026-04-08 (Session 18: Linux — Event handlers, form events, build script)
 
   EVENT HANDLER RECOVERY (LINUX):
