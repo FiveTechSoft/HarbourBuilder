@@ -1982,9 +1982,11 @@ void ListBoxImpl::Create(Window & /*parent*/, int /*ctrlID*/, Scintilla::Interna
 	table.doubleAction = @selector(doubleClick:);
 	table.selectionHighlightStyle = NSTableViewSelectionHighlightStyleSourceList;
 
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= 110000
 	if (@available(macOS 11.0, *)) {
 		[table setStyle: NSTableViewStylePlain];
 	}
+#endif
 
 	wid = (__bridge_retained WindowID)winLB;
 }

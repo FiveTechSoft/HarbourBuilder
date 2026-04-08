@@ -1946,30 +1946,29 @@ static NSPopUpButton * s_aiModelBtn = nil;
       [req setHTTPBody:[body dataUsingEncoding:NSUTF8StringEncoding]];
       [req setTimeoutInterval:60];
 
-      NSURLResponse * response = nil;
-      NSError * error = nil;
-      NSData * data = [NSURLConnection sendSynchronousRequest:req
-                       returningResponse:&response error:&error];
-
-      dispatch_async( dispatch_get_main_queue(), ^{
-         if( error || !data )
-         {
-            NSString * errMsg = [NSString stringWithFormat:@"\n[Error: %@]\n",
-               error ? [error localizedDescription] : @"No data"];
-            [[[s_aiOutput textStorage] mutableString] appendString:errMsg];
-         }
-         else
-         {
-            NSDictionary * json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-            NSString * reply = json[@"response"];
-            if( reply )
-               [[[s_aiOutput textStorage] mutableString] appendString:
-                  [NSString stringWithFormat:@"\n%@\n", reply]];
+      NSURLSessionDataTask * task = [[NSURLSession sharedSession]
+         dataTaskWithRequest:req completionHandler:^(NSData * data, NSURLResponse * response, NSError * error) {
+         dispatch_async( dispatch_get_main_queue(), ^{
+            if( error || !data )
+            {
+               NSString * errMsg = [NSString stringWithFormat:@"\n[Error: %@]\n",
+                  error ? [error localizedDescription] : @"No data"];
+               [[[s_aiOutput textStorage] mutableString] appendString:errMsg];
+            }
             else
-               [[[s_aiOutput textStorage] mutableString] appendString:@"\n[No response]\n"];
-         }
-         [s_aiOutput scrollRangeToVisible:NSMakeRange([[s_aiOutput textStorage] length], 0)];
-      });
+            {
+               NSDictionary * json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+               NSString * reply = json[@"response"];
+               if( reply )
+                  [[[s_aiOutput textStorage] mutableString] appendString:
+                     [NSString stringWithFormat:@"\n%@\n", reply]];
+               else
+                  [[[s_aiOutput textStorage] mutableString] appendString:@"\n[No response]\n"];
+            }
+            [s_aiOutput scrollRangeToVisible:NSMakeRange([[s_aiOutput textStorage] length], 0)];
+         });
+      }];
+      [task resume];
    });
 }
 
@@ -2468,7 +2467,7 @@ HB_FUNC( MAC_PROGRESSSTEP )
 {
    if( s_progressBar ) {
       if( [s_progressBar isIndeterminate] )
-         [s_progressBar animate:nil];
+         [s_progressBar displayIfNeeded];
       else
          [s_progressBar setDoubleValue:hb_parnd(1)];
    }
@@ -2545,7 +2544,7 @@ HB_FUNC( MAC_SHELLEXECLIVE )
 
          /* Animate progress bar + pump run loop */
          if( s_progressBar && [s_progressBar isIndeterminate] )
-            [s_progressBar animate:nil];
+            [s_progressBar displayIfNeeded];
          [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
       }
    }
@@ -2561,7 +2560,7 @@ HB_FUNC( MAC_SHELLEXECLIVE )
             buf = (char *) realloc( buf, bufSize );
          }
          if( s_progressBar && [s_progressBar isIndeterminate] )
-            [s_progressBar animate:nil];
+            [s_progressBar displayIfNeeded];
          [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
       }
       buf[total] = 0;

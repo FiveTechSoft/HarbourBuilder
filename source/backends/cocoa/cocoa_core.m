@@ -6,7 +6,10 @@
  */
 
 #import <Cocoa/Cocoa.h>
+#if __has_include(<UniformTypeIdentifiers/UniformTypeIdentifiers.h>)
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
+#define HAS_UTTYPE 1
+#endif
 #include <hbapi.h>
 #include <hbapiitm.h>
 #include <hbapicls.h>
@@ -625,7 +628,7 @@ void EnsureNSApp( void )
       case CT_BITBTN: case CT_SPEEDBTN: {
          NSButton * btn = [[NSButton alloc] initWithFrame:NSMakeRect(FLeft,FTop,FWidth,FHeight)];
          [btn setTitle:[NSString stringWithUTF8String:FText]];
-         [btn setBezelStyle:NSRoundedBezelStyle];
+         [btn setBezelStyle:NSBezelStyleRounded];
          if( FControlType == CT_SPEEDBTN ) [btn setBordered:NO];
          v = btn; break;
       }
@@ -740,7 +743,7 @@ void EnsureNSApp( void )
          /* Non-visual (Timer, Dialogs) or unknown: create a small placeholder */
          NSTextField * tf = [[NSTextField alloc] initWithFrame:NSMakeRect(FLeft,FTop,32,32)];
          [tf setStringValue:[NSString stringWithUTF8String:FClassName]];
-         [tf setEditable:NO]; [tf setBezeled:YES]; [tf setAlignment:NSCenterTextAlignment];
+         [tf setEditable:NO]; [tf setBezeled:YES]; [tf setAlignment:NSTextAlignmentCenter];
          NSFont * smallFont = [NSFont systemFontOfSize:7]; [tf setFont:smallFont];
          v = tf; break;
       }
@@ -4090,9 +4093,21 @@ HB_FUNC( MAC_OPENFILEDIALOG )
    if( HB_ISCHAR(2) )
    {
       NSString * ext = [NSString stringWithUTF8String:hb_parc(2)];
-      UTType * type = [UTType typeWithFilenameExtension:ext];
-      if( type )
-         [panel setAllowedContentTypes:@[type]];
+#if HAS_UTTYPE
+      if( @available(macOS 11.0, *) )
+      {
+         UTType * type = [UTType typeWithFilenameExtension:ext];
+         if( type )
+            [panel setAllowedContentTypes:@[type]];
+      }
+      else
+#endif
+      {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+         [panel setAllowedFileTypes:@[ext]];
+#pragma clang diagnostic pop
+      }
    }
    if( [panel runModal] == NSModalResponseOK )
    {
@@ -4115,9 +4130,21 @@ HB_FUNC( MAC_SAVEFILEDIALOG )
    if( HB_ISCHAR(3) )
    {
       NSString * ext = [NSString stringWithUTF8String:hb_parc(3)];
-      UTType * type = [UTType typeWithFilenameExtension:ext];
-      if( type )
-         [panel setAllowedContentTypes:@[type]];
+#if HAS_UTTYPE
+      if( @available(macOS 11.0, *) )
+      {
+         UTType * type = [UTType typeWithFilenameExtension:ext];
+         if( type )
+            [panel setAllowedContentTypes:@[type]];
+      }
+      else
+#endif
+      {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+         [panel setAllowedFileTypes:@[ext]];
+#pragma clang diagnostic pop
+      }
    }
    if( [panel runModal] == NSModalResponseOK )
    {

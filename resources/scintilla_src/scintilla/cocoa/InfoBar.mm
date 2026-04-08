@@ -95,7 +95,11 @@
 		mCurrentCaretX = 0;
 		mCurrentCaretY = 0;
 		[self createItems];
-		self.clipsToBounds = TRUE;
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= 140000
+		if (@available(macOS 14.0, *)) {
+			self.clipsToBounds = TRUE;
+		}
+#endif
 	}
 	return self;
 }

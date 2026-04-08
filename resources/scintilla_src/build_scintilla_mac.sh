@@ -12,7 +12,7 @@ BUILDDIR="$SCIDIR/build"
 mkdir -p "$BUILDDIR/obj_sci" "$BUILDDIR/obj_lex"
 
 CXX="clang++"
-CXXFLAGS="-std=c++17 -O2 -DNDEBUG -DSCI_NAMESPACE -DSCI_LEXER"
+CXXFLAGS="-std=c++17 -O2 -mmacosx-version-min=10.15 -DNDEBUG -DSCI_NAMESPACE -DSCI_LEXER"
 CXXFLAGS="$CXXFLAGS -I$SCINTILLA/include -I$SCINTILLA/src"
 OBJCFLAGS="-fobjc-arc"
 

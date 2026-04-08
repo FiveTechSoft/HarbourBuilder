@@ -10,6 +10,11 @@ PROJDIR="$(cd "$(dirname "$0")" && pwd)"
 SRC="hbbuilder_macos"
 PROG="HbBuilder"
 
+# Detect macOS version for API compatibility
+MACOS_VER=$(sw_vers -productVersion)
+MACOS_MAJOR=$(echo "$MACOS_VER" | cut -d. -f1)
+echo "Detected macOS $MACOS_VER"
+
 cd "$PROJDIR/source"
 
 # Check Harbour is installed
@@ -75,7 +80,7 @@ fi
 # [2/4] C → Object (only if .c changed)
 if needs_rebuild "${SRC}.c" "${SRC}.o"; then
    echo "[2/4] Compiling ${SRC}.c..."
-   clang -c -O2 -Wno-unused-value \
+   clang -c -O2 -mmacosx-version-min=10.15 -Wno-unused-value \
       -I"$HBINC" \
       ${SRC}.c -o ${SRC}.o
    NEED_LINK=1
@@ -86,7 +91,7 @@ fi
 # [3/4] Cocoa sources (only if .m changed)
 if needs_rebuild "$PROJDIR/source/backends/cocoa/cocoa_core.m" cocoa_core.o; then
    echo "[3/4] Compiling cocoa_core.m..."
-   clang -c -O2 -fobjc-arc \
+   clang -c -O2 -mmacosx-version-min=10.15 -fobjc-arc \
       -I"$HBINC" \
       "$PROJDIR/source/backends/cocoa/cocoa_core.m" -o cocoa_core.o
    NEED_LINK=1
@@ -96,7 +101,7 @@ fi
 
 if needs_rebuild "$PROJDIR/source/backends/cocoa/cocoa_inspector.m" cocoa_inspector.o; then
    echo "[3/4] Compiling cocoa_inspector.m..."
-   clang -c -O2 -fobjc-arc \
+   clang -c -O2 -mmacosx-version-min=10.15 -fobjc-arc \
       -I"$HBINC" \
       "$PROJDIR/source/backends/cocoa/cocoa_inspector.m" -o cocoa_inspector.o
    NEED_LINK=1
@@ -107,7 +112,7 @@ fi
 # [3b/4] Scintilla editor (only if .mm changed)
 if needs_rebuild "$PROJDIR/source/backends/cocoa/cocoa_editor.mm" cocoa_editor.o; then
    echo "[3b/4] Compiling cocoa_editor.mm..."
-   clang++ -c -O2 -fobjc-arc -std=c++17 \
+   clang++ -c -O2 -mmacosx-version-min=10.15 -fobjc-arc -std=c++17 \
       -I"$HBINC" \
       -I"$SCIINC" \
       -I"$SCICOCOA" \
@@ -144,7 +149,7 @@ clang++ -o ${PROG} \
    -lgtcgi -lgttrm -lgtstd \
    -framework Cocoa \
    -framework QuartzCore \
-   -framework UniformTypeIdentifiers \
+   $([ "$MACOS_MAJOR" -ge 11 ] 2>/dev/null && echo "-framework UniformTypeIdentifiers" || echo "") \
    -lm -lpthread -lc++ -lsqlite3
 
 # [5/5] Create .app bundle

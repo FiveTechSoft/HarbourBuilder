@@ -1980,7 +1980,7 @@ static function TBRun()
               " -lrddntx -lrddnsx -lrddcdx -lrddfpt" + ;
               " -lhbhsx -lhbsix -lhbusrrdd" + ;
               " -lgtcgi -lgtstd" + ;
-              " -framework Cocoa -framework UniformTypeIdentifiers -framework QuartzCore" + ;
+              " -framework Cocoa -framework QuartzCore" + If( Val( MAC_ShellExec( "sw_vers -productVersion | cut -d. -f1" ) ) >= 11, " -framework UniformTypeIdentifiers", "" ) + ;
               " -lm -lpthread -lc++ -lsqlite3 2>&1"
       cOutput := MAC_ShellExec( cCmd )
       if "error" $ Lower( cOutput )
@@ -2222,7 +2222,7 @@ static function TBDebugRun()
               " -lrddntx -lrddnsx -lrddcdx -lrddfpt" + ;
               " -lhbhsx -lhbsix -lhbusrrdd" + ;
               " -lgtcgi -lgtstd" + ;
-              " -framework Cocoa -framework UniformTypeIdentifiers -framework QuartzCore" + ;
+              " -framework Cocoa -framework QuartzCore" + If( Val( MAC_ShellExec( "sw_vers -productVersion | cut -d. -f1" ) ) >= 11, " -framework UniformTypeIdentifiers", "" ) + ;
               " -lm -lpthread -lc++ -lsqlite3 2>&1"
       cOutput := MAC_ShellExec( cCmd )
       if "error" $ Lower( cOutput )
