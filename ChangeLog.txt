@@ -11,6 +11,11 @@ HarbourBuilder - Cross-platform visual IDE for Harbour
   - Cancel button kills the build process and appends "Cancelled by user"
     to the output, matching Win32's cancel behavior.
 
+  EDITOR CLEANUP (MACOS):
+  - Removed messages panel (File/Line/Type/Message table) from bottom
+    of code editor. Editor now uses full space between tab bar and
+    status bar.
+
   BUILD SCRIPT:
   - Moved build_mac.sh from samples/ to project root. PROJDIR now
     resolves to the script's own directory instead of parent.

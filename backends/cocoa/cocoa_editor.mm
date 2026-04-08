@@ -1397,35 +1397,13 @@ HB_FUNC( CODEEDITORCREATE )
    [ed->statusBar setTextColor:[NSColor colorWithCalibratedRed:0.6 green:0.6 blue:0.6 alpha:1]];
    [ed->statusBar setDrawsBackground:YES];
 
-   /* Messages panel (above status bar) — build errors, warnings */
-   CGFloat msgH = 120;
+   /* Messages data (used by CodeEditorAddMessage/ClearMessages) */
    ed->msgData = [NSMutableArray array];
+   ed->msgPanel = nil;
+   ed->msgTable = nil;
 
-   NSScrollView * msgSV = [[NSScrollView alloc] initWithFrame:
-      NSMakeRect( 0, statusH, contentBounds.size.width, msgH )];
-   [msgSV setHasVerticalScroller:YES];
-   [msgSV setAutoresizingMask:NSViewWidthSizable | NSViewMaxYMargin];
-   [msgSV setBorderType:NSBezelBorder];
-
-   ed->msgTable = [[NSTableView alloc] initWithFrame:NSMakeRect(0, 0, contentBounds.size.width, msgH)];
-   NSString * msgCols[] = { @"File", @"Line", @"Type", @"Message" };
-   CGFloat  msgWidths[] = { 120, 50, 60, 500 };
-   for( int c = 0; c < 4; c++ ) {
-      NSTableColumn * col = [[NSTableColumn alloc] initWithIdentifier:msgCols[c]];
-      [[col headerCell] setStringValue:msgCols[c]];
-      [col setWidth:msgWidths[c]];
-      [ed->msgTable addTableColumn:col];
-   }
-   [ed->msgTable setRowHeight:18];
-   [ed->msgTable setGridStyleMask:NSTableViewSolidHorizontalGridLineMask];
-   s_msgEditor = ed;
-   /* Data source set lazily when first message is added (class defined later) */
-   [msgSV setDocumentView:ed->msgTable];
-
-   ed->msgPanel = msgSV;
-
-   /* Scintilla view (between tab bar and messages panel) */
-   CGFloat sciBottom = statusH + msgH;
+   /* Scintilla view (between tab bar and status bar) */
+   CGFloat sciBottom = statusH;
    NSRect sciFrame = NSMakeRect( 0, sciBottom, contentBounds.size.width,
                                  contentBounds.size.height - tabBarH - sciBottom );
    ed->sciView = [[ScintillaView alloc] initWithFrame:sciFrame];
@@ -1442,7 +1420,6 @@ HB_FUNC( CODEEDITORCREATE )
    CE_InstallKeyMonitor( ed );
 
    [content addSubview:ed->statusBar];
-   [content addSubview:ed->msgPanel];
    [content addSubview:ed->sciView];
    [content addSubview:ed->tabBar positioned:NSWindowAbove relativeTo:nil];
 
@@ -3690,7 +3667,7 @@ HB_FUNC( CODEEDITORADDMESSAGE )
    NSString * msg  = HB_ISCHAR(5) ? [NSString stringWithUTF8String:hb_parc(5)] : @"";
 
    [ed->msgData addObject:@[file, line, type, msg]];
-   [ed->msgTable reloadData];
+   if( ed->msgTable ) [ed->msgTable reloadData];
 
    /* Auto-scroll to last message */
    NSInteger lastRow = (NSInteger)[ed->msgData count] - 1;
