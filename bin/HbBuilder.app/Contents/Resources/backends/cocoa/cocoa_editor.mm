@@ -2239,6 +2239,19 @@ static NSTextView * s_errTextView = nil;
 static NSWindow * s_progressWin = nil;
 static NSProgressIndicator * s_progressBar = nil;
 static NSTextField * s_progressLbl = nil;
+static NSScrollView * s_progressLogScroll = nil;
+static NSTextView * s_progressLog = nil;
+static volatile BOOL s_progressCancelled = NO;
+static NSButton * s_progressCancelBtn = nil;
+
+/* Target for Cancel button in progress dialog */
+@interface HBProgressCancelTarget : NSObject
+- (void)cancelClicked:(id)sender;
+@end
+@implementation HBProgressCancelTarget
+- (void)cancelClicked:(id)sender { s_progressCancelled = YES; }
+@end
+static HBProgressCancelTarget * s_progressCancelTarget = nil;
 
 /* Target for Copy to Clipboard button */
 @interface HBErrCopyTarget : NSObject
@@ -2323,36 +2336,45 @@ HB_FUNC( MAC_BUILDERRORDIALOG )
  * Progress Dialog
  * ----------------------------------------------------------------------- */
 
-/* MAC_ProgressOpen( cTitle, nMax ) — nMax=0 for indeterminate */
+/* MAC_ProgressOpen( cTitle, nMax ) — nMax=0 for indeterminate (with build log) */
 HB_FUNC( MAC_PROGRESSOPEN )
 {
    const char * title = HB_ISCHAR(1) ? hb_parc(1) : "Working...";
    double nMax = HB_ISNUM(2) ? hb_parnd(2) : 100.0;
+   BOOL bWithLog = ( nMax <= 0 );  /* indeterminate = show build log */
 
    if( s_progressWin ) {
       [s_progressWin makeKeyAndOrderFront:nil];
       return;
    }
 
-   NSRect frame = NSMakeRect(400, 400, 480, 100);
+   CGFloat dlgW = bWithLog ? 560 : 480;
+   CGFloat dlgH = bWithLog ? 420 : 100;
+
+   NSRect frame = NSMakeRect(400, 400, dlgW, dlgH);
    s_progressWin = [[NSWindow alloc] initWithContentRect:frame
-      styleMask:NSWindowStyleMaskTitled
+      styleMask:NSWindowStyleMaskTitled | (bWithLog ? NSWindowStyleMaskClosable : 0)
       backing:NSBackingStoreBuffered defer:NO];
    [s_progressWin setTitle:[NSString stringWithUTF8String:title]];
    [s_progressWin setReleasedWhenClosed:NO];
    [s_progressWin setAppearance:[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua]];
 
    NSView * cv = [s_progressWin contentView];
+   NSRect cvBounds = [cv bounds];
 
-   s_progressLbl = [[NSTextField alloc] initWithFrame:NSMakeRect(20, 55, 440, 20)];
+   /* Label at top */
+   CGFloat lblY = bWithLog ? cvBounds.size.height - 30 : 55;
+   s_progressLbl = [[NSTextField alloc] initWithFrame:NSMakeRect(20, lblY, cvBounds.size.width - 40, 20)];
    [s_progressLbl setStringValue:@""];
    [s_progressLbl setEditable:NO]; [s_progressLbl setBezeled:NO]; [s_progressLbl setDrawsBackground:NO];
    [s_progressLbl setTextColor:[NSColor colorWithCalibratedRed:0.83 green:0.83 blue:0.83 alpha:1]];
    [cv addSubview:s_progressLbl];
 
-   s_progressBar = [[NSProgressIndicator alloc] initWithFrame:NSMakeRect(20, 25, 440, 20)];
+   /* Progress bar below label */
+   CGFloat barY = bWithLog ? cvBounds.size.height - 56 : 25;
+   s_progressBar = [[NSProgressIndicator alloc] initWithFrame:NSMakeRect(20, barY, cvBounds.size.width - 40, 20)];
    [s_progressBar setStyle:NSProgressIndicatorStyleBar];
-   if( nMax <= 0 ) {
+   if( bWithLog ) {
       [s_progressBar setIndeterminate:YES];
       [s_progressBar startAnimation:nil];
    } else {
@@ -2362,6 +2384,49 @@ HB_FUNC( MAC_PROGRESSOPEN )
       [s_progressBar setDoubleValue:0.0];
    }
    [cv addSubview:s_progressBar];
+
+   /* Build log (only for indeterminate/build mode) */
+   s_progressLog = nil;
+   s_progressLogScroll = nil;
+   s_progressCancelBtn = nil;
+   s_progressCancelled = NO;
+   if( bWithLog )
+   {
+      /* Cancel button at bottom */
+      CGFloat btnW = 90, btnH = 28, btnMargin = 16;
+      s_progressCancelBtn = [[NSButton alloc] initWithFrame:
+         NSMakeRect((cvBounds.size.width - btnW) / 2, btnMargin, btnW, btnH)];
+      [s_progressCancelBtn setTitle:@"Cancel"];
+      [s_progressCancelBtn setBezelStyle:NSBezelStyleRounded];
+      if( !s_progressCancelTarget )
+         s_progressCancelTarget = [[HBProgressCancelTarget alloc] init];
+      [s_progressCancelBtn setTarget:s_progressCancelTarget];
+      [s_progressCancelBtn setAction:@selector(cancelClicked:)];
+      [cv addSubview:s_progressCancelBtn];
+
+      CGFloat logTop = btnMargin + btnH + 8;
+      CGFloat logH = barY - logTop - 12;
+      NSRect scrollFrame = NSMakeRect(20, logTop, cvBounds.size.width - 40, logH);
+      s_progressLogScroll = [[NSScrollView alloc] initWithFrame:scrollFrame];
+      [s_progressLogScroll setHasVerticalScroller:YES];
+      [s_progressLogScroll setBorderType:NSBezelBorder];
+      [s_progressLogScroll setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
+
+      NSRect textFrame = NSMakeRect(0, 0, scrollFrame.size.width, scrollFrame.size.height);
+      s_progressLog = [[NSTextView alloc] initWithFrame:textFrame];
+      [s_progressLog setEditable:NO];
+      [s_progressLog setFont:[NSFont fontWithName:@"Menlo" size:11]];
+      [s_progressLog setBackgroundColor:[NSColor colorWithCalibratedWhite:0.10 alpha:1.0]];
+      [s_progressLog setTextColor:[NSColor colorWithCalibratedWhite:0.82 alpha:1.0]];
+      [s_progressLog setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
+      [[s_progressLog textContainer] setWidthTracksTextView:NO];
+      [[s_progressLog textContainer] setContainerSize:NSMakeSize(1e7, 1e7)];
+      [s_progressLog setHorizontallyResizable:YES];
+      [s_progressLog setMaxSize:NSMakeSize(1e7, 1e7)];
+
+      [s_progressLogScroll setDocumentView:s_progressLog];
+      [cv addSubview:s_progressLogScroll];
+   }
 
    [s_progressWin center];
    [s_progressWin makeKeyAndOrderFront:nil];
@@ -2383,7 +2448,8 @@ HB_FUNC( MAC_PROGRESSSTEP )
 }
 
 /* MAC_ShellExecLive( cCmd, [cProgressMsg] ) -> cOutput
- * Run a shell command while keeping the UI responsive (progress dialog updates) */
+ * Run a shell command while keeping the UI responsive.
+ * If the progress dialog has a log view, output is shown line by line. */
 HB_FUNC( MAC_SHELLEXECLIVE )
 {
    const char * szCmd = hb_parc(1);
@@ -2396,24 +2462,80 @@ HB_FUNC( MAC_SHELLEXECLIVE )
    FILE * fp = popen( szCmd, "r" );
    if( !fp ) { hb_retc(""); return; }
 
-   size_t bufSize = 8192, total = 0;
+   /* Use line-based reading when log view is available */
+   BOOL hasLog = ( s_progressLog != nil );
+
+   size_t bufSize = 65536, total = 0;
    char * buf = (char *) malloc( bufSize );
    buf[0] = 0;
 
-   while( !feof(fp) )
+   if( hasLog )
    {
-      size_t n = fread( buf + total, 1, 1024, fp );
-      total += n;
-      if( total >= bufSize - 1024 ) {
-         bufSize *= 2;
-         buf = (char *) realloc( buf, bufSize );
+      /* Line-by-line: read with fgets, append each line to the log */
+      char line[1024];
+      while( fgets( line, sizeof(line), fp ) != NULL )
+      {
+         /* Check for cancel */
+         if( s_progressCancelled )
+         {
+            const char * cmsg = "\n*** Cancelled by user ***\n";
+            size_t msgLen = strlen( cmsg );
+            if( total + msgLen + 1 >= bufSize ) {
+               bufSize = total + msgLen + 64;
+               buf = (char *) realloc( buf, bufSize );
+            }
+            memcpy( buf + total, cmsg, msgLen );
+            total += msgLen;
+            buf[total] = 0;
+            break;
+         }
+
+         size_t lineLen = strlen( line );
+         if( total + lineLen + 1 >= bufSize ) {
+            bufSize *= 2;
+            buf = (char *) realloc( buf, bufSize );
+         }
+         memcpy( buf + total, line, lineLen );
+         total += lineLen;
+         buf[total] = 0;
+
+         /* Append to NSTextView */
+         NSString * ns = [NSString stringWithUTF8String:line];
+         if( ns ) {
+            [[s_progressLog textStorage] appendAttributedString:
+               [[NSAttributedString alloc] initWithString:ns
+                  attributes:@{
+                     NSFontAttributeName: [NSFont fontWithName:@"Menlo" size:11],
+                     NSForegroundColorAttributeName: [NSColor colorWithCalibratedWhite:0.82 alpha:1.0]
+                  }]];
+            /* Auto-scroll to bottom */
+            [s_progressLog scrollRangeToVisible:NSMakeRange([[s_progressLog string] length], 0)];
+         }
+
+         /* Animate progress bar + pump run loop */
+         if( s_progressBar && [s_progressBar isIndeterminate] )
+            [s_progressBar animate:nil];
+         [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
       }
-      /* Pump the run loop so UI stays alive */
-      if( s_progressBar && [s_progressBar isIndeterminate] )
-         [s_progressBar animate:nil];
-      [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
    }
-   buf[total] = 0;
+   else
+   {
+      /* Block-based: original behavior for simple progress dialogs */
+      while( !feof(fp) )
+      {
+         size_t n = fread( buf + total, 1, 1024, fp );
+         total += n;
+         if( total >= bufSize - 1024 ) {
+            bufSize *= 2;
+            buf = (char *) realloc( buf, bufSize );
+         }
+         if( s_progressBar && [s_progressBar isIndeterminate] )
+            [s_progressBar animate:nil];
+         [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
+      }
+      buf[total] = 0;
+   }
+
    pclose( fp );
 
    hb_retc( buf );
@@ -2428,6 +2550,10 @@ HB_FUNC( MAC_PROGRESSCLOSE )
       s_progressWin = nil;
       s_progressBar = nil;
       s_progressLbl = nil;
+      s_progressLog = nil;
+      s_progressLogScroll = nil;
+      s_progressCancelBtn = nil;
+      s_progressCancelled = NO;
    }
 }
 

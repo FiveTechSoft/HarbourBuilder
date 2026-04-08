@@ -3,6 +3,14 @@ HarbourBuilder - Cross-platform visual IDE for Harbour
 
 2026-04-08 (Session 17: macOS — Inspector events parity with Win32)
 
+  PROGRESS DIALOG WITH BUILD LOG (MACOS):
+  - MAC_ProgressOpen with nMax=0 (indeterminate) now creates a 560x420
+    dialog with NSTextView log, matching Win32's build output window.
+  - MAC_ShellExecLive appends output line-by-line to the log in real time,
+    with auto-scroll to bottom and progress bar animation.
+  - Cancel button kills the build process and appends "Cancelled by user"
+    to the output, matching Win32's cancel behavior.
+
   BUILD SCRIPT:
   - Moved build_mac.sh from samples/ to project root. PROJDIR now
     resolves to the script's own directory instead of parent.
