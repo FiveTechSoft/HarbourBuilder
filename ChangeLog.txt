@@ -33,6 +33,11 @@ HarbourBuilder - Cross-platform visual IDE for Harbour
     (previously only showed text label fallback)
   - Components loaded from disk now display proper palette icons
 
+  BUILD:
+  - build_mac.sh auto-downloads Scintilla 5.5.6 + Lexilla 5.2.0 if source missing
+  - Added REQUEST DBFCDX, DBFNTX, DBFFPT to generated main.prg (Run and Debug)
+    so DBF/CDX operations work at runtime
+
   BUGFIXES:
   - Copy hbide.ch to temp build dir alongside hbbuilder.ch (Run and Debug paths)
   - Fixed "Can't open #include file 'hbide.ch'" when building user projects

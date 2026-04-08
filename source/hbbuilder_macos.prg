@@ -1949,7 +1949,8 @@ static function TBRun()
    MAC_ProgressStep( 2, "Assembling main.prg..." )
    cLog += "[2] Building main.prg..." + Chr(10)
    cAllPrg := '#include "hbbuilder.ch"' + Chr(10)
-   cAllPrg += "REQUEST HB_GT_NUL_DEFAULT" + Chr(10) + Chr(10)
+   cAllPrg += "REQUEST HB_GT_NUL_DEFAULT" + Chr(10)
+   cAllPrg += "REQUEST DBFCDX, DBFNTX, DBFFPT" + Chr(10) + Chr(10)
    cAllPrg += StrTran( MemoRead( cBuildDir + "/Project1.prg" ), ;
                        '#include "hbbuilder.ch"', "" ) + Chr(10)
    for i := 1 to Len( aForms )
@@ -2180,10 +2181,11 @@ static function TBDebugRun()
    // Header: #include + GT + INIT PROCEDURE to start debug client
    cAllPrg := '#include "hbbuilder.ch"' + Chr(10)
    cAllPrg += "REQUEST HB_GT_NUL_DEFAULT" + Chr(10)
+   cAllPrg += "REQUEST DBFCDX, DBFNTX, DBFFPT" + Chr(10)
    cAllPrg += "INIT PROCEDURE __DbgInit" + Chr(10)
    cAllPrg += "   DbgClientStart( 19800 )" + Chr(10)
    cAllPrg += "return" + Chr(10) + Chr(10)
-   nCurLine := 7
+   nCurLine := 8
 
    aDbgOffsets := {}
 

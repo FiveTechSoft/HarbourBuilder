@@ -46,6 +46,17 @@ SCIINC="$SCIDIR/scintilla/include"
 SCICOCOA="$SCIDIR/scintilla/cocoa"
 LEXINC="$SCIDIR/lexilla/include"
 
+# Download Scintilla + Lexilla source if not present
+if [ ! -f "$SCIINC/ScintillaView.h" ]; then
+   echo "[0/4] Downloading Scintilla + Lexilla source..."
+   mkdir -p "$SCIDIR"
+   curl -L -o "$SCIDIR/scintilla556.tgz" https://www.scintilla.org/scintilla556.tgz
+   curl -L -o "$SCIDIR/lexilla520.tgz" https://www.scintilla.org/lexilla520.tgz
+   tar xzf "$SCIDIR/scintilla556.tgz" -C "$SCIDIR"
+   tar xzf "$SCIDIR/lexilla520.tgz" -C "$SCIDIR"
+   rm -f "$SCIDIR/scintilla556.tgz" "$SCIDIR/lexilla520.tgz"
+fi
+
 # Build Scintilla static libraries if not present
 if [ ! -f "$SCIBUILD/libscintilla.a" ] || [ ! -f "$SCIBUILD/liblexilla.a" ]; then
    echo "[0/4] Building Scintilla + Lexilla static libraries..."
