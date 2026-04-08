@@ -9,11 +9,10 @@
  *   UI_FormRun( hForm )
  */
 
-/* Prevent windows.h from including old winsock.h (we need winsock2.h) */
-#define _WINSOCKAPI_
-#include "hbide.h"
+/* Include winsock2.h before windows.h (via hbide.h) to avoid conflicts */
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include "hbide.h"
 #include <string.h>
 
 #ifndef __GNUC__

@@ -51,10 +51,7 @@ class TComponentPalette;
 #define CT_PANEL      25
 #define CT_SCROLLBAR  26
 /* Additional extras */
-#define CT_SPEEDBTN   27
 #define CT_MASKEDIT2  28
-#define CT_STRINGGRID 29
-#define CT_SCROLLBOX  30
 #define CT_STATICTEXT 31
 #define CT_LABELEDEDIT 32
 /* Win32 extras */

@@ -1160,7 +1160,7 @@ void TBrowse::SetCellText( int nRow, int nCol, const char * szText )
       memset( &lvi, 0, sizeof(lvi) );
       lvi.mask = LVIF_TEXT;
       lvi.iItem = FRowCount;
-      lvi.pszText = "";
+      lvi.pszText = (LPSTR) "";
       SendMessageA( FHandle, LVM_INSERTITEMA, 0, (LPARAM) &lvi );
       FRowCount++;
    }
