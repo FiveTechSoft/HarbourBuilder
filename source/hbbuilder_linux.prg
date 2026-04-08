@@ -1535,7 +1535,7 @@ static function TBRun()
       MemoWrit( cBuildDir + "/" + aForms[i][1] + ".prg", aForms[i][3] )
       cLog += "    " + aForms[i][1] + ".prg" + Chr(10)
    next
-   GTK_ShellExec( "cp " + cProjDir + "/harbour/classes.prg " + cBuildDir + "/" )
+   GTK_ShellExec( "cp " + cProjDir + "/source/common/classes.prg " + cBuildDir + "/" )
    GTK_ShellExec( "cp " + cProjDir + "/include/hbbuilder.ch " + cBuildDir + "/" )
 
    // Step 2: Assemble main.prg
@@ -1599,7 +1599,7 @@ static function TBRun()
       cLog += "[6] Compiling GTK3 backend..." + Chr(10)
       cCmd := "gcc -c -O2 -I" + cHbInc + ;
               " $(pkg-config --cflags gtk+-3.0)" + ;
-              " " + cProjDir + "/backends/gtk3/gtk3_core.c" + ;
+              " " + cProjDir + "/source/backends/gtk3/gtk3_core.c" + ;
               " -o " + cBuildDir + "/gtk3_core.o 2>&1"
       GTK_ShellExec( cCmd )
       cLog += "    OK" + Chr(10)
@@ -1689,9 +1689,9 @@ static function TBDebugRun()
       MemoWrit( cBuildDir + "/" + aForms[i][1] + ".prg", ;
          CodeEditorGetTabText( hCodeEditor, i + 1 ) )
    next
-   GTK_ShellExec( "cp " + cProjDir + "/harbour/classes.prg " + cBuildDir + "/" )
+   GTK_ShellExec( "cp " + cProjDir + "/source/common/classes.prg " + cBuildDir + "/" )
    GTK_ShellExec( "cp " + cProjDir + "/include/hbbuilder.ch " + cBuildDir + "/" )
-   GTK_ShellExec( "cp " + cProjDir + "/harbour/dbgclient.prg " + cBuildDir + "/" )
+   GTK_ShellExec( "cp " + cProjDir + "/source/debugger/dbgclient.prg " + cBuildDir + "/" )
 
    // Step 2: Assemble debug_main.prg (tracking line offsets for each section)
    cLog += "[2] Assembling debug_main.prg..." + Chr(10)
@@ -1768,7 +1768,7 @@ static function TBDebugRun()
       cLog += "[5] dbghook + backend (prebuilt)..." + Chr(10)
 
       cCmd := "gcc -c -O2 -I" + cHbInc + ;
-              " " + cProjDir + "/harbour/dbghook.c" + ;
+              " " + cProjDir + "/source/debugger/dbghook.c" + ;
               " -o " + cBuildDir + "/dbghook.o 2>&1"
       GTK_ShellExec( cCmd )
 
@@ -2319,5 +2319,5 @@ function _InsGetEditorCode()
 return ""
 
 // Framework
-#include "../harbour/classes.prg"
-#include "../harbour/inspector_gtk.prg"
+#include "common/classes.prg"
+#include "inspector/inspector_gtk.prg"

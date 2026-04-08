@@ -17,7 +17,7 @@ PROJDIR="$(cd "$(dirname "$0")" && pwd)"
 PROG="${1:-hbbuilder_linux}"
 RESDIR="$PROJDIR/resources"
 
-cd "$PROJDIR/samples"
+cd "$PROJDIR/source"
 
 # Check Harbour is installed
 if [ ! -d "$HBDIR/include" ]; then
@@ -69,14 +69,15 @@ fi
 
 # [1/6] Harbour -> C (only if .prg changed)
 if needs_rebuild "${PROG}.prg" "${PROG}.c" || \
-   needs_rebuild "$PROJDIR/harbour/classes.prg" "${PROG}.c" || \
-   needs_rebuild "$PROJDIR/harbour/inspector_gtk.prg" "${PROG}.c" || \
+   needs_rebuild "$PROJDIR/source/common/classes.prg" "${PROG}.c" || \
+   needs_rebuild "$PROJDIR/source/inspector/inspector_gtk.prg" "${PROG}.c" || \
    needs_rebuild "$PROJDIR/include/hbbuilder.ch" "${PROG}.c"; then
    echo "[1/6] Compiling ${PROG}.prg..."
    "$HBBIN/harbour" ${PROG}.prg -n -w -q \
       -I"$HBINC" \
       -I"$PROJDIR/include" \
-      -I"$PROJDIR/harbour" \
+      -I"$PROJDIR/source/common" \
+      -I"$PROJDIR/source/inspector" \
       -o${PROG}.c
    NEED_LINK=1
 else
@@ -96,24 +97,24 @@ else
 fi
 
 # [3/6] GTK3 core (only if .c changed)
-if needs_rebuild "$PROJDIR/backends/gtk3/gtk3_core.c" gtk3_core.o; then
+if needs_rebuild "$PROJDIR/source/backends/gtk3/gtk3_core.c" gtk3_core.o; then
    echo "[3/6] Compiling GTK3 core..."
    gcc -c -g \
       -I"$HBINC" \
       $(pkg-config --cflags gtk+-3.0) \
-      "$PROJDIR/backends/gtk3/gtk3_core.c" -o gtk3_core.o
+      "$PROJDIR/source/backends/gtk3/gtk3_core.c" -o gtk3_core.o
    NEED_LINK=1
 else
    echo "[3/6] gtk3_core.o — up to date"
 fi
 
 # [4/6] GTK3 inspector (only if .c changed)
-if needs_rebuild "$PROJDIR/backends/gtk3/gtk3_inspector.c" gtk3_inspector.o; then
+if needs_rebuild "$PROJDIR/source/backends/gtk3/gtk3_inspector.c" gtk3_inspector.o; then
    echo "[4/6] Compiling GTK3 inspector..."
    gcc -c -g \
       -I"$HBINC" \
       $(pkg-config --cflags gtk+-3.0) \
-      "$PROJDIR/backends/gtk3/gtk3_inspector.c" -o gtk3_inspector.o
+      "$PROJDIR/source/backends/gtk3/gtk3_inspector.c" -o gtk3_inspector.o
    NEED_LINK=1
 else
    echo "[4/6] gtk3_inspector.o — up to date"

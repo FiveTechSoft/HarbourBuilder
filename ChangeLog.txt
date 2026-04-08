@@ -1,6 +1,21 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-08 (Session 22: Linux — Source folder restructuring)
+
+  SOURCE RESTRUCTURING (LINUX):
+  - Moved source files to match macOS reorganization:
+    samples/hbbuilder_linux.prg → source/hbbuilder_linux.prg
+    samples/hbbuilder_win.prg → source/hbbuilder_win.prg
+    harbour/classes.prg → source/common/classes.prg
+    harbour/dbgclient.prg, dbghook.c → source/debugger/
+    harbour/inspector*.prg → source/inspector/
+    backends/* → source/backends/
+  - Updated build_linux.sh: cd to source/, paths to source/common/,
+    source/inspector/, source/backends/gtk3/
+  - Updated hbbuilder_linux.prg: all #include, cp, and compile paths
+    adjusted for new structure
+
 2026-04-08 (Session 21: macOS — Fix paths for new source/ folder structure)
 
   BUILD SCRIPT (build_mac.sh):
