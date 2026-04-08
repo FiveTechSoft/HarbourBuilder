@@ -4214,24 +4214,37 @@ HB_FUNC( W32_SELECTFROMLIST )
 
    hFont = (HFONT) GetStockObject( DEFAULT_GUI_FONT );
 
-   hList = CreateWindowExA( WS_EX_CLIENTEDGE, "LISTBOX", NULL,
-      WS_CHILD | WS_VISIBLE | WS_VSCROLL | LBS_NOTIFY,
-      10, 10, dlgW - 30, dlgH - 90,
-      hDlg, (HMENU)100, GetModuleHandle(NULL), NULL );
+   /* Use client rect for symmetric layout */
+   {
+      RECT rc;
+      int m = 12;        /* margin */
+      int btnW = 80, btnH = 28, btnGap = 10;
+      int cw, ch, btnTotalW, btnX, btnY;
+      GetClientRect( hDlg, &rc );
+      cw = rc.right;  ch = rc.bottom;
+      btnTotalW = btnW + btnGap + btnW;
+      btnX = ( cw - btnTotalW ) / 2;
+      btnY = ch - m - btnH;
+
+      hList = CreateWindowExA( WS_EX_CLIENTEDGE, "LISTBOX", NULL,
+         WS_CHILD | WS_VISIBLE | WS_VSCROLL | LBS_NOTIFY,
+         m, m, cw - 2 * m, btnY - m - m,
+         hDlg, (HMENU)100, GetModuleHandle(NULL), NULL );
+
+      hBtnOK = CreateWindowExA( 0, "BUTTON", "OK",
+         WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
+         btnX, btnY, btnW, btnH,
+         hDlg, (HMENU)IDOK, GetModuleHandle(NULL), NULL );
+
+      hBtnCancel = CreateWindowExA( 0, "BUTTON", "Cancel",
+         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+         btnX + btnW + btnGap, btnY, btnW, btnH,
+         hDlg, (HMENU)IDCANCEL, GetModuleHandle(NULL), NULL );
+   }
    SendMessage( hList, WM_SETFONT, (WPARAM) hFont, TRUE );
-   s_formsListBox = hList;
-
-   hBtnOK = CreateWindowExA( 0, "BUTTON", "OK",
-      WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
-      dlgW/2 - 90, dlgH - 70, 80, 28,
-      hDlg, (HMENU)IDOK, GetModuleHandle(NULL), NULL );
    SendMessage( hBtnOK, WM_SETFONT, (WPARAM) hFont, TRUE );
-
-   hBtnCancel = CreateWindowExA( 0, "BUTTON", "Cancel",
-      WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-      dlgW/2, dlgH - 70, 80, 28,
-      hDlg, (HMENU)IDCANCEL, GetModuleHandle(NULL), NULL );
    SendMessage( hBtnCancel, WM_SETFONT, (WPARAM) hFont, TRUE );
+   s_formsListBox = hList;
 
    for( i = 0; i < nCount; i++ )
    {
