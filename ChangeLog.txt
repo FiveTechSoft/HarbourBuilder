@@ -3,6 +3,10 @@ HarbourBuilder - Cross-platform visual IDE for Harbour
 
 2026-04-08 (Session 17: macOS — Inspector events parity with Win32)
 
+  BUILD SCRIPT:
+  - Moved build_mac.sh from samples/ to project root. PROJDIR now
+    resolves to the script's own directory instead of parent.
+
   INSPECTOR EVENTS (MACOS):
   - Replaced array-driven event display with Win32-style InsPopulateEvents():
     events are now built by control type (CT_FORM, CT_BUTTON, CT_EDIT, etc.)

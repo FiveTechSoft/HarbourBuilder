@@ -6,11 +6,11 @@
 set -e
 
 HBDIR="${HBDIR:-$HOME/harbour}"
-PROJDIR="$(cd "$(dirname "$0")/.." && pwd)"
+PROJDIR="$(cd "$(dirname "$0")" && pwd)"
 SRC="hbbuilder_macos"
 PROG="HbBuilder"
 
-cd "$(dirname "$0")"
+cd "$PROJDIR/samples"
 
 # Check Harbour is installed
 if [ ! -d "$HBDIR/include" ]; then
