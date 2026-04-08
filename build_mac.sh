@@ -10,7 +10,7 @@ PROJDIR="$(cd "$(dirname "$0")" && pwd)"
 SRC="hbbuilder_macos"
 PROG="HbBuilder"
 
-cd "$PROJDIR/samples"
+cd "$PROJDIR/source"
 
 # Check Harbour is installed
 if [ ! -d "$HBDIR/include" ]; then
@@ -58,13 +58,14 @@ NEED_LINK=0
 
 # [1/4] Harbour → C (only if .prg changed)
 if needs_rebuild "${SRC}.prg" "${SRC}.c" || \
-   needs_rebuild "$PROJDIR/harbour/classes.prg" "${SRC}.c" || \
+   needs_rebuild "$PROJDIR/source/common/classes.prg" "${SRC}.c" || \
    needs_rebuild "$PROJDIR/include/hbbuilder.ch" "${SRC}.c"; then
    echo "[1/4] Compiling ${SRC}.prg..."
    "$HBBIN/harbour" ${SRC}.prg -n -w -q \
       -I"$HBINC" \
       -I"$PROJDIR/include" \
-      -I"$PROJDIR/harbour" \
+      -I"$PROJDIR/source/common" \
+      -I"$PROJDIR/source/inspector" \
       -o${SRC}.c
    NEED_LINK=1
 else
@@ -83,28 +84,28 @@ else
 fi
 
 # [3/4] Cocoa sources (only if .m changed)
-if needs_rebuild "$PROJDIR/backends/cocoa/cocoa_core.m" cocoa_core.o; then
+if needs_rebuild "$PROJDIR/source/backends/cocoa/cocoa_core.m" cocoa_core.o; then
    echo "[3/4] Compiling cocoa_core.m..."
    clang -c -O2 -fobjc-arc \
       -I"$HBINC" \
-      "$PROJDIR/backends/cocoa/cocoa_core.m" -o cocoa_core.o
+      "$PROJDIR/source/backends/cocoa/cocoa_core.m" -o cocoa_core.o
    NEED_LINK=1
 else
    echo "[3/4] cocoa_core.o — up to date"
 fi
 
-if needs_rebuild "$PROJDIR/backends/cocoa/cocoa_inspector.m" cocoa_inspector.o; then
+if needs_rebuild "$PROJDIR/source/backends/cocoa/cocoa_inspector.m" cocoa_inspector.o; then
    echo "[3/4] Compiling cocoa_inspector.m..."
    clang -c -O2 -fobjc-arc \
       -I"$HBINC" \
-      "$PROJDIR/backends/cocoa/cocoa_inspector.m" -o cocoa_inspector.o
+      "$PROJDIR/source/backends/cocoa/cocoa_inspector.m" -o cocoa_inspector.o
    NEED_LINK=1
 else
    echo "[3/4] cocoa_inspector.o — up to date"
 fi
 
 # [3b/4] Scintilla editor (only if .mm changed)
-if needs_rebuild "$PROJDIR/backends/cocoa/cocoa_editor.mm" cocoa_editor.o; then
+if needs_rebuild "$PROJDIR/source/backends/cocoa/cocoa_editor.mm" cocoa_editor.o; then
    echo "[3b/4] Compiling cocoa_editor.mm..."
    clang++ -c -O2 -fobjc-arc -std=c++17 \
       -I"$HBINC" \
@@ -112,7 +113,7 @@ if needs_rebuild "$PROJDIR/backends/cocoa/cocoa_editor.mm" cocoa_editor.o; then
       -I"$SCICOCOA" \
       -I"$LEXINC" \
       -I"$SCIDIR/scintilla/src" \
-      "$PROJDIR/backends/cocoa/cocoa_editor.mm" -o cocoa_editor.o
+      "$PROJDIR/source/backends/cocoa/cocoa_editor.mm" -o cocoa_editor.o
    NEED_LINK=1
 else
    echo "[3b/4] cocoa_editor.o — up to date"
@@ -159,15 +160,16 @@ cp "$PROJDIR/resources/palette.bmp" "$APP/Contents/Resources/" 2>/dev/null
 cp "$PROJDIR/resources/harbour_logo.png" "$APP/Contents/Resources/" 2>/dev/null
 cp -R "$PROJDIR/resources/menu_icons" "$APP/Contents/Resources/" 2>/dev/null
 # Copy Harbour source files needed for building user projects
-cp "$PROJDIR/harbour/classes.prg" "$APP/Contents/Resources/" 2>/dev/null
+cp "$PROJDIR/source/common/classes.prg" "$APP/Contents/Resources/" 2>/dev/null
 cp "$PROJDIR/include/hbbuilder.ch" "$APP/Contents/Resources/" 2>/dev/null
-cp "$PROJDIR/harbour/dbgclient.prg" "$APP/Contents/Resources/" 2>/dev/null
-cp "$PROJDIR/harbour/dbghook.c" "$APP/Contents/Resources/" 2>/dev/null
+cp "$PROJDIR/source/debugger/dbgclient.prg" "$APP/Contents/Resources/" 2>/dev/null
+cp "$PROJDIR/source/debugger/dbghook.c" "$APP/Contents/Resources/" 2>/dev/null
 # Copy backends for user project compilation
 mkdir -p "$APP/Contents/Resources/backends/cocoa"
-cp "$PROJDIR/backends/cocoa/cocoa_core.m" "$APP/Contents/Resources/backends/cocoa/" 2>/dev/null
-cp "$PROJDIR/backends/cocoa/cocoa_editor.mm" "$APP/Contents/Resources/backends/cocoa/" 2>/dev/null
-cp "$PROJDIR/backends/cocoa/gt_dummy.c" "$APP/Contents/Resources/backends/cocoa/" 2>/dev/null
+cp "$PROJDIR/source/backends/cocoa/cocoa_core.m" "$APP/Contents/Resources/backends/cocoa/" 2>/dev/null
+cp "$PROJDIR/source/backends/cocoa/cocoa_editor.mm" "$APP/Contents/Resources/backends/cocoa/" 2>/dev/null
+cp "$PROJDIR/source/backends/cocoa/cocoa_inspector.m" "$APP/Contents/Resources/backends/cocoa/" 2>/dev/null
+cp "$PROJDIR/source/backends/cocoa/gt_dummy.c" "$APP/Contents/Resources/backends/cocoa/" 2>/dev/null
 # Copy Scintilla includes and libs for user project compilation
 mkdir -p "$APP/Contents/Resources/scintilla/include"
 mkdir -p "$APP/Contents/Resources/scintilla/cocoa"

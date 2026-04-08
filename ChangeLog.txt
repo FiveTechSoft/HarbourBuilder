@@ -1,6 +1,22 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-08 (Session 21: macOS — Fix paths for new source/ folder structure)
+
+  BUILD SCRIPT (build_mac.sh):
+  - Updated all paths for new directory layout: source/, source/common/,
+    source/backends/cocoa/, source/debugger/, source/inspector/.
+  - Build working directory changed from samples/ to source/.
+  - Added -I flags for common/ and inspector/ include paths.
+  - Added cocoa_inspector.m copy to .app bundle Resources.
+
+  HBBUILDER_MACOS.PRG:
+  - Updated runtime paths: cProjDir + "/backends/cocoa" →
+    "/source/backends/cocoa", harbour/classes.prg → source/common/,
+    harbour/dbg* → source/debugger/.
+  - #include directives use short names (classes.prg, inspector_mac.prg)
+    resolved via -I flags instead of relative ../harbour/ paths.
+
 2026-04-08 (Session 20: Linux — Live build progress dialog)
 
   PROGRESS DIALOG WITH LIVE LOG (GTK3):
