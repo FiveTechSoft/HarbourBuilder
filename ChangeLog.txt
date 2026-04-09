@@ -1,6 +1,20 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-09 (build_mac.sh: detect Scintilla architecture mismatch)
+
+  BUILD FIX (macOS):
+  - build_mac.sh now verifies cached libscintilla.a / liblexilla.a match
+    the host architecture (arm64 vs x86_64) via 'lipo -archs' and rebuilds
+    them automatically if mismatched
+  - Previously the script only checked file existence, so stale libs from
+    an Intel build or from a bad download would be silently reused on
+    Apple Silicon, producing cryptic link errors:
+       warning: ignoring file liblexilla.a(Accessor.o):
+       found architecture 'x86_64', required architecture 'arm64'
+       Undefined symbols: _CreateLexer, OBJC_CLASS$_ScintillaView
+  - Reported by Marek Olszewski on macOS arm64
+
 2026-04-09 (Cross-platform fix: classes.prg linker errors on macOS/Linux)
 
   BUILD FIX (macOS/Linux):

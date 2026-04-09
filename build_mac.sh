@@ -57,9 +57,26 @@ if [ ! -f "$SCICOCOA/ScintillaView.h" ]; then
    rm -f "$SCIDIR/scintilla556.tgz" "$SCIDIR/lexilla520.tgz"
 fi
 
-# Build Scintilla static libraries if not present
+# Build Scintilla static libraries if not present — or if architecture mismatch
+HOST_ARCH=$(uname -m)   # arm64 or x86_64
+SCI_ARCH_OK=1
 if [ ! -f "$SCIBUILD/libscintilla.a" ] || [ ! -f "$SCIBUILD/liblexilla.a" ]; then
+   SCI_ARCH_OK=0
+else
+   # Verify cached libs match host architecture (prevents silent link failures
+   # when switching between Intel and Apple Silicon, or using stale libs)
+   for lib in libscintilla.a liblexilla.a; do
+      LIB_ARCH=$(lipo -archs "$SCIBUILD/$lib" 2>/dev/null || echo "unknown")
+      if ! echo "$LIB_ARCH" | grep -qw "$HOST_ARCH"; then
+         echo "[0/4] $lib is '$LIB_ARCH' but host is '$HOST_ARCH' — will rebuild"
+         SCI_ARCH_OK=0
+         break
+      fi
+   done
+fi
+if [ "$SCI_ARCH_OK" -eq 0 ]; then
    echo "[0/4] Building Scintilla + Lexilla static libraries..."
+   rm -rf "$SCIBUILD"
    bash "$SCIDIR/build_scintilla_mac.sh"
 fi
 
