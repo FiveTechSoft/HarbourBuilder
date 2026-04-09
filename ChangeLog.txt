@@ -1,7 +1,43 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
-2026-04-09 (Session 33: Windows — Fix build_win.bat include path)
+2026-04-09 (Session 33: Windows — macOS parity: autocomplete, inspector, code gen)
+
+  CROSS-FILE AUTOCOMPLETE:
+  - ':' after variable triggers class member dropdown (Self:, oForm:, ::member)
+  - 4 resolution strategies: Self, DATA comment, assignment pattern, naming convention
+  - Searches all open editor tabs for CLASS definitions (cross-file)
+  - Methods show with () suffix, properties without
+  - s_classMembers table with 22 standard classes
+
+  INSPECTOR — BROWSE COLUMNS:
+  - Browse columns appear as "oBrowse1Col1 AS TBrwColumn" in inspector combo
+  - Selecting a column shows editable properties: cTitle, nWidth, nAlign,
+    cFieldName, cFooterText
+  - New bridge functions: UI_BrowseColCount, UI_BrowseGetColProps,
+    UI_BrowseSetColProp
+  - Combo map tracks form/control/column entries
+  - Arrow keys skip category rows in property grid
+
+  CODE GENERATION:
+  - Browse: HEADERS + COLSIZES clauses with per-column widths
+  - IsNonVisual() classifies component types (Browse/DBGrid/WebView are visual)
+  - COMPONENT syntax for non-visual types (Timer, Database, etc.)
+  - TDbfTable: cFileName, cRDD, Open() serialization
+  - TCompArray: aHeaders, aData serialization
+  - Memo control code generation
+
+  SAVE PROMPT:
+  - MsgYesNoCancel before New Application / Open Project
+  - Offers Save / Don't Save / Cancel
+
+  EVENT HANDLERS:
+  - InspectorRefresh resolves handler names from editor code
+
+  BUILD FIX:
+  - Added -I%INCDIR% to Harbour compile step in build_win.bat (all 3 compilers)
+
+2026-04-09 (Session 33 prep: Windows — Fix build_win.bat include path)
 
   BUILD FIX:
   - Added -I%INCDIR% to Harbour compile step in all three compiler sections

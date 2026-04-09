@@ -537,6 +537,109 @@ HB_FUNC( UI_BROWSEONEVENT )
    }
 }
 
+/* UI_BrowseColCount( hBrowse ) -> nCols */
+HB_FUNC( UI_BROWSECOLCOUNT )
+{
+   TControl * p = (TControl *) GetCtrl(1);
+   if( p && p->FControlType == CT_BROWSE )
+      hb_retni( ((TBrowse *)p)->FColCount );
+   else
+      hb_retni( 0 );
+}
+
+/* UI_BrowseGetColProps( hBrowse, nCol ) -> { {"cTitle",val}, {"cFieldName",val}, {"nWidth",val}, {"nAlign",val}, {"cFooterText",val} } */
+HB_FUNC( UI_BROWSEGETCOLPROPS )
+{
+   TControl * p = (TControl *) GetCtrl(1);
+   int nCol = hb_parni(2);
+   if( p && p->FControlType == CT_BROWSE )
+   {
+      TBrowse * br = (TBrowse *) p;
+      if( nCol >= 0 && nCol < br->FColCount )
+      {
+         PHB_ITEM aResult = hb_itemArrayNew( 5 );
+         PHB_ITEM aPair;
+
+         aPair = hb_itemArrayNew( 2 );
+         hb_arraySetC( aPair, 1, "cTitle" );
+         hb_arraySetC( aPair, 2, br->FCols[nCol].szTitle );
+         hb_arraySet( aResult, 1, aPair );
+         hb_itemRelease( aPair );
+
+         aPair = hb_itemArrayNew( 2 );
+         hb_arraySetC( aPair, 1, "cFieldName" );
+         hb_arraySetC( aPair, 2, br->FCols[nCol].szFieldName );
+         hb_arraySet( aResult, 2, aPair );
+         hb_itemRelease( aPair );
+
+         aPair = hb_itemArrayNew( 2 );
+         hb_arraySetC( aPair, 1, "nWidth" );
+         hb_arraySetNI( aPair, 2, br->FCols[nCol].nWidth );
+         hb_arraySet( aResult, 3, aPair );
+         hb_itemRelease( aPair );
+
+         aPair = hb_itemArrayNew( 2 );
+         hb_arraySetC( aPair, 1, "nAlign" );
+         hb_arraySetNI( aPair, 2, br->FCols[nCol].nAlign );
+         hb_arraySet( aResult, 4, aPair );
+         hb_itemRelease( aPair );
+
+         aPair = hb_itemArrayNew( 2 );
+         hb_arraySetC( aPair, 1, "cFooterText" );
+         hb_arraySetC( aPair, 2, br->FCols[nCol].szFooterText );
+         hb_arraySet( aResult, 5, aPair );
+         hb_itemRelease( aPair );
+
+         hb_itemReturnRelease( aResult );
+         return;
+      }
+   }
+   hb_reta( 0 );
+}
+
+/* UI_BrowseSetColProp( hBrowse, nCol, cPropName, xValue ) */
+HB_FUNC( UI_BROWSESETCOLPROP )
+{
+   TControl * p = (TControl *) GetCtrl(1);
+   int nCol = hb_parni(2);
+   const char * szProp = hb_parc(3);
+   TBrowse * br;
+   if( !p || p->FControlType != CT_BROWSE || !szProp ) return;
+
+   br = (TBrowse *) p;
+   if( nCol < 0 || nCol >= br->FColCount ) return;
+
+   if( lstrcmpiA( szProp, "cTitle" ) == 0 && HB_ISCHAR(4) )
+   {
+      lstrcpynA( br->FCols[nCol].szTitle, hb_parc(4), 64 );
+      if( br->FHandle )
+      {
+         LVCOLUMNA lvc = {0};
+         lvc.mask = LVCF_TEXT;
+         lvc.pszText = br->FCols[nCol].szTitle;
+         SendMessageA( br->FHandle, LVM_SETCOLUMNA, nCol, (LPARAM)&lvc );
+      }
+   }
+   else if( lstrcmpiA( szProp, "nWidth" ) == 0 )
+   {
+      br->FCols[nCol].nWidth = hb_parni(4);
+      if( br->FHandle )
+         SendMessageA( br->FHandle, LVM_SETCOLUMNWIDTH, nCol, br->FCols[nCol].nWidth );
+   }
+   else if( lstrcmpiA( szProp, "nAlign" ) == 0 )
+   {
+      br->FCols[nCol].nAlign = hb_parni(4);
+   }
+   else if( lstrcmpiA( szProp, "cFieldName" ) == 0 && HB_ISCHAR(4) )
+   {
+      lstrcpynA( br->FCols[nCol].szFieldName, hb_parc(4), 64 );
+   }
+   else if( lstrcmpiA( szProp, "cFooterText" ) == 0 && HB_ISCHAR(4) )
+   {
+      lstrcpynA( br->FCols[nCol].szFooterText, hb_parc(4), 64 );
+   }
+}
+
 /* ======================================================================
  * Property access
  * ====================================================================== */

@@ -1,5 +1,10 @@
 // inspector.prg - Live Property Grid Inspector (non-modal)
 
+// Force symbol registration for C functions called via hb_dynsymFindName
+EXTERNAL UI_BROWSESETCOLPROP
+EXTERNAL UI_BROWSEGETCOLPROPS
+EXTERNAL UI_BROWSECOLCOUNT
+
 function InspectorOpen()
    if _InsGetData() == 0
       _InsSetData( INS_Create() )
@@ -10,21 +15,50 @@ return nil
 
 function InspectorRefresh( hCtrl, hForm )
    local h := _InsGetData()
-   local aProps
+   local aProps, aEvents
+   local i, cName, cHandler, cCode
    if h != 0
       if hCtrl != nil .and. hCtrl != 0
-         aProps := UI_GetAllProps( hCtrl )
+         aProps  := UI_GetAllProps( hCtrl )
+         aEvents := UI_GetAllEvents( hCtrl )
+
+         // Resolve handler names from editor code
+         cCode := _InsGetEditorCode()
+         cName := UI_GetProp( hCtrl, "cName" )
+         if Empty( cName )
+            if UI_GetProp( hCtrl, "cClassName" ) == "TForm"
+               cName := "Form1"
+            else
+               cName := "ctrl"
+            endif
+         endif
+         if ! Empty( cCode ) .and. ! Empty( aEvents )
+            for i := 1 to Len( aEvents )
+               if Len( aEvents[i] ) >= 3 .and. ! Empty( aEvents[i][1] )
+                  cHandler := cName + SubStr( aEvents[i][1], 3 )
+                  if ( "function " + cHandler ) $ cCode
+                     aEvents[i][2] := cHandler
+                  endif
+               endif
+            next
+         endif
+
          INS_RefreshWithData( h, hCtrl, aProps )
+         INS_SetEvents( h, aEvents )
       else
          INS_RefreshWithData( h, 0, {} )
+         INS_SetEvents( h, {} )
       endif
    endif
 return nil
 
 // Populate combo with all controls from the design form
+// Combo map: maps combo index -> { nType, hCtrl, nColIdx }
+//   nType: 0=form, 1=control, 2=browse column
 function InspectorPopulateCombo( hForm )
    local h := _InsGetData()
-   local i, nCount, hChild, cName, cClass, cEntry
+   local i, j, nCount, hChild, cName, cClass, cEntry, nColCount
+   local aMap
 
    if h == 0 .or. hForm == 0
       return nil
@@ -32,6 +66,7 @@ function InspectorPopulateCombo( hForm )
 
    INS_ComboClear( h )
    INS_SetFormCtrl( h, hForm )
+   aMap := {}
 
    // Add the form itself: "oForm1 AS TForm1"
    cName  := UI_GetProp( hForm, "cName" )
@@ -39,8 +74,9 @@ function InspectorPopulateCombo( hForm )
    if Empty( cName ); cName := "Form1"; endif
    cEntry := "o" + cName + " AS T" + cName
    INS_ComboAdd( h, cEntry )
+   AAdd( aMap, { 0, hForm, 0 } )
 
-   // Add all child controls: "oTimer1 AS Timer"
+   // Add all child controls: "oButton1 AS TButton"
    nCount := UI_GetChildCount( hForm )
    for i := 1 to nCount
       hChild := UI_GetChild( hForm, i )
@@ -50,12 +86,41 @@ function InspectorPopulateCombo( hForm )
          if Empty( cName ); cName := "ctrl" + LTrim( Str( i ) ); endif
          cEntry := "o" + cName + " AS " + cClass
          INS_ComboAdd( h, cEntry )
+         AAdd( aMap, { 1, hChild, 0 } )
+
+         // If it's a Browse, add its columns as sub-entries
+         if UI_GetType( hChild ) == 79  // CT_BROWSE
+            nColCount := UI_BrowseColCount( hChild )
+            for j := 1 to nColCount
+               cEntry := "  o" + cName + "Col" + LTrim( Str( j ) ) + " AS TBrwColumn"
+               INS_ComboAdd( h, cEntry )
+               AAdd( aMap, { 2, hChild, j - 1 } )  // 0-based col index
+            next
+         endif
       endif
    next
 
-   // Select current control in combo
+   _InsSetComboMap( aMap )
+
+   // Select form (first entry)
    INS_ComboSelect( h, 0 )
 
+return nil
+
+function InspectorGetComboMap()
+return _InsGetComboMap()
+
+// Refresh inspector showing column properties
+function InspectorRefreshColumn( hBrowse, nCol )
+   local h := _InsGetData()
+   local aProps
+   if h != 0 .and. hBrowse != 0
+      aProps := UI_BrowseGetColProps( hBrowse, nCol )
+      if ! Empty( aProps )
+         INS_RefreshWithData( h, hBrowse, aProps )
+         INS_SetEvents( h, {} )  // Columns have no events
+      endif
+   endif
 return nil
 
 function InspectorClose()
@@ -74,9 +139,28 @@ return nil
 // Simple global storage via C static
 #pragma BEGINDUMP
 #include <hbapi.h>
+#include <hbapiitm.h>
 static HB_PTRUINT s_insData = 0;
 HB_FUNC( _INSGETDATA ) { hb_retnint( s_insData ); }
 HB_FUNC( _INSSETDATA ) { s_insData = (HB_PTRUINT) hb_parnint(1); }
+
+static PHB_ITEM s_comboMap = NULL;
+
+HB_FUNC( _INSSETCOMBOMAP ) {
+   if( s_comboMap ) hb_itemRelease( s_comboMap );
+   s_comboMap = hb_itemClone( hb_param(1, HB_IT_ARRAY) );
+}
+HB_FUNC( _INSGETCOMBOMAP ) {
+   if( s_comboMap )
+      hb_itemReturn( s_comboMap );
+   else
+      hb_reta( 0 );
+}
+
+/* INS_SetEvents( hInsData, aEvents ) - store events from Harbour.
+ * On Windows, events are populated internally by InsPopulateEvents(),
+ * so this is a no-op stub for cross-platform compatibility. */
+HB_FUNC( INS_SETEVENTS ) { /* no-op on Windows */ }
 #pragma ENDDUMP
 
 #pragma BEGINDUMP
@@ -479,6 +563,31 @@ static LRESULT CALLBACK InsWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             }
             return 0;
          }
+
+         /* Arrow key navigation: skip category rows */
+         if( pnm->code == LVN_ITEMCHANGED && pnm->idFrom == 100 )
+         {
+            NMLISTVIEW * pnlv = (NMLISTVIEW *) lParam;
+            if( d && (pnlv->uNewState & LVIS_SELECTED) && !(pnlv->uOldState & LVIS_SELECTED) )
+            {
+               int nRow = pnlv->iItem;
+               if( nRow >= 0 && nRow < d->nVisible )
+               {
+                  int nReal = d->map[nRow];
+                  if( d->rows[nReal].bIsCat )
+                  {
+                     int next = nRow + 1;
+                     if( next < d->nVisible && !d->rows[d->map[next]].bIsCat ) {
+                        ListView_SetItemState( d->hList, next, LVIS_SELECTED|LVIS_FOCUSED, LVIS_SELECTED|LVIS_FOCUSED );
+                     } else if( nRow > 0 ) {
+                        ListView_SetItemState( d->hList, nRow - 1, LVIS_SELECTED|LVIS_FOCUSED, LVIS_SELECTED|LVIS_FOCUSED );
+                     }
+                     ListView_SetItemState( d->hList, nRow, 0, LVIS_SELECTED|LVIS_FOCUSED );
+                  }
+               }
+            }
+         }
+
          /* Custom draw for Events ListView: bold category rows */
          if( pnm->code == NM_CUSTOMDRAW && pnm->idFrom == 103 )
          {

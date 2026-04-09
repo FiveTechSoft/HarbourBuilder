@@ -667,6 +667,7 @@ static function RegenerateFormCode( cName, hForm )
    local nL, nT, nCW, nCH, cText
    local cDatas := "", cCreate := "", cEvents := ""
    local cExistingCode, aEvents, j, cEvName, cEvSuffix, cHandlerName
+   local cVal, aHdrs, kk, nColCount, aColProps, nColW
 
    // Read existing code to find declared event handlers
    cExistingCode := ""
@@ -775,9 +776,70 @@ static function RegenerateFormCode( cName, hForm )
                cCreate += '   // ::o' + cCtrlName + ' (TRichEdit) at ' + ;
                   LTrim(Str(nL)) + ',' + LTrim(Str(nT)) + ' SIZE ' + ;
                   LTrim(Str(nCW)) + ',' + LTrim(Str(nCH)) + e
+            case nType == 9   // Memo
+               cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
+                  ' MEMO ::o' + cCtrlName + ' VAR "' + cText + '" OF Self SIZE ' + ;
+                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
+            case nType == 79  // Browse
+               cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
+                  ' BROWSE ::o' + cCtrlName + ' OF Self SIZE ' + ;
+                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH))
+               cVal := UI_GetProp( hCtrl, "aColumns" )
+               if ! Empty( cVal )
+                  aHdrs := hb_ATokens( cVal, "|" )
+                  cCreate += ' HEADERS '
+                  for kk := 1 to Len( aHdrs )
+                     if kk > 1; cCreate += ', '; endif
+                     cCreate += '"' + AllTrim( aHdrs[kk] ) + '"'
+                  next
+               endif
+               nColCount := UI_BrowseColCount( hCtrl )
+               if nColCount > 0
+                  cCreate += ' COLSIZES '
+                  for kk := 1 to nColCount
+                     if kk > 1; cCreate += ', '; endif
+                     aColProps := UI_BrowseGetColProps( hCtrl, kk - 1 )
+                     nColW := 100
+                     if Len( aColProps ) >= 3; nColW := aColProps[3][2]; endif
+                     cCreate += LTrim( Str( nColW ) )
+                  next
+               endif
+               cCreate += e
+               cVal := UI_GetProp( hCtrl, "cDataSource" )
+               if ! Empty( cVal )
+                  cCreate += '   ::o' + cCtrlName + ':cDataSource := "' + cVal + '"' + e
+               endif
             otherwise
-               // Non-visual and other components
-               cCreate += '   // ::o' + cCtrlName + ' := ' + cCtrlClass + '():New( Self )' + e
+               if IsNonVisual( nType )
+                  cCreate += '   COMPONENT ::o' + cCtrlName + ' TYPE ' + ;
+                     ComponentTypeName( nType ) + ' OF Self  // ' + cCtrlClass + e
+                  if nType == 53  // DBFTable
+                     cVal := UI_GetProp( hCtrl, "cFileName" )
+                     if ! Empty( cVal )
+                        cCreate += '   ::o' + cCtrlName + ':cFileName := "' + cVal + '"' + e
+                     endif
+                     cVal := UI_GetProp( hCtrl, "cRDD" )
+                     if ! Empty( cVal ) .and. Upper( cVal ) != "DBFCDX"
+                        cCreate += '   ::o' + cCtrlName + ':cRDD := "' + cVal + '"' + e
+                     endif
+                     if UI_GetProp( hCtrl, "lActive" )
+                        cCreate += '   ::o' + cCtrlName + ':Open()' + e
+                     endif
+                  elseif nType == 131  // CompArray
+                     cVal := UI_GetProp( hCtrl, "aHeaders" )
+                     if ! Empty( cVal )
+                        cCreate += '   ::o' + cCtrlName + ':aHeaders := "' + cVal + '"' + e
+                     endif
+                     cVal := UI_GetProp( hCtrl, "aData" )
+                     if ! Empty( cVal )
+                        cCreate += '   ::o' + cCtrlName + ':aData := "' + cVal + '"' + e
+                     endif
+                  endif
+               else
+                  cCreate += '   // ::o' + cCtrlName + ' (' + cCtrlClass + ') at ' + ;
+                     LTrim(Str(nL)) + ',' + LTrim(Str(nT)) + ' SIZE ' + ;
+                     LTrim(Str(nCW)) + ',' + LTrim(Str(nCH)) + e
+               endif
          endcase
 
          // Scan for event handlers matching this control
@@ -1421,7 +1483,17 @@ return nil
 static function TBNew()
 
    local i, nFormX, nFormY, nInsW, nEditorX, nEditorW, nEditorH
-   local nInsTop, nEditorTop
+   local nInsTop, nEditorTop, nAns
+
+   // Ask to save current work if there are forms open
+   if Len( aForms ) > 0
+      nAns := MsgYesNoCancel( "Save current project before creating a new one?", "HbBuilder" )
+      if nAns == 0  // Cancel
+         return nil
+      elseif nAns == 1  // Yes
+         TBSave()
+      endif
+   endif
 
    // Destroy all existing forms
    for i := 1 to Len( aForms )
@@ -1609,9 +1681,19 @@ return nil
 // Open Project: load a .hbp project file
 static function TBOpen()
 
-   local cFile, cContent, cDir, aLines, i
+   local cFile, cContent, cDir, aLines, i, nAns
    local cFormName, cFormCode, nFormX, nFormY
    local nInsW, nInsTop, nEditorTop, nEditorX, nEditorW, nEditorH
+
+   // Ask to save current work if there are forms open
+   if Len( aForms ) > 0
+      nAns := MsgYesNoCancel( "Save current project before opening?", "HbBuilder" )
+      if nAns == 0  // Cancel
+         return nil
+      elseif nAns == 1  // Yes
+         TBSave()
+      endif
+   endif
 
    cFile := W32_OpenFileDialog( "Open HbBuilder Project", "hbp" )
    if Empty( cFile ); return nil; endif
@@ -3730,6 +3812,43 @@ function _InsGetEditorCode()
 
 return ""
 
+static function IsNonVisual( nType )
+   // Visual controls that have high CT_* numbers
+   // CT_BROWSE=79, CT_DBGRID=80, CT_DBNAVIGATOR=81, CT_DBTEXT=82,
+   // CT_DBEDIT=83, CT_DBCOMBOBOX=84, CT_DBCHECKBOX=85, CT_DBIMAGE=86,
+   // CT_WEBVIEW=62
+   if nType == 62 .or. ( nType >= 79 .and. nType <= 86 )
+      return .F.
+   endif
+return nType >= 38
+
+static function ComponentTypeName( nType )
+   do case
+      case nType == 38;  return "CT_TIMER"
+      case nType == 39;  return "CT_PAINTBOX"
+      case nType == 40;  return "CT_OPENDIALOG"
+      case nType == 41;  return "CT_SAVEDIALOG"
+      case nType == 42;  return "CT_FONTDIALOG"
+      case nType == 43;  return "CT_COLORDIALOG"
+      case nType == 44;  return "CT_FINDDIALOG"
+      case nType == 45;  return "CT_REPLACEDIALOG"
+      case nType == 53;  return "CT_DBFTABLE"
+      case nType == 54;  return "CT_MYSQL"
+      case nType == 55;  return "CT_MARIADB"
+      case nType == 56;  return "CT_POSTGRESQL"
+      case nType == 57;  return "CT_SQLITE"
+      case nType == 58;  return "CT_FIREBIRD"
+      case nType == 59;  return "CT_SQLSERVER"
+      case nType == 60;  return "CT_ORACLE"
+      case nType == 61;  return "CT_MONGODB"
+      case nType == 62;  return "CT_WEBVIEW"
+      case nType == 63;  return "CT_WEBSERVER"
+      case nType == 64;  return "CT_WEBSOCKET"
+      case nType == 65;  return "CT_HTTPCLIENT"
+      case nType == 131; return "CT_COMPARRAY"
+   endcase
+return "CT_UNKNOWN_" + LTrim( Str( nType ) )
+
 // Framework
 #include "core/classes.prg"
 #include "inspector/inspector_win.prg"
@@ -4020,6 +4139,20 @@ HB_FUNC( UI_MSGYESNO )
    int nResult = MessageBoxA( GetActiveWindow(), hb_parc(1),
       hb_parc(2) ? hb_parc(2) : "Confirm", MB_YESNO | MB_ICONQUESTION );
    hb_retl( nResult == IDYES );
+}
+
+/* MsgYesNoCancel( cText, cTitle ) -> 0=Cancel, 1=Yes, 2=No */
+HB_FUNC( MSGYESNOCANCEL )
+{
+   int nResult = MessageBoxA( GetActiveWindow(),
+      hb_parc(1),
+      HB_ISCHAR(2) ? hb_parc(2) : "Confirm",
+      MB_YESNOCANCEL | MB_ICONQUESTION );
+   switch( nResult ) {
+      case IDYES:    hb_retni( 1 ); break;
+      case IDNO:     hb_retni( 2 ); break;
+      default:       hb_retni( 0 ); break;
+   }
 }
 
 HB_FUNC( W32_GETSCREENWIDTH )
@@ -5720,6 +5853,502 @@ typedef struct {
 } SCI_FINDINFO;
 
 /* ======================================================================
+ * Class member autocomplete — triggered when ':' is typed
+ * ====================================================================== */
+
+typedef struct {
+   const char * className;
+   const char * members;
+} ClassMembers;
+
+static ClassMembers s_classMembers[] = {
+   { "TForm",
+     "Activate() AlphaBlend AlphaBlendValue AppBar AutoScroll BorderIcons "
+     "BorderStyle BorderWidth ClientHeight ClientWidth Close() Color Cursor "
+     "Destroy() DoubleBuffered FontName FontSize FormStyle Height Hint "
+     "KeyPreview Left ModalResult Name OnActivate OnChange OnClick OnClose "
+     "OnCloseQuery OnCreate OnDblClick OnDeactivate OnDestroy OnHide "
+     "OnKeyDown OnKeyPress OnKeyUp OnMouseDown OnMouseMove OnMouseUp "
+     "OnMouseWheel OnPaint OnResize OnShow Position Show() ShowHint "
+     "ShowModal() Sizable Text Title ToolWindow Top Width WindowState" },
+   { "TLabel",
+     "Height Left Name OnChange OnClick OnClose Text Top Width" },
+   { "TEdit",
+     "Height Left Name OnChange OnClick OnClose Text Top Value Width" },
+   { "TMemo",
+     "Height Left Name OnChange OnClick OnClose Text Top Value Width" },
+   { "TButton",
+     "Cancel Default Height Left Name OnChange OnClick OnClose Text Top Width" },
+   { "TCheckBox",
+     "Checked Height Left Name OnChange OnClick OnClose Text Top Width" },
+   { "TRadioButton",
+     "Checked Height Left Name OnChange OnClick OnClose Text Top Width" },
+   { "TComboBox",
+     "AddItem() Height Left Name OnChange OnClick OnClose Text Top Value Width" },
+   { "TListBox",
+     "Height Left Name OnChange OnClick OnClose Text Top Width" },
+   { "TGroupBox",
+     "Height Left Name OnChange OnClick OnClose Text Top Width" },
+   { "TToolBar",
+     "AddButton() AddSeparator() Height Left Name Text Top Width" },
+   { "TTimer",
+     "Height Left Name OnChange OnClick OnClose OnTimer Text Top Width" },
+   { "TApplication",
+     "CreateForm() Run() Title" },
+   { "TPanel",
+     "Height Left Name OnChange OnClick OnClose Text Top Width" },
+   { "TProgressBar",
+     "Height Left Name OnChange OnClick OnClose Text Top Width" },
+   { "TTabControl",
+     "Height Left Name OnChange OnClick OnClose Text Top Width" },
+   { "TTreeView",
+     "Height Left Name OnChange OnClick OnClose Text Top Width" },
+   { "TListView",
+     "Height Left Name OnChange OnClick OnClose Text Top Width" },
+   { "TImage",
+     "Height Left Name OnChange OnClick OnClose Text Top Width" },
+   { "TDatabase",
+     "Close() Exec() Field() FieldCount() FieldName() FreeResult() Goto() Host Name "
+     "Open() Password Port Query() RecCount() RecNo() Server Skip() Table User" },
+   { "TSQLite",
+     "Close() Exec() Field() FieldCount() FieldName() FreeResult() Goto() Host Name "
+     "Open() Password Port Query() RecCount() RecNo() Server Skip() Table User" },
+   { "TReport",
+     "Preview() Print()" },
+   { "TWebServer",
+     "Get() Post() Run()" },
+   { "THttpClient",
+     "Get() Post()" },
+   { "TThread",
+     "Join() Start()" },
+   { "TDBFTable",
+     "Append() Bof() cAlias cDatabase cFileName cIndexFile cRDD Close() "
+     "CreateIndex() Delete() Deleted() Eof() FieldCount() FieldGet() "
+     "FieldName() FieldPut() Found() GoBottom() GoTo() GoTop() "
+     "lConnected lExclusive lReadOnly nArea Open() Recall() "
+     "RecCount() RecNo() Seek() Skip() Structure() Tables()" },
+   { NULL, NULL }
+};
+
+/* Collect DATA/METHOD from current editor CLASS block */
+static int CE_CollectUserData( HWND hSci, int classLine, char * buf, int bufSize )
+{
+   int pos = 0, l;
+   int totalLines = (int) SciMsg( hSci, 2009, 0, 0 );
+   for( l = classLine + 1; l < totalLines; l++ )
+   {
+      char line[512];
+      int len = (int) SciMsg( hSci, 2094, l, 0 );
+      const char * p;
+      int isData, isMethod;
+      char name[64];
+      int ni;
+      if( len <= 0 || len >= (int)sizeof(line) ) continue;
+      SciMsg( hSci, 2095, l, (LPARAM)line );
+      line[len] = 0;
+      p = line;
+      while( *p == ' ' || *p == '\t' || *p == '\r' || *p == '\n' ) p++;
+      if( *p == 0 ) continue;
+      if( _strnicmp( p, "ENDCLASS", 8 ) == 0 ) break;
+      isData = ( _strnicmp( p, "DATA ", 5 ) == 0 );
+      isMethod = ( _strnicmp( p, "METHOD ", 7 ) == 0 ) ||
+                 ( _strnicmp( p, "ACCESS ", 7 ) == 0 );
+      if( !isData && !isMethod ) continue;
+      if( isData ) p += 5; else p += 7;
+      while( *p == ' ' ) p++;
+      ni = 0;
+      while( ni < 63 && (isalnum((unsigned char)p[ni]) || p[ni] == '_') )
+         { name[ni] = p[ni]; ni++; }
+      name[ni] = 0;
+      if( ni == 0 ) continue;
+      if( isMethod && ni < 61 ) { name[ni++] = '('; name[ni++] = ')'; name[ni] = 0; }
+      if( pos > 0 && pos < bufSize - 1 ) buf[pos++] = ' ';
+      if( ni > bufSize - pos - 1 ) break;
+      memcpy( buf + pos, name, (size_t)ni );
+      pos += ni;
+   }
+   buf[pos] = 0;
+   return pos;
+}
+
+/* Search plain text for CLASS declaration matching cls */
+static const char * CE_FindClassInText( const char * text, const char * cls, char * parentCls )
+{
+   const char * cur = text;
+   parentCls[0] = 0;
+   while( *cur )
+   {
+      const char * lineStart = cur;
+      const char * lineEnd = cur;
+      int lineLen;
+      while( *lineEnd && *lineEnd != '\n' ) lineEnd++;
+      lineLen = (int)(lineEnd - cur);
+      if( lineLen > 0 && lineLen < 510 )
+      {
+         char line[512];
+         const char * p;
+         char foundCls[64];
+         int fi;
+         memcpy( line, cur, (size_t)lineLen );
+         line[lineLen] = 0;
+         p = line;
+         while( *p == ' ' || *p == '\t' ) p++;
+         if( _strnicmp( p, "CLASS ", 6 ) == 0 )
+         {
+            p += 6;
+            while( *p == ' ' ) p++;
+            fi = 0;
+            while( fi < 63 && (isalnum((unsigned char)p[fi]) || p[fi] == '_') )
+               { foundCls[fi] = p[fi]; fi++; }
+            foundCls[fi] = 0;
+            if( _stricmp( foundCls, cls ) == 0 )
+            {
+               p += fi;
+               while( *p == ' ' ) p++;
+               if( _strnicmp( p, "INHERIT ", 8 ) == 0 ) p += 8;
+               else if( _strnicmp( p, "FROM ", 5 ) == 0 ) p += 5;
+               else p = NULL;
+               if( p ) {
+                  int pi = 0;
+                  while( *p == ' ' ) p++;
+                  while( pi < 63 && (isalnum((unsigned char)p[pi]) || p[pi] == '_') )
+                     { parentCls[pi] = p[pi]; pi++; }
+                  parentCls[pi] = 0;
+               }
+               return lineStart;
+            }
+         }
+      }
+      cur = lineEnd;
+      if( *cur == '\n' ) cur++;
+   }
+   return NULL;
+}
+
+/* Collect DATA/METHOD from plain text starting after CLASS line */
+static int CE_CollectUserDataFromText( const char * text, const char * classLineStart,
+                                        char * buf, int bufSize )
+{
+   int pos = 0;
+   const char * cur = classLineStart;
+   while( *cur && *cur != '\n' ) cur++;
+   if( *cur == '\n' ) cur++;
+   while( *cur )
+   {
+      const char * lineEnd = cur;
+      int lineLen;
+      while( *lineEnd && *lineEnd != '\n' ) lineEnd++;
+      lineLen = (int)(lineEnd - cur);
+      if( lineLen > 0 && lineLen < 510 )
+      {
+         char line[512];
+         const char * p;
+         int isData, isMethod;
+         memcpy( line, cur, (size_t)lineLen );
+         line[lineLen] = 0;
+         p = line;
+         while( *p == ' ' || *p == '\t' || *p == '\r' ) p++;
+         if( *p != 0 )
+         {
+            if( _strnicmp( p, "ENDCLASS", 8 ) == 0 ) break;
+            isData = ( _strnicmp( p, "DATA ", 5 ) == 0 );
+            isMethod = ( _strnicmp( p, "METHOD ", 7 ) == 0 ) ||
+                       ( _strnicmp( p, "ACCESS ", 7 ) == 0 );
+            if( isData || isMethod )
+            {
+               char name[64];
+               int ni = 0;
+               if( isData ) p += 5; else p += 7;
+               while( *p == ' ' ) p++;
+               while( ni < 63 && (isalnum((unsigned char)p[ni]) || p[ni] == '_') )
+                  { name[ni] = p[ni]; ni++; }
+               name[ni] = 0;
+               if( isMethod && ni < 61 ) { name[ni++] = '('; name[ni++] = ')'; name[ni] = 0; }
+               if( ni > 0 ) {
+                  if( pos > 0 && pos < bufSize - 1 ) buf[pos++] = ' ';
+                  if( ni > bufSize - pos - 1 ) break;
+                  memcpy( buf + pos, name, (size_t)ni );
+                  pos += ni;
+               }
+            }
+         }
+      }
+      cur = lineEnd;
+      if( *cur == '\n' ) cur++;
+   }
+   buf[pos] = 0;
+   return pos;
+}
+
+/* Find current CLASS name by scanning backwards from line */
+static const char * CE_FindCurrentClass( HWND hSci, int fromLine )
+{
+   static char s_curClass[64];
+   int l;
+   for( l = fromLine; l >= 0; l-- )
+   {
+      char buf[512];
+      int len = (int) SciMsg( hSci, 2094, l, 0 );
+      const char * cp;
+      int ci;
+      if( len <= 0 || len >= (int)sizeof(buf) ) continue;
+      SciMsg( hSci, 2095, l, (LPARAM)buf );
+      buf[len] = 0;
+      cp = buf;
+      while( *cp == ' ' || *cp == '\t' ) cp++;
+      if( _strnicmp( cp, "CLASS ", 6 ) == 0 ) {
+         cp += 6;
+         while( *cp == ' ' ) cp++;
+         ci = 0;
+         while( ci < 63 && (isalnum((unsigned char)cp[ci]) || cp[ci] == '_') )
+            { s_curClass[ci] = cp[ci]; ci++; }
+         s_curClass[ci] = 0;
+         if( ci > 0 ) return s_curClass;
+         break;
+      }
+   }
+   return NULL;
+}
+
+/* Find class members combining standard + user-defined */
+static const char * CE_FindClassMembers( CODEEDITOR * ed, const char * cls )
+{
+   static char s_combined[4096];
+   const char * stdMembers = NULL;
+   char userMembers[2048] = "";
+   int classLine = -1, i, t;
+
+   for( i = 0; s_classMembers[i].className; i++ )
+      if( _stricmp( cls, s_classMembers[i].className ) == 0 )
+         { stdMembers = s_classMembers[i].members; break; }
+
+   if( !ed || !ed->hEdit ) goto cm_combine;
+
+   /* Search current editor for CLASS definition */
+   {
+      int totalLines = (int) SciMsg( ed->hEdit, 2009, 0, 0 );
+      for( i = 0; i < totalLines; i++ )
+      {
+         char buf[512];
+         int len = (int) SciMsg( ed->hEdit, 2094, i, 0 );
+         const char * cp;
+         char foundCls[64];
+         int fi;
+         if( len <= 0 || len >= (int)sizeof(buf) ) continue;
+         SciMsg( ed->hEdit, 2095, i, (LPARAM)buf );
+         buf[len] = 0;
+         cp = buf;
+         while( *cp == ' ' || *cp == '\t' ) cp++;
+         if( _strnicmp( cp, "CLASS ", 6 ) != 0 ) continue;
+         cp += 6;
+         while( *cp == ' ' ) cp++;
+         fi = 0;
+         while( fi < 63 && (isalnum((unsigned char)cp[fi]) || cp[fi] == '_') )
+            { foundCls[fi] = cp[fi]; fi++; }
+         foundCls[fi] = 0;
+         if( _stricmp( foundCls, cls ) == 0 )
+         {
+            classLine = i;
+            cp += fi;
+            while( *cp == ' ' ) cp++;
+            if( _strnicmp( cp, "INHERIT ", 8 ) == 0 ) cp += 8;
+            else if( _strnicmp( cp, "FROM ", 5 ) == 0 ) cp += 5;
+            else cp = NULL;
+            if( cp && !stdMembers ) {
+               char parent[64];
+               int pi = 0;
+               while( *cp == ' ' ) cp++;
+               while( pi < 63 && (isalnum((unsigned char)cp[pi]) || cp[pi] == '_') )
+                  { parent[pi] = cp[pi]; pi++; }
+               parent[pi] = 0;
+               for( i = 0; s_classMembers[i].className; i++ )
+                  if( _stricmp( parent, s_classMembers[i].className ) == 0 )
+                     { stdMembers = s_classMembers[i].members; break; }
+            }
+            break;
+         }
+      }
+      if( classLine >= 0 )
+         CE_CollectUserData( ed->hEdit, classLine, userMembers, sizeof(userMembers) );
+   }
+
+   /* If not found, search other tabs */
+   if( classLine < 0 )
+   {
+      for( t = 0; t < ed->nTabs; t++ )
+      {
+         char parentCls[64];
+         const char * classPos;
+         if( t == ed->nActiveTab || !ed->aTexts[t] || !ed->aTexts[t][0] ) continue;
+         classPos = CE_FindClassInText( ed->aTexts[t], cls, parentCls );
+         if( classPos ) {
+            CE_CollectUserDataFromText( ed->aTexts[t], classPos, userMembers, sizeof(userMembers) );
+            if( parentCls[0] && !stdMembers ) {
+               for( i = 0; s_classMembers[i].className; i++ )
+                  if( _stricmp( parentCls, s_classMembers[i].className ) == 0 )
+                     { stdMembers = s_classMembers[i].members; break; }
+            }
+            break;
+         }
+      }
+   }
+
+cm_combine:
+   if( stdMembers && userMembers[0] ) {
+      _snprintf( s_combined, sizeof(s_combined), "%s %s", stdMembers, userMembers );
+      return s_combined;
+   }
+   if( stdMembers ) return stdMembers;
+   if( userMembers[0] ) { lstrcpynA( s_combined, userMembers, sizeof(s_combined) ); return s_combined; }
+   return NULL;
+}
+
+/* Resolve variable class from context (4 strategies) */
+static const char * CE_ResolveVarClass( CODEEDITOR * ed, int colonPos )
+{
+   static char s_resolved[64];
+   int line, lineStart, lineLen;
+   char lineBuf[512];
+   int end, nameEnd, nameStart, varLen;
+   char varName[128];
+   int hasDblColon;
+   int totalLines, l, i;
+
+   static struct { const char * prefix; const char * cls; } s_nameMap[] = {
+      { "Form", "TForm" }, { "Button", "TButton" }, { "Edit", "TEdit" },
+      { "Label", "TLabel" }, { "Memo", "TMemo" }, { "CheckBox", "TCheckBox" },
+      { "RadioButton", "TRadioButton" }, { "ComboBox", "TComboBox" },
+      { "ListBox", "TListBox" }, { "GroupBox", "TGroupBox" }, { "Panel", "TPanel" },
+      { "Timer", "TTimer" }, { "ToolBar", "TToolBar" }, { "ProgressBar", "TProgressBar" },
+      { "TabControl", "TTabControl" }, { "TreeView", "TTreeView" },
+      { "ListView", "TListView" }, { "Image", "TImage" }, { "Database", "TDatabase" },
+      { "DBFTable", "TDBFTable" }, { "SQLite", "TSQLite" }, { "Report", "TReport" },
+      { "WebServer", "TWebServer" }, { "HttpClient", "THttpClient" },
+      { "Thread", "TThread" }, { "App", "TApplication" }, { NULL, NULL }
+   };
+
+   if( !ed || !ed->hEdit ) return NULL;
+
+   line = (int) SciMsg( ed->hEdit, SCI_LINEFROMPOSITION, colonPos, 0 );
+   lineStart = (int) SciMsg( ed->hEdit, 2166, line, 0 ); /* SCI_POSITIONFROMLINE */
+   lineLen = colonPos - lineStart;
+   if( lineLen <= 0 || lineLen > 500 ) return NULL;
+
+   /* Get text before colon char by char */
+   {
+      int ci;
+      for( ci = 0; ci < lineLen && ci < 511; ci++ )
+         lineBuf[ci] = (char) SciMsg( ed->hEdit, 2007, lineStart + ci, 0 );
+      lineBuf[ci] = 0;
+   }
+
+   end = lineLen - 1;
+   while( end >= 0 && lineBuf[end] == ':' ) end--;
+   nameEnd = end;
+   while( end >= 0 && (isalnum((unsigned char)lineBuf[end]) || lineBuf[end] == '_') ) end--;
+   nameStart = end + 1;
+   if( nameStart > nameEnd ) return NULL;
+
+   varLen = nameEnd - nameStart + 1;
+   if( varLen <= 0 || varLen >= (int)sizeof(varName) ) return NULL;
+   memcpy( varName, &lineBuf[nameStart], (size_t)varLen );
+   varName[varLen] = 0;
+
+   hasDblColon = ( nameStart >= 2 && lineBuf[nameStart-1] == ':' && lineBuf[nameStart-2] == ':' );
+
+   /* "Self:" */
+   if( _stricmp( varName, "Self" ) == 0 )
+      return CE_FindCurrentClass( ed->hEdit, line );
+
+   /* Strategy 1: DATA comment — "DATA oName // TClassName" */
+   totalLines = (int) SciMsg( ed->hEdit, 2009, 0, 0 );
+   for( l = 0; l < totalLines; l++ )
+   {
+      char buf[512];
+      int len = (int) SciMsg( ed->hEdit, 2094, l, 0 );
+      const char * dp, * cmt;
+      if( len <= 0 || len >= (int)sizeof(buf) ) continue;
+      SciMsg( ed->hEdit, 2095, l, (LPARAM)buf );
+      buf[len] = 0;
+      dp = buf;
+      while( *dp == ' ' || *dp == '\t' ) dp++;
+      if( _strnicmp( dp, "DATA ", 5 ) != 0 ) continue;
+      dp += 5;
+      while( *dp == ' ' ) dp++;
+      if( _strnicmp( dp, varName, (size_t)varLen ) != 0 ) continue;
+      dp += varLen;
+      if( isalnum((unsigned char)*dp) || *dp == '_' ) continue;
+      cmt = strstr( dp, "//" );
+      if( !cmt ) continue;
+      cmt += 2;
+      while( *cmt == ' ' ) cmt++;
+      if( isalpha((unsigned char)*cmt) ) {
+         int ri = 0;
+         char rawCls[64];
+         while( ri < 63 && (isalnum((unsigned char)cmt[ri]) || cmt[ri] == '_') )
+            { rawCls[ri] = cmt[ri]; ri++; }
+         rawCls[ri] = 0;
+         if( rawCls[0] == 'T' && isupper((unsigned char)rawCls[1]) )
+            lstrcpynA( s_resolved, rawCls, 63 );
+         else
+            _snprintf( s_resolved, 64, "T%s", rawCls );
+         return s_resolved;
+      }
+   }
+
+   /* Strategy 2: assignment pattern — "varName := TClassName():New" */
+   for( l = 0; l < totalLines; l++ )
+   {
+      char buf[512];
+      int len = (int) SciMsg( ed->hEdit, 2094, l, 0 );
+      const char * vp;
+      if( len <= 0 || len >= (int)sizeof(buf) ) continue;
+      SciMsg( ed->hEdit, 2095, l, (LPARAM)buf );
+      buf[len] = 0;
+      vp = strstr( buf, varName );
+      if( !vp ) continue;
+      vp += varLen;
+      while( *vp == ' ' ) vp++;
+      if( *vp != ':' || vp[1] != '=' ) continue;
+      vp += 2;
+      while( *vp == ' ' ) vp++;
+      if( *vp == 'T' && isalpha((unsigned char)vp[1]) ) {
+         int ci = 0, slen;
+         while( ci < 63 && (isalnum((unsigned char)vp[ci]) || vp[ci] == '_') )
+            { s_resolved[ci] = vp[ci]; ci++; }
+         s_resolved[ci] = 0;
+         slen = (int)strlen( s_resolved );
+         if( slen > 2 && s_resolved[slen-1] == ')' && s_resolved[slen-2] == '(' )
+            s_resolved[slen-2] = 0;
+         return s_resolved;
+      }
+   }
+
+   /* Strategy 3: :: prefix → current class */
+   if( hasDblColon )
+      return CE_FindCurrentClass( ed->hEdit, line );
+
+   /* Strategy 4: naming convention — oForm→TForm, oButton→TButton */
+   {
+      const char * base = varName;
+      if( (base[0] == 'o' || base[0] == 'O') && isupper((unsigned char)base[1]) )
+         base++;
+      for( i = 0; s_nameMap[i].prefix; i++ ) {
+         int plen = (int)strlen( s_nameMap[i].prefix );
+         if( _strnicmp( base, s_nameMap[i].prefix, (size_t)plen ) == 0 ) {
+            char next = base[plen];
+            if( next == 0 || isdigit((unsigned char)next) || isupper((unsigned char)next) || next == '_' ) {
+               lstrcpynA( s_resolved, s_nameMap[i].cls, 63 );
+               return s_resolved;
+            }
+         }
+      }
+   }
+
+   return NULL;
+}
+
+/* ======================================================================
  * Auto-completion - uses Scintilla's built-in autocomplete
  * ====================================================================== */
 
@@ -6104,6 +6733,23 @@ static LRESULT CALLBACK CodeEdWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARA
                      SciMsg( ed->hEdit, 2126, curLine, indent ); /* SCI_SETLINEINDENTATION */
                      pos = (int) SciMsg( ed->hEdit, 2128, curLine, 0 ); /* SCI_GETLINEINDENTPOSITION */
                      SciMsg( ed->hEdit, SCI_GOTOPOS, pos, 0 );
+                  }
+               }
+               /* ':' typed — show class member dropdown */
+               else if( scn->ch == ':' )
+               {
+                  int pos = (int) SciMsg( ed->hEdit, SCI_GETCURRENTPOS, 0, 0 );
+                  const char * cls = CE_ResolveVarClass( ed, pos - 1 );
+                  if( cls )
+                  {
+                     const char * members = CE_FindClassMembers( ed, cls );
+                     if( members )
+                     {
+                        SciMsg( ed->hEdit, SCI_AUTOCSETIGNORECASE, 1, 0 );
+                        SciMsg( ed->hEdit, SCI_AUTOCSETSEPARATOR, ' ', 0 );
+                        SciMsg( ed->hEdit, 2235, 1, 0 );  /* SCI_AUTOCSETORDER = SC_ORDER_PERFORMSORT */
+                        SciMsg( ed->hEdit, SCI_AUTOCSHOW, 0, (LPARAM) members );
+                     }
                   }
                }
             }
