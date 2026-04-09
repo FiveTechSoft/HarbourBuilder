@@ -56,13 +56,16 @@ HarbourBuilder - Cross-platform visual IDE for Harbour
   - Offers Save / Don't Save / Cancel
 
   CONTROL COLOR (nClrPane):
-  - Code gen: emit ::oCtrl:nClrPane := value for non-default background colors
-  - TControl: ACCESS/ASSIGN nClrPane added (maps to UI_SetProp("nClrPane"))
-  - TBrowse: LVM_SETBKCOLOR + LVM_SETTEXTBKCOLOR on nClrPane change (live)
+  - UI_StoreClrPane(): new C function stores FClrPane without window operations
+    (safe to call before HWND exists, prevents runtime crash)
+  - Code gen: emit UI_StoreClrPane(::oCtrl:hCpp, nValue) for non-default colors
+  - TControl: ACCESS/ASSIGN nClrPane with hCpp guard, creates brush in CreateHandle
+  - TBrowse: LVM_SETBKCOLOR + LVM_SETTEXTBKCOLOR on nClrPane change (live in IDE)
   - TBrowse::CreateHandle applies FClrPane if already set
-  - RestoreFormFromCode: second pass parses ::oName:nClrPane/Color := value
+  - RestoreFormFromCode: second pass parses UI_StoreClrPane() and ::oName:prop lines
   - Strip Chr(13) from parsed lines to fix CRLF comparison issues
   - Skip commented lines (//) in second pass to prevent crashes
+  - Runtime stubs removed (hbbridge.obj already linked with real functions)
 
   EVENT HANDLERS:
   - InspectorRefresh resolves handler names from editor code
