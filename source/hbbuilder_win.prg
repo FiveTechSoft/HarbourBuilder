@@ -1734,40 +1734,46 @@ static function RestoreFormFromCode( hForm, cCode )
       endif
    next
 
-   // Second pass: apply property assignments like ::oCtrlName:nClrPane := value
+   // Second pass: apply property assignments like ::oCtrlName:prop := value
+   // Only handles known properties: nClrPane, Color, cDataSource
+   nCh := UI_GetChildCount( hForm )
    for i := 1 to Len( aLines )
       cTrim := StrTran( AllTrim( aLines[i] ), Chr(13), "" )
-      if Left( cTrim, 3 ) == "::o" .and. ":=" $ cTrim
-         nPos := At( ":", SubStr( cTrim, 4 ) )
-         if nPos > 0
-            cName := SubStr( cTrim, 4, nPos - 1 )
-            cText := SubStr( cTrim, 4 + nPos )
-            nPos2 := At( ":=", cText )
-            if nPos2 > 0
-               cProp := AllTrim( Left( cText, nPos2 - 1 ) )
-               cText := AllTrim( SubStr( cText, nPos2 + 2 ) )
+      // Skip comments and non-assignment lines
+      if Left( cTrim, 2 ) == "//"; loop; endif
+      if ! ( Left( cTrim, 3 ) == "::o" ) .or. ! ( ":=" $ cTrim ); loop; endif
+      // Must have a second ":" for the property (::oName:prop := value)
+      nPos := At( ":", SubStr( cTrim, 4 ) )
+      if nPos == 0; loop; endif
+      cName := SubStr( cTrim, 4, nPos - 1 )
+      cText := SubStr( cTrim, 4 + nPos )
+      nPos2 := At( ":=", cText )
+      if nPos2 == 0; loop; endif
+      cProp := AllTrim( Left( cText, nPos2 - 1 ) )
+      cText := AllTrim( SubStr( cText, nPos2 + 2 ) )
 
-               hCtrl := 0
-               nCh := UI_GetChildCount( hForm )
-               for kk := 1 to nCh
-                  if AllTrim( UI_GetProp( UI_GetChild( hForm, kk ), "cName" ) ) == cName
-                     hCtrl := UI_GetChild( hForm, kk )
-                     exit
-                  endif
-               next
+      // Only process known properties
+      if ! ( cProp == "nClrPane" .or. cProp == "Color" .or. cProp == "cDataSource" )
+         loop
+      endif
 
-               if hCtrl != 0 .and. ! Empty( cProp )
-                  if cProp == "nClrPane" .or. cProp == "Color"
-                     UI_SetProp( hCtrl, "nClrPane", Val( cText ) )
-                  elseif cProp == "cDataSource"
-                     if Left( cText, 1 ) == '"'
-                        cText := SubStr( cText, 2, Len( cText ) - 2 )
-                     endif
-                     UI_SetProp( hCtrl, "cDataSource", cText )
-                  endif
-               endif
-            endif
+      // Find the control by name
+      hCtrl := 0
+      for kk := 1 to nCh
+         if AllTrim( UI_GetProp( UI_GetChild( hForm, kk ), "cName" ) ) == cName
+            hCtrl := UI_GetChild( hForm, kk )
+            exit
          endif
+      next
+      if hCtrl == 0; loop; endif
+
+      if cProp == "nClrPane" .or. cProp == "Color"
+         UI_SetProp( hCtrl, "nClrPane", Val( cText ) )
+      elseif cProp == "cDataSource"
+         if Left( cText, 1 ) == '"'
+            cText := SubStr( cText, 2, Len( cText ) - 2 )
+         endif
+         UI_SetProp( hCtrl, "cDataSource", cText )
       endif
    next
 
