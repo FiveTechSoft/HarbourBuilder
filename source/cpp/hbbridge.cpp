@@ -771,6 +771,12 @@ HB_FUNC( UI_SETPROP )
             style = ( style & ~0x0FL ) | BS_OWNERDRAW;
             SetWindowLongPtr( p->FHandle, GWL_STYLE, style );
          }
+         /* ListView (Browse): set background color via LVM messages */
+         if( (p->FControlType == CT_BROWSE || p->FControlType == CT_DBGRID) && p->FHandle )
+         {
+            SendMessage( p->FHandle, LVM_SETBKCOLOR, 0, (LPARAM) p->FClrPane );
+            SendMessage( p->FHandle, LVM_SETTEXTBKCOLOR, 0, (LPARAM) p->FClrPane );
+         }
          /* Child control: repaint via parent */
          if( p->FHandle )
          {
