@@ -861,7 +861,7 @@ static function RegenerateFormCode( cName, hForm )
          // nClrPane for any control (CLR_INVALID = 4294967295 = default/inherit)
          nCtrlClr := UI_GetProp( hCtrl, "nClrPane" )
          if nCtrlClr != 4294967295 .and. nCtrlClr != 0
-            cCreate += '   ::o' + cCtrlName + ':nClrPane := ' + LTrim( Str( nCtrlClr ) ) + e
+            cCreate += '   UI_StoreClrPane( ::o' + cCtrlName + ':hCpp, ' + LTrim( Str( nCtrlClr ) ) + ' )' + e
          endif
 
          // Scan for event handlers matching this control
@@ -1734,13 +1734,43 @@ static function RestoreFormFromCode( hForm, cCode )
       endif
    next
 
-   // Second pass: apply property assignments like ::oCtrlName:prop := value
-   // Only handles known properties: nClrPane, Color, cDataSource
+   // Second pass: apply property assignments and UI_StoreClrPane calls
    nCh := UI_GetChildCount( hForm )
    for i := 1 to Len( aLines )
       cTrim := StrTran( AllTrim( aLines[i] ), Chr(13), "" )
-      // Skip comments and non-assignment lines
+      // Skip comments
       if Left( cTrim, 2 ) == "//"; loop; endif
+
+      // Parse UI_StoreClrPane( ::oName:hCpp, nValue )
+      if Left( cTrim, 16 ) == "UI_StoreClrPane("
+         nPos := At( "::o", cTrim )
+         if nPos > 0
+            cName := SubStr( cTrim, nPos + 3 )
+            nPos2 := At( ":", cName )
+            if nPos2 > 0
+               cName := Left( cName, nPos2 - 1 )
+               nPos := At( ",", cTrim )
+               if nPos > 0
+                  cText := AllTrim( SubStr( cTrim, nPos + 1 ) )
+                  // Remove trailing " )"
+                  cText := StrTran( cText, ")", "" )
+                  cText := AllTrim( cText )
+                  hCtrl := 0
+                  for kk := 1 to nCh
+                     if AllTrim( UI_GetProp( UI_GetChild( hForm, kk ), "cName" ) ) == cName
+                        hCtrl := UI_GetChild( hForm, kk )
+                        exit
+                     endif
+                  next
+                  if hCtrl != 0
+                     UI_StoreClrPane( hCtrl, Val( cText ) )
+                  endif
+               endif
+            endif
+         endif
+         loop
+      endif
+
       if ! ( Left( cTrim, 3 ) == "::o" ) .or. ! ( ":=" $ cTrim ); loop; endif
       // Must have a second ":" for the property (::oName:prop := value)
       nPos := At( ":", SubStr( cTrim, 4 ) )

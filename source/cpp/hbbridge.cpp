@@ -659,6 +659,14 @@ HB_FUNC( UI_BROWSESETCOLPROP )
  * ====================================================================== */
 
 /* UI_SetProp( hCtrl, cProp, xValue ) */
+/* UI_StoreClrPane( hCtrl, nColor ) - store color without window operations.
+ * Safe to call before HWND exists. CreateHandle will apply it later. */
+HB_FUNC( UI_STORECLRPANE )
+{
+   TControl * p = GetCtrl(1);
+   if( p ) p->FClrPane = (COLORREF) hb_parnint(2);
+}
+
 HB_FUNC( UI_SETPROP )
 {
    TControl * p = GetCtrl(1);

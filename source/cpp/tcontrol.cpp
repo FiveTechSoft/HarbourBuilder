@@ -105,6 +105,12 @@ void TControl::CreateHandle( HWND hParent )
       else if( hParent )
          SendMessage( FHandle, WM_SETFONT,
             SendMessage( hParent, WM_GETFONT, 0, 0 ), TRUE );
+
+      /* Apply stored background color if set */
+      if( FClrPane != CLR_INVALID )
+      {
+         if( !FBkBrush ) FBkBrush = CreateSolidBrush( FClrPane );
+      }
    }
 }
 
