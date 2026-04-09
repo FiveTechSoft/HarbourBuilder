@@ -43,13 +43,31 @@ CLASS TControl
 ENDCLASS
 
 METHOD _SetClrPane( n ) CLASS TControl
-   ::_nPendingClr := n
-   // Only apply to C++ if handle exists (avoids crash before Activate)
-   if ::hCpp != 0 .and. UI_HasHandle( ::hCpp )
-      UI_SetProp( ::hCpp, "nClrPane", n )
-   elseif ::hCpp != 0
-      UI_StoreClrPane( ::hCpp, n )
-   endif
+   local cLog
+   BEGIN SEQUENCE
+      cLog := "--- _SetClrPane: n=" + LTrim(Str(n)) + " hCpp=" + LTrim(Str(::hCpp))
+      MemoWrit( "c:\hbbuilder_build\clrpane.log", ;
+         MemoRead( "c:\hbbuilder_build\clrpane.log" ) + cLog + Chr(10) )
+      ::_nPendingClr := n
+      if ::hCpp != 0
+         if UI_HasHandle( ::hCpp )
+            MemoWrit( "c:\hbbuilder_build\clrpane.log", ;
+               MemoRead( "c:\hbbuilder_build\clrpane.log" ) + "  HasHandle=T, SetProp" + Chr(10) )
+            UI_SetProp( ::hCpp, "nClrPane", n )
+         else
+            MemoWrit( "c:\hbbuilder_build\clrpane.log", ;
+               MemoRead( "c:\hbbuilder_build\clrpane.log" ) + "  HasHandle=F, Store" + Chr(10) )
+            UI_StoreClrPane( ::hCpp, n )
+         endif
+         MemoWrit( "c:\hbbuilder_build\clrpane.log", ;
+            MemoRead( "c:\hbbuilder_build\clrpane.log" ) + "  done OK" + Chr(10) )
+      endif
+      MemoWrit( "c:\hbbuilder_build\clrpane.log", ;
+         MemoRead( "c:\hbbuilder_build\clrpane.log" ) + "  returning Self" + Chr(10) )
+   RECOVER
+      MemoWrit( "c:\hbbuilder_build\clrpane.log", ;
+         MemoRead( "c:\hbbuilder_build\clrpane.log" ) + "  EXCEPTION CAUGHT!" + Chr(10) )
+   END SEQUENCE
 return Self
 
 //----------------------------------------------------------------------------//
@@ -119,10 +137,10 @@ CLASS TForm INHERIT TControl
    DATA _nPendingClr INIT -1   // pending color to apply after activation
 
    // Color / nClrPane
-   ACCESS Color   INLINE iif( ::hCpp != 0, UI_GetProp( ::hCpp, "nClrPane" ), ::_nPendingClr )
-   ASSIGN Color( n )    INLINE ::_SetClrPane( n )
-   ACCESS nClrPane      INLINE iif( ::hCpp != 0, UI_GetProp( ::hCpp, "nClrPane" ), ::_nPendingClr )
-   ASSIGN nClrPane( n ) INLINE ::_SetClrPane( n )
+   ACCESS Color         INLINE ::_nPendingClr
+   ASSIGN Color( n )    INLINE ::_nPendingClr := n
+   ACCESS nClrPane      INLINE ::_nPendingClr
+   ASSIGN nClrPane( n ) INLINE ::_nPendingClr := n
 
    // Transparency
    ACCESS AlphaBlend          INLINE UI_GetProp( ::hCpp, "lAlphaBlend" )
@@ -184,6 +202,7 @@ return Self
 
 METHOD Activate() CLASS TForm
 
+   // Apply pending colors before showing (HWNDs created by FormRun)
    UI_FormRun( ::hCpp )
 
 return Self

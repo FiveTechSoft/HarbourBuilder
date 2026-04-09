@@ -2138,8 +2138,9 @@ static function TBRun()
    for i := 1 to Len( aForms )
       cAllCode += aForms[i][3]
    next
-   // Include compiler in hash so switching compiler forces rebuild
+   // Include compiler and framework in hash so changes force rebuild
    cAllCode += DetectCompiler() + LTrim( Str( nSelectedCompIdx ) )
+   cAllCode += MemoRead( "c:\HarbourBuilder\source\core\classes.prg" )
    nHash := Len( cAllCode )
    for i := 1 to Min( Len( cAllCode ), 5000 )
       nHash := nHash + Asc( SubStr( cAllCode, i, 1 ) ) * i
