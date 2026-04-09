@@ -8,24 +8,48 @@ HarbourBuilder - Cross-platform visual IDE for Harbour
   - 4 resolution strategies: Self, DATA comment, assignment pattern, naming convention
   - Searches all open editor tabs for CLASS definitions (cross-file)
   - Methods show with () suffix, properties without
-  - s_classMembers table with 22 standard classes
+  - s_classMembers table with 22 standard classes + CreateForm()
+  - Fixed SCI_POSITIONFROMLINE message number (was using 2166 instead of 2167)
 
   INSPECTOR — BROWSE COLUMNS:
   - Browse columns appear as "oBrowse1Col1 AS TBrwColumn" in inspector combo
   - Selecting a column shows editable properties: cTitle, nWidth, nAlign,
-    cFieldName, cFooterText
+    cFieldName, cFooterText — with correct 4-element array format
+  - Editing column properties calls UI_BrowseSetColProp (via nBrowseCol field)
+  - Changing cTitle updates ListView column header live
   - New bridge functions: UI_BrowseColCount, UI_BrowseGetColProps,
     UI_BrowseSetColProp
   - Combo map tracks form/control/column entries
   - Arrow keys skip category rows in property grid
 
+  INSPECTOR — ARRAY PROPERTIES:
+  - Type 'A' properties display "(N items)" instead of raw value
+  - "..." button opens modal array editor dialog (multiline edit)
+  - Dialog centered on screen, dark mode support
+  - Pipe-separated storage ↔ line-per-item display conversion
+  - After editing aColumns, inspector combo repopulates to show TBrwColumn entries
+
+  TBROWSE FOOTER:
+  - Custom-drawn footer bar (HBBrowseFooter HWND) below ListView
+  - Paints each column's szFooterText aligned with column widths
+  - Live update when editing cFooterText from inspector
+  - Footer height 22px, ListView shrunk to make room
+
   CODE GENERATION:
   - Browse: HEADERS + COLSIZES clauses with per-column widths
+  - COLSIZES clause added to BROWSE xcommand in hbbuilder.ch
+  - TBrowse:SetColSizes() method applies column widths at runtime
   - IsNonVisual() classifies component types (Browse/DBGrid/WebView are visual)
   - COMPONENT syntax for non-visual types (Timer, Database, etc.)
   - TDbfTable: cFileName, cRDD, Open() serialization
   - TCompArray: aHeaders, aData serialization
   - Memo control code generation
+
+  PROJECT LOAD/SAVE:
+  - RestoreFormFromCode: parse BROWSE, HEADERS, and COLSIZES clauses
+  - Column widths restored via UI_BrowseSetColProp on load
+  - TBrowse aColumns + cDataSource in UI_GetAllProps/GetProp/SetProp
+  - FDataSourceName[64] field for code gen (separate from PHB_ITEM FDataSource)
 
   SAVE PROMPT:
   - MsgYesNoCancel before New Application / Open Project
@@ -34,8 +58,9 @@ HarbourBuilder - Cross-platform visual IDE for Harbour
   EVENT HANDLERS:
   - InspectorRefresh resolves handler names from editor code
 
-  BUILD FIX:
+  BUILD FIXES:
   - Added -I%INCDIR% to Harbour compile step in build_win.bat (all 3 compilers)
+  - Copy hbide.ch to build dir in TBRun and TBDebugRun
 
 2026-04-09 (Session 33 prep: Windows — Fix build_win.bat include path)
 
