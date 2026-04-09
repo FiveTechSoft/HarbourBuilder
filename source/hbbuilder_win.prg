@@ -858,10 +858,10 @@ static function RegenerateFormCode( cName, hForm )
                endif
          endcase
 
-         // Color for any control (CLR_INVALID = 4294967295 = default/inherit)
+         // nClrPane for any control (CLR_INVALID = 4294967295 = default/inherit)
          nCtrlClr := UI_GetProp( hCtrl, "nClrPane" )
          if nCtrlClr != 4294967295 .and. nCtrlClr != 0
-            cCreate += '   ::o' + cCtrlName + ':Color := ' + LTrim( Str( nCtrlClr ) ) + e
+            cCreate += '   ::o' + cCtrlName + ':nClrPane := ' + LTrim( Str( nCtrlClr ) ) + e
          endif
 
          // Scan for event handlers matching this control

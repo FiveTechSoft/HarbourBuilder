@@ -101,9 +101,11 @@ CLASS TForm INHERIT TControl
    ACCESS DoubleBuffered       INLINE UI_GetProp( ::hCpp, "lDoubleBuffered" )
    ASSIGN DoubleBuffered( l )  INLINE UI_SetProp( ::hCpp, "lDoubleBuffered", l )
 
-   // Color (alias for nClrPane - C++Builder uses Color)
+   // Color / nClrPane
    ACCESS Color            INLINE UI_GetProp( ::hCpp, "nClrPane" )
    ASSIGN Color( n )       INLINE UI_SetProp( ::hCpp, "nClrPane", n )
+   ACCESS nClrPane         INLINE UI_GetProp( ::hCpp, "nClrPane" )
+   ASSIGN nClrPane( n )    INLINE UI_SetProp( ::hCpp, "nClrPane", n )
 
    // Transparency
    ACCESS AlphaBlend          INLINE UI_GetProp( ::hCpp, "lAlphaBlend" )
