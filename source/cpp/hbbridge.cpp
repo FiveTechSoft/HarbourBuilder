@@ -557,38 +557,51 @@ HB_FUNC( UI_BROWSEGETCOLPROPS )
       TBrowse * br = (TBrowse *) p;
       if( nCol >= 0 && nCol < br->FColCount )
       {
+         /* Return same format as UI_GetAllProps: { {name,value,category,type}, ... } */
          PHB_ITEM aResult = hb_itemArrayNew( 5 );
-         PHB_ITEM aPair;
+         PHB_ITEM aProp;
+         char szNum[32];
 
-         aPair = hb_itemArrayNew( 2 );
-         hb_arraySetC( aPair, 1, "cTitle" );
-         hb_arraySetC( aPair, 2, br->FCols[nCol].szTitle );
-         hb_arraySet( aResult, 1, aPair );
-         hb_itemRelease( aPair );
+         aProp = hb_itemArrayNew( 4 );
+         hb_arraySetC( aProp, 1, "cTitle" );
+         hb_arraySetC( aProp, 2, br->FCols[nCol].szTitle );
+         hb_arraySetC( aProp, 3, "Column" );
+         hb_arraySetC( aProp, 4, "S" );
+         hb_arraySet( aResult, 1, aProp );
+         hb_itemRelease( aProp );
 
-         aPair = hb_itemArrayNew( 2 );
-         hb_arraySetC( aPair, 1, "cFieldName" );
-         hb_arraySetC( aPair, 2, br->FCols[nCol].szFieldName );
-         hb_arraySet( aResult, 2, aPair );
-         hb_itemRelease( aPair );
+         aProp = hb_itemArrayNew( 4 );
+         hb_arraySetC( aProp, 1, "cFieldName" );
+         hb_arraySetC( aProp, 2, br->FCols[nCol].szFieldName );
+         hb_arraySetC( aProp, 3, "Column" );
+         hb_arraySetC( aProp, 4, "S" );
+         hb_arraySet( aResult, 2, aProp );
+         hb_itemRelease( aProp );
 
-         aPair = hb_itemArrayNew( 2 );
-         hb_arraySetC( aPair, 1, "nWidth" );
-         hb_arraySetNI( aPair, 2, br->FCols[nCol].nWidth );
-         hb_arraySet( aResult, 3, aPair );
-         hb_itemRelease( aPair );
+         aProp = hb_itemArrayNew( 4 );
+         hb_arraySetC( aProp, 1, "nWidth" );
+         sprintf( szNum, "%d", br->FCols[nCol].nWidth );
+         hb_arraySetNI( aProp, 2, br->FCols[nCol].nWidth );
+         hb_arraySetC( aProp, 3, "Column" );
+         hb_arraySetC( aProp, 4, "N" );
+         hb_arraySet( aResult, 3, aProp );
+         hb_itemRelease( aProp );
 
-         aPair = hb_itemArrayNew( 2 );
-         hb_arraySetC( aPair, 1, "nAlign" );
-         hb_arraySetNI( aPair, 2, br->FCols[nCol].nAlign );
-         hb_arraySet( aResult, 4, aPair );
-         hb_itemRelease( aPair );
+         aProp = hb_itemArrayNew( 4 );
+         hb_arraySetC( aProp, 1, "nAlign" );
+         hb_arraySetNI( aProp, 2, br->FCols[nCol].nAlign );
+         hb_arraySetC( aProp, 3, "Column" );
+         hb_arraySetC( aProp, 4, "N" );
+         hb_arraySet( aResult, 4, aProp );
+         hb_itemRelease( aProp );
 
-         aPair = hb_itemArrayNew( 2 );
-         hb_arraySetC( aPair, 1, "cFooterText" );
-         hb_arraySetC( aPair, 2, br->FCols[nCol].szFooterText );
-         hb_arraySet( aResult, 5, aPair );
-         hb_itemRelease( aPair );
+         aProp = hb_itemArrayNew( 4 );
+         hb_arraySetC( aProp, 1, "cFooterText" );
+         hb_arraySetC( aProp, 2, br->FCols[nCol].szFooterText );
+         hb_arraySetC( aProp, 3, "Column" );
+         hb_arraySetC( aProp, 4, "S" );
+         hb_arraySet( aResult, 5, aProp );
+         hb_itemRelease( aProp );
 
          hb_itemReturnRelease( aResult );
          return;

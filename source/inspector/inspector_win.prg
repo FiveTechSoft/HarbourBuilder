@@ -118,6 +118,7 @@ function InspectorRefreshColumn( hBrowse, nCol )
       aProps := UI_BrowseGetColProps( hBrowse, nCol )
       if ! Empty( aProps )
          INS_RefreshWithData( h, hBrowse, aProps )
+         INS_SetBrowseCol( h, nCol )  // Tell inspector we're editing a column
          INS_SetEvents( h, {} )  // Columns have no events
       endif
    endif
@@ -161,6 +162,7 @@ HB_FUNC( _INSGETCOMBOMAP ) {
  * On Windows, events are populated internally by InsPopulateEvents(),
  * so this is a no-op stub for cross-platform compatibility. */
 HB_FUNC( INS_SETEVENTS ) { /* no-op on Windows */ }
+
 #pragma ENDDUMP
 
 #pragma BEGINDUMP
@@ -250,6 +252,7 @@ typedef struct {
    WNDPROC oldEditProc;
    int    nActiveTab;   /* 0=Properties, 1=Events */
    int    bDebugMode;  /* 1=showing Vars/CallStack/Watch */
+   int    nBrowseCol;  /* -1 = not editing column, >= 0 = column index */
    PHB_ITEM pOnComboSel; /* callback when combo selection changes: {|nIndex| ... } */
    PHB_ITEM pOnEventDblClick; /* callback when event double-clicked: {|hCtrl, cEvent| ... } */
    PHB_ITEM pOnPropChanged;   /* callback when property value changes: {|| ... } */
@@ -1171,29 +1174,48 @@ static void InsApplyValue( INSDATA * d, int nReal, const char * szVal )
       nReal, d->rows[nReal].szName, d->rows[nReal].cType, szVal, (void*)(size_t)d->hCtrl );
    InsLog( logBuf );
 
-   pDyn = hb_dynsymFindName( "UI_SETPROP" );
-   if( !pDyn ) { InsLog("  -> UI_SETPROP not found!"); return; }
-
-   InsLog( "  -> calling hb_vmDo(3)" );
-   hb_vmPushDynSym( pDyn ); hb_vmPushNil();
-   hb_vmPushNumInt( d->hCtrl );
-   hb_vmPushString( d->rows[nReal].szName, lstrlenA(d->rows[nReal].szName) );
-   if( d->rows[nReal].cType == 'S' )
-      hb_vmPushString( szVal, lstrlenA(szVal) );
-   else if( d->rows[nReal].cType == 'N' )
-      hb_vmPushInteger( atoi(szVal) );
-   else if( d->rows[nReal].cType == 'L' )
-      hb_vmPushLogical( lstrcmpiA(szVal,".T.")==0 );
-   else if( d->rows[nReal].cType == 'C' )
-      hb_vmPushNumInt( (HB_MAXINT) strtoul(szVal, NULL, 10) );
-   else if( d->rows[nReal].cType == 'F' )
-      hb_vmPushString( szVal, lstrlenA(szVal) );
-   else if( d->rows[nReal].cType == 'A' )
-      hb_vmPushString( szVal, lstrlenA(szVal) );
+   /* If editing a browse column, use UI_BrowseSetColProp instead of UI_SetProp */
+   if( d->nBrowseCol >= 0 )
+   {
+      pDyn = hb_dynsymFindName( "UI_BROWSESETCOLPROP" );
+      if( !pDyn ) { InsLog("  -> UI_BROWSESETCOLPROP not found!"); return; }
+      InsLog( "  -> calling UI_BrowseSetColProp" );
+      hb_vmPushDynSym( pDyn ); hb_vmPushNil();
+      hb_vmPushNumInt( d->hCtrl );
+      hb_vmPushInteger( d->nBrowseCol );
+      hb_vmPushString( d->rows[nReal].szName, lstrlenA(d->rows[nReal].szName) );
+      if( d->rows[nReal].cType == 'N' )
+         hb_vmPushInteger( atoi(szVal) );
+      else
+         hb_vmPushString( szVal, lstrlenA(szVal) );
+      hb_vmDo( 4 );
+      InsLog( "  -> UI_BrowseSetColProp returned OK" );
+   }
    else
-      hb_vmPushNil();
-   hb_vmDo( 3 );
-   InsLog( "  -> hb_vmDo(3) returned OK" );
+   {
+      pDyn = hb_dynsymFindName( "UI_SETPROP" );
+      if( !pDyn ) { InsLog("  -> UI_SETPROP not found!"); return; }
+      InsLog( "  -> calling hb_vmDo(3)" );
+      hb_vmPushDynSym( pDyn ); hb_vmPushNil();
+      hb_vmPushNumInt( d->hCtrl );
+      hb_vmPushString( d->rows[nReal].szName, lstrlenA(d->rows[nReal].szName) );
+      if( d->rows[nReal].cType == 'S' )
+         hb_vmPushString( szVal, lstrlenA(szVal) );
+      else if( d->rows[nReal].cType == 'N' )
+         hb_vmPushInteger( atoi(szVal) );
+      else if( d->rows[nReal].cType == 'L' )
+         hb_vmPushLogical( lstrcmpiA(szVal,".T.")==0 );
+      else if( d->rows[nReal].cType == 'C' )
+         hb_vmPushNumInt( (HB_MAXINT) strtoul(szVal, NULL, 10) );
+      else if( d->rows[nReal].cType == 'F' )
+         hb_vmPushString( szVal, lstrlenA(szVal) );
+      else if( d->rows[nReal].cType == 'A' )
+         hb_vmPushString( szVal, lstrlenA(szVal) );
+      else
+         hb_vmPushNil();
+      hb_vmDo( 3 );
+      InsLog( "  -> hb_vmDo(3) returned OK" );
+   }
 
    /* Notify IDE that a property changed */
    if( d->pOnPropChanged && HB_IS_BLOCK( d->pOnPropChanged ) )
@@ -1402,6 +1424,7 @@ HB_FUNC( INS_CREATE )
    d->hBtn = NULL;
    d->nActiveTab = 0;
    d->hFormCtrl = 0;
+   d->nBrowseCol = -1;
    d->pOnComboSel = NULL;
    d->pOnEventDblClick = NULL;
    d->pOnPropChanged = NULL;
@@ -1511,6 +1534,7 @@ HB_FUNC( INS_REFRESHWITHDATA )
    if( !d ) return;
 
    d->hCtrl = (HB_PTRUINT) hb_parnint(2);
+   d->nBrowseCol = -1;  /* reset; InspectorRefreshColumn sets it after */
    d->nRows = 0;
 
    if( d->hCtrl == 0 || !pArray || hb_arrayLen(pArray) == 0 )
@@ -2289,6 +2313,13 @@ HB_FUNC( INS_REFRESHTHEME )
    InvalidateRect( d->hList, NULL, TRUE );
    InvalidateRect( d->hEventList, NULL, TRUE );
    InvalidateRect( d->hTab, NULL, TRUE );
+}
+
+/* INS_SetBrowseCol( hInsData, nCol ) - set column index for property editing */
+HB_FUNC( INS_SETBROWSECOL )
+{
+   INSDATA * d = (INSDATA *) (HB_PTRUINT) hb_parnint(1);
+   if( d ) d->nBrowseCol = hb_parni(2);
 }
 
 HB_FUNC( INS_DESTROY )
