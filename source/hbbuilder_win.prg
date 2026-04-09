@@ -6232,7 +6232,7 @@ static const char * CE_ResolveVarClass( CODEEDITOR * ed, int colonPos )
    if( !ed || !ed->hEdit ) return NULL;
 
    line = (int) SciMsg( ed->hEdit, SCI_LINEFROMPOSITION, colonPos, 0 );
-   lineStart = (int) SciMsg( ed->hEdit, 2166, line, 0 ); /* SCI_POSITIONFROMLINE */
+   lineStart = (int) SciMsg( ed->hEdit, SCI_POSITIONFROMLINE, line, 0 );
    lineLen = colonPos - lineStart;
    if( lineLen <= 0 || lineLen > 500 ) return NULL;
 
