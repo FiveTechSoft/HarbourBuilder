@@ -35,7 +35,18 @@ CLASS TControl
    ASSIGN OnChange( b ) INLINE UI_OnEvent( ::hCpp, "OnChange", b )
    ASSIGN OnClose( b )  INLINE UI_OnEvent( ::hCpp, "OnClose", b )
 
+   METHOD _SetClrPane( n )
+
 ENDCLASS
+
+METHOD _SetClrPane( n ) CLASS TControl
+   if ::hCpp != 0
+      UI_StoreClrPane( ::hCpp, n )
+      if UI_HasHandle( ::hCpp )
+         UI_SetProp( ::hCpp, "nClrPane", n )
+      endif
+   endif
+return Self
 
 //----------------------------------------------------------------------------//
 // TForm
@@ -101,11 +112,12 @@ CLASS TForm INHERIT TControl
    ACCESS DoubleBuffered       INLINE UI_GetProp( ::hCpp, "lDoubleBuffered" )
    ASSIGN DoubleBuffered( l )  INLINE UI_SetProp( ::hCpp, "lDoubleBuffered", l )
 
-   // Color / nClrPane
-   ACCESS Color            INLINE iif( ::hCpp != 0, UI_GetProp( ::hCpp, "nClrPane" ), 0 )
-   ASSIGN Color( n )       INLINE iif( ::hCpp != 0, UI_SetProp( ::hCpp, "nClrPane", n ), nil )
-   ACCESS nClrPane         INLINE iif( ::hCpp != 0, UI_GetProp( ::hCpp, "nClrPane" ), 0 )
-   ASSIGN nClrPane( n )    INLINE iif( ::hCpp != 0, UI_SetProp( ::hCpp, "nClrPane", n ), nil )
+   // Color / nClrPane — StoreClrPane is safe before HWND exists;
+   // SetProp applies live (LVM_SETBKCOLOR etc.) when HWND already exists
+   ACCESS Color   INLINE iif( ::hCpp != 0, UI_GetProp( ::hCpp, "nClrPane" ), 0 )
+   ASSIGN Color( n )    INLINE ::_SetClrPane( n )
+   ACCESS nClrPane      INLINE iif( ::hCpp != 0, UI_GetProp( ::hCpp, "nClrPane" ), 0 )
+   ASSIGN nClrPane( n ) INLINE ::_SetClrPane( n )
 
    // Transparency
    ACCESS AlphaBlend          INLINE UI_GetProp( ::hCpp, "lAlphaBlend" )

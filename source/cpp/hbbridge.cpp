@@ -667,6 +667,13 @@ HB_FUNC( UI_STORECLRPANE )
    if( p ) p->FClrPane = (COLORREF) hb_parnint(2);
 }
 
+/* UI_HasHandle( hCtrl ) -> .T./.F. - check if control has a window handle */
+HB_FUNC( UI_HASHANDLE )
+{
+   TControl * p = GetCtrl(1);
+   hb_retl( p && p->FHandle != NULL );
+}
+
 HB_FUNC( UI_SETPROP )
 {
    TControl * p = GetCtrl(1);
