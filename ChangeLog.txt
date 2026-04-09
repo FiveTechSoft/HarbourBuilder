@@ -56,16 +56,23 @@ HarbourBuilder - Cross-platform visual IDE for Harbour
   - Offers Save / Don't Save / Cancel
 
   CONTROL COLOR (nClrPane):
-  - UI_StoreClrPane(): new C function stores FClrPane without window operations
-    (safe to call before HWND exists, prevents runtime crash)
-  - Code gen: emit UI_StoreClrPane(::oCtrl:hCpp, nValue) for non-default colors
-  - TControl: ACCESS/ASSIGN nClrPane with hCpp guard, creates brush in CreateHandle
-  - TBrowse: LVM_SETBKCOLOR + LVM_SETTEXTBKCOLOR on nClrPane change (live in IDE)
+  - ACCESS/ASSIGN nClrPane and Color moved to TControl (was in TForm only,
+    causing "Message not found" on TBrowse and other non-form controls)
+  - UI_StoreClrPane(): stores FClrPane without window operations
+  - Code gen: emit ::oCtrl:nClrPane := value for non-default colors
+  - TBrowse: LVM_SETBKCOLOR + LVM_SETTEXTBKCOLOR on nClrPane change (live)
   - TBrowse::CreateHandle applies FClrPane if already set
-  - RestoreFormFromCode: second pass parses UI_StoreClrPane() and ::oName:prop lines
+  - TControl::CreateHandle creates brush from stored FClrPane
+  - RestoreFormFromCode: second pass parses ::oName:nClrPane/Color := value
   - Strip Chr(13) from parsed lines to fix CRLF comparison issues
   - Skip commented lines (//) in second pass to prevent crashes
-  - Runtime stubs removed (hbbridge.obj already linked with real functions)
+  - CLR_INVALID comparison fixed for 32-bit (check -1 as well as 4294967295)
+
+  RUNTIME ERROR DIALOG:
+  - W32_ErrorDialog: multiline readonly edit with copy/paste for error details
+  - AppShowError falls back to W32_ErrorDialog when MAC_RuntimeErrorDialog
+    returns 0 (stub on Windows) — errors were silently swallowed before
+  - Build hash now includes classes.prg to force recompilation on framework changes
 
   EVENT HANDLERS:
   - InspectorRefresh resolves handler names from editor code
