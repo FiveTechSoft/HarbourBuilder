@@ -38,37 +38,7 @@ CLASS TControl
    ASSIGN OnChange( b ) INLINE UI_OnEvent( ::hCpp, "OnChange", b )
    ASSIGN OnClose( b )  INLINE UI_OnEvent( ::hCpp, "OnClose", b )
 
-   METHOD _SetClrPane( n )
-
 ENDCLASS
-
-METHOD _SetClrPane( n ) CLASS TControl
-   local cLog
-   BEGIN SEQUENCE
-      cLog := "--- _SetClrPane: n=" + LTrim(Str(n)) + " hCpp=" + LTrim(Str(::hCpp))
-      MemoWrit( "c:\hbbuilder_build\clrpane.log", ;
-         MemoRead( "c:\hbbuilder_build\clrpane.log" ) + cLog + Chr(10) )
-      ::_nPendingClr := n
-      if ::hCpp != 0
-         if UI_HasHandle( ::hCpp )
-            MemoWrit( "c:\hbbuilder_build\clrpane.log", ;
-               MemoRead( "c:\hbbuilder_build\clrpane.log" ) + "  HasHandle=T, SetProp" + Chr(10) )
-            UI_SetProp( ::hCpp, "nClrPane", n )
-         else
-            MemoWrit( "c:\hbbuilder_build\clrpane.log", ;
-               MemoRead( "c:\hbbuilder_build\clrpane.log" ) + "  HasHandle=F, Store" + Chr(10) )
-            UI_StoreClrPane( ::hCpp, n )
-         endif
-         MemoWrit( "c:\hbbuilder_build\clrpane.log", ;
-            MemoRead( "c:\hbbuilder_build\clrpane.log" ) + "  done OK" + Chr(10) )
-      endif
-      MemoWrit( "c:\hbbuilder_build\clrpane.log", ;
-         MemoRead( "c:\hbbuilder_build\clrpane.log" ) + "  returning Self" + Chr(10) )
-   RECOVER
-      MemoWrit( "c:\hbbuilder_build\clrpane.log", ;
-         MemoRead( "c:\hbbuilder_build\clrpane.log" ) + "  EXCEPTION CAUGHT!" + Chr(10) )
-   END SEQUENCE
-return Self
 
 //----------------------------------------------------------------------------//
 // TForm
