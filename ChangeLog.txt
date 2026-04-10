@@ -1,6 +1,39 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-10 (Linux: full dark mode toggle, nClrPane persist, footer persist)
+
+  DARK MODE (Linux):
+  - Full dark/light mode toggle from Tools > Dark Mode menu item,
+    matching Windows and macOS behavior
+  - CodeEditorApplyTheme(): switches Scintilla between VS Code Dark+
+    (dark bg, blue keywords, green comments, orange strings) and
+    VS Code Light+ (white bg, blue keywords, green comments, red strings)
+  - Applies to: Scintilla editor (all syntax colors, caret, selection,
+    margins, fold markers), editor window background, design form
+    background, inspector (already adapted via GTK_IsDark), entire GTK
+    UI (gtk-application-prefer-dark-theme + CSS override)
+  - State persisted in hbbuilder.ini, restored at startup
+  - Light theme applied at editor creation when DarkMode=0
+
+  TBROWSE FIXES:
+  - nClrPane code gen: emits ::oCtrlName:nClrPane := value for all
+    controls with non-default color (fixed default detection:
+    0xFFFFFFFF not 0 or 15790320)
+  - nClrPane restore: second-pass parser for ::oName:prop := value
+    lines, finds control by name, applies UI_SetProp. Also handles
+    cDataSource. Works for any control type, not just TBrowse
+  - Footer persist: code gen emits FOOTERS "text1", "text2" clause
+    after COLSIZES; restore parses FOOTERS and calls
+    UI_BrowseSetColProp(hCtrl, nCol, "cFooterText", value)
+  - nClrPane at widget creation: fixed condition to check against
+    0xFFFFFFFF (true default from HBControl_Init)
+
+  BUILD FIX:
+  - Copy hbide.ch to build dir alongside hbbuilder.ch (hbbuilder.ch
+    #includes hbide.ch which was missing, causing build failure)
+  - Applied to both normal build and debug build paths
+
 2026-04-10 (Linux: full TBrowse implementation, GTK error dialog, build fixes)
 
   LINUX BUILD FIXES:

@@ -258,6 +258,11 @@ function Main()
    // === Window 4: Code Editor ===
    hCodeEditor := CodeEditorCreate( nEditorX, nEditorTop, nEditorW, nEditorH )
 
+   // Apply saved dark/light theme to editor
+   if ! GTK_IsDarkMode()
+      CodeEditorApplyTheme( hCodeEditor, .F. )
+   endif
+
    // === Window 3: Form Designer ===
    CreateDesignForm( nFormX, nFormY )
    oDesignForm:SetDesign( .t. )
@@ -2370,6 +2375,7 @@ static function LoadDarkMode()
    local cIni := MemoRead( GetIniPath() )
    if "DarkMode=1" $ cIni
       GTK_SetDarkMode( .T. )
+      // Editor theme applied later when hCodeEditor is created
       return .T.
    endif
 return .F.
@@ -2383,8 +2389,19 @@ static function ToggleDarkMode()
    lDark := ! GTK_IsDarkMode()
    GTK_SetDarkMode( lDark )
    SaveDarkMode( lDark )
-   // Refresh inspector so property colors update
+
+   // Apply to code editor
+   if hCodeEditor != nil .and. hCodeEditor != 0
+      CodeEditorApplyTheme( hCodeEditor, lDark )
+   endif
+
+   // Apply to design form background
    if oDesignForm != nil
+      if lDark
+         UI_SetProp( oDesignForm:hCpp, "nClrPane", 2960685 )  // RGB(45,45,45)
+      else
+         UI_SetProp( oDesignForm:hCpp, "nClrPane", 15790320 ) // RGB(240,240,240)
+      endif
       InspectorRefresh( oDesignForm:hCpp )
    endif
 return nil

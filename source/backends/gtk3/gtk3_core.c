@@ -6493,6 +6493,99 @@ HB_FUNC( GTK_SETDARKMODE )
 /* GTK_IsDarkMode accessor for inspector */
 int GTK_IsDark(void) { return s_bDarkMode; }
 
+/* Apply dark or light theme to a Scintilla widget */
+static void ApplyScintillaTheme( GtkWidget * sci, int bDark )
+{
+   if( !sci ) return;
+
+   if( bDark )
+   {
+      /* VS Code Dark+ */
+      SciMsg( sci, SCI_STYLESETFORE, STYLE_DEFAULT, SciRGB(212,212,212) );
+      SciMsg( sci, SCI_STYLESETBACK, STYLE_DEFAULT, SciRGB(30,30,30) );
+      SciMsg( sci, SCI_STYLECLEARALL, 0, 0 );
+      SciMsg( sci, SCI_STYLESETFORE, STYLE_LINENUMBER, SciRGB(133,133,133) );
+      SciMsg( sci, SCI_STYLESETBACK, STYLE_LINENUMBER, SciRGB(37,37,38) );
+      SciMsg( sci, SCI_STYLESETFORE, SCE_C_WORD,       SciRGB(86,156,214) );
+      SciMsg( sci, SCI_STYLESETBOLD, SCE_C_WORD,       1 );
+      SciMsg( sci, SCI_STYLESETFORE, SCE_C_WORD2,      SciRGB(78,201,176) );
+      SciMsg( sci, SCI_STYLESETFORE, SCE_C_COMMENT,     SciRGB(106,153,85) );
+      SciMsg( sci, SCI_STYLESETFORE, SCE_C_COMMENTLINE,  SciRGB(106,153,85) );
+      SciMsg( sci, SCI_STYLESETFORE, SCE_C_COMMENTDOC,   SciRGB(106,153,85) );
+      SciMsg( sci, SCI_STYLESETITALIC, SCE_C_COMMENT, 1 );
+      SciMsg( sci, SCI_STYLESETITALIC, SCE_C_COMMENTLINE, 1 );
+      SciMsg( sci, SCI_STYLESETFORE, SCE_C_STRING,      SciRGB(206,145,120) );
+      SciMsg( sci, SCI_STYLESETFORE, SCE_C_CHARACTER,    SciRGB(206,145,120) );
+      SciMsg( sci, SCI_STYLESETFORE, SCE_C_NUMBER,      SciRGB(181,206,168) );
+      SciMsg( sci, SCI_STYLESETFORE, SCE_C_PREPROCESSOR, SciRGB(197,134,192) );
+      SciMsg( sci, SCI_STYLESETFORE, SCE_C_OPERATOR,    SciRGB(212,212,212) );
+      SciMsg( sci, SCI_STYLESETFORE, SCE_C_IDENTIFIER,  SciRGB(220,220,220) );
+      SciMsg( sci, SCI_STYLESETFORE, SCE_C_GLOBALCLASS,  SciRGB(78,201,176) );
+      SciMsg( sci, SCI_SETCARETFORE, SciRGB(255,255,255), 0 );
+      SciMsg( sci, SCI_SETSELBACK,   1, SciRGB(38,79,120) );
+      { int m; for( m = 25; m <= 31; m++ ) {
+         SciMsg( sci, SCI_MARKERSETFORE, m, SciRGB(160,160,160) );
+         SciMsg( sci, SCI_MARKERSETBACK, m, SciRGB(37,37,38) );
+      } }
+      SciMsg( sci, SCI_MARKERSETBACK, 11, SciRGB(60,60,0) ); /* debug line */
+   }
+   else
+   {
+      /* VS Code Light+ */
+      SciMsg( sci, SCI_STYLESETFORE, STYLE_DEFAULT, SciRGB(30,30,30) );
+      SciMsg( sci, SCI_STYLESETBACK, STYLE_DEFAULT, SciRGB(255,255,255) );
+      SciMsg( sci, SCI_STYLECLEARALL, 0, 0 );
+      SciMsg( sci, SCI_STYLESETFORE, STYLE_LINENUMBER, SciRGB(120,120,120) );
+      SciMsg( sci, SCI_STYLESETBACK, STYLE_LINENUMBER, SciRGB(240,240,240) );
+      SciMsg( sci, SCI_STYLESETFORE, SCE_C_WORD,       SciRGB(0,0,255) );
+      SciMsg( sci, SCI_STYLESETBOLD, SCE_C_WORD,       1 );
+      SciMsg( sci, SCI_STYLESETFORE, SCE_C_WORD2,      SciRGB(0,128,128) );
+      SciMsg( sci, SCI_STYLESETFORE, SCE_C_COMMENT,     SciRGB(0,128,0) );
+      SciMsg( sci, SCI_STYLESETFORE, SCE_C_COMMENTLINE,  SciRGB(0,128,0) );
+      SciMsg( sci, SCI_STYLESETFORE, SCE_C_COMMENTDOC,   SciRGB(0,128,0) );
+      SciMsg( sci, SCI_STYLESETITALIC, SCE_C_COMMENT, 1 );
+      SciMsg( sci, SCI_STYLESETITALIC, SCE_C_COMMENTLINE, 1 );
+      SciMsg( sci, SCI_STYLESETFORE, SCE_C_STRING,      SciRGB(163,21,21) );
+      SciMsg( sci, SCI_STYLESETFORE, SCE_C_CHARACTER,    SciRGB(163,21,21) );
+      SciMsg( sci, SCI_STYLESETFORE, SCE_C_NUMBER,      SciRGB(9,134,88) );
+      SciMsg( sci, SCI_STYLESETFORE, SCE_C_PREPROCESSOR, SciRGB(175,0,219) );
+      SciMsg( sci, SCI_STYLESETFORE, SCE_C_OPERATOR,    SciRGB(30,30,30) );
+      SciMsg( sci, SCI_STYLESETFORE, SCE_C_IDENTIFIER,  SciRGB(30,30,30) );
+      SciMsg( sci, SCI_STYLESETFORE, SCE_C_GLOBALCLASS,  SciRGB(0,128,128) );
+      SciMsg( sci, SCI_SETCARETFORE, SciRGB(0,0,0), 0 );
+      SciMsg( sci, SCI_SETSELBACK,   1, SciRGB(173,214,255) );
+      { int m; for( m = 25; m <= 31; m++ ) {
+         SciMsg( sci, SCI_MARKERSETFORE, m, SciRGB(120,120,120) );
+         SciMsg( sci, SCI_MARKERSETBACK, m, SciRGB(240,240,240) );
+      } }
+      SciMsg( sci, SCI_MARKERSETBACK, 11, SciRGB(255,255,200) ); /* debug line */
+   }
+}
+
+/* CodeEditorApplyTheme( hEditor, lDark ) — switch all tabs dark/light */
+HB_FUNC( CODEEDITORAPPLYTHEME )
+{
+   CODEEDITOR * ed = (CODEEDITOR *)(HB_PTRUINT) hb_parnint(1);
+   int bDark = hb_parl(2);
+   if( !ed || !ed->sciWidget ) return;
+   ApplyScintillaTheme( ed->sciWidget, bDark );
+
+   /* Update editor window background */
+   if( ed->window )
+   {
+      char css[128];
+      if( bDark )
+         snprintf( css, sizeof(css), "window { background-color: #1E1E1E; }" );
+      else
+         snprintf( css, sizeof(css), "window { background-color: #FFFFFF; }" );
+      GtkCssProvider * prov = gtk_css_provider_new();
+      gtk_css_provider_load_from_data( prov, css, -1, NULL );
+      gtk_style_context_add_provider( gtk_widget_get_style_context(ed->window),
+         GTK_STYLE_PROVIDER(prov), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION );
+      g_object_unref( prov );
+   }
+}
+
 /* ======================================================================
  * Debugger Panel - floating window with 5 tabs
  * ====================================================================== */
