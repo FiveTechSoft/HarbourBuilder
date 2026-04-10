@@ -757,7 +757,7 @@ static function RestoreFormFromCode( hForm, cCode )
 
    local aLines, cLine, cTrim, i, nType
    local nT, nL, nW, nH, cText, cName, hCtrl
-   local nPos, nPos2, cTitle
+   local nPos, nPos2, cTitle, cTypeStr
 
    if Empty( cCode ) .or. hForm == 0
       return nil
@@ -809,7 +809,14 @@ static function RestoreFormFromCode( hForm, cCode )
             if nPos2 > 0; cName := Left( cName, nPos2 - 1 ); endif
             nPos := At( "TYPE ", Upper( cTrim ) )
             if nPos > 0
-               nType := Val( SubStr( cTrim, nPos + 5 ) )
+               cTypeStr := AllTrim( SubStr( cTrim, nPos + 5 ) )
+               nPos2 := At( " ", cTypeStr )
+               if nPos2 > 0; cTypeStr := Left( cTypeStr, nPos2 - 1 ); endif
+               if Left( cTypeStr, 3 ) == "CT_"
+                  nType := ComponentTypeFromName( cTypeStr )
+               else
+                  nType := Val( cTypeStr )
+               endif
                if nType >= 38
                   hCtrl := UI_DropNonVisual( hForm, nType, cName )
                endif
@@ -2675,6 +2682,33 @@ static function ResPath( cFile )
       return cBundle
    endif
 return "../resources/" + cFile
+
+static function ComponentTypeFromName( cName )
+   do case
+      case cName == "CT_TIMER";         return 38
+      case cName == "CT_PAINTBOX";      return 39
+      case cName == "CT_OPENDIALOG";    return 40
+      case cName == "CT_SAVEDIALOG";    return 41
+      case cName == "CT_FONTDIALOG";    return 42
+      case cName == "CT_COLORDIALOG";   return 43
+      case cName == "CT_FINDDIALOG";    return 44
+      case cName == "CT_REPLACEDIALOG"; return 45
+      case cName == "CT_DBFTABLE";      return 53
+      case cName == "CT_MYSQL";         return 54
+      case cName == "CT_MARIADB";       return 55
+      case cName == "CT_POSTGRESQL";    return 56
+      case cName == "CT_SQLITE";        return 57
+      case cName == "CT_FIREBIRD";      return 58
+      case cName == "CT_SQLSERVER";     return 59
+      case cName == "CT_ORACLE";        return 60
+      case cName == "CT_MONGODB";       return 61
+      case cName == "CT_WEBVIEW";       return 62
+      case cName == "CT_WEBSERVER";     return 63
+      case cName == "CT_WEBSOCKET";     return 64
+      case cName == "CT_HTTPCLIENT";    return 65
+      case cName == "CT_COMPARRAY";     return 131
+   endcase
+return 0
 
 // Framework
 #include "../harbour/classes.prg"

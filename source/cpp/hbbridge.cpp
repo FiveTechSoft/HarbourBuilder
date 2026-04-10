@@ -15,6 +15,8 @@
 #include "hbide.h"
 #include <string.h>
 
+TComponentPalette * g_palette = NULL;
+
 #ifndef __GNUC__
 #pragma comment(lib, "ws2_32.lib")
 #endif
@@ -448,6 +450,32 @@ HB_FUNC( UI_RICHEDITNEW )
    RetCtrl( p );
 }
 
+/* UI_TimerNew( hForm, nInterval ) --> hCtrl - create runtime timer (non-visual) */
+HB_FUNC( UI_TIMERNEW )
+{
+   TForm * pForm = GetForm(1);
+   int nInterval = HB_ISNUM(2) ? hb_parni(2) : 1000;
+   TControl * p = new TControl();
+   p->FControlType = CT_TIMER;
+   p->FInterval = nInterval;
+   p->FWidth = 0;
+   p->FHeight = 0;
+   p->FEnabled = TRUE;
+   strncpy( p->FText, "Timer", sizeof(p->FText) - 1 );
+   if( pForm )
+   {
+      pForm->AddChild( p );
+      /* Start the Win32 timer using the form's HWND */
+      if( pForm->FHandle )
+      {
+         UINT_PTR id = (UINT_PTR) p;  /* use pointer as unique timer ID */
+         SetTimer( pForm->FHandle, id, nInterval, NULL );
+         p->FTimerID = id;
+      }
+   }
+   RetCtrl( p );
+}
+
 /* ======================================================================
  * TBrowse - Data Grid
  * ====================================================================== */
@@ -702,7 +730,26 @@ HB_FUNC( UI_SETPROP )
       if( p->FHandle ) ShowWindow( p->FHandle, p->FVisible ? SW_SHOW : SW_HIDE ); }
    else if( lstrcmpi( szProp, "lEnabled" ) == 0 )
    {  p->FEnabled = hb_parl(3);
-      if( p->FHandle ) EnableWindow( p->FHandle, p->FEnabled ); }
+      if( p->FControlType == CT_TIMER && p->FCtrlParent )
+      {
+         HWND hParent = p->FCtrlParent->FHandle;
+         if( p->FEnabled && hParent )
+         {  UINT_PTR id = (UINT_PTR) p;
+            SetTimer( hParent, id, p->FInterval, NULL );
+            p->FTimerID = id;
+         }
+         else if( !p->FEnabled && p->FTimerID )
+         {  KillTimer( hParent, p->FTimerID );
+            p->FTimerID = 0;
+         }
+      }
+      else if( p->FHandle ) EnableWindow( p->FHandle, p->FEnabled ); }
+   else if( lstrcmpi( szProp, "nInterval" ) == 0 && p->FControlType == CT_TIMER )
+   {  p->FInterval = hb_parni(3);
+      /* Update running timer */
+      if( p->FTimerID && p->FCtrlParent && p->FCtrlParent->FHandle )
+         SetTimer( p->FCtrlParent->FHandle, p->FTimerID, p->FInterval, NULL );
+   }
    else if( lstrcmpi( szProp, "lDefault" ) == 0 && p->FControlType == CT_BUTTON )
       ((TButton*)p)->FDefault = hb_parl(3);
    else if( lstrcmpi( szProp, "lCancel" ) == 0 && p->FControlType == CT_BUTTON )
@@ -921,6 +968,8 @@ HB_FUNC( UI_GETPROP )
       hb_retni( p->FWidth );
    else if( lstrcmpi( szProp, "nHeight" ) == 0 )
       hb_retni( p->FHeight );
+   else if( lstrcmpi( szProp, "nInterval" ) == 0 && p->FControlType == CT_TIMER )
+      hb_retni( p->FInterval );
    else if( lstrcmpi( szProp, "lDefault" ) == 0 && p->FControlType == CT_BUTTON )
       hb_retl( ((TButton*)p)->FDefault );
    else if( lstrcmpi( szProp, "lCancel" ) == 0 && p->FControlType == CT_BUTTON )
@@ -1635,6 +1684,9 @@ HB_FUNC( UI_GETALLPROPS )
          ADD_PROP_S( "cDataSource", br->FDataSourceName, "Data" );
          break;
       }
+      case CT_TIMER:
+         ADD_PROP_N( "nInterval", p->FInterval, "Behavior" );
+         break;
    }
 
    hb_itemReturnRelease( pArray );
@@ -1907,7 +1959,7 @@ HB_FUNC( UI_DROPNONVISUAL )
    const char * cName = hb_parc(3);
    const char * cIconPath = HB_ISCHAR(4) ? hb_parc(4) : NULL;
 
-   if( !form || !form->FHandle || !cName ) return;
+   if( !form || !cName ) return;
 
    /* Find next available position (grid of 40x40, bottom area of form) */
    int nExisting = 0;
@@ -1939,38 +1991,58 @@ HB_FUNC( UI_DROPNONVISUAL )
    lstrcpynA( ctrl->FName, cName, sizeof(ctrl->FName) );
    lstrcpynA( ctrl->FText, cName, sizeof(ctrl->FText) );
 
+   /* Set class name from component type */
+   const char * cls = NULL;
+   switch( nType )
+   {
+      case CT_TIMER:         cls = "TTimer"; break;
+      case CT_PAINTBOX:      cls = "TPaintBox"; break;
+      case CT_OPENDIALOG:    cls = "TOpenDialog"; break;
+      case CT_SAVEDIALOG:    cls = "TSaveDialog"; break;
+      case CT_FONTDIALOG:    cls = "TFontDialog"; break;
+      case CT_COLORDIALOG:   cls = "TColorDialog"; break;
+      case CT_FINDDIALOG:    cls = "TFindDialog"; break;
+      case CT_REPLACEDIALOG: cls = "TReplaceDialog"; break;
+      case CT_DBFTABLE:      cls = "TDBFTable"; break;
+      case CT_MYSQL:         cls = "TMySQL"; break;
+      case CT_SQLITE:        cls = "TSQLite"; break;
+      default:               cls = "TComponent"; break;
+   }
+   lstrcpynA( ctrl->FClassName, cls, sizeof(ctrl->FClassName) );
+
    form->AddChild( ctrl );
 
-   /* Create as a small static window with icon or text */
-   HWND hChild = CreateWindowExA( 0, "STATIC", cName,
-      WS_CHILD | WS_VISIBLE | SS_CENTER | SS_NOTIFY,
-      x, y + form->FClientTop, 32, 32,
-      form->FHandle, NULL, GetModuleHandle(NULL), NULL );
-
-   if( hChild )
+   /* Create HWND only if form window already exists (deferred otherwise) */
+   if( form->FHandle )
    {
-      ctrl->FHandle = hChild;
+      HWND hChild = CreateWindowExA( 0, "STATIC", cName,
+         WS_CHILD | WS_VISIBLE | SS_CENTER | SS_NOTIFY,
+         x, y + form->FClientTop, 32, 32,
+         form->FHandle, NULL, GetModuleHandle(NULL), NULL );
 
-      /* Try to load icon from PNG */
-      if( cIconPath )
+      if( hChild )
       {
-         HBITMAP hBmp = LoadPngAsBitmap( cIconPath );
-         if( hBmp )
+         ctrl->FHandle = hChild;
+
+         /* Try to load icon from PNG */
+         if( cIconPath )
          {
-            /* Convert STATIC to SS_BITMAP and set the image */
-            SetWindowLongA( hChild, GWL_STYLE,
-               (GetWindowLongA(hChild, GWL_STYLE) & ~0xF) | SS_BITMAP );
-            SendMessageA( hChild, STM_SETIMAGE, IMAGE_BITMAP, (LPARAM) hBmp );
+            HBITMAP hBmp = LoadPngAsBitmap( cIconPath );
+            if( hBmp )
+            {
+               SetWindowLongA( hChild, GWL_STYLE,
+                  (GetWindowLongA(hChild, GWL_STYLE) & ~0xF) | SS_BITMAP );
+               SendMessageA( hChild, STM_SETIMAGE, IMAGE_BITMAP, (LPARAM) hBmp );
+            }
          }
+
+         /* Subclass for design-mode dragging */
+         SetWindowLongPtr( hChild, GWLP_USERDATA, (LONG_PTR) ctrl );
       }
 
-      /* Subclass for design-mode dragging */
-      SetWindowLongPtr( hChild, GWLP_USERDATA, (LONG_PTR) ctrl );
+      form->SelectControl( ctrl, FALSE );
+      form->UpdateOverlay();
    }
-
-   /* Select the new component */
-   form->SelectControl( ctrl, FALSE );
-   form->UpdateOverlay();
 
    hb_retnint( (HB_PTRUINT) ctrl );
 }
@@ -2651,6 +2723,7 @@ HB_FUNC( UI_PALETTENEW )
       p->FCtrlParent = pForm;
       p->FParent = pForm;
    }
+   g_palette = p;
 
    RetCtrl( p );
 }

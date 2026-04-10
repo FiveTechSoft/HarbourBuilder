@@ -1567,7 +1567,7 @@ static function RestoreFormFromCode( hForm, cCode )
 
    local aLines, cLine, cTrim, i, nType, kk
    local nT, nL, nW, nH, cText, cName, hCtrl, cVal
-   local nPos, nPos2, cTitle, nCh, cProp
+   local nPos, nPos2, cTitle, nCh, cProp, cTypeStr
 
    if Empty( cCode ) .or. hForm == 0
       return nil
@@ -1619,7 +1619,14 @@ static function RestoreFormFromCode( hForm, cCode )
             if nPos2 > 0; cName := Left( cName, nPos2 - 1 ); endif
             nPos := At( "TYPE ", Upper( cTrim ) )
             if nPos > 0
-               nType := Val( SubStr( cTrim, nPos + 5 ) )
+               cTypeStr := AllTrim( SubStr( cTrim, nPos + 5 ) )
+               nPos2 := At( " ", cTypeStr )
+               if nPos2 > 0; cTypeStr := Left( cTypeStr, nPos2 - 1 ); endif
+               if Left( cTypeStr, 3 ) == "CT_"
+                  nType := ComponentTypeFromName( cTypeStr )
+               else
+                  nType := Val( cTypeStr )
+               endif
                if nType >= 38
                   hCtrl := UI_DropNonVisual( hForm, nType, cName )
                endif
@@ -1763,7 +1770,7 @@ static function RestoreFormFromCode( hForm, cCode )
       cText := AllTrim( SubStr( cText, nPos2 + 2 ) )
 
       // Only process known properties
-      if ! ( cProp == "nClrPane" .or. cProp == "Color" .or. cProp == "cDataSource" )
+      if ! ( cProp == "nClrPane" .or. cProp == "Color" .or. cProp == "cDataSource" .or. cProp == "nInterval" )
          loop
       endif
 
@@ -1784,6 +1791,8 @@ static function RestoreFormFromCode( hForm, cCode )
             cText := SubStr( cText, 2, Len( cText ) - 2 )
          endif
          UI_SetProp( hCtrl, "cDataSource", cText )
+      elseif cProp == "nInterval"
+         UI_SetProp( hCtrl, "nInterval", Val( cText ) )
       endif
    next
 
@@ -4008,6 +4017,33 @@ static function ComponentTypeName( nType )
       case nType == 131; return "CT_COMPARRAY"
    endcase
 return "CT_UNKNOWN_" + LTrim( Str( nType ) )
+
+static function ComponentTypeFromName( cName )
+   do case
+      case cName == "CT_TIMER";         return 38
+      case cName == "CT_PAINTBOX";      return 39
+      case cName == "CT_OPENDIALOG";    return 40
+      case cName == "CT_SAVEDIALOG";    return 41
+      case cName == "CT_FONTDIALOG";    return 42
+      case cName == "CT_COLORDIALOG";   return 43
+      case cName == "CT_FINDDIALOG";    return 44
+      case cName == "CT_REPLACEDIALOG"; return 45
+      case cName == "CT_DBFTABLE";      return 53
+      case cName == "CT_MYSQL";         return 54
+      case cName == "CT_MARIADB";       return 55
+      case cName == "CT_POSTGRESQL";    return 56
+      case cName == "CT_SQLITE";        return 57
+      case cName == "CT_FIREBIRD";      return 58
+      case cName == "CT_SQLSERVER";     return 59
+      case cName == "CT_ORACLE";        return 60
+      case cName == "CT_MONGODB";       return 61
+      case cName == "CT_WEBVIEW";       return 62
+      case cName == "CT_WEBSERVER";     return 63
+      case cName == "CT_WEBSOCKET";     return 64
+      case cName == "CT_HTTPCLIENT";    return 65
+      case cName == "CT_COMPARRAY";     return 131
+   endcase
+return 0
 
 // Framework
 #include "core/classes.prg"

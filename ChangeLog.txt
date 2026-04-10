@@ -1,6 +1,29 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-10 (Windows: TTimer runtime + IDE design-time fixes)
+
+  TTIMER IDE DESIGN-TIME:
+  - Fix: RestoreFormFromCode parsed "CT_TIMER" with Val() returning 0;
+    added ComponentTypeFromName() to resolve symbolic CT_* names (all 3 platforms)
+  - Fix: UI_DropNonVisual early-returned when form HWND was NULL (deferred
+    creation before Show); now registers child and defers HWND creation
+  - Fix: non-visual component icons now load from palette ImageList via
+    g_palette global when design form Show() creates deferred children
+  - Fix: FClassName set correctly ("TTimer" not "TLabel") via type-to-class
+    mapping in UI_DropNonVisual
+  - nInterval property in inspector (Behavior category), UI_SetProp/UI_GetProp
+  - FInterval field added to TControl (default 1000ms)
+
+  TTIMER RUNTIME (Windows):
+  - UI_TimerNew: stores FInterval, FEnabled; calls SetTimer() if form HWND exists
+  - WM_TIMER handler in TForm::HandleMessage fires FOnTimer codeblock
+  - WM_SHOWWINDOW: auto-starts pending timers when form becomes visible
+  - FOnTimer/FTimerID fields in TControl; SetEvent supports "OnTimer"
+  - UI_SetProp "lEnabled": SetTimer/KillTimer for CT_TIMER controls
+  - UI_SetProp "nInterval": restarts running timer with new interval
+  - Cleanup: KillTimer in TControl destructor, release FOnTimer codeblock
+
 2026-04-10 (all platforms: TTimer component with Interval, OnTimer, Enabled)
 
   TTIMER COMPONENT:

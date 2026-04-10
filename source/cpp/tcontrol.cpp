@@ -56,6 +56,7 @@ TControl::TControl()
    FControlType = 0;
    FFont = NULL;
    FClrPane = CLR_INVALID;  /* no color = inherit from parent */
+   FInterval = 1000;
    FBkBrush = NULL;
    FCtrlParent = NULL;
    FChildCount = 0;
@@ -64,6 +65,8 @@ TControl::TControl()
    FOnChange = NULL;
    FOnInit = NULL;
    FOnClose = NULL;
+   FOnTimer = NULL;
+   FTimerID = 0;
 }
 
 TControl::~TControl()
@@ -199,6 +202,8 @@ void TControl::SetEvent( const char * szEvent, PHB_ITEM pBlock )
       ppTarget = &FOnInit;
    else if( lstrcmpi( szEvent, "OnClose" ) == 0 )
       ppTarget = &FOnClose;
+   else if( lstrcmpi( szEvent, "OnTimer" ) == 0 )
+      ppTarget = &FOnTimer;
 
    if( ppTarget )
    {
@@ -231,6 +236,8 @@ void TControl::ReleaseEvents()
    if( FOnChange ) { hb_itemRelease( FOnChange ); FOnChange = NULL; }
    if( FOnInit )   { hb_itemRelease( FOnInit );   FOnInit = NULL; }
    if( FOnClose )  { hb_itemRelease( FOnClose );  FOnClose = NULL; }
+   if( FOnTimer )  { hb_itemRelease( FOnTimer );  FOnTimer = NULL; }
+   if( FTimerID )  { KillTimer( NULL, FTimerID );  FTimerID = 0; }
 }
 
 const PROPDESC * TControl::GetPropDescs( int * pnCount )

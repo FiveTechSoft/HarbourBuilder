@@ -27,6 +27,7 @@ static void SetDarkTitleBar( HWND hWnd, BOOL bDark )
 
 /* Global pointer to the current design form (set by UI_SetDesignForm) */
 extern TForm * g_designForm;
+extern TComponentPalette * g_palette;
 
 static PROPDESC aFormProps[] = {
    { "cFontName", PT_STRING,  0, "Appearance" },
@@ -672,7 +673,21 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
          if( !FDesignMode )
          {
             if( wParam )
+            {
+               /* Start any pending timers */
+               int ti;
+               for( ti = 0; ti < FChildCount; ti++ )
+               {
+                  if( FChildren[ti]->FControlType == CT_TIMER &&
+                      FChildren[ti]->FEnabled && FChildren[ti]->FTimerID == 0 )
+                  {
+                     UINT_PTR id = (UINT_PTR) FChildren[ti];
+                     SetTimer( FHandle, id, FChildren[ti]->FInterval, NULL );
+                     FChildren[ti]->FTimerID = id;
+                  }
+               }
                FireEvent( FOnShow );
+            }
             else
                FireEvent( FOnHide );
          }
@@ -1187,6 +1202,22 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
          break;
       }
 
+      case WM_TIMER:
+      {
+         /* Find the timer child by its FTimerID and fire OnTimer */
+         UINT_PTR tid = (UINT_PTR) wParam;
+         int ti;
+         for( ti = 0; ti < FChildCount; ti++ )
+         {
+            if( FChildren[ti]->FTimerID == tid && FChildren[ti]->FOnTimer )
+            {
+               FChildren[ti]->FireEvent( FChildren[ti]->FOnTimer );
+               break;
+            }
+         }
+         return 0;
+      }
+
       case WM_KEYDOWN:
       {
          if( FDesignMode )
@@ -1536,13 +1567,59 @@ void TForm::CreateAllChildren()
       if( FChildren[i]->FControlType != CT_GROUPBOX &&
           FChildren[i]->FControlType != CT_TOOLBAR )
       {
-         FChildren[i]->SetFont( FFormFont );
-         FChildren[i]->CreateHandle( FHandle );
-         /* Offset below toolbar */
-         if( FClientTop > 0 && FChildren[i]->FHandle )
-            SetWindowPos( FChildren[i]->FHandle, NULL,
-               FChildren[i]->FLeft, FChildren[i]->FTop + FClientTop,
-               FChildren[i]->FWidth, FChildren[i]->FHeight, SWP_NOZORDER );
+         BYTE ct = FChildren[i]->FControlType;
+         BOOL isNV = ( ct >= CT_TIMER && ct != CT_WEBVIEW &&
+                       !( ct >= CT_BROWSE && ct <= CT_BROWSE + 7 ) );
+
+         if( isNV && FChildren[i]->FWidth == 32 && FChildren[i]->FHeight == 32 )
+         {
+            /* Non-visual component: create STATIC with palette icon */
+            HICON hIcon = NULL;
+            TComponentPalette * pal = FPalette ? FPalette : g_palette;
+            if( pal && pal->FPalImageList )
+            {
+               int imgIdx = 0, t, b;
+               BOOL found = FALSE;
+               for( t = 0; t < pal->FTabCount && !found; t++ )
+                  for( b = 0; b < pal->FTabs[t].nBtnCount && !found; b++ )
+                  {
+                     if( pal->FTabs[t].btns[b].nControlType == ct )
+                        { found = TRUE; break; }
+                     imgIdx++;
+                  }
+               if( found )
+                  hIcon = ImageList_GetIcon( pal->FPalImageList, imgIdx, ILD_TRANSPARENT );
+            }
+
+            if( hIcon )
+            {
+               FChildren[i]->FHandle = CreateWindowExA( 0, "STATIC", NULL,
+                  WS_CHILD | WS_VISIBLE | SS_ICON | SS_NOTIFY,
+                  FChildren[i]->FLeft, FChildren[i]->FTop + FClientTop, 32, 32,
+                  FHandle, NULL, GetModuleHandle(NULL), NULL );
+               if( FChildren[i]->FHandle )
+                  SendMessageA( FChildren[i]->FHandle, STM_SETICON, (WPARAM) hIcon, 0 );
+            }
+            else
+            {
+               FChildren[i]->FHandle = CreateWindowExA( 0, "STATIC", FChildren[i]->FText,
+                  WS_CHILD | WS_VISIBLE | SS_CENTER | SS_CENTERIMAGE | WS_BORDER | SS_NOTIFY,
+                  FChildren[i]->FLeft, FChildren[i]->FTop + FClientTop, 32, 32,
+                  FHandle, NULL, GetModuleHandle(NULL), NULL );
+            }
+            if( FChildren[i]->FHandle )
+               SetWindowLongPtr( FChildren[i]->FHandle, GWLP_USERDATA, (LONG_PTR) FChildren[i] );
+         }
+         else
+         {
+            FChildren[i]->SetFont( FFormFont );
+            FChildren[i]->CreateHandle( FHandle );
+            /* Offset below toolbar */
+            if( FClientTop > 0 && FChildren[i]->FHandle )
+               SetWindowPos( FChildren[i]->FHandle, NULL,
+                  FChildren[i]->FLeft, FChildren[i]->FTop + FClientTop,
+                  FChildren[i]->FWidth, FChildren[i]->FHeight, SWP_NOZORDER );
+         }
       }
    }
 }

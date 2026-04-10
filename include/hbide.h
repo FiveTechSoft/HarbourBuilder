@@ -228,6 +228,7 @@ public:
    BYTE         FControlType;
    HFONT        FFont;
    COLORREF     FClrPane;
+   int          FInterval;     /* Timer interval (ms), default 1000 */
    HBRUSH       FBkBrush;
 
    /* Harbour event codeblocks */
@@ -235,6 +236,8 @@ public:
    PHB_ITEM     FOnChange;
    PHB_ITEM     FOnInit;
    PHB_ITEM     FOnClose;
+   PHB_ITEM     FOnTimer;
+   UINT_PTR     FTimerID;      /* Win32 timer ID (0 = inactive) */
 
    /* Parent/children */
    TControl *   FCtrlParent;
