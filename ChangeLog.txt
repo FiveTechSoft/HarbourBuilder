@@ -1,7 +1,6 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
-<<<<<<< HEAD
 2026-04-11 (Linux: TTimer, autocomplete, build warnings, design-time fixes)
 
   TTIMER RUNTIME (Linux/GTK3):
@@ -112,6 +111,21 @@ HarbourBuilder - Cross-platform visual IDE for Harbour
     font is set, so the label view and overlay handles match
   - applyFont: for CT_LABEL, adjusts FHeight and redraws overlay after
     font change in the designer
+
+2026-04-11 (macOS: AppTitle property for application menu name)
+
+  APPTITLE PROPERTY:
+  - New cAppTitle field on HBForm (char[128]), exposed in inspector
+    under Appearance category for the main form
+  - TForm class: AppTitle ACCESS/ASSIGN in classes.prg
+  - UI_SETPROP/UI_GETPROP: cAppTitle getter/setter for CT_FORM
+  - RegenerateFormCode: emits ::AppTitle := "..." when non-empty
+  - RestoreFormFromCode: parses ::AppTitle to restore in designer
+  - Runtime: [run] method updates NSApp main menu title and Quit
+    item text from FAppTitle before creating the window
+  - Build pipeline: binary and .app bundle use AppTitle as name
+    (falls back to "UserApp" if empty); Info.plist includes
+    CFBundleName for proper menu bar display
 
 2026-04-10 (all platforms: TTimer component with Interval, OnTimer, Enabled)
 

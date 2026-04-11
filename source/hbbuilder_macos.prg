@@ -597,7 +597,7 @@ static function RegenerateFormCode( cName, hForm )
    local cSep := "//" + Replicate( "-", 68 ) + e
    local cClass := "T" + cName  // TForm1, TForm2...
    local i, nCount, hCtrl, cCtrlName, cCtrlClass, nType
-   local nW, nH, nFL, nFT, cTitle, nClr
+   local nW, nH, nFL, nFT, cTitle, nClr, cAppTitle
    local nL, nT, nCW, nCH, cText
    local cDatas := "", cCreate := "", cEvents := "", cVal
    local cExistingCode, aEvents, j, cEvName, cEvSuffix, cHandlerName
@@ -617,6 +617,7 @@ static function RegenerateFormCode( cName, hForm )
       nW     := UI_GetProp( hForm, "nWidth" )
       nH     := UI_GetProp( hForm, "nHeight" )
       nClr   := UI_GetProp( hForm, "nClrPane" )
+      cAppTitle := UI_GetProp( hForm, "cAppTitle" )
    else
       cTitle := cName
       nFL    := 0
@@ -831,6 +832,9 @@ static function RegenerateFormCode( cName, hForm )
    if nClr != 15790320  // non-default color
       cCode += "   ::Color  := " + LTrim(Str(nClr)) + e
    endif
+   if ! Empty( cAppTitle )
+      cCode += '   ::AppTitle := "' + cAppTitle + '"' + e
+   endif
    if ! Empty( cCreate )
       cCode += e
       cCode += cCreate
@@ -891,6 +895,14 @@ static function RestoreFormFromCode( hForm, cCode )
       endif
       if '::Color' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
          UI_SetProp( hForm, "nClrPane", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
+         loop
+      endif
+      if '::AppTitle' $ cTrim .and. ':=' $ cTrim
+         nPos := At( '"', cTrim )
+         nPos2 := RAt( '"', cTrim )
+         if nPos > 0 .and. nPos2 > nPos
+            UI_SetProp( hForm, "cAppTitle", SubStr( cTrim, nPos + 1, nPos2 - nPos - 1 ) )
+         endif
          loop
       endif
 
@@ -2099,7 +2111,15 @@ static function TBRun()
    local cAllPrg, cCmd, cAllCode, nHash
    local cResDir, cBackends, cSciInc, cSciCocoa, cLexInc, cSciLib
    local cOldTab, cSepLine, nP1, nP2, cUserCode
+   local cAppTitle, cAppName
    static nLastHash := 0
+
+   // Get AppTitle from the main form (first form)
+   cAppTitle := ""
+   if Len( aForms ) > 0 .and. aForms[1][2] != nil .and. aForms[1][2]:hCpp != 0
+      cAppTitle := UI_GetProp( aForms[1][2]:hCpp, "cAppTitle" )
+   endif
+   cAppName := iif( ! Empty( cAppTitle ), cAppTitle, "UserApp" )
 
    // Sync all forms before building (ensures event wiring is up to date)
    cSepLine := "//" + Replicate( "-", 68 )
@@ -2180,8 +2200,8 @@ static function TBRun()
       nHash := nHash + Asc( SubStr( cAllCode, i, 1 ) ) * i
    next
    if nHash == nLastHash .and. nLastHash != 0 .and. ;
-      File( cBuildDir + "/UserApp.app/Contents/MacOS/UserApp" )
-      MAC_ShellExec( "open " + cBuildDir + "/UserApp.app" )
+      File( cBuildDir + "/" + cAppName + ".app/Contents/MacOS/" + cAppName )
+      MAC_ShellExec( "open " + cBuildDir + "/" + cAppName + ".app" )
       return nil
    endif
 
@@ -2312,7 +2332,7 @@ static function TBRun()
    if ! lError
       MAC_ProgressStep( 7, "Linking executable..." )
       cLog += "[7] Linking..." + Chr(10)
-      cCmd := "clang++ -o " + cBuildDir + "/UserApp" + ;
+      cCmd := "clang++ -o " + cBuildDir + "/" + cAppName + ;
               " " + cBuildDir + "/main.o" + ;
               " " + cBuildDir + "/classes.o" + ;
               " " + cBuildDir + "/cocoa_core.o" + ;
@@ -2347,20 +2367,21 @@ static function TBRun()
    // Result
    if lError
       MAC_BuildErrorDialog( "Build Failed", cLog )
-   elseif ! File( cBuildDir + "/UserApp" )
-      cLog += Chr(10) + "ERROR: UserApp was not created." + Chr(10)
+   elseif ! File( cBuildDir + "/" + cAppName )
+      cLog += Chr(10) + "ERROR: " + cAppName + " was not created." + Chr(10)
       MAC_BuildErrorDialog( "Build Failed", cLog )
    else
       nLastHash := nHash
       // Create .app bundle and launch (macOS needs bundle for GUI app)
-      MAC_ShellExec( "mkdir -p " + cBuildDir + "/UserApp.app/Contents/MacOS" )
-      MAC_ShellExec( "cp " + cBuildDir + "/UserApp " + cBuildDir + "/UserApp.app/Contents/MacOS/" )
-      MemoWrit( cBuildDir + "/UserApp.app/Contents/Info.plist", ;
+      MAC_ShellExec( "mkdir -p " + cBuildDir + "/" + cAppName + ".app/Contents/MacOS" )
+      MAC_ShellExec( "cp " + cBuildDir + "/" + cAppName + " " + cBuildDir + "/" + cAppName + ".app/Contents/MacOS/" )
+      MemoWrit( cBuildDir + "/" + cAppName + ".app/Contents/Info.plist", ;
          '<?xml version="1.0"?>' + Chr(10) + ;
          '<plist version="1.0"><dict>' + Chr(10) + ;
-         '<key>CFBundleExecutable</key><string>UserApp</string>' + Chr(10) + ;
+         '<key>CFBundleExecutable</key><string>' + cAppName + '</string>' + Chr(10) + ;
+         '<key>CFBundleName</key><string>' + cAppName + '</string>' + Chr(10) + ;
          '</dict></plist>' + Chr(10) )
-      MAC_ShellExec( "open " + cBuildDir + "/UserApp.app" )
+      MAC_ShellExec( "open " + cBuildDir + "/" + cAppName + ".app" )
    endif
 
 return nil

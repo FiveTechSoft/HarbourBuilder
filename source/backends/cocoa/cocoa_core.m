@@ -417,6 +417,7 @@ void EnsureNSApp( void )
    BOOL       FAutoScroll;
    BOOL       FDoubleBuffered;
    int        FBorderWidth;
+   char       FAppTitle[128];    /* Application menu title (main form only) */
    /* Events */
    PHB_ITEM   FOnActivate;
    PHB_ITEM   FOnDeactivate;
@@ -2039,6 +2040,7 @@ static HBPaletteTarget * s_palTarget = nil;
       FAutoScroll = YES;
       FDoubleBuffered = NO;
       FBorderWidth = 0;
+      FAppTitle[0] = 0;
       /* Events */
       FOnActivate = NULL; FOnDeactivate = NULL;
       FOnResize = NULL; FOnPaint = NULL;
@@ -2081,6 +2083,25 @@ static HBPaletteTarget * s_palTarget = nil;
 - (void)run
 {
    EnsureNSApp();
+
+   /* Update application menu title from AppTitle property */
+   if( FAppTitle[0] ) {
+      NSMenu * mainMenu = [NSApp mainMenu];
+      if( mainMenu && [mainMenu numberOfItems] > 0 ) {
+         NSMenuItem * appItem = [mainMenu itemAtIndex:0];
+         if( [appItem submenu] ) {
+            NSString * title = [NSString stringWithUTF8String:FAppTitle];
+            [[appItem submenu] setTitle:title];
+            /* Update Quit item text */
+            NSMenu * appMenu = [appItem submenu];
+            for( NSInteger i = 0; i < [appMenu numberOfItems]; i++ ) {
+               NSMenuItem * item = [appMenu itemAtIndex:i];
+               if( [[item keyEquivalent] isEqualToString:@"q"] )
+                  [item setTitle:[NSString stringWithFormat:@"Quit %@", title]];
+            }
+         }
+      }
+   }
 
    [self createWindowWithRunLoop:YES];
 }
@@ -3361,6 +3382,8 @@ HB_FUNC( UI_SETPROP )
       ((HBForm *)p)->FCursor = hb_parni(3);
    else if( strcasecmp(szProp,"lShowHint")==0 && p->FControlType == CT_FORM )
       ((HBForm *)p)->FShowHint = hb_parl(3);
+   else if( strcasecmp(szProp,"cAppTitle")==0 && p->FControlType == CT_FORM && HB_ISCHAR(3) )
+      strncpy( ((HBForm *)p)->FAppTitle, hb_parc(3), sizeof(((HBForm *)p)->FAppTitle)-1 );
    else if( strcasecmp(szProp,"cHint")==0 && p->FControlType == CT_FORM && HB_ISCHAR(3) )
       strncpy( ((HBForm *)p)->FHint, hb_parc(3), sizeof(((HBForm *)p)->FHint)-1 );
    else if( strcasecmp(szProp,"lAutoScroll")==0 && p->FControlType == CT_FORM )
@@ -3517,6 +3540,8 @@ HB_FUNC( UI_GETPROP )
       hb_retni( ((HBForm *)p)->FCursor );
    else if( strcasecmp(szProp,"lShowHint")==0 && p->FControlType==CT_FORM )
       hb_retl( ((HBForm *)p)->FShowHint );
+   else if( strcasecmp(szProp,"cAppTitle")==0 && p->FControlType==CT_FORM )
+      hb_retc( ((HBForm *)p)->FAppTitle );
    else if( strcasecmp(szProp,"cHint")==0 && p->FControlType==CT_FORM )
       hb_retc( ((HBForm *)p)->FHint );
    else if( strcasecmp(szProp,"lAutoScroll")==0 && p->FControlType==CT_FORM )
@@ -3664,6 +3689,7 @@ HB_FUNC( UI_GETALLPROPS )
    switch(p->FControlType) {
       case CT_FORM: {
          HBForm * f = (HBForm *)p;
+         ADD_S("cAppTitle",f->FAppTitle,"Appearance");
          ADD_D("nBorderStyle",f->FBorderStyle,"bsNone|bsSingle|bsSizeable|bsDialog|bsToolWindow|bsSizeToolWin","Appearance");
          ADD_N("nBorderIcons",f->FBorderIcons,"Appearance");
          ADD_N("nBorderWidth",f->FBorderWidth,"Appearance");

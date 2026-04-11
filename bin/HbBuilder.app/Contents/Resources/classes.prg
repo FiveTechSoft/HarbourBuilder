@@ -62,6 +62,10 @@ CLASS TForm INHERIT TControl
    ACCESS Title         INLINE UI_GetProp( ::hCpp, "cText" )
    ASSIGN Title( c )    INLINE UI_SetProp( ::hCpp, "cText", c )
 
+   // AppTitle (application menu name on macOS, window title on Windows)
+   ACCESS AppTitle      INLINE UI_GetProp( ::hCpp, "cAppTitle" )
+   ASSIGN AppTitle( c ) INLINE UI_SetProp( ::hCpp, "cAppTitle", c )
+
    // Font
    ACCESS FontName      INLINE UI_GetProp( ::hCpp, "cFontName" )
    ASSIGN FontName( c ) INLINE UI_SetProp( ::hCpp, "cFontName", c )
