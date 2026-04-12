@@ -2309,7 +2309,11 @@ METHOD Execute() CLASS TOpenDialog
    #ifdef __PLATFORM__WINDOWS
    cRes := W32_ExecOpenDialog( ::cTitle, ::cFilter, ::cInitialDir, ::cDefaultExt, ::nOptions )
    #else
-   cRes := ""
+      #ifdef __PLATFORM__DARWIN
+      cRes := MAC_ExecOpenDialog( ::cTitle, ::cFilter, ::cInitialDir, ::cDefaultExt, ::nOptions )
+      #else
+      cRes := ""
+      #endif
    #endif
    if cRes != nil .and. ! Empty( cRes )
       ::cFileName := cRes
@@ -2336,7 +2340,11 @@ METHOD Execute() CLASS TSaveDialog
    #ifdef __PLATFORM__WINDOWS
    cRes := W32_ExecSaveDialog( ::cTitle, ::cFilter, ::cInitialDir, ::cDefaultExt, ::cFileName, ::nOptions )
    #else
-   cRes := ""
+      #ifdef __PLATFORM__DARWIN
+      cRes := MAC_ExecSaveDialog( ::cTitle, ::cFilter, ::cInitialDir, ::cDefaultExt, ::cFileName, ::nOptions )
+      #else
+      cRes := ""
+      #endif
    #endif
    if cRes != nil .and. ! Empty( cRes )
       ::cFileName := cRes
@@ -2361,7 +2369,11 @@ METHOD Execute() CLASS TFontDialog
    #ifdef __PLATFORM__WINDOWS
    aRes := W32_ExecFontDialog( ::cFontName, ::nSize, ::nColor, ::nStyle )
    #else
-   aRes := nil
+      #ifdef __PLATFORM__DARWIN
+      aRes := MAC_ExecFontDialog( ::cFontName, ::nSize, ::nColor, ::nStyle )
+      #else
+      aRes := nil
+      #endif
    #endif
    if ValType( aRes ) == "A" .and. Len( aRes ) >= 4
       ::cFontName := aRes[1]
@@ -2386,7 +2398,11 @@ METHOD Execute() CLASS TColorDialog
    #ifdef __PLATFORM__WINDOWS
    nRes := W32_ExecColorDialog( ::nColor )
    #else
-   nRes := -1
+      #ifdef __PLATFORM__DARWIN
+      nRes := MAC_ExecColorDialog( ::nColor )
+      #else
+      nRes := -1
+      #endif
    #endif
    if ValType( nRes ) == "N" .and. nRes >= 0
       ::nColor := nRes

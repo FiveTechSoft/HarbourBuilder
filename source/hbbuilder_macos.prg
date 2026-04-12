@@ -311,8 +311,8 @@ static function CreatePalette()
    nTab := oPal:AddTab( "Standard" )
    oPal:AddComp( nTab, "A",    "Label",       1 )
    oPal:AddComp( nTab, "ab",   "Edit",        2 )
-   oPal:AddComp( nTab, "Mem",  "Memo",       24 )
    oPal:AddComp( nTab, "Btn",  "Button",      3 )
+   oPal:AddComp( nTab, "Mem",  "Memo",       24 )
    oPal:AddComp( nTab, "Chk",  "CheckBox",    4 )
    oPal:AddComp( nTab, "Rad",  "RadioButton", 8 )
    oPal:AddComp( nTab, "Lst",  "ListBox",     7 )
@@ -2289,10 +2289,12 @@ static function TBRun()
       MAC_ShellExec( "cp " + HB_DirBase() + "../Resources/classes.prg " + cBuildDir + "/" )
       MAC_ShellExec( "cp " + HB_DirBase() + "../Resources/hbbuilder.ch " + cBuildDir + "/" )
       MAC_ShellExec( "cp " + HB_DirBase() + "../Resources/hbide.ch " + cBuildDir + "/" )
+      MAC_ShellExec( "cp " + HB_DirBase() + "../Resources/stddlgs_mac.mm " + cBuildDir + "/ 2>/dev/null" )
    else
       MAC_ShellExec( "cp " + cProjDir + "/source/core/classes.prg " + cBuildDir + "/" )
       MAC_ShellExec( "cp " + cProjDir + "/include/hbbuilder.ch " + cBuildDir + "/" )
       MAC_ShellExec( "cp " + cProjDir + "/include/hbide.ch " + cBuildDir + "/" )
+      MAC_ShellExec( "cp " + cProjDir + "/resources/stddlgs_mac.mm " + cBuildDir + "/ 2>/dev/null" )
    endif
 
    // Step 2: Assemble main.prg
@@ -2386,6 +2388,12 @@ static function TBRun()
               " " + cBackends + "/gt_dummy.c" + ;
               " -o " + cBuildDir + "/gt_dummy.o 2>&1"
       MAC_ShellExec( cCmd )
+      if File( cBuildDir + "/stddlgs_mac.mm" )
+         cCmd := "clang++ -c -O2 -fobjc-arc -I" + cHbInc + ;
+                 " " + cBuildDir + "/stddlgs_mac.mm" + ;
+                 " -o " + cBuildDir + "/stddlgs_mac.o 2>&1"
+         MAC_ShellExec( cCmd )
+      endif
       cLog += "    OK" + Chr(10)
    endif
 
@@ -2399,6 +2407,7 @@ static function TBRun()
               " " + cBuildDir + "/cocoa_core.o" + ;
               " " + cBuildDir + "/cocoa_editor.o" + ;
               " " + cBuildDir + "/gt_dummy.o" + ;
+              If( File( cBuildDir + "/stddlgs_mac.o" ), " " + cBuildDir + "/stddlgs_mac.o", "" ) + ;
               " " + cSciLib + "/libscintilla.a" + ;
               " " + cSciLib + "/liblexilla.a" + ;
               " -L" + cHbLib + ;
@@ -2529,11 +2538,13 @@ static function TBDebugRun()
       MAC_ShellExec( "cp " + cResDir + "/hbbuilder.ch " + cBuildDir + "/" )
       MAC_ShellExec( "cp " + cResDir + "/hbide.ch " + cBuildDir + "/" )
       MAC_ShellExec( "cp " + cResDir + "/dbgclient.prg " + cBuildDir + "/" )
+      MAC_ShellExec( "cp " + cResDir + "/stddlgs_mac.mm " + cBuildDir + "/ 2>/dev/null" )
    else
       MAC_ShellExec( "cp " + cProjDir + "/source/core/classes.prg " + cBuildDir + "/" )
       MAC_ShellExec( "cp " + cProjDir + "/include/hbbuilder.ch " + cBuildDir + "/" )
       MAC_ShellExec( "cp " + cProjDir + "/include/hbide.ch " + cBuildDir + "/" )
       MAC_ShellExec( "cp " + cProjDir + "/source/debugger/dbgclient.prg " + cBuildDir + "/" )
+      MAC_ShellExec( "cp " + cProjDir + "/resources/stddlgs_mac.mm " + cBuildDir + "/ 2>/dev/null" )
    endif
 
    // Step 2: Assemble debug_main.prg (tracking line offsets for each section)
@@ -2633,6 +2644,12 @@ static function TBDebugRun()
               " " + cBackends + "/gt_dummy.c" + ;
               " -o " + cBuildDir + "/gt_dummy.o 2>&1"
       MAC_ShellExec( cCmd )
+      if File( cBuildDir + "/stddlgs_mac.mm" )
+         cCmd := "clang++ -c -O2 -fobjc-arc -I" + cHbInc + ;
+                 " " + cBuildDir + "/stddlgs_mac.mm" + ;
+                 " -o " + cBuildDir + "/stddlgs_mac.o 2>&1"
+         MAC_ShellExec( cCmd )
+      endif
       cLog += "    OK" + Chr(10)
    endif
 
@@ -2645,6 +2662,7 @@ static function TBDebugRun()
               " " + cBuildDir + "/cocoa_core.o" + ;
               " " + cBuildDir + "/cocoa_editor.o" + ;
               " " + cBuildDir + "/gt_dummy.o" + ;
+              If( File( cBuildDir + "/stddlgs_mac.o" ), " " + cBuildDir + "/stddlgs_mac.o", "" ) + ;
               " " + cSciLib + "/libscintilla.a" + ;
               " " + cSciLib + "/liblexilla.a" + ;
               " -L" + cHbLib + ;

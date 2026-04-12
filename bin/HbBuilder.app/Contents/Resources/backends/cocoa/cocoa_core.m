@@ -4223,14 +4223,19 @@ static void PalShowTab( PALDATA * pd, int nTab )
    int btnW = 52, btnH = 50;
    CGFloat y = 0;
 
+   /* Icons in palette.bmp are laid out sequentially following the AddComp
+    * order across tabs, not keyed by nControlType. Compute this tab's base
+    * index by summing prior tabs' button counts. */
+   int imgBase = 0;
+   for( int k = 0; k < nTab; k++ ) imgBase += pd->tabs[k].nBtnCount;
+
    for( int i = 0; i < t->nBtnCount; i++ ) {
       NSString * title = [NSString stringWithUTF8String:t->btns[i].szText];
       NSFont * btnFont = [NSFont systemFontOfSize:11];
       int thisBtnW = btnW;
 
-      /* If palette images loaded, use icon index from nControlType */
-      int imgIdx = t->btns[i].nControlType;
-      BOOL hasImage = ( pd->palImages && imgIdx > 0 && imgIdx <= (int)[pd->palImages count] );
+      int imgIdx = imgBase + i;
+      BOOL hasImage = ( pd->palImages && imgIdx >= 0 && imgIdx < (int)[pd->palImages count] );
 
       if( !hasImage ) {
          NSDictionary * attrs = @{ NSFontAttributeName: btnFont };
@@ -4244,7 +4249,7 @@ static void PalShowTab( PALDATA * pd, int nTab )
       [btn setFont:btnFont];
 
       if( hasImage ) {
-         [btn setImage:pd->palImages[imgIdx - 1]];
+         [btn setImage:pd->palImages[imgIdx]];
          [btn setImagePosition:NSImageOnly];
          [btn setTitle:@""];
       } else {

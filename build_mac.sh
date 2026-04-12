@@ -152,6 +152,17 @@ else
    echo "[3b/4] cocoa_editor.o — up to date"
 fi
 
+# [3c/4] Standard dialog backends (TOpenDialog/TSaveDialog/TFontDialog/TColorDialog)
+if needs_rebuild "$PROJDIR/resources/stddlgs_mac.mm" stddlgs_mac.o; then
+   echo "[3c/4] Compiling stddlgs_mac.mm..."
+   clang++ -c -O2 -mmacosx-version-min=10.15 -fobjc-arc \
+      -I"$HBINC" \
+      "$PROJDIR/resources/stddlgs_mac.mm" -o stddlgs_mac.o
+   NEED_LINK=1
+else
+   echo "[3c/4] stddlgs_mac.o — up to date"
+fi
+
 if [ "$NEED_LINK" -eq 0 ] && [ -f "${PROG}" ]; then
    echo "[4/4] ${PROG} — up to date (nothing changed)"
    # Still create .app bundle if missing
@@ -165,7 +176,7 @@ fi
 
 echo "[4/4] Linking ${PROG}..."
 clang++ -o ${PROG} \
-   ${SRC}.o cocoa_core.o cocoa_inspector.o cocoa_editor.o \
+   ${SRC}.o cocoa_core.o cocoa_inspector.o cocoa_editor.o stddlgs_mac.o \
    -L"$HBLIB" \
    -L"$SCIBUILD" \
    -lscintilla -llexilla \
@@ -196,6 +207,7 @@ cp -R "$PROJDIR/resources/menu_icons" "$APP/Contents/Resources/" 2>/dev/null
 cp "$PROJDIR/source/core/classes.prg" "$APP/Contents/Resources/" 2>/dev/null
 cp "$PROJDIR/include/hbbuilder.ch" "$APP/Contents/Resources/" 2>/dev/null
 cp "$PROJDIR/include/hbide.ch" "$APP/Contents/Resources/" 2>/dev/null
+cp "$PROJDIR/resources/stddlgs_mac.mm" "$APP/Contents/Resources/" 2>/dev/null
 cp "$PROJDIR/source/debugger/dbgclient.prg" "$APP/Contents/Resources/" 2>/dev/null
 cp "$PROJDIR/source/debugger/dbghook.c" "$APP/Contents/Resources/" 2>/dev/null
 # Copy backends for user project compilation

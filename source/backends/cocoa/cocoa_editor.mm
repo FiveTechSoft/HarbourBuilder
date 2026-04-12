@@ -433,6 +433,17 @@ static HBSciTabTarget * s_sciTabTarget = nil;
    if( !ed ) return;
    ed->debounceTimer = nil;
 
+   /* If autocomplete dropdown is active, defer the sync so typing ':' or
+    * selecting a member doesn't close the popup (re-syncing the form code
+    * rewrites the buffer and Scintilla cancels the active list). */
+   if( ed->sciView && SciMsg0( ed->sciView, SCI_AUTOCACTIVE ) )
+   {
+      ed->debounceTimer = [NSTimer scheduledTimerWithTimeInterval:0.3
+         target:self selector:@selector(fireTextChange:)
+         userInfo:nil repeats:NO];
+      return;
+   }
+
    if( ed->pOnTextChange && HB_IS_BLOCK( ed->pOnTextChange ) )
    {
       hb_vmPushEvalSym();
@@ -663,6 +674,18 @@ static ClassMembers s_classMembers[] = {
      "Get() Post()" },
    { "TThread",
      "Join() Start()" },
+   { "TOpenDialog",
+     "cFileName cFilter cInitialDir cTitle cDefaultExt Execute() nOptions" },
+   { "TSaveDialog",
+     "cFileName cFilter cInitialDir cTitle cDefaultExt Execute() nOptions" },
+   { "TFontDialog",
+     "cFontName nSize nColor nStyle Execute()" },
+   { "TColorDialog",
+     "nColor Execute()" },
+   { "TFindDialog",
+     "cFindText nOptions bOnFind Execute()" },
+   { "TReplaceDialog",
+     "cFindText cReplaceText nOptions bOnFind bOnReplace Execute()" },
    { "TDBFTable",
      "Append() Bof() cAlias cDatabase cFileName cIndexFile cRDD Close() "
      "CreateIndex() Delete() Deleted() Eof() FieldCount() FieldGet() "
@@ -1210,6 +1233,12 @@ static const char * CE_ResolveVarClass( ScintillaView * sv, sptr_t colonPos )
          { "HttpClient",  "THttpClient" },
          { "Thread",      "TThread" },
          { "App",         "TApplication" },
+         { "OpenDialog",   "TOpenDialog" },
+         { "SaveDialog",   "TSaveDialog" },
+         { "FontDialog",   "TFontDialog" },
+         { "ColorDialog",  "TColorDialog" },
+         { "FindDialog",   "TFindDialog" },
+         { "ReplaceDialog","TReplaceDialog" },
          { NULL, NULL }
       };
 

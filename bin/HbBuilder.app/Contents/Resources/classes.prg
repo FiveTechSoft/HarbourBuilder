@@ -2286,6 +2286,164 @@ function RPT_NewDataField( oBand, cField, nTop, nLeft, nW, nH, cFont, nFSize, lB
    oBand:AddField( oFld )
 return oFld
 
+//----------------------------------------------------------------------------//
+// Standard dialog components (non-visual) — Open/Save/Font/Color/Find/Replace
+//----------------------------------------------------------------------------//
+
+CLASS TOpenDialog
+   DATA cFileName   INIT ""
+   DATA cFilter     INIT "All Files (*.*)|*.*"
+   DATA cInitialDir INIT ""
+   DATA cTitle      INIT ""
+   DATA cDefaultExt INIT ""
+   DATA nOptions    INIT 0
+   METHOD New() CONSTRUCTOR
+   METHOD Execute()
+ENDCLASS
+
+METHOD New() CLASS TOpenDialog
+return Self
+
+METHOD Execute() CLASS TOpenDialog
+   local cRes
+   #ifdef __PLATFORM__WINDOWS
+   cRes := W32_ExecOpenDialog( ::cTitle, ::cFilter, ::cInitialDir, ::cDefaultExt, ::nOptions )
+   #else
+      #ifdef __PLATFORM__DARWIN
+      cRes := MAC_ExecOpenDialog( ::cTitle, ::cFilter, ::cInitialDir, ::cDefaultExt, ::nOptions )
+      #else
+      cRes := ""
+      #endif
+   #endif
+   if cRes != nil .and. ! Empty( cRes )
+      ::cFileName := cRes
+      return .T.
+   endif
+return .F.
+
+CLASS TSaveDialog
+   DATA cFileName   INIT ""
+   DATA cFilter     INIT "All Files (*.*)|*.*"
+   DATA cInitialDir INIT ""
+   DATA cTitle      INIT ""
+   DATA cDefaultExt INIT ""
+   DATA nOptions    INIT 0
+   METHOD New() CONSTRUCTOR
+   METHOD Execute()
+ENDCLASS
+
+METHOD New() CLASS TSaveDialog
+return Self
+
+METHOD Execute() CLASS TSaveDialog
+   local cRes
+   #ifdef __PLATFORM__WINDOWS
+   cRes := W32_ExecSaveDialog( ::cTitle, ::cFilter, ::cInitialDir, ::cDefaultExt, ::cFileName, ::nOptions )
+   #else
+      #ifdef __PLATFORM__DARWIN
+      cRes := MAC_ExecSaveDialog( ::cTitle, ::cFilter, ::cInitialDir, ::cDefaultExt, ::cFileName, ::nOptions )
+      #else
+      cRes := ""
+      #endif
+   #endif
+   if cRes != nil .and. ! Empty( cRes )
+      ::cFileName := cRes
+      return .T.
+   endif
+return .F.
+
+CLASS TFontDialog
+   DATA cFontName INIT "Segoe UI"
+   DATA nSize     INIT 10
+   DATA nColor    INIT 0
+   DATA nStyle    INIT 0   // 0=regular, 1=bold, 2=italic, 3=bold+italic, 4=underline
+   METHOD New() CONSTRUCTOR
+   METHOD Execute()
+ENDCLASS
+
+METHOD New() CLASS TFontDialog
+return Self
+
+METHOD Execute() CLASS TFontDialog
+   local aRes
+   #ifdef __PLATFORM__WINDOWS
+   aRes := W32_ExecFontDialog( ::cFontName, ::nSize, ::nColor, ::nStyle )
+   #else
+      #ifdef __PLATFORM__DARWIN
+      aRes := MAC_ExecFontDialog( ::cFontName, ::nSize, ::nColor, ::nStyle )
+      #else
+      aRes := nil
+      #endif
+   #endif
+   if ValType( aRes ) == "A" .and. Len( aRes ) >= 4
+      ::cFontName := aRes[1]
+      ::nSize     := aRes[2]
+      ::nColor    := aRes[3]
+      ::nStyle    := aRes[4]
+      return .T.
+   endif
+return .F.
+
+CLASS TColorDialog
+   DATA nColor INIT 0
+   METHOD New() CONSTRUCTOR
+   METHOD Execute()
+ENDCLASS
+
+METHOD New() CLASS TColorDialog
+return Self
+
+METHOD Execute() CLASS TColorDialog
+   local nRes
+   #ifdef __PLATFORM__WINDOWS
+   nRes := W32_ExecColorDialog( ::nColor )
+   #else
+      #ifdef __PLATFORM__DARWIN
+      nRes := MAC_ExecColorDialog( ::nColor )
+      #else
+      nRes := -1
+      #endif
+   #endif
+   if ValType( nRes ) == "N" .and. nRes >= 0
+      ::nColor := nRes
+      return .T.
+   endif
+return .F.
+
+CLASS TFindDialog
+   DATA cFindText INIT ""
+   DATA nOptions  INIT 0
+   DATA bOnFind   INIT nil
+   METHOD New() CONSTRUCTOR
+   METHOD Execute()
+ENDCLASS
+
+METHOD New() CLASS TFindDialog
+return Self
+
+METHOD Execute() CLASS TFindDialog
+   // Minimal fallback — UI-less. Real modeless dialog requires platform binding.
+   if ValType( ::bOnFind ) == "B"; Eval( ::bOnFind, Self ); endif
+return .T.
+
+CLASS TReplaceDialog
+   DATA cFindText    INIT ""
+   DATA cReplaceText INIT ""
+   DATA nOptions     INIT 0
+   DATA bOnFind      INIT nil
+   DATA bOnReplace   INIT nil
+   METHOD New() CONSTRUCTOR
+   METHOD Execute()
+ENDCLASS
+
+METHOD New() CLASS TReplaceDialog
+return Self
+
+METHOD Execute() CLASS TReplaceDialog
+   // Minimal fallback — UI-less. Real modeless dialog requires platform binding.
+   if ValType( ::bOnReplace ) == "B"; Eval( ::bOnReplace, Self ); endif
+return .T.
+
 // Helper for COMPONENT xcommand - maps type number to class instance
 function HB_CreateComponent( nType, oParent )
    local oComp
@@ -2298,6 +2456,12 @@ function HB_CreateComponent( nType, oParent )
       case nType == CT_FIREBIRD;   return TFirebird():New()
       case nType == CT_SQLSERVER;  return TSQLServer():New()
       case nType == CT_COMPARRAY;  return TCompArray():New()
+      case nType == CT_OPENDIALOG;    return TOpenDialog():New()
+      case nType == CT_SAVEDIALOG;    return TSaveDialog():New()
+      case nType == CT_FONTDIALOG;    return TFontDialog():New()
+      case nType == CT_COLORDIALOG;   return TColorDialog():New()
+      case nType == CT_FINDDIALOG;    return TFindDialog():New()
+      case nType == CT_REPLACEDIALOG; return TReplaceDialog():New()
       case nType == CT_TIMER
          oComp := TTimer():New()
          if oParent != nil .and. __objHasMsg( oParent, "HCPP" ) .and. oParent:hCpp != 0
@@ -2306,3 +2470,4 @@ function HB_CreateComponent( nType, oParent )
          return oComp
    endcase
 return nil
+

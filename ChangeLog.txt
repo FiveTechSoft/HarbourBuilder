@@ -1,6 +1,49 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-12 (macOS: standard dialog components, autocomplete popup, palette icons)
+
+  FEATURES
+  - TOpenDialog / TSaveDialog / TFontDialog / TColorDialog now work on
+    macOS. New resources/stddlgs_mac.mm implements MAC_ExecOpenDialog
+    (NSOpenPanel), MAC_ExecSaveDialog (NSSavePanel), MAC_ExecFontDialog
+    (NSFontPanel with custom OK/Cancel accessory view and colour via
+    changeAttributes:), MAC_ExecColorDialog (NSColorPanel with
+    OK/Cancel accessory). Colours are exchanged in Win32-style BGR so
+    the same user code works across platforms.
+  - source/core/classes.prg: Execute() methods gain a __PLATFORM__DARWIN
+    branch alongside the existing __PLATFORM__WINDOWS one.
+  - source/hbbuilder_macos.prg: TBRun and DBGRun copy stddlgs_mac.mm
+    into the build dir, compile it with clang++ -fobjc-arc, and link
+    stddlgs_mac.o into the user binary (and DebugApp).
+  - build_mac.sh: new [3c/4] step compiles stddlgs_mac.o, linker picks
+    it up so HB_FUN_MAC_EXEC* symbols resolve in the IDE itself;
+    stddlgs_mac.mm is bundled into .app/Contents/Resources/ for the
+    user-project build path.
+
+  FIXES
+  - Autocomplete popup no longer closes when the debounced form-sync
+    timer fires. cocoa_editor.mm fireTextChange: now checks
+    SCI_AUTOCACTIVE and reschedules itself 300 ms later instead of
+    invoking the Harbour text-change callback (which rewrites the
+    buffer and cancels the active list). Matches the Win32 fix.
+  - Component palette icons were misaligned: palette.bmp is laid out
+    sequentially in AddComp order, but cocoa_core.m PalShowTab indexed
+    it as (nControlType - 1). Since nControlType values are not
+    contiguous (1,2,3,4,8,…), CheckBox (nType=4) displayed the Memo
+    cell, RadioButton (nType=8) displayed a wrong icon, etc. Switched
+    to imgBase + i indexing (same scheme as Win32 tcontrols.cpp).
+  - hbbuilder_macos.prg Standard palette tab: Memo and Button were
+    swapped relative to Windows, so once sequential indexing was in
+    place the first cells drifted. Reordered to match palette.bmp.
+  - Autocomplete: typing `oForm:oOpenDialog1:` (or any other dialog
+    component) produced no dropdown. cocoa_editor.mm s_classMembers
+    gains TOpenDialog / TSaveDialog / TFontDialog / TColorDialog /
+    TFindDialog / TReplaceDialog entries, and the Hungarian-prefix
+    resolver s_nameMap recognises OpenDialog/SaveDialog/FontDialog/
+    ColorDialog/FindDialog/ReplaceDialog so Strategy 4 maps the var
+    name to its class.
+
 2026-04-12 (Windows: standard dialog components + autocomplete + palette fixes)
 
   FEATURES
