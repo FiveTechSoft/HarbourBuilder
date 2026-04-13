@@ -2702,9 +2702,10 @@ static function TBRunAndroid()
    W32_ProgressOpen( "Building Android APK...", 3 )
    W32_ProgressStep( "Compiling generated PRG -> signed APK..." )
 
-   // Run the GUI pipeline (forward slashes to make bash happy)
-   cCmd := 'cmd /c ""' + cBash + '" -lc "bash /c/HarbourBuilder/source/backends/android/build-apk-gui.sh ' + ;
-           '/c/HarbourBuilder/source/backends/android/_generated.prg > /c/HarbourAndroid/apk-gui/build.log 2>&1""'
+   // Run the GUI pipeline. W32_ShellExec already wraps with "cmd /c",
+   // so we pass the bash invocation directly.
+   cCmd := '"' + cBash + '" -lc "bash /c/HarbourBuilder/source/backends/android/build-apk-gui.sh ' + ;
+           '/c/HarbourBuilder/source/backends/android/_generated.prg > /c/HarbourAndroid/apk-gui/build.log 2>&1"'
    W32_ShellExec( cCmd )
 
    cLog := iif( File( cLogPath ), MemoRead( cLogPath ), "(no log produced)" )
@@ -2724,12 +2725,10 @@ static function TBRunAndroid()
    endif
 
    W32_ProgressStep( "Installing on device..." )
-   cCmd := 'cmd /c ""' + cAdb + '" install -r "' + cApkPath + '""'
-   W32_ShellExec( cCmd )
+   W32_ShellExec( '"' + cAdb + '" install -r "' + cApkPath + '"' )
 
    W32_ProgressStep( "Launching app..." )
-   cCmd := 'cmd /c ""' + cAdb + '" shell am start -n com.harbour.builder/.MainActivity"'
-   W32_ShellExec( cCmd )
+   W32_ShellExec( '"' + cAdb + '" shell am start -n com.harbour.builder/.MainActivity' )
    W32_ProgressClose()
 
    MsgInfo( "APK installed and launched on the emulator:" + Chr(10) + cApkPath, ;
@@ -2740,30 +2739,42 @@ return nil
 // Ensure an Android device is ready. If none is connected, launch the
 // AVD "HarbourBuilderAVD" in background and poll getprop sys.boot_completed
 // for up to 120 seconds. Returns .T. when the device is ready.
+//
+// Note: W32_ShellExec internally wraps its argument with "cmd /c" already
+// and returns the captured stdout+stderr, so we must NOT prefix "cmd /c"
+// ourselves — that produced "cmd /c cmd /c ..." with busted quoting and
+// empty output, which made the loop wait forever.
 static function AndroidEnsureDevice( cAdb )
 
    local cEmulator := "C:\Android\Sdk\emulator\emulator.exe"
    local cAvd      := "HarbourBuilderAVD"
-   local cOut, cCmd, nTries
+   local cOut, nTries, nEol
 
-   // 1. Already a device connected?
-   cOut := W32_ShellExec( 'cmd /c ""' + cAdb + '" devices"' )
-   if ValType( cOut ) == "C" .and. "device" $ SubStr( cOut, At( Chr(10), cOut ) + 1 )
-      return .T.
+   // 1. Already a device connected and ready?
+   cOut := W32_ShellExec( '"' + cAdb + '" devices' )
+   if ValType( cOut ) == "C"
+      nEol := At( Chr(10), cOut )
+      if nEol > 0 .and. "device" $ SubStr( cOut, nEol + 1 )
+         // Still need to confirm boot_completed (device may be booting)
+         cOut := W32_ShellExec( '"' + cAdb + '" shell getprop sys.boot_completed' )
+         if ValType( cOut ) == "C" .and. "1" $ cOut
+            return .T.
+         endif
+      endif
    endif
 
-   // 2. Launch the emulator detached (fire-and-forget, new window)
+   // 2. Launch the emulator detached if nothing is running
    if ! File( cEmulator )
       MsgInfo( "Android emulator not found at " + cEmulator, "Android target" )
       return .F.
    endif
-   cCmd := 'cmd /c start "" "' + cEmulator + '" -avd ' + cAvd + ' -no-snapshot-save'
-   W32_ShellExec( cCmd )
+   // cmd /c start "" "<exe>" opens a new window and returns immediately.
+   W32_ShellExec( 'start "" "' + cEmulator + '" -avd ' + cAvd + ' -no-snapshot-save' )
 
    // 3. Poll sys.boot_completed (up to ~120 s at ~2 s per try)
    for nTries := 1 to 60
       W32_ProgressStep( "Waiting for emulator (" + LTrim(Str(nTries)) + "/60)..." )
-      cOut := W32_ShellExec( 'cmd /c ""' + cAdb + '" shell getprop sys.boot_completed 2>nul"' )
+      cOut := W32_ShellExec( '"' + cAdb + '" shell getprop sys.boot_completed 2^>nul' )
       if ValType( cOut ) == "C" .and. "1" $ cOut
          return .T.
       endif
