@@ -103,32 +103,34 @@ javac -d "$WORK/classes" \
 
 # ---------- 7. d8 ----------
 echo ">>> [7/8] d8"
-d8 --output "$WORK/apk" $(find "$WORK/classes" -name '*.class')
+d8.bat --lib "$ANDROID_JAR" --min-api 24 \
+       --output "$WORK/apk" $(find "$WORK/classes" -name '*.class')
 ls "$WORK/apk/classes.dex"
 
 # ---------- 8. package & sign ----------
 echo ">>> [8/8] package & sign"
-cd "$WORK/apk"
+cp "$WORK/apk/base.apk" "$WORK/apk/unsigned.apk"
 
-# Bundle classes.dex + libapp.so into base.apk
-zip -j base.apk classes.dex
-mkdir -p lib/arm64-v8a
-cp "$WORK/jni-libs/arm64-v8a/libapp.so" lib/arm64-v8a/
-zip -r base.apk lib
+# Stage payload tree and add classes.dex + libapp.so to the APK via jar uf.
+mkdir -p "$WORK/payload/lib/arm64-v8a"
+cp "$WORK/apk/classes.dex"              "$WORK/payload/classes.dex"
+cp "$WORK/jni-libs/arm64-v8a/libapp.so" "$WORK/payload/lib/arm64-v8a/libapp.so"
+cd "$WORK/payload"
+"$JDK/bin/jar.exe" uf "$WORK/apk/unsigned.apk" classes.dex lib/arm64-v8a/libapp.so
+cd "$WORK"
 
-zipalign -f -p 4 base.apk aligned.apk
+zipalign.exe -f -p 4 "$WORK/apk/unsigned.apk" "$WORK/apk/aligned.apk"
 
-# Create keystore on first run
+# Debug keystore (reuse if already created, else generate)
 if [ ! -f "$KEYSTORE" ]; then
-  keytool -genkeypair -v \
-    -keystore "$KEYSTORE" -storepass android -keypass android \
-    -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
-    -dname "CN=HarbourBuilder Debug, O=HarbourBuilder, C=ES"
+  keytool -genkeypair -v -keystore "$KEYSTORE" -alias demo -keyalg RSA -keysize 2048 \
+    -validity 10000 -storepass android -keypass android \
+    -dname "CN=HarbourBuilder Debug,O=HarbourBuilder,C=ES"
 fi
 
-apksigner sign --ks "$KEYSTORE" --ks-pass pass:android \
-               --key-pass pass:android \
-               --out "$WORK/harbour-gui.apk" aligned.apk
+apksigner.bat sign --ks "$KEYSTORE" --ks-pass pass:android \
+                   --key-pass pass:android \
+                   --out "$WORK/harbour-gui.apk" "$WORK/apk/aligned.apk"
 
 echo "=============================================="
 echo " APK ready: $WORK/harbour-gui.apk"

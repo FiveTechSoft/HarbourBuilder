@@ -109,7 +109,7 @@ public class MainActivity extends Activity {
         }});
     }
 
-    public void setText( final int id, final String text ) {
+    public void setCtrlText( final int id, final String text ) {
         runOnUiThread( new Runnable() { @Override public void run() {
             View v = ctrls.get( id );
             if( v instanceof TextView ) ( (TextView) v ).setText( text );
@@ -117,7 +117,7 @@ public class MainActivity extends Activity {
     }
 
     /** Must block until the UI thread answers - JNI caller expects a value. */
-    public String getText( int id ) {
+    public String getCtrlText( int id ) {
         View v = ctrls.get( id );
         if( v instanceof TextView ) return ( (TextView) v ).getText().toString();
         return "";
