@@ -43,6 +43,9 @@ function Main()
    local nFormX, nFormY, nInsTop, nEditorTop, nBottomY
    local cIcoDir
 
+   /* IDE-wide error trap: dump error + call stack to /tmp/hb_ide.err */
+   ErrorBlock( { |o| IdeDumpError( o ) } )
+
    nScreenW := MAC_GetScreenWidth()
    nScreenH := MAC_GetScreenHeight()
    cCurrentFile := ""
@@ -664,8 +667,11 @@ static function RegenerateFormCode( cName, hForm )
             nOwnerH := UI_GetCtrlOwner( hCtrl )
             for kk := 1 to UI_GetChildCount( hForm )
                if UI_GetChild( hForm, kk ) == nOwnerH
-                  cParent := "::o" + UI_GetProp( nOwnerH, "cName" ) + ;
-                     ":aPages[ " + LTrim( Str( UI_GetCtrlPage( hCtrl ) + 1 ) ) + " ]"
+                  cVal := UI_GetProp( nOwnerH, "cName" )
+                  if ValType( cVal ) == "C" .and. ! Empty( cVal )
+                     cParent := "::o" + cVal + ":aPages[ " + ;
+                        LTrim( Str( UI_GetCtrlPage( hCtrl ) + 1 ) ) + " ]"
+                  endif
                   exit
                endif
             next
@@ -771,7 +777,8 @@ static function RegenerateFormCode( cName, hForm )
             otherwise
                if IsNonVisual( nType )
                   cCreate += '   COMPONENT ::o' + cCtrlName + ' TYPE ' + ;
-                     ComponentTypeName( nType ) + ' OF Self  // ' + cCtrlClass + e
+                     ComponentTypeName( nType ) + ' OF Self  // ' + cCtrlClass + ;
+                     ' @ ' + LTrim(Str(nL)) + ',' + LTrim(Str(nT)) + e
                   // Component-specific properties
                   if nType == 53  // DBFTable
                      cVal := UI_GetProp( hCtrl, "cFileName" )
@@ -978,6 +985,20 @@ static function RestoreFormFromCode( hForm, cCode )
                endif
                if IsNonVisual( nType )
                   hCtrl := UI_DropNonVisual( hForm, nType, cName )
+                  // Restore designer position from trailing "// ... @ L,T"
+                  if hCtrl != 0
+                     nPos2 := At( " @ ", cTrim )
+                     if nPos2 > 0
+                        cVal := SubStr( cTrim, nPos2 + 3 )
+                        nL := Val( cVal )
+                        nPos2 := At( ",", cVal )
+                        if nPos2 > 0
+                           nT := Val( SubStr( cVal, nPos2 + 1 ) )
+                           UI_SetProp( hCtrl, "nLeft", nL )
+                           UI_SetProp( hCtrl, "nTop",  nT )
+                        endif
+                     endif
+                  endif
                endif
             endif
          endif
@@ -1532,9 +1553,50 @@ return cHandler
 
 // === Component drop from palette ===
 
+static function Var2Char( x )
+   local t := ValType( x )
+   do case
+   case t == "C"; return x
+   case t == "U"; return "NIL"
+   case t == "N"; return LTrim( Str( x ) )
+   case t == "L"; return If( x, ".T.", ".F." )
+   case t == "O"; return "[O]"
+   otherwise;     return "[" + t + "]"
+   endcase
+
+static function IdeTrace( cMsg )
+   local hDbg := FOpen( "/tmp/hb_trace.log", 1 )
+   if hDbg == -1; hDbg := FCreate( "/tmp/hb_trace.log" ); endif
+   FSeek( hDbg, 0, 2 )
+   FWrite( hDbg, cMsg + Chr(10) )
+   FClose( hDbg )
+return nil
+
+static function IdeDumpError( oErr )
+   local cStack := "", i
+   local hFile := FCreate( "/tmp/hb_ide.err" )
+   if hFile != -1
+      cStack := "ERR: " + Var2Char( oErr:description ) + ;
+         " op=" + Var2Char( oErr:operation ) + ;
+         " subcode=" + LTrim(Str(oErr:subcode)) + Chr(10)
+      if ValType( oErr:args ) == "A"
+         for i := 1 to Len( oErr:args )
+            cStack += "  arg[" + LTrim(Str(i)) + "]=" + Var2Char( oErr:args[i] ) + ;
+               " type=" + ValType( oErr:args[i] ) + Chr(10)
+         next
+      endif
+      for i := 2 to 30
+         if ProcName(i) == ""; exit; endif
+         cStack += ProcName(i) + "(" + LTrim(Str(ProcLine(i))) + ")" + Chr(10)
+      next
+      FWrite( hFile, cStack )
+      FClose( hFile )
+   endif
+return nil
+
 static function OnComponentDrop( hForm, nType, nL, nT, nW, nH )
 
-   local cName, nCount, hCtrl
+   local cName, nCount, hCtrl, hDbg
    static aCnt := nil
    static aNames := { ;
       "Label", "Edit", "Button", "CheckBox", "ComboBox", "GroupBox", ;
@@ -1566,7 +1628,7 @@ static function OnComponentDrop( hForm, nType, nL, nT, nW, nH )
       "GitRepo", "GitCommit", "GitBranch", "GitLog", "GitDiff", ;
       "GitRemote", "GitStash", "GitTag", "GitBlame", "GitMerge" }
 
-   if aCnt == nil; aCnt := Array(120); AFill(aCnt,0); endif
+   if aCnt == nil; aCnt := Array( Len( aNames ) ); AFill(aCnt,0); endif
    UI_FormUndoPush( hForm )
    if nType < 1 .or. nType > Len(aNames) .or. Empty(aNames[nType]); return nil; endif
    aCnt[nType]++

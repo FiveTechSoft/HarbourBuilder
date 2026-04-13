@@ -1013,22 +1013,56 @@ static int         s_pendingPage   = 0;
          v = sv; break;
       }
       default: {
-         /* Non-visual (Timer, Dialogs, DB components) or unknown */
-         int imgIdx = FControlType;
-         BOOL hasImage = ( s_palData && s_palData->palImages && imgIdx > 0 &&
-                           imgIdx <= (int)[s_palData->palImages count] );
+         /* Non-visual (Timer, Dialogs, DB components) or unknown.
+          * Palette icons are laid out sequentially (imgBase + btnIdx),
+          * NOT keyed by FControlType. */
+         int imgIdx = -1;
+         const char * btnText = NULL;
+         if( s_palData ) {
+            int imgBase = 0;
+            for( int k = 0; k < s_palData->nTabCount && imgIdx < 0; k++ ) {
+               PaletteTab * t = &s_palData->tabs[k];
+               for( int i = 0; i < t->nBtnCount; i++ ) {
+                  if( t->btns[i].nControlType == FControlType ) {
+                     imgIdx = imgBase + i;
+                     btnText = t->btns[i].szText;
+                     break;
+                  }
+               }
+               imgBase += t->nBtnCount;
+            }
+         }
+         BOOL hasImage = ( s_palData && s_palData->palImages && imgIdx >= 0 &&
+                           imgIdx < (int)[s_palData->palImages count] );
          if( hasImage ) {
             NSImageView * iv = [[NSImageView alloc] initWithFrame:NSMakeRect(FLeft,FTop,32,32)];
-            [iv setImage:s_palData->palImages[imgIdx - 1]];
+            [iv setImage:s_palData->palImages[imgIdx]];
             [iv setImageScaling:NSImageScaleProportionallyUpOrDown];
             [iv setEditable:NO];
             v = iv;
          } else {
-            NSTextField * tf = [[NSTextField alloc] initWithFrame:NSMakeRect(FLeft,FTop,32,32)];
-            [tf setStringValue:[NSString stringWithUTF8String:FName[0] ? FName : FClassName]];
-            [tf setEditable:NO]; [tf setBezeled:YES]; [tf setAlignment:NSTextAlignmentCenter];
-            NSFont * smallFont = [NSFont systemFontOfSize:7]; [tf setFont:smallFont];
-            v = tf;
+            NSString * ns = btnText ? [NSString stringWithUTF8String:btnText]
+                                    : [NSString stringWithUTF8String:FName[0] ? FName : FClassName];
+            NSImage * img = [NSImage imageWithSize:NSMakeSize(32,32)
+                                           flipped:NO
+                                    drawingHandler:^BOOL(NSRect r) {
+               [[NSColor colorWithCalibratedRed:0.25 green:0.45 blue:0.70 alpha:1.0] set];
+               NSRectFill( r );
+               NSDictionary * attrs = @{
+                  NSFontAttributeName: [NSFont boldSystemFontOfSize:11],
+                  NSForegroundColorAttributeName: [NSColor whiteColor]
+               };
+               NSSize sz = [ns sizeWithAttributes:attrs];
+               NSPoint pt = NSMakePoint( (r.size.width - sz.width)/2,
+                                         (r.size.height - sz.height)/2 );
+               [ns drawAtPoint:pt withAttributes:attrs];
+               return YES;
+            }];
+            NSImageView * iv = [[NSImageView alloc] initWithFrame:NSMakeRect(FLeft,FTop,32,32)];
+            [iv setImage:img];
+            [iv setImageScaling:NSImageScaleNone];
+            [iv setEditable:NO];
+            v = iv;
          }
          break;
       }
@@ -1664,6 +1698,7 @@ static int         s_pendingPage   = 0;
 
 - (void)palBtnClicked:(id)sender
 {
+   NSLog(@"[HB] palBtnClicked entry palData=%p", palData);
    if( !palData ) return;
 
    /* Find which button was clicked */
@@ -1675,10 +1710,12 @@ static int         s_pendingPage   = 0;
    if( btnIdx < 0 ) return;
 
    int ctrlType = t->btns[btnIdx].nControlType;
+   NSLog(@"[HB] palBtnClicked ctrlType=%d btnIdx=%d tooltip=%s", ctrlType, btnIdx, t->btns[btnIdx].szTooltip);
 
    /* Set pending drop mode on the design form (not the IDE bar) */
    HBForm * targetForm = s_designForm;
-   if( !targetForm || !targetForm->FDesignMode ) return;
+   if( !targetForm || !targetForm->FDesignMode ) { NSLog(@"[HB] no design form"); return; }
+   NSLog(@"[HB] targetForm=%p FChildCount=%d", targetForm, targetForm->FChildCount);
 
    /* Check if non-visual component (auto-drop, no click needed) */
    int isNonVisual = 0;
@@ -1692,8 +1729,10 @@ static int         s_pendingPage   = 0;
    if( ctrlType >= CT_PRINTER && ctrlType <= CT_BARCODEPRINTER ) isNonVisual = 1;
    if( ctrlType >= 110 ) isNonVisual = 1; /* Whisper, Embeddings, Connectivity, Git */
 
+   NSLog(@"[HB] isNonVisual=%d", isNonVisual);
    if( isNonVisual )
    {
+      NSLog(@"[HB] entering nonVisual path");
       /* Auto-drop: create non-visual component icon at bottom of form */
       int nNV = 0;
       for( int ci = 0; ci < targetForm->FChildCount; ci++ )
@@ -1712,31 +1751,54 @@ static int         s_pendingPage   = 0;
       ctrl->FHeight = 32;
       strncpy( ctrl->FClassName, t->btns[btnIdx].szTooltip, sizeof(ctrl->FClassName) - 1 );
 
+      KeepAlive( ctrl );
       [targetForm addChild:ctrl];
 
-      /* Create the view: palette icon image (or text fallback) */
+      /* Create the view: palette icon image (or text fallback).
+       * Icons in palette.bmp are laid out sequentially across tabs, so the
+       * image index is the palette position (imgBase + btnIdx), not ctrlType. */
       if( targetForm->FContentView ) {
-         int imgIdx = ctrlType;
-         BOOL hasImage = ( palData->palImages && imgIdx > 0 &&
-                           imgIdx <= (int)[palData->palImages count] );
+         int imgBase = 0;
+         for( int k = 0; k < palData->nCurrentTab; k++ )
+            imgBase += palData->tabs[k].nBtnCount;
+         int imgIdx = imgBase + btnIdx;
+         BOOL hasImage = ( palData->palImages && imgIdx >= 0 &&
+                           imgIdx < (int)[palData->palImages count] );
          if( hasImage ) {
             NSImageView * iv = [[NSImageView alloc] initWithFrame:
                NSMakeRect( nx, ny + targetForm->FClientTop, 32, 32 )];
-            [iv setImage:palData->palImages[imgIdx - 1]];
+            [iv setImage:palData->palImages[imgIdx]];
             [iv setImageScaling:NSImageScaleProportionallyUpOrDown];
             [iv setEditable:NO];
             ctrl->FView = (NSView *)iv;
             [targetForm->FContentView addSubview:iv];
          } else {
-            NSTextField * lbl = [[NSTextField alloc] initWithFrame:
+            /* Fallback when no BMP icon is available: render a 32x32 image
+             * in code (blue square with the palette's short label) so the
+             * view is an NSImageView (does not intercept mouse events). */
+            NSString * ns = [NSString stringWithUTF8String:t->btns[btnIdx].szText];
+            NSImage * img = [NSImage imageWithSize:NSMakeSize(32,32)
+                                           flipped:NO
+                                    drawingHandler:^BOOL(NSRect r) {
+               [[NSColor colorWithCalibratedRed:0.25 green:0.45 blue:0.70 alpha:1.0] set];
+               NSRectFill( r );
+               NSDictionary * attrs = @{
+                  NSFontAttributeName: [NSFont boldSystemFontOfSize:11],
+                  NSForegroundColorAttributeName: [NSColor whiteColor]
+               };
+               NSSize sz = [ns sizeWithAttributes:attrs];
+               NSPoint pt = NSMakePoint( (r.size.width - sz.width)/2,
+                                         (r.size.height - sz.height)/2 );
+               [ns drawAtPoint:pt withAttributes:attrs];
+               return YES;
+            }];
+            NSImageView * iv = [[NSImageView alloc] initWithFrame:
                NSMakeRect( nx, ny + targetForm->FClientTop, 32, 32 )];
-            [lbl setStringValue:[NSString stringWithUTF8String:t->btns[btnIdx].szText]];
-            [lbl setEditable:NO]; [lbl setBezeled:YES];
-            [lbl setAlignment:NSTextAlignmentCenter];
-            [lbl setFont:[NSFont systemFontOfSize:9]];
-            [lbl setDrawsBackground:YES];
-            ctrl->FView = (NSView *)lbl;
-            [targetForm->FContentView addSubview:lbl];
+            [iv setImage:img];
+            [iv setImageScaling:NSImageScaleNone];
+            [iv setEditable:NO];
+            ctrl->FView = (NSView *)iv;
+            [targetForm->FContentView addSubview:iv];
          }
       }
 
@@ -3497,6 +3559,9 @@ HB_FUNC( UI_DROPNONVISUAL )
          { CT_COMPARRAY, "TCompArray" },
          { CT_BROWSE, "TBrowse" }, { CT_DBGRID, "TDbGrid" },
          { CT_DBNAVIGATOR, "TDbNavigator" },
+         { 112, "TPython" }, { 113, "TSwift" }, { 114, "TGo" },
+         { 115, "TNode" }, { 116, "TRust" }, { 117, "TJava" },
+         { 118, "TDotNet" }, { 119, "TLua" }, { 120, "TRuby" },
          { 0, NULL }
       };
       BOOL found = NO;
@@ -3515,29 +3580,61 @@ HB_FUNC( UI_DROPNONVISUAL )
 
    [form addChild:ctrl];
 
-   /* Create the visual representation (bitmap icon or text fallback) */
+   /* Create the visual representation (bitmap icon or text fallback).
+    * Palette icons are laid out sequentially (imgBase + btnIdx), NOT by
+    * ctrlType. Locate this type's button in the palette to get its index. */
    if( form->FContentView ) {
-      int imgIdx = nType;
-      BOOL hasImage = ( s_palData && s_palData->palImages && imgIdx > 0 &&
-                        imgIdx <= (int)[s_palData->palImages count] );
+      int imgIdx = -1;
+      const char * btnText = NULL;
+      if( s_palData ) {
+         int imgBase = 0;
+         for( int k = 0; k < s_palData->nTabCount && imgIdx < 0; k++ ) {
+            PaletteTab * t = &s_palData->tabs[k];
+            for( int i = 0; i < t->nBtnCount; i++ ) {
+               if( t->btns[i].nControlType == nType ) {
+                  imgIdx = imgBase + i;
+                  btnText = t->btns[i].szText;
+                  break;
+               }
+            }
+            imgBase += t->nBtnCount;
+         }
+      }
+      BOOL hasImage = ( s_palData && s_palData->palImages && imgIdx >= 0 &&
+                        imgIdx < (int)[s_palData->palImages count] );
       if( hasImage ) {
          NSImageView * iv = [[NSImageView alloc] initWithFrame:
             NSMakeRect( x, y + form->FClientTop, 32, 32 )];
-         [iv setImage:s_palData->palImages[imgIdx - 1]];
+         [iv setImage:s_palData->palImages[imgIdx]];
          [iv setImageScaling:NSImageScaleProportionallyUpOrDown];
          [iv setEditable:NO];
          ctrl->FView = (NSView *)iv;
          [form->FContentView addSubview:iv];
       } else {
-         NSTextField * lbl = [[NSTextField alloc] initWithFrame:
+         NSString * ns = btnText ? [NSString stringWithUTF8String:btnText]
+                                 : [NSString stringWithUTF8String:cName];
+         NSImage * img = [NSImage imageWithSize:NSMakeSize(32,32)
+                                        flipped:NO
+                                 drawingHandler:^BOOL(NSRect r) {
+            [[NSColor colorWithCalibratedRed:0.25 green:0.45 blue:0.70 alpha:1.0] set];
+            NSRectFill( r );
+            NSDictionary * attrs = @{
+               NSFontAttributeName: [NSFont boldSystemFontOfSize:11],
+               NSForegroundColorAttributeName: [NSColor whiteColor]
+            };
+            NSSize sz = [ns sizeWithAttributes:attrs];
+            NSPoint pt = NSMakePoint( (r.size.width - sz.width)/2,
+                                      (r.size.height - sz.height)/2 );
+            [ns drawAtPoint:pt withAttributes:attrs];
+            return YES;
+         }];
+         NSImageView * iv = [[NSImageView alloc] initWithFrame:
             NSMakeRect( x, y + form->FClientTop, 32, 32 )];
-         [lbl setStringValue:[NSString stringWithUTF8String:cName]];
-         [lbl setEditable:NO]; [lbl setBezeled:YES];
-         [lbl setAlignment:NSTextAlignmentCenter];
-         [lbl setFont:[NSFont systemFontOfSize:9]];
-         [lbl setDrawsBackground:YES];
-         ctrl->FView = (NSView *)lbl;
-         [form->FContentView addSubview:lbl];
+         [iv setImage:img];
+         [iv setImageScaling:NSImageScaleNone];
+         [iv setEditable:NO];
+         ctrl->FView = (NSView *)iv;
+         [form->FContentView addSubview:iv];
       }
    }
 

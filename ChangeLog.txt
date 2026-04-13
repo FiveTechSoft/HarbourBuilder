@@ -1,6 +1,66 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-13 (macOS: Connectivity components — TPython and 8 siblings via TInteropRuntime)
+
+  FEATURES
+  - New class hierarchy for the Connectivity palette tab:
+    - TInteropRuntime (base) with shared properties: cRuntimePath,
+      cScript, cScriptFile, lAutoStart, aModules, cLastResult,
+      cLastError, lRunning, and events OnReady / OnError / OnOutput.
+      Methods Start/Stop and virtual Exec/Eval/CallFunc/SetVar/GetVar.
+    - Concrete subclasses: TPython, TNode, TLua, TRuby (dynamic);
+      TGo, TRust, TSwift (compiled — add cCompileFlags, OnBuild, Build);
+      TJava (+ cClassPath), TDotNet (+ cAssemblyPath).
+    - Registered in HB_CreateComponent dispatcher so the generated
+      `COMPONENT ::oPython TYPE CT_PYTHON OF Self` line instantiates
+      the right class at runtime.
+  - Non-visual component icon in the designer now uses the palette
+    bitmap icon correctly (palette images are laid out sequentially by
+    palette position, not by ctrlType). palBtnClicked, UI_DropNonVisual
+    and HBControl:createViewInParent now all compute imgIdx as
+    `imgBase + btnIdx`. Fallback when no palette icon exists: a 32x32
+    blue NSImageView rendered in code with the palette short label.
+  - Designer position of non-visual components is now preserved across
+    save/load: codegen appends `@ L,T` to the trailing comment on the
+    COMPONENT line; parser restores it with UI_SetProp nLeft/nTop
+    after UI_DropNonVisual.
+  - New UI_DropNonVisual type map includes TPython .. TRuby so class
+    names survive reopen.
+
+  FIXES
+  - palBtnClicked non-visual path now calls KeepAlive(ctrl); otherwise
+    the freshly created control was not in s_allControls and the
+    stricter GetCtrlRaw validator returned nil, breaking the inspector
+    combo, drag, and triggering "Argument error: +" in codegen.
+  - IDE-wide ErrorBlock installed at Main() that writes error +
+    call-stack to /tmp/hb_ide.err (returns NIL so Harbour handles the
+    default dialog without poisoning downstream values).
+  - RegenerateFormCode cParent helper guards against UI_GetProp
+    returning nil so "+ NIL" is avoided for stale owner handles.
+  - TFolder-style `OF ::oFolder:aPages[n]` parser skipped auto-page
+    TPanels in codegen (flagged FAutoPage) so they are re-created by
+    the aTabs setter instead of duplicated.
+
+  NEW SAMPLE
+  - samples/projects/python: Project1.hbp + Project1.prg + Form1.prg
+    that shows a TPython component driven from the form (script memo,
+    output memo, Start/Exec/Eval/Set-Get/Stop buttons) exercising the
+    TInteropRuntime API.
+
+  FILES
+  - source/core/classes.prg: TInteropRuntime + TPython, TSwift, TGo,
+    TNode, TRust, TJava, TDotNet, TLua, TRuby; HB_CreateComponent
+    dispatch for types 112..120.
+  - source/backends/cocoa/cocoa_core.m: palette-position icon lookup
+    in palBtnClicked, UI_DropNonVisual and createViewInParent;
+    KeepAlive(ctrl) before addChild in the palette non-visual path;
+    type→class map extended with 112..120.
+  - source/hbbuilder_macos.prg: ErrorBlock + IdeDumpError + Var2Char;
+    guarded cParent helper in RegenerateFormCode; `@ L,T` emission on
+    COMPONENT lines; parser restores non-visual designer position.
+  - samples/projects/python: new sample.
+
 2026-04-13 (macOS: TTreeView class and hierarchical aItems editor)
 
   FEATURES

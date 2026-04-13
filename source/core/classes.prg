@@ -2553,6 +2553,111 @@ METHOD Execute() CLASS TReplaceDialog
    if ValType( ::bOnReplace ) == "B"; Eval( ::bOnReplace, Self ); endif
 return .T.
 
+//----------------------------------------------------------------------------//
+// TInteropRuntime — base class for language/runtime interop components
+// Shared by TPython, TSwift, TGo, TNode, TRust, TJava, TDotNet, TLua, TRuby
+//----------------------------------------------------------------------------//
+
+CLASS TInteropRuntime
+
+   DATA hCpp         INIT 0
+   DATA oParent      INIT nil
+
+   // Common configuration
+   DATA cRuntimePath INIT ""         // path to interpreter/compiler binary (auto if empty)
+   DATA cScript      INIT ""         // inline source code
+   DATA cScriptFile  INIT ""         // path to source file (alternative to cScript)
+   DATA lAutoStart   INIT .F.        // start runtime at form creation
+   DATA aModules     INIT {}         // modules/packages to import at Start()
+
+   // Runtime state (read-only in practice)
+   DATA cLastResult  INIT ""
+   DATA cLastError   INIT ""
+   DATA lRunning     INIT .F.
+
+   // Events
+   DATA bOnReady     INIT nil        // block executed after Start()
+   DATA bOnError     INIT nil        // block( oSelf, cError )
+   DATA bOnOutput    INIT nil        // block( oSelf, cLine ) — stdout/stderr
+
+   METHOD New( oParent )
+   METHOD Start()   INLINE ( ::lRunning := .T., ;
+                             If( ValType( ::bOnReady ) == "B", Eval( ::bOnReady, Self ), nil ), ;
+                             Self )
+   METHOD Stop()    INLINE ( ::lRunning := .F., Self )
+   METHOD Exec( cCode )     VIRTUAL
+   METHOD Eval( cExpr )     VIRTUAL
+   METHOD CallFunc( cName )              VIRTUAL
+   METHOD SetVar( cName, xValue )        VIRTUAL
+   METHOD GetVar( cName )                VIRTUAL
+
+   ASSIGN OnReady( b )   INLINE ::bOnReady  := b
+   ASSIGN OnError( b )   INLINE ::bOnError  := b
+   ASSIGN OnOutput( b )  INLINE ::bOnOutput := b
+
+ENDCLASS
+
+METHOD New( oParent ) CLASS TInteropRuntime
+   ::oParent := oParent
+return Self
+
+//----------------------------------------------------------------------------//
+// Concrete runtimes — each adds the minimum language-specific extras
+//----------------------------------------------------------------------------//
+
+CLASS TPython INHERIT TInteropRuntime
+ENDCLASS
+
+CLASS TNode INHERIT TInteropRuntime
+ENDCLASS
+
+CLASS TLua INHERIT TInteropRuntime
+ENDCLASS
+
+CLASS TRuby INHERIT TInteropRuntime
+ENDCLASS
+
+// Compiled languages: add build flags + Build() / OnBuild hook
+
+CLASS TGo INHERIT TInteropRuntime
+   DATA cCompileFlags INIT ""
+   DATA bOnBuild      INIT nil
+   METHOD Build()    VIRTUAL
+   ASSIGN OnBuild( b ) INLINE ::bOnBuild := b
+ENDCLASS
+
+CLASS TRust INHERIT TInteropRuntime
+   DATA cCompileFlags INIT ""
+   DATA bOnBuild      INIT nil
+   METHOD Build()    VIRTUAL
+   ASSIGN OnBuild( b ) INLINE ::bOnBuild := b
+ENDCLASS
+
+CLASS TSwift INHERIT TInteropRuntime
+   DATA cCompileFlags INIT ""
+   DATA bOnBuild      INIT nil
+   METHOD Build()    VIRTUAL
+   ASSIGN OnBuild( b ) INLINE ::bOnBuild := b
+ENDCLASS
+
+CLASS TJava INHERIT TInteropRuntime
+   DATA cCompileFlags INIT ""
+   DATA cClassPath    INIT ""
+   DATA bOnBuild      INIT nil
+   METHOD Build()    VIRTUAL
+   ASSIGN OnBuild( b ) INLINE ::bOnBuild := b
+ENDCLASS
+
+CLASS TDotNet INHERIT TInteropRuntime
+   DATA cCompileFlags INIT ""
+   DATA cAssemblyPath INIT ""
+   DATA bOnBuild      INIT nil
+   METHOD Build()    VIRTUAL
+   ASSIGN OnBuild( b ) INLINE ::bOnBuild := b
+ENDCLASS
+
+//----------------------------------------------------------------------------//
+
 // Helper for COMPONENT xcommand - maps type number to class instance
 function HB_CreateComponent( nType, oParent )
    local oComp
@@ -2571,6 +2676,15 @@ function HB_CreateComponent( nType, oParent )
       case nType == CT_COLORDIALOG;   return TColorDialog():New()
       case nType == CT_FINDDIALOG;    return TFindDialog():New()
       case nType == CT_REPLACEDIALOG; return TReplaceDialog():New()
+      case nType == 112; return TPython():New( oParent )
+      case nType == 113; return TSwift():New( oParent )
+      case nType == 114; return TGo():New( oParent )
+      case nType == 115; return TNode():New( oParent )
+      case nType == 116; return TRust():New( oParent )
+      case nType == 117; return TJava():New( oParent )
+      case nType == 118; return TDotNet():New( oParent )
+      case nType == 119; return TLua():New( oParent )
+      case nType == 120; return TRuby():New( oParent )
       case nType == CT_TIMER
          oComp := TTimer():New()
          if oParent != nil .and. __objHasMsg( oParent, "HCPP" ) .and. oParent:hCpp != 0
