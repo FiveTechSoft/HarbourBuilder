@@ -93,8 +93,8 @@
 <h1>Controles de Conectividade <span class="badge new">NEW</span></h1>
 <p>O HarbourBuilder fornece <strong>9 controles de interoperabilidade de linguagens</strong> que permitem chamar codigo
 escrito em Python, Swift, Go, Node.js, Rust, Java, .NET, Lua e Ruby diretamente das suas
-aplicacoes Harbour. Sem IPC, sem wrappers HTTP, sem filas de mensagens — apenas chamadas de funcao
-diretas atraves de fronteiras de linguagem.</p>
+aplicacoes Harbour. Os 9 controles herdam da classe base <strong>TInteropRuntime</strong>,
+que fornece uma API unificada para chamadas entre linguagens.</p>
 
 <div class="info-box tip">
   <strong>Chame Qualquer Linguagem a Partir do Harbour</strong>
@@ -118,9 +118,70 @@ diretas atraves de fronteiras de linguagem.</p>
   <tr><td><strong>TRuby</strong></td><td>Ruby</td><td>Ruby C API (libruby)</td><td>Web scraping, processamento de texto, DSLs.</td></tr>
 </table>
 
+<h2 id="interop-runtime">Classe Base TInteropRuntime</h2>
+
+<p>Os 9 controles de conectividade herdam de <strong>TInteropRuntime</strong>, uma classe base abstrata
+que define a interface comum para comunicacao entre linguagens. Este design garante que
+mudar entre linguagens requer apenas alterar o nome da classe do componente — a API
+permanece identica.</p>
+
+<div class="mermaid">
+classDiagram
+    class TInteropRuntime {
+        +string cLibPath
+        +string cRuntimePath
+        +logical lInitialized
+        +logical lAutoShutdown
+        +Init()
+        +Eval(cCode)
+        +Call(cFunction, ...args)
+        +SetVar(cName, xValue)
+        +GetVar(cName)
+        +Shutdown()
+        #LoadLibrary(cPath)*
+        #UnloadLibrary()*
+        #MarshalToForeign(xValue)*
+        #MarshalToHarbour(foreignValue)*
+    }
+    TInteropRuntime <|-- TPython
+    TInteropRuntime <|-- TNode
+    TInteropRuntime <|-- TLua
+    TInteropRuntime <|-- TGo
+    TInteropRuntime <|-- TRust
+    TInteropRuntime <|-- TJava
+    TInteropRuntime <|-- TDotNet
+    TInteropRuntime <|-- TSwift
+    TInteropRuntime <|-- TRuby
+    style TInteropRuntime fill:#58a6ff,stroke:#388bfd,color:#0d1117
+</div>
+
+<h3 id="propriedades-herdadas">Propriedades Herdadas</h3>
+
+<table>
+  <tr><th>Propriedade</th><th>Tipo</th><th>Padrao</th><th>Descricao</th></tr>
+  <tr><td><code>cLibPath</code></td><td>String</td><td>""</td><td>Caminho da biblioteca compartilhada estrangeira (.so, .dll, .dylib).</td></tr>
+  <tr><td><code>cRuntimePath</code></td><td>String</td><td>""</td><td>Caminho do executavel ou VM do runtime (Python, Java, Node, etc.).</td></tr>
+  <tr><td><code>lInitialized</code></td><td>Logico</td><td>.F.</td><td>Verdadeiro apos chamada bem-sucedida de Init() (somente leitura).</td></tr>
+  <tr><td><code>lAutoShutdown</code></td><td>Logico</td><td>.T.</td><td>Chamar Shutdown() automaticamente ao destruir o componente.</td></tr>
+  <tr><td><code>nLastErrorCode</code></td><td>Numero</td><td>0</td><td>Ultimo codigo de erro do runtime estrangeiro (somente leitura).</td></tr>
+  <tr><td><code>cLastError</code></td><td>String</td><td>""</td><td>Descricao da ultima mensagem de erro (somente leitura).</td></tr>
+</table>
+
+<h3 id="metodos-abstractos">Metodos Abstratos</h3>
+
+<p>Cada classe filha deve implementar estes metodos internos, que sao chamados pela API publica:</p>
+
+<table>
+  <tr><th>Metodo</th><th>Descricao</th></tr>
+  <tr><td><code>LoadLibrary( cPath )</code></td><td>Carregar a biblioteca ou inicializar o runtime embutido.</td></tr>
+  <tr><td><code>UnloadLibrary()</code></td><td>Liberar a biblioteca e os recursos.</td></tr>
+  <tr><td><code>MarshalToForeign( xValue )</code></td><td>Converter valores Harbour para tipos da linguagem estrangeira.</td></tr>
+  <tr><td><code>MarshalToHarbour( foreignValue )</code></td><td>Converter tipos da linguagem estrangeira de volta para Harbour.</td></tr>
+</table>
+
 <h2 id="padrao-de-api-comun">Padrao de API Comun</h2>
 
-<p>Todos os componentes de conectividade seguem um padrao de API consistente:</p>
+<p>Estes metodos sao definidos em <strong>TInteropRuntime</strong> e herdados por todos os controles de conectividade:</p>
 
 <table>
   <tr><th>Metodo</th><th>Parametros</th><th>Descricao</th></tr>
@@ -244,7 +305,7 @@ oRust:<span class="fn">Shutdown</span>()</pre>
 
 <div class="mermaid">
 graph TB
-    A["Aplicacao Harbour\n(.prg → .hrb)"] --> B["Componente de\nConectividade"]
+    A["Aplicacao Harbour\n(.prg → .hrb)"] --> B["TInteropRuntime\nBase Class"]
     B --> C1["TPython\nlibpython"]
     B --> C2["TNode\nNode-API"]
     B --> C3["TLua\nliblua"]
@@ -254,8 +315,17 @@ graph TB
     B --> C7["TDotNet\nCoreCLR"]
     B --> C8["TSwift\n@_cdecl"]
     B --> C9["TRuby\nlibruby"]
+    C1 --> D1["Python\nInterpreter"]
+    C2 --> D2["Node.js\nRuntime"]
+    C3 --> D3["Lua\nVM"]
+    C4 --> D4["Go\n.so"]
+    C5 --> D5["Rust\ncdylib"]
+    C6 --> D6["Java\nJVM"]
+    C7 --> D7[".NET\nCLR"]
+    C8 --> D8["Swift\n@_cdecl"]
+    C9 --> D9["Ruby\nVM"]
     style A fill:#d2a8ff,stroke:#bc8cff,color:#0d1117
-    style B fill:#f0883e,stroke:#db6d28,color:#0d1117
+    style B fill:#58a6ff,stroke:#388bfd,color:#0d1117
 </div>
 
 <h2 id="consideracoes-de-desempenho">Consideracoes de Desempenho</h2>
@@ -285,13 +355,10 @@ graph TB
 <!-- Table of Contents Rail -->
 <div class="toc-rail">
   <h4>Nesta Página</h4>
-  <a href="#primeiros-passos" class="toc-h3 active">Primeiros Passos</a>
-  <a href="#paleta-de-componentes" class="toc-h3">Paleta de Componentes</a>
-  <a href="#recursos-do-ide" class="toc-h3">Recursos do IDE</a>
-  <a href="#tutoriais" class="toc-h3">Tutoriais</a>
-  <a href="#referencia" class="toc-h3">Referencia</a>
-  <a href="#plataformas" class="toc-h3">Plataformas</a>
   <a href="#linguagens-suportadas" class="toc-h2">Linguagens Suportadas</a>
+  <a href="#interop-runtime" class="toc-h2">Classe Base TInteropRuntime</a>
+  <a href="#propriedades-herdadas" class="toc-h3">Propriedades Herdadas</a>
+  <a href="#metodos-abstractos" class="toc-h3">Metodos Abstratos</a>
   <a href="#padrao-de-api-comun" class="toc-h2">Padrao de API Comun</a>
   <a href="#exemplo-de-integracao-python" class="toc-h2">Exemplo de Integracao Python</a>
   <a href="#exemplo-de-integracao-nodejs" class="toc-h2">Exemplo de Integracao Node.js</a>

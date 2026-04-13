@@ -83,8 +83,8 @@
 <h1>Controles de Conectividad <span class="badge new">NUEVO</span></h1>
 <p>HarbourBuilder proporciona <strong>9 controles de interoperabilidad de lenguajes</strong> que te permiten llamar codigo
 escrito en Python, Swift, Go, Node.js, Rust, Java, .NET, Lua y Ruby directamente desde tus
-aplicaciones Harbour. Sin IPC, sin envoltorios HTTP, sin colas de mensajes — solo llamadas a funciones
-directas a traves de fronteras de lenguaje.</p>
+aplicaciones Harbour. Los 9 controles heredan de la clase base <strong>TInteropRuntime</strong>,
+que proporciona una API unificada para llamadas entre lenguajes.</p>
 
 <div class="info-box tip">
   <strong>Llama Cualquier Lenguaje desde Harbour</strong>
@@ -108,9 +108,70 @@ directas a traves de fronteras de lenguaje.</p>
   <tr><td><strong>TRuby</strong></td><td>Ruby</td><td>API C de Ruby (libruby)</td><td>Web scraping, procesamiento de texto, DSLs.</td></tr>
 </table>
 
+<h2 id="interop-runtime">Clase Base TInteropRuntime</h2>
+
+<p>Los 9 controles de conectividad heredan de <strong>TInteropRuntime</strong>, una clase base abstracta
+que define la interfaz comun para la comunicacion entre lenguajes. Este diseno asegura que
+cambiar entre lenguajes solo requiere modificar el nombre de la clase del componente — la API
+permanece identica.</p>
+
+<div class="mermaid">
+classDiagram
+    class TInteropRuntime {
+        +string cLibPath
+        +string cRuntimePath
+        +logical lInitialized
+        +logical lAutoShutdown
+        +Init()
+        +Eval(cCode)
+        +Call(cFunction, ...args)
+        +SetVar(cName, xValue)
+        +GetVar(cName)
+        +Shutdown()
+        #LoadLibrary(cPath)*
+        #UnloadLibrary()*
+        #MarshalToForeign(xValue)*
+        #MarshalToHarbour(foreignValue)*
+    }
+    TInteropRuntime <|-- TPython
+    TInteropRuntime <|-- TNode
+    TInteropRuntime <|-- TLua
+    TInteropRuntime <|-- TGo
+    TInteropRuntime <|-- TRust
+    TInteropRuntime <|-- TJava
+    TInteropRuntime <|-- TDotNet
+    TInteropRuntime <|-- TSwift
+    TInteropRuntime <|-- TRuby
+    style TInteropRuntime fill:#58a6ff,stroke:#388bfd,color:#0d1117
+</div>
+
+<h3 id="propiedades-heredadas">Propiedades Heredadas</h3>
+
+<table>
+  <tr><th>Propiedad</th><th>Tipo</th><th>Valor por defecto</th><th>Descripcion</th></tr>
+  <tr><td><code>cLibPath</code></td><td>Cadena</td><td>""</td><td>Ruta a la biblioteca compartida extranjera (.so, .dll, .dylib).</td></tr>
+  <tr><td><code>cRuntimePath</code></td><td>Cadena</td><td>""</td><td>Ruta al ejecutable o VM del runtime (Python, Java, Node, etc.).</td></tr>
+  <tr><td><code>lInitialized</code></td><td>Logico</td><td>.F.</td><td>Verdadero despues de una llamada exitosa a Init() (solo lectura).</td></tr>
+  <tr><td><code>lAutoShutdown</code></td><td>Logico</td><td>.T.</td><td>Llamar automaticamente a Shutdown() al destruir el componente.</td></tr>
+  <tr><td><code>nLastErrorCode</code></td><td>Numero</td><td>0</td><td>Ultimo codigo de error del runtime extranjero (solo lectura).</td></tr>
+  <tr><td><code>cLastError</code></td><td>Cadena</td><td>""</td><td>Descripcion del ultimo mensaje de error (solo lectura).</td></tr>
+</table>
+
+<h3 id="metodos-abstractos">Metodos Abstractos</h3>
+
+<p>Cada clase hija debe implementar estos metodos internos, que son llamados por la API publica:</p>
+
+<table>
+  <tr><th>Metodo</th><th>Descripcion</th></tr>
+  <tr><td><code>LoadLibrary( cPath )</code></td><td>Cargar la biblioteca o inicializar el runtime embebido.</td></tr>
+  <tr><td><code>UnloadLibrary()</code></td><td>Liberar la biblioteca y los recursos.</td></tr>
+  <tr><td><code>MarshalToForeign( xValue )</code></td><td>Convertir valores Harbour a tipos del lenguaje extranjero.</td></tr>
+  <tr><td><code>MarshalToHarbour( foreignValue )</code></td><td>Convertir tipos del lenguaje extranjero de vuelta a Harbour.</td></tr>
+</table>
+
 <h2 id="patron-de-api-comun">Patron de API Comun</h2>
 
-<p>Todos los componentes de conectividad siguen un patron de API consistente:</p>
+<p>Estos metodos estan definidos en <strong>TInteropRuntime</strong> y son heredados por todos los controles de conectividad:</p>
 
 <table>
   <tr><th>Metodo</th><th>Parametros</th><th>Descripcion</th></tr>
@@ -228,6 +289,33 @@ oRust:<span class="fn">Init</span>()
 
 oRust:<span class="fn">Shutdown</span>()</pre>
 
+<h2 id="arquitectura">Arquitectura</h2>
+
+<div class="mermaid">
+graph TB
+    A["Aplicacion Harbour\n(.prg → .hrb)"] --> B["TInteropRuntime\nBase Class"]
+    B --> C1["TPython\nlibpython"]
+    B --> C2["TNode\nNode-API"]
+    B --> C3["TLua\nliblua"]
+    B --> C4["TGo\nc-shared .so"]
+    B --> C5["TRust\ncdylib FFI"]
+    B --> C6["TJava\nJNI"]
+    B --> C7["TDotNet\nCoreCLR"]
+    B --> C8["TSwift\n@_cdecl"]
+    B --> C9["TRuby\nlibruby"]
+    C1 --> D1["Python\nInterpreter"]
+    C2 --> D2["Node.js\nRuntime"]
+    C3 --> D3["Lua\nVM"]
+    C4 --> D4["Go\n.so"]
+    C5 --> D5["Rust\ncdylib"]
+    C6 --> D6["Java\nJVM"]
+    C7 --> D7[".NET\nCLR"]
+    C8 --> D8["Swift\n@_cdecl"]
+    C9 --> D9["Ruby\nVM"]
+    style A fill:#d2a8ff,stroke:#bc8cff,color:#0d1117
+    style B fill:#58a6ff,stroke:#388bfd,color:#0d1117
+</div>
+
 <h2 id="consideraciones-de-rendimiento">Consideraciones de Rendimiento</h2>
 
 <table>
@@ -254,19 +342,17 @@ oRust:<span class="fn">Shutdown</span>()</pre>
 <!-- Table of Contents Rail -->
 <div class="toc-rail">
   <h4>En Esta Página</h4>
-  <a href="#primeros-pasos" class="toc-h3 active">Primeros pasos</a>
-  <a href="#paleta-de-componentes" class="toc-h3">Paleta de componentes</a>
-  <a href="#funciones-del-ide" class="toc-h3">Funciones del IDE</a>
-  <a href="#tutoriales" class="toc-h3">Tutoriales</a>
-  <a href="#referencia" class="toc-h3">Referencia</a>
-  <a href="#plataformas" class="toc-h3">Plataformas</a>
   <a href="#lenguajes-soportados" class="toc-h2">Lenguajes Soportados</a>
+  <a href="#interop-runtime" class="toc-h2">Clase Base TInteropRuntime</a>
+  <a href="#propiedades-heredadas" class="toc-h3">Propiedades Heredadas</a>
+  <a href="#metodos-abstractos" class="toc-h3">Metodos Abstractos</a>
   <a href="#patron-de-api-comun" class="toc-h2">Patron de API Comun</a>
   <a href="#ejemplo-de-integracion-con-python" class="toc-h2">Ejemplo de Integracion con Python</a>
   <a href="#ejemplo-de-integracion-con-nodejs" class="toc-h2">Ejemplo de Integracion con Node.js</a>
   <a href="#ejemplo-de-integracion-con-lua" class="toc-h2">Ejemplo de Integracion con Lua</a>
   <a href="#ejemplo-de-integracion-con-go" class="toc-h2">Ejemplo de Integracion con Go</a>
   <a href="#ejemplo-de-integracion-con-rust" class="toc-h2">Ejemplo de Integracion con Rust</a>
+  <a href="#arquitectura" class="toc-h2">Arquitectura</a>
   <a href="#consideraciones-de-rendimiento" class="toc-h2">Consideraciones de Rendimiento</a>
 </div>
 

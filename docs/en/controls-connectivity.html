@@ -93,8 +93,8 @@
 <h1>Connectivity Controls <span class="badge new">NEW</span></h1>
 <p>HarbourBuilder provides <strong>9 language interop controls</strong> that let you call code
 written in Python, Swift, Go, Node.js, Rust, Java, .NET, Lua, and Ruby directly from your
-Harbour applications. No IPC, no HTTP wrappers, no message queues &mdash; just direct function
-calls across language boundaries.</p>
+Harbour applications. All connectivity components inherit from <strong>TInteropRuntime</strong>,
+which provides a unified API for cross-language function calls.</p>
 
 <div class="info-box tip">
   <strong>Call Any Language from Harbour</strong>
@@ -118,9 +118,70 @@ calls across language boundaries.</p>
   <tr><td><strong>TRuby</strong></td><td>Ruby</td><td>Ruby C API (libruby)</td><td>Web scraping, text processing, DSLs.</td></tr>
 </table>
 
+<h2 id="interop-runtime">TInteropRuntime Base Class</h2>
+
+<p>All 9 connectivity components inherit from <strong>TInteropRuntime</strong>, an abstract base
+class that defines the common interface for cross-language communication. This design ensures
+that switching between languages requires changing only the component class name &mdash; the
+API remains identical.</p>
+
+<div class="mermaid">
+classDiagram
+    class TInteropRuntime {
+        +string cLibPath
+        +string cRuntimePath
+        +logical lInitialized
+        +logical lAutoShutdown
+        +Init()
+        +Eval(cCode)
+        +Call(cFunction, ...args)
+        +SetVar(cName, xValue)
+        +GetVar(cName)
+        +Shutdown()
+        #LoadLibrary(cPath)*
+        #UnloadLibrary()*
+        #MarshalToForeign(xValue)*
+        #MarshalToHarbour(foreignValue)*
+    }
+    TInteropRuntime <|-- TPython
+    TInteropRuntime <|-- TNode
+    TInteropRuntime <|-- TLua
+    TInteropRuntime <|-- TGo
+    TInteropRuntime <|-- TRust
+    TInteropRuntime <|-- TJava
+    TInteropRuntime <|-- TDotNet
+    TInteropRuntime <|-- TSwift
+    TInteropRuntime <|-- TRuby
+    style TInteropRuntime fill:#58a6ff,stroke:#388bfd,color:#0d1117
+</div>
+
+<h3 id="inherited-properties">Inherited Properties</h3>
+
+<table>
+  <tr><th>Property</th><th>Type</th><th>Default</th><th>Description</th></tr>
+  <tr><td><code>cLibPath</code></td><td>String</td><td>""</td><td>Path to the foreign shared library (.so, .dll, .dylib).</td></tr>
+  <tr><td><code>cRuntimePath</code></td><td>String</td><td>""</td><td>Path to the runtime executable or VM (Python, Java, Node, etc.).</td></tr>
+  <tr><td><code>lInitialized</code></td><td>Logical</td><td>.F.</td><td>True after successful Init() call (read-only).</td></tr>
+  <tr><td><code>lAutoShutdown</code></td><td>Logical</td><td>.T.</td><td>Automatically call Shutdown() on component destroy.</td></tr>
+  <tr><td><code>nLastErrorCode</code></td><td>Numeric</td><td>0</td><td>Last error code from the foreign runtime (read-only).</td></tr>
+  <tr><td><code>cLastError</code></td><td>String</td><td>""</td><td>Last error message description (read-only).</td></tr>
+</table>
+
+<h3 id="abstract-methods">Abstract Methods (implemented by each child)</h3>
+
+<p>Each child class must implement these internal methods, which are called by the public API:</p>
+
+<table>
+  <tr><th>Method</th><th>Description</th></tr>
+  <tr><td><code>LoadLibrary( cPath )</code></td><td>Load the foreign library or initialize the embedded runtime.</td></tr>
+  <tr><td><code>UnloadLibrary()</code></td><td>Release the library and free resources.</td></tr>
+  <tr><td><code>MarshalToForeign( xValue )</code></td><td>Convert Harbour values to foreign language types.</td></tr>
+  <tr><td><code>MarshalToHarbour( foreignValue )</code></td><td>Convert foreign language types back to Harbour.</td></tr>
+</table>
+
 <h2 id="common-api-pattern">Common API Pattern</h2>
 
-<p>All connectivity components follow a consistent API pattern:</p>
+<p>These methods are defined on <strong>TInteropRuntime</strong> and inherited by all connectivity controls:</p>
 
 <table>
   <tr><th>Method</th><th>Parameters</th><th>Description</th></tr>
@@ -244,7 +305,7 @@ oRust:<span class="fn">Shutdown</span>()</pre>
 
 <div class="mermaid">
 graph TB
-    A["Harbour Application\n(.prg → .hrb)"] --> B["Connectivity\nComponent"]
+    A["Harbour Application\n(.prg → .hrb)"] --> B["TInteropRuntime\nBase Class"]
     B --> C1["TPython\nlibpython"]
     B --> C2["TNode\nNode-API"]
     B --> C3["TLua\nliblua"]
@@ -254,8 +315,17 @@ graph TB
     B --> C7["TDotNet\nCoreCLR"]
     B --> C8["TSwift\n@_cdecl"]
     B --> C9["TRuby\nlibruby"]
+    C1 --> D1["Python\nInterpreter"]
+    C2 --> D2["Node.js\nRuntime"]
+    C3 --> D3["Lua\nVM"]
+    C4 --> D4["Go\n.so"]
+    C5 --> D5["Rust\ncdylib"]
+    C6 --> D6["Java\nJVM"]
+    C7 --> D7[".NET\nCLR"]
+    C8 --> D8["Swift\n@_cdecl"]
+    C9 --> D9["Ruby\nVM"]
     style A fill:#d2a8ff,stroke:#bc8cff,color:#0d1117
-    style B fill:#f0883e,stroke:#db6d28,color:#0d1117
+    style B fill:#58a6ff,stroke:#388bfd,color:#0d1117
 </div>
 
 <h2 id="performance-considerations">Performance Considerations</h2>
@@ -285,13 +355,10 @@ graph TB
 <!-- Table of Contents Rail -->
 <div class="toc-rail">
   <h4>On This Page</h4>
-  <a href="#getting-started" class="toc-h3 active">Getting Started</a>
-  <a href="#component-palette" class="toc-h3">Component Palette</a>
-  <a href="#ide-features" class="toc-h3">IDE Features</a>
-  <a href="#tutorials" class="toc-h3">Tutorials</a>
-  <a href="#reference" class="toc-h3">Reference</a>
-  <a href="#platforms" class="toc-h3">Platforms</a>
   <a href="#supported-languages" class="toc-h2">Supported Languages</a>
+  <a href="#interop-runtime" class="toc-h2">TInteropRuntime Base Class</a>
+  <a href="#inherited-properties" class="toc-h3">Inherited Properties</a>
+  <a href="#abstract-methods" class="toc-h3">Abstract Methods</a>
   <a href="#common-api-pattern" class="toc-h2">Common API Pattern</a>
   <a href="#python-integration-example" class="toc-h2">Python Integration Example</a>
   <a href="#nodejs-integration-example" class="toc-h2">Node.js Integration Example</a>
