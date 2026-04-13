@@ -1,3 +1,20 @@
+# Secrets, signing keys, credentials — NEVER commit
+*.keystore
+*.jks
+*.pem
+*.p12
+*.pfx
+*.key
+*.crt
+*.cer
+*.env
+.env.*
+!.env.example
+secrets/
+credentials/
+*.apikey
+google-services.json
+
 # Compiled / build artifacts
 *.obj
 *.exe
