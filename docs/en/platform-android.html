@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Android Platform Guide - HarbourBuilder Documentation</title>
+  <link rel="stylesheet" href="../assets/css/docs.css">
+  <style>
+    .badge.android { background: #34c759; color: #0d1117; }
+    .badge.ios     { background: #e5e5ea; color: #0d1117; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <a class="logo" href="index.html"><span>HB</span> HarbourBuilder Docs</a>
+  <nav>
+    <input class="search-box" type="text" placeholder="Search docs..." oninput="doSearch(this.value)">
+    <button class="lang-btn active">EN</button>
+    <a class="lang-btn" href="../es/platform-android.html">ES</a>
+    <a class="lang-btn" href="../pt/platform-android.html">PT</a>
+    <button class="theme-toggle" onclick="toggleTheme()">&#9788;</button>
+  </nav>
+</div>
+
+<div class="sidebar">
+  <div class="nav-section">
+    <h3 id="getting-started">Getting Started</h3>
+    <a href="index.html">Overview</a>
+    <a href="quickstart.html">Quick Start</a>
+    <a href="installation.html">Installation</a>
+    <a href="architecture.html">Architecture</a>
+  </div>
+  <div class="nav-section">
+    <h3 id="ide-features">IDE Features</h3>
+    <a href="form-designer.html">Form Designer</a>
+    <a href="object-inspector.html">Object Inspector</a>
+    <a href="code-editor.html">Code Editor</a>
+    <a href="two-way-tools.html">Two-Way Tools</a>
+    <a href="debugger.html">Debugger</a>
+    <a href="ai-assistant.html">AI Assistant</a>
+    <a href="build-run.html">Build &amp; Run</a>
+  </div>
+  <div class="nav-section">
+    <h3 id="platforms">Platforms</h3>
+    <a href="platform-windows.html">Windows</a>
+    <a href="platform-macos.html">macOS</a>
+    <a href="platform-linux.html">Linux</a>
+    <a href="platform-android.html" class="active">Android <span class="badge new">New</span></a>
+    <a href="platform-ios.html">iOS <span class="badge planned">Soon</span></a>
+  </div>
+</div>
+
+<div class="content">
+
+<div class="breadcrumbs">
+  <a href="index.html">Docs</a> <span>/</span>
+  <a href="index.html">Platforms</a> <span>/</span> Android
+</div>
+
+<h1><span class="badge android">Android</span> Platform Guide</h1>
+<p>The Android backend ships an end-to-end pipeline that turns an IDE project into a signed APK running on
+a real Android emulator or device, with <strong>native</strong> <code>android.widget.*</code> controls. The same
+Harbour source that drives the Windows, macOS and Linux desktops now targets Android too — no WebView,
+no skinned UI, no runtime dependency.</p>
+
+<div class="info-box info">
+  <strong>Backend Statistics</strong>
+  <table>
+    <tr><th>Status</th><th><span class="badge new">Iteration 1</span> — available now</th></tr>
+    <tr><th>Language</th><th>C (JNI) + Java</th></tr>
+    <tr><th>Native API</th><th>android.widget.* via JNI</th></tr>
+    <tr><th>Min SDK</th><th>API 24 (Android 7.0 Nougat)</th></tr>
+    <tr><th>Target SDK</th><th>API 34 (Android 14)</th></tr>
+    <tr><th>ABI</th><th>arm64-v8a (64-bit ARM)</th></tr>
+    <tr><th>Toolchain</th><th>NDK r26d · SDK 34 · JDK 17</th></tr>
+    <tr><th>Validated on</th><th>Pixel 5 emulator / Android 14</th></tr>
+  </table>
+</div>
+
+<div class="info-box warning">
+  <strong>⚠️ In development.</strong> Iteration 1 wires <code>UI_FormNew</code>, <code>UI_LabelNew</code>,
+  <code>UI_ButtonNew</code>, <code>UI_EditNew</code>, <code>UI_SetText</code>, <code>UI_GetText</code> and
+  <code>UI_OnClick</code>. More controls (ComboBox, ListView, CheckBox, RadioButton, DatePicker…) land in
+  subsequent iterations. See <a href="#roadmap">Roadmap</a> below.
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<h2 id="architecture-overview">Architecture Overview</h2>
+
+<p>Android is HarbourBuilder's 4th native GUI backend. The same <code>classes.prg</code> that every other
+platform uses dispatches to <code>android_core.c</code> instead of the Win32 / Cocoa / GTK3 bridge, and the
+JNI calls turn into real Android widgets added to a <code>FrameLayout</code> inside <code>MainActivity</code>.</p>
+
+<div class="mermaid">
+graph TB
+    A["Harbour .prg<br/>DEFINE FORM ... BUTTON ..."] --> B["classes.prg<br/>UI_FormNew, UI_ButtonNew, ..."]
+    B --> C["android_core.c<br/>HB_FUNC + JNI bridge"]
+    C -->|JNI CallVoidMethod| D["MainActivity.java<br/>FrameLayout host"]
+    D --> E["android.widget.TextView"]
+    D --> F["android.widget.Button"]
+    D --> G["android.widget.EditText"]
+    F -->|onClick| H["nativeOnClick(id)"]
+    H -->|hb_evalBlock0| B
+    style A fill:#8b5cf6,stroke:#7c3aed,color:#fff
+    style B fill:#f59e0b,stroke:#d97706,color:#0d1117
+    style C fill:#34c759,stroke:#28a745,color:#0d1117
+    style D fill:#34c759,stroke:#28a745,color:#0d1117
+    style E fill:#3ddc84,stroke:#1a8d4d,color:#0d1117
+    style F fill:#3ddc84,stroke:#1a8d4d,color:#0d1117
+    style G fill:#3ddc84,stroke:#1a8d4d,color:#0d1117
+    style H fill:#34c759,stroke:#28a745,color:#0d1117
+</div>
+
+<p>Every HarbourBuilder backend implements the same family of <code>UI_*</code> HB_FUNCs; the Android one lives
+in <code>source/backends/android/android_core.c</code> and mirrors, HB_FUNC-for-HB_FUNC, the Win32 bridge
+(<code>source/cpp/hbbridge.cpp</code>) and the Cocoa bridge (<code>source/backends/cocoa/cocoa_core.m</code>).</p>
+
+<!-- ──────────────────────────────────────────── -->
+<h2 id="build-pipeline">Build Pipeline</h2>
+<p>The <strong>Run → Run on Android…</strong> menu item drives an 8-stage pipeline that produces a signed
+APK ready to install. The same pipeline is available as a standalone script at
+<code>source/backends/android/build-apk-gui.sh</code>.</p>
+
+<div class="mermaid">
+graph LR
+    A[".prg source"] --> B["1. harbour.exe<br/>prg → .c"]
+    B --> C["2. clang<br/>C → .o"]
+    C --> D["3. clang --shared<br/>libapp.so"]
+    D --> E["4. aapt2 compile<br/>resources"]
+    E --> F["5. aapt2 link<br/>base.apk"]
+    F --> G["6. javac<br/>MainActivity.class"]
+    G --> H["7. d8<br/>classes.dex"]
+    H --> I["8. zipalign + apksigner<br/>signed APK"]
+    style I fill:#34c759,stroke:#28a745,color:#0d1117
+</div>
+
+<ol>
+  <li><strong>harbour.exe</strong> — host Harbour compiler transpiles <code>.prg</code> to portable C.</li>
+  <li><strong>clang (NDK)</strong> — cross-compiles C to <code>aarch64-linux-android24</code> object files.</li>
+  <li><strong>clang --shared</strong> — links <code>libapp.so</code> with the full <code>harbour/core</code> static
+  library set (hbvm, hbrtl, hblang, hbcpage, hbrdd, hbmacro, hbpp, hbcommon, hbpcre, hbzlib, hbnulrdd,
+  hbdebug, hbcplr, rddntx/cdx/fpt/nsx, gtstd/trm/cgi/pca, hbsix, hbhsx).</li>
+  <li><strong>aapt2 compile</strong> — compiles Android resources (<code>res/</code>).</li>
+  <li><strong>aapt2 link</strong> — links resources + manifest into <code>base.apk</code>; emits <code>R.java</code>.</li>
+  <li><strong>javac</strong> — compiles <code>MainActivity.java</code> against the Android SDK.</li>
+  <li><strong>d8</strong> — dex-compiles <code>.class</code> files to <code>classes.dex</code>.</li>
+  <li><strong>zipalign + apksigner</strong> — aligns and v2-signs the APK with a debug keystore.</li>
+</ol>
+
+<!-- ──────────────────────────────────────────── -->
+<h2 id="ui-api">UI_* API on Android</h2>
+<p>The Harbour-callable surface exposed by the Android backend. All coordinates are in <strong>form-designer
+pixels</strong>, identical to Win32/Cocoa/GTK3 — see <a href="#density">density handling</a>.</p>
+
+<table>
+  <tr><th>HB_FUNC</th><th>Signature</th><th>Maps to</th></tr>
+  <tr><td><code>UI_FormNew</code></td><td><code>(cTitle, nW, nH) → hForm</code></td><td><code>MainActivity.setTitle()</code> — the Activity <em>is</em> the form</td></tr>
+  <tr><td><code>UI_LabelNew</code></td><td><code>(hForm, cText, x, y, w, h) → hCtrl</code></td><td><code>android.widget.TextView</code></td></tr>
+  <tr><td><code>UI_ButtonNew</code></td><td><code>(hForm, cText, x, y, w, h) → hCtrl</code></td><td><code>android.widget.Button</code></td></tr>
+  <tr><td><code>UI_EditNew</code></td><td><code>(hForm, cText, x, y, w, h) → hCtrl</code></td><td><code>android.widget.EditText</code></td></tr>
+  <tr><td><code>UI_SetText</code></td><td><code>(hCtrl, cText)</code></td><td><code>TextView.setText()</code></td></tr>
+  <tr><td><code>UI_GetText</code></td><td><code>(hCtrl) → cText</code></td><td><code>TextView.getText()</code></td></tr>
+  <tr><td><code>UI_OnClick</code></td><td><code>(hCtrl, bBlock)</code></td><td>stores the codeblock for dispatch from <code>nativeOnClick</code></td></tr>
+  <tr><td><code>UI_FormRun</code></td><td><code>(hForm)</code></td><td>no-op (Android Activity owns the event loop)</td></tr>
+</table>
+
+<!-- ──────────────────────────────────────────── -->
+<h2 id="jni-bridge">JNI Bridge</h2>
+<p>Each <code>UI_*</code> HB_FUNC obtains the JNIEnv of the calling thread and invokes a cached method id on the
+MainActivity global reference. The Java side runs the actual widget creation on the UI thread with
+<code>runOnUiThread</code>. Clicks travel the opposite direction:
+<code>Button.setOnClickListener → nativeOnClick(controlId) → hb_evalBlock0</code>.</p>
+
+<pre><span class="cm">// android_core.c — UI_ButtonNew dispatch</span>
+<span class="kw">HB_FUNC</span>( UI_BUTTONNEW )
+{
+    <span class="kw">int</span> id = <span class="fn">create_widget</span>( m_createButton,
+                             <span class="fn">HB_ISCHAR</span>(2) ? <span class="fn">hb_parc</span>(2) : <span class="st">""</span>,
+                             <span class="fn">hb_parni</span>(3), <span class="fn">hb_parni</span>(4),
+                             <span class="fn">hb_parni</span>(5), <span class="fn">hb_parni</span>(6) );
+    <span class="fn">hb_retni</span>( id );
+}
+
+<span class="cm">// Java called back from native:</span>
+<span class="kw">public void</span> <span class="fn">createButton</span>( <span class="kw">final int</span> id, <span class="kw">final</span> String text,
+                          <span class="kw">final int</span> x, <span class="kw">final int</span> y, <span class="kw">final int</span> w, <span class="kw">final int</span> h ) {
+    <span class="fn">runOnUiThread</span>( <span class="kw">new</span> Runnable() { <span class="kw">public void</span> <span class="fn">run</span>() {
+        Button b = <span class="kw">new</span> Button( MainActivity.<span class="kw">this</span> );
+        b.<span class="fn">setText</span>( text );
+        b.<span class="fn">setOnClickListener</span>( v -&gt; <span class="fn">nativeOnClick</span>( id ) );
+        root.<span class="fn">addView</span>( b, <span class="fn">lp</span>( x, y, w, h ) );
+        ctrls.<span class="fn">put</span>( id, b );
+    }});
+}</pre>
+
+<p>Control handles are small integers (<code>1..255</code>) returned by each <code>UI_*New</code>. The Java side keys a
+<code>HashMap&lt;Integer, View&gt;</code>; the C side keeps a parallel
+<code>PHB_ITEM g_click_handlers[256]</code> holding the Harbour codeblocks attached via <code>UI_OnClick</code>.</p>
+
+<!-- ──────────────────────────────────────────── -->
+<h2 id="density">Density-aware Coordinates</h2>
+<p>Form-designer coordinates are 1:1 with Windows desktop pixels. On Android the same pixel values scale
+with <code>DisplayMetrics.density</code> so a 100-px button looks consistent on mdpi (×1.0), hdpi (×1.5),
+xhdpi (×2.0), xxhdpi (×3.0) and xxxhdpi (×4.0) screens.</p>
+
+<pre><span class="cm">// MainActivity.java — density multiplier</span>
+<span class="kw">private</span> <span class="kw">int</span> <span class="fn">dp</span>( <span class="kw">int</span> formPx ) { <span class="kw">return</span> Math.<span class="fn">round</span>( formPx * density ); }
+
+<span class="kw">private</span> FrameLayout.LayoutParams <span class="fn">lp</span>( <span class="kw">int</span> x, <span class="kw">int</span> y, <span class="kw">int</span> w, <span class="kw">int</span> h ) {
+    FrameLayout.LayoutParams p = <span class="kw">new</span> FrameLayout.LayoutParams( <span class="fn">dp</span>(w), <span class="fn">dp</span>(h) );
+    p.leftMargin = <span class="fn">dp</span>(x);
+    p.topMargin  = <span class="fn">dp</span>(y);
+    <span class="kw">return</span> p;
+}</pre>
+
+<!-- ──────────────────────────────────────────── -->
+<h2 id="event-loop">Event Loop (inverted)</h2>
+<p>On Win32, Cocoa and GTK the Harbour <code>oForm:Run()</code> call blocks on a message pump. On Android the
+<strong>OS owns the event loop</strong>: <code>UI_FormRun()</code> is a no-op. The Activity's
+<code>onCreate()</code> calls <code>nativeInit()</code>, which starts the Harbour VM and invokes <code>Main()</code> —
+<code>Main()</code> creates the widgets via <code>UI_*New</code> and returns. From then on the Activity lifecycle
+drives everything; user interactions fire <code>nativeOnClick</code>, which dispatches the stored codeblock.</p>
+
+<!-- ──────────────────────────────────────────── -->
+<h2 id="running">Running from the IDE</h2>
+<p>On Windows the IDE adds a <strong>Run → Run on Android…</strong> menu item. Clicking it:</p>
+<ol>
+  <li>Saves the active project (<code>SaveActiveFormCode</code>).</li>
+  <li>Writes <code>Project1.prg</code> content to the Android build source directory.</li>
+  <li>Opens a progress dialog and invokes <code>build-apk.sh</code> via Git Bash.</li>
+  <li>On failure: shows the full <code>build-apk.log</code> in a build-error dialog.</li>
+  <li>On success: launches <code>run-on-emulator.sh</code> in the background — boots the AVD if needed,
+  installs the APK, launches the activity, tails <code>logcat</code> to a log file.</li>
+</ol>
+
+<pre><span class="cm">// hbbuilder_win.prg — menu wiring</span>
+<span class="kw">DEFINE POPUP</span> oRun <span class="kw">PROMPT</span> <span class="st">"&amp;Run"</span> <span class="kw">OF</span> oIDE
+   <span class="kw">MENUITEM</span> <span class="st">"&amp;Run"</span>              <span class="kw">OF</span> oRun <span class="kw">ACTION</span> <span class="fn">TBRun</span>()
+   <span class="kw">MENUITEM</span> <span class="st">"&amp;Debug"</span>            <span class="kw">OF</span> oRun <span class="kw">ACTION</span> <span class="fn">TBDebugRun</span>()
+   <span class="kw">MENUSEPARATOR</span> <span class="kw">OF</span> oRun
+   <span class="kw">MENUITEM</span> <span class="st">"Run on &amp;Android..."</span> <span class="kw">OF</span> oRun <span class="kw">ACTION</span> <span class="fn">TBRunAndroid</span>()</pre>
+
+<!-- ──────────────────────────────────────────── -->
+<h2 id="toolchain">Toolchain Requirements</h2>
+<p>The Android target depends on four external toolchains. Today they must be installed manually; an
+auto-install wizard is on the roadmap (see below).</p>
+
+<table>
+  <tr><th>Component</th><th>Version</th><th>Default path (Windows)</th></tr>
+  <tr><td>Android NDK</td><td>r26d</td><td><code>C:\Android\android-ndk-r26d\</code></td></tr>
+  <tr><td>Android SDK</td><td>platform 34 · build-tools 34.0.0</td><td><code>C:\Android\Sdk\</code></td></tr>
+  <tr><td>JDK</td><td>17 (Temurin, portable)</td><td><code>C:\JDK17\jdk-17.0.13+11\</code></td></tr>
+  <tr><td>Host Harbour</td><td>3.2.0dev</td><td><code>C:\harbour\bin\win\bcc\harbour.exe</code></td></tr>
+  <tr><td>Git Bash</td><td>any recent</td><td><code>C:\Program Files\Git\bin\bash.exe</code></td></tr>
+  <tr><td>AVD</td><td>Pixel 5 · android-34 · google_apis · x86_64</td><td>named <code>HarbourBuilderAVD</code></td></tr>
+</table>
+
+<p>Total disk footprint of the toolchain is ≈4 GB. Installs are self-contained — no registry entries, no
+PATH changes: the build scripts export <code>PATH</code> internally.</p>
+
+<!-- ──────────────────────────────────────────── -->
+<h2 id="example">Hello Android — full example</h2>
+<p>The source <code>source/backends/android/hello_gui.prg</code> uses the Android-backed
+<code>UI_*</code> API directly:</p>
+
+<pre><span class="kw">PROCEDURE</span> <span class="fn">Main</span>()
+
+   <span class="kw">LOCAL</span> hForm, hLabel, hEdit, hBtn
+
+   hForm  := <span class="fn">UI_FormNew</span>( <span class="st">"Hello Android"</span>, <span class="nb">400</span>, <span class="nb">600</span> )
+   hLabel := <span class="fn">UI_LabelNew</span>(  hForm, <span class="st">"Type your name:"</span>, <span class="nb">20</span>, <span class="nb">20</span>,  <span class="nb">300</span>, <span class="nb">30</span> )
+   hEdit  := <span class="fn">UI_EditNew</span>(   hForm, <span class="st">""</span>,                <span class="nb">20</span>, <span class="nb">60</span>,  <span class="nb">300</span>, <span class="nb">50</span> )
+   hBtn   := <span class="fn">UI_ButtonNew</span>( hForm, <span class="st">"Greet"</span>,           <span class="nb">20</span>, <span class="nb">130</span>, <span class="nb">300</span>, <span class="nb">50</span> )
+
+   <span class="fn">UI_OnClick</span>( hBtn, ;
+      {|| <span class="fn">UI_SetText</span>( hLabel, <span class="st">"Hello, "</span> + <span class="fn">UI_GetText</span>( hEdit ) + <span class="st">" !"</span> ) } )
+
+   <span class="fn">UI_FormRun</span>( hForm )   <span class="cm">// no-op on Android; Activity owns the loop</span>
+
+<span class="kw">RETURN</span></pre>
+
+<p>Build and deploy:</p>
+
+<pre><span class="cm"># build the APK</span>
+bash source/backends/android/build-apk-gui.sh
+
+<span class="cm"># install + launch on the emulator</span>
+adb install -r C:/HarbourAndroid/apk-gui/harbour-gui.apk
+adb shell am start -n com.harbour.builder/.MainActivity</pre>
+
+<!-- ──────────────────────────────────────────── -->
+<h2 id="limitations">Known Limitations</h2>
+
+<div class="info-box warning">
+<ul>
+  <li><strong>arm64-v8a only</strong> — x86_64 / armv7 builds not enabled yet. All modern devices and the
+  reference AVD are arm64.</li>
+  <li><strong>Dynamic <code>libharbour.so</code></strong> does not build on Windows: the link command exceeds
+  the Windows 8 KB command-line limit (Error 87). Per-app static linking is used instead (works on every
+  host). Non-blocking.</li>
+  <li><strong>Default GT is <code>gtstd</code></strong> — legacy <code>? "text"</code> prints to logcat, not to the
+  UI. For visible output use <code>UI_SetText()</code> on a label.</li>
+  <li><strong>IDE form-designer integration</strong> — the current menu item sends the raw Project1.prg as-is.
+  A dedicated Android code generator that emits <code>UI_*</code>-based code from the visual form is the
+  iteration 1b deliverable.</li>
+  <li><strong>TPageControl / tabs</strong> — Android backend stubs <code>UI_TabControlNew</code>,
+  <code>UI_SetCtrlOwner</code>, <code>UI_GetCtrlPage</code> as no-ops. Full page support lands with the
+  ViewPager2 binding.</li>
+</ul>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<h2 id="roadmap">Roadmap</h2>
+<table>
+  <tr><th>Iteration</th><th>Deliverables</th></tr>
+  <tr><td><strong>1 ✅</strong></td><td>APK pipeline, JNI bridge, Form/Label/Button/Edit, density scaling, click dispatch, validated on emulator</td></tr>
+  <tr><td><strong>1b</strong></td><td>IDE form-designer → Android code generator (visual controls emit <code>UI_*</code> calls)</td></tr>
+  <tr><td><strong>2</strong></td><td>CheckBox, RadioButton, ComboBox (Spinner), ListView, DatePicker, TimePicker, ProgressBar, Slider (SeekBar)</td></tr>
+  <tr><td><strong>3</strong></td><td>Menu (ActionBar), Dialog (AlertDialog), Toast, MessageBox parity</td></tr>
+  <tr><td><strong>4</strong></td><td>Image / Bitmap rendering, resource packaging, per-density icon sets</td></tr>
+  <tr><td><strong>5</strong></td><td>Embedded <code>adb logcat</code> panel in the IDE + live build stream + device picker (AVD / USB / Wi-Fi ADB)</td></tr>
+  <tr><td><strong>6</strong></td><td>Android toolchain auto-installer wizard — detects missing NDK/SDK/JDK and provisions them with zero PATH changes on Windows, macOS and Linux</td></tr>
+  <tr><td><strong>7</strong></td><td>Release keystore manager + AAB export + Play Console upload helper</td></tr>
+  <tr><td><strong>8</strong></td><td>Mobile-specific controls: TSwitch, TSegmentedControl, TFloatingActionButton, TSwipeView, TQRScanner, TCamera, TMapView</td></tr>
+</table>
+
+<!-- ──────────────────────────────────────────── -->
+<h2 id="files">Source Files</h2>
+<table>
+  <tr><th>File</th><th>Purpose</th></tr>
+  <tr><td><code>source/backends/android/android_core.c</code></td><td>JNI bridge and <code>UI_*</code> HB_FUNCs</td></tr>
+  <tr><td><code>source/backends/android/java/com/harbour/builder/MainActivity.java</code></td><td>programmatic FrameLayout host, click dispatch</td></tr>
+  <tr><td><code>source/backends/android/AndroidManifest.xml</code></td><td>package metadata, min/target SDK</td></tr>
+  <tr><td><code>source/backends/android/res/values/strings.xml</code></td><td>minimal resource bundle</td></tr>
+  <tr><td><code>source/backends/android/build-apk-gui.sh</code></td><td>8-stage build + sign pipeline</td></tr>
+  <tr><td><code>source/backends/android/hello_gui.prg</code></td><td>demo PRG proving the pipeline end-to-end</td></tr>
+</table>
+
+<!-- Table of Contents Rail -->
+<div class="toc-rail">
+  <h4>On This Page</h4>
+  <a href="#architecture-overview" class="toc-h2">Architecture Overview</a>
+  <a href="#build-pipeline" class="toc-h2">Build Pipeline</a>
+  <a href="#ui-api" class="toc-h2">UI_* API on Android</a>
+  <a href="#jni-bridge" class="toc-h2">JNI Bridge</a>
+  <a href="#density" class="toc-h2">Density-aware Coordinates</a>
+  <a href="#event-loop" class="toc-h2">Event Loop (inverted)</a>
+  <a href="#running" class="toc-h2">Running from the IDE</a>
+  <a href="#toolchain" class="toc-h2">Toolchain Requirements</a>
+  <a href="#example" class="toc-h2">Hello Android — example</a>
+  <a href="#limitations" class="toc-h2">Known Limitations</a>
+  <a href="#roadmap" class="toc-h2">Roadmap</a>
+  <a href="#files" class="toc-h2">Source Files</a>
+</div>
+
+<script src="../assets/js/docs.js"></script>
+</body>
+</html>
