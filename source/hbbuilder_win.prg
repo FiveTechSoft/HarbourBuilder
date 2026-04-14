@@ -2716,22 +2716,20 @@ static function TBRunAndroid()
       return nil
    endif
 
-   W32_ProgressStep( "Checking / booting emulator..." )
-   if ! AndroidEnsureDevice( cAdb )
-      W32_ProgressClose()
-      MsgInfo( "Emulator did not boot within 120 seconds." + Chr(10) + ;
-               "APK is ready at:" + Chr(10) + cApkPath, "Android target" )
-      return nil
-   endif
-
-   W32_ProgressStep( "Installing on device..." )
-   W32_ShellExec( '"' + cAdb + '" install -r "' + cApkPath + '"' )
-
-   W32_ProgressStep( "Launching app..." )
-   W32_ShellExec( '"' + cAdb + '" shell am start -n com.harbour.builder/.MainActivity' )
    W32_ProgressClose()
 
-   MsgInfo( "APK installed and launched on the emulator:" + Chr(10) + cApkPath, ;
+   // Fire install-and-run.sh in its own visible terminal window and return
+   // control to the IDE immediately. The script boots the AVD if needed,
+   // waits for sys.boot_completed, installs the APK, launches the activity
+   // and then tails logcat so the user sees live output.
+   cCmd := 'start "HarbourBuilder - Android install & run" "' + cBash + '" -lc ' + ;
+           '"bash /c/HarbourBuilder/source/backends/android/install-and-run.sh; exec bash"'
+   W32_ShellExec( cCmd )
+
+   MsgInfo( "APK built:" + Chr(10) + cApkPath + Chr(10) + Chr(10) + ;
+            "Install + launch running in a separate terminal window." + Chr(10) + ;
+            "The emulator will be started if it isn't already." + Chr(10) + ;
+            "Logcat (filtered to HbAndroid + errors) streams live there.", ;
             "Android target" )
 
 return nil
