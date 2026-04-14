@@ -2673,15 +2673,23 @@ static function TBRunAndroid()
    local cLogPath    := cAndroidDir + "\apk-gui\build.log"
    local cBash       := "C:\Program Files\Git\bin\bash.exe"
    local cAdb        := "C:\Android\Sdk\platform-tools\adb.exe"
-   local cPrg, cLog, cCmd
+   local cPrg, cLog, cCmd, nRc
+
+   AndroidTrace( "=== TBRunAndroid start ===" )
+   AndroidTrace( "cBash    = " + cBash + " exists=" + iif( File(cBash), "Y", "N" ) )
+   AndroidTrace( "cAdb     = " + cAdb  + " exists=" + iif( File(cAdb),  "Y", "N" ) )
+   AndroidTrace( "cGenPrg  = " + cGenPrg )
+   AndroidTrace( "cApkPath = " + cApkPath )
 
    if ! lIsDir( cAndroidDir )
+      AndroidTrace( "ABORT: toolchain dir missing" )
       MsgInfo( "Android toolchain not found at " + cAndroidDir + Chr(10) + ;
                "See memory/project_android_build.md for the required layout.", ;
                "Android target" )
       return nil
    endif
    if ! File( cBash )
+      AndroidTrace( "ABORT: bash.exe missing" )
       MsgInfo( "bash.exe not found at " + cBash + Chr(10) + ;
                "Install Git for Windows to provide bash.", "Android target" )
       return nil
@@ -2690,48 +2698,65 @@ static function TBRunAndroid()
    SaveActiveFormCode()
    SyncDesignerToCode()
 
-   // Generate the Android PRG from the current form
+   AndroidTrace( "Generating Android PRG..." )
    cPrg := GenerateAndroidPRG()
    if Empty( cPrg )
+      AndroidTrace( "ABORT: empty generated PRG" )
       MsgInfo( "No form to build - add at least one control to the designer.", ;
                "Android target" )
       return nil
    endif
    MemoWrit( cGenPrg, cPrg )
+   AndroidTrace( "Wrote " + cGenPrg + " (" + LTrim(Str(Len(cPrg))) + " bytes)" )
 
-   W32_ProgressOpen( "Building Android APK...", 3 )
+   W32_ProgressOpen( "Building Android APK...", 2 )
    W32_ProgressStep( "Compiling generated PRG -> signed APK..." )
 
-   // Run the GUI pipeline. W32_ShellExec already wraps with "cmd /c",
-   // so we pass the bash invocation directly.
    cCmd := '"' + cBash + '" -lc "bash /c/HarbourBuilder/source/backends/android/build-apk-gui.sh ' + ;
            '/c/HarbourBuilder/source/backends/android/_generated.prg > /c/HarbourAndroid/apk-gui/build.log 2>&1"'
+   AndroidTrace( "Build cmd: " + cCmd )
    W32_ShellExec( cCmd )
+   AndroidTrace( "Build cmd returned. APK exists=" + iif( File( cApkPath ), "Y", "N" ) )
 
    cLog := iif( File( cLogPath ), MemoRead( cLogPath ), "(no log produced)" )
 
    if ! File( cApkPath )
+      AndroidTrace( "ABORT: APK not produced. build.log follows:" )
+      AndroidTrace( cLog )
       W32_ProgressClose()
       W32_BuildErrorDialog( "Android Build Failed", cLog )
       return nil
    endif
 
+   W32_ProgressStep( "Spawning install-and-run terminal..." )
    W32_ProgressClose()
 
-   // Fire install-and-run.sh in its own visible terminal window and return
-   // control to the IDE immediately. The script boots the AVD if needed,
-   // waits for sys.boot_completed, installs the APK, launches the activity
-   // and then tails logcat so the user sees live output.
-   cCmd := 'start "HarbourBuilder - Android install & run" "' + cBash + '" -lc ' + ;
+   // Fire install-and-run.sh in its own terminal window and return
+   // control to the IDE immediately. Use hb_run( "start ..." ) because
+   // W32_ShellExec captures pipes synchronously and tends to hang when
+   // the child re-spawns detached processes.
+   cCmd := 'start "HarbourBuilder Android" "' + cBash + '" -lc ' + ;
            '"bash /c/HarbourBuilder/source/backends/android/install-and-run.sh; exec bash"'
-   W32_ShellExec( cCmd )
+   AndroidTrace( "Launch cmd: " + cCmd )
+   nRc := hb_run( cCmd )
+   AndroidTrace( "Launch cmd returned rc=" + LTrim( Str( nRc ) ) )
 
-   MsgInfo( "APK built:" + Chr(10) + cApkPath + Chr(10) + Chr(10) + ;
-            "Install + launch running in a separate terminal window." + Chr(10) + ;
-            "The emulator will be started if it isn't already." + Chr(10) + ;
-            "Logcat (filtered to HbAndroid + errors) streams live there.", ;
-            "Android target" )
+   AndroidTrace( "=== TBRunAndroid end (success path) ===" )
+return nil
 
+static function AndroidTrace( cMsg )
+   local nH, cLine
+   cLine := DToS( Date() ) + " " + Time() + " " + cMsg + Chr(13) + Chr(10)
+   nH := FOpen( "c:\HarbourBuilder\android_trace.log", 2 )
+   if nH == -1
+      nH := FCreate( "c:\HarbourBuilder\android_trace.log" )
+   else
+      FSeek( nH, 0, 2 )
+   endif
+   if nH != -1
+      FWrite( nH, cLine )
+      FClose( nH )
+   endif
 return nil
 
 // Ensure an Android device is ready. If none is connected, launch the
