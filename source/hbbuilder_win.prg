@@ -160,6 +160,7 @@ function Main()
    MENUITEM "&Debug"            OF oRun ACTION TBDebugRun()
    MENUSEPARATOR OF oRun
    MENUITEM "Run on &Android..." OF oRun ACTION TBRunAndroid()
+   MENUITEM "Android Setup &Wizard..." OF oRun ACTION AndroidSetupWizard()
    MENUSEPARATOR OF oRun
    MENUITEM "&Continue"      OF oRun ACTION IDE_DebugGo()
    MENUITEM "&Step Over"     OF oRun ACTION DebugStepOver()
@@ -2763,6 +2764,86 @@ static function TBRunAndroid()
    AndroidTrace( "Launch cmd returned rc=" + LTrim( Str( nRc ) ) )
 
    AndroidTrace( "=== TBRunAndroid end (success path) ===" )
+return nil
+
+// Android Setup Wizard
+//
+// Reports which toolchain components are present and offers to install
+// the pieces we ship prebuilt (Harbour-for-Android libs). External
+// toolchains (NDK/SDK/JDK) still need the manual steps in
+// source/backends/android/SETUP.md - downloading several GB of Google
+// binaries inside the IDE is roadmap iter 6.
+static function AndroidSetupWizard()
+
+   local cReport := "Android toolchain status:" + Chr(10) + Chr(10)
+   local lNdk, lSdk, lBT, lPT, lEmu, lJdk, lBash, lHbAnd, lAvd
+   local cZipSrc := "C:\HarbourBuilder\releases\harbour-android-arm64-v8a.zip"
+   local cHbRoot := "C:\HarbourAndroid\harbour-core"
+   local cAvdDir := GetEnv( "USERPROFILE" ) + "\.android\avd\HarbourBuilderAVD.avd"
+   local cCmd, cTag, cQ2 := Chr(39)
+
+   lNdk   := hb_DirExists( "C:\Android\android-ndk-r26d" )
+   lSdk   := hb_DirExists( "C:\Android\Sdk\platforms\android-34" )
+   lBT    := hb_DirExists( "C:\Android\Sdk\build-tools\34.0.0" )
+   lPT    := File( "C:\Android\Sdk\platform-tools\adb.exe" )
+   lEmu   := File( "C:\Android\Sdk\emulator\emulator.exe" )
+   lJdk   := File( "C:\JDK17\jdk-17.0.13+11\bin\javac.exe" )
+   lBash  := File( "C:\Program Files\Git\bin\bash.exe" )
+   lHbAnd := hb_DirExists( cHbRoot + "\lib\android\clang-android-arm64-v8a" )
+   lAvd   := hb_DirExists( cAvdDir )
+
+   cReport += "  NDK r26d        " + iif( lNdk,   "OK", "MISSING" ) + Chr(10)
+   cReport += "  SDK platform 34 " + iif( lSdk,   "OK", "MISSING" ) + Chr(10)
+   cReport += "  build-tools 34  " + iif( lBT,    "OK", "MISSING" ) + Chr(10)
+   cReport += "  platform-tools  " + iif( lPT,    "OK", "MISSING" ) + Chr(10)
+   cReport += "  emulator        " + iif( lEmu,   "OK", "MISSING" ) + Chr(10)
+   cReport += "  JDK 17          " + iif( lJdk,   "OK", "MISSING" ) + Chr(10)
+   cReport += "  Git Bash        " + iif( lBash,  "OK", "MISSING" ) + Chr(10)
+   cReport += "  Harbour-Android " + iif( lHbAnd, "OK", "MISSING" ) + Chr(10)
+   cReport += "  AVD             " + iif( lAvd,   "OK", "MISSING" ) + Chr(10)
+
+   // Offer to install the only piece we ship prebuilt.
+   if ! lHbAnd .and. File( cZipSrc )
+      cReport += Chr(10) + "Harbour-for-Android is MISSING but the repo ships a " + ;
+                 "prebuilt 3.6 MB zip." + Chr(10) + ;
+                 "Install it into " + cHbRoot + " now?"
+      if MsgYesNo( cReport, "Android Setup Wizard" )
+         // Create target dir, extract zip via PowerShell Expand-Archive,
+         // and copy the inner layout out (the zip contains a top-level
+         // harbour-android-arm64-v8a/ folder).
+         W32_ShellExec( "mkdir " + Chr(34) + "C:\HarbourAndroid" + Chr(34) + " 2>nul" )
+         W32_ShellExec( "mkdir " + Chr(34) + cHbRoot + Chr(34) + " 2>nul" )
+         cCmd := "powershell -NoProfile -Command " + Chr(34) + ;
+                 "Expand-Archive -Force -LiteralPath " + cQ2 + cZipSrc + cQ2 + ;
+                 " -DestinationPath " + cQ2 + "C:\HarbourAndroid\tmp-hb-extract" + cQ2 + ;
+                 Chr(34)
+         W32_ShellExec( cCmd )
+         W32_ShellExec( "xcopy /E /Y /I " + Chr(34) + ;
+                        "C:\HarbourAndroid\tmp-hb-extract\harbour-android-arm64-v8a\*" + ;
+                        Chr(34) + " " + Chr(34) + cHbRoot + Chr(34) )
+         W32_ShellExec( "rmdir /S /Q " + Chr(34) + "C:\HarbourAndroid\tmp-hb-extract" + Chr(34) )
+
+         if hb_DirExists( cHbRoot + "\lib\android\clang-android-arm64-v8a" )
+            MsgInfo( "Harbour-for-Android installed at " + cHbRoot + Chr(10) + ;
+                     "You can now Run > Run on Android.", "Android Setup Wizard" )
+         else
+            MsgInfo( "Extraction reported success but the target folder is " + ;
+                     "still empty. Check releases/harbour-android-arm64-v8a.zip " + ;
+                     "and retry manually.", "Android Setup Wizard" )
+         endif
+      endif
+      return nil
+   endif
+
+   cTag := Chr(10) + "The remaining missing items are external toolchains." + ;
+           Chr(10) + "See source/backends/android/SETUP.md for the download links."
+   if lNdk .and. lSdk .and. lBT .and. lPT .and. lEmu .and. lJdk .and. lBash .and. lHbAnd
+      cTag := Chr(10) + "Toolchain is complete. " + ;
+              iif( lAvd, "Ready to build and run.", ;
+                         "Create an AVD named HarbourBuilderAVD to run on an emulator." )
+   endif
+   MsgInfo( cReport + cTag, "Android Setup Wizard" )
+
 return nil
 
 static function AndroidTrace( cMsg )
