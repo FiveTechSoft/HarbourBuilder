@@ -1,6 +1,61 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-14 (Android Setup Wizard + prebuilt Harbour-for-Android shipped in repo)
+
+  FEATURES
+  - NEW menu Run > "Android Setup Wizard..." next to Run on Android.
+    Checks 9 toolchain components (NDK r26d, SDK platform 34,
+    build-tools 34, platform-tools, emulator, JDK 17, Git Bash,
+    Harbour-for-Android libs, AVD HarbourBuilderAVD) and reports each
+    as OK / MISSING. If anything is missing and Git Bash is present,
+    offers to run the full installer in a dedicated terminal window.
+  - NEW source/backends/android/setup-android-toolchain.sh - one
+    script that downloads and installs every external component a
+    fresh machine needs, into fixed paths under C:\. Idempotent:
+    detects what is already in place and skips it.
+      * JDK 17 Temurin (Adoptium)                 ~175 MB
+      * Android NDK r26d (dl.google.com)          ~1.5 GB
+      * SDK cmdline-tools (dl.google.com)         ~100 MB
+      * SDK packages via sdkmanager (platform 34, build-tools 34,
+        platform-tools, emulator, system-image android-34 x86_64)  ~1.2 GB
+      * AVD HarbourBuilderAVD (Pixel 5) via avdmanager
+      * Harbour-for-Android libs extracted from releases/ (shipped
+        in the repo, 3.6 MB prebuilt)
+    Uses curl for downloads and PowerShell Expand-Archive for zips.
+    Auto-applies the NDK ar/ranlib/strip tweak that Harbour mk files
+    need. Pipes 'yes' into sdkmanager --licenses so the installer
+    doesn't block on license prompts.
+  - NEW releases/harbour-android-arm64-v8a.zip (3.6 MB) - 30 static
+    .a libraries (libhbvm, libhbrtl, libgttrm, rddntx, ...) plus 72
+    headers, all cross-compiled from official harbour/core 3.2.0dev
+    r2502031126 with NDK Clang for aarch64-linux-android24. Shipping
+    the prebuilt means a fresh clone skips the 5-10 minute
+    bootstrap-harbour.sh step entirely - the wizard just extracts it.
+  - NEW source/backends/android/bootstrap-harbour.sh - the recipe
+    that produced the shipped zip, versioned for users who want to
+    track upstream Harbour changes or target other ABIs.
+  - NEW source/backends/android/SETUP.md - end-to-end manual setup
+    guide (toolchain tables, NDK tweak, AVD creation, bootstrap,
+    validation, troubleshooting) for users who prefer to install by
+    hand or can't use the Wizard yet.
+  - NEW source/backends/android/run-on-emulator.sh - standalone AVD
+    bootstrap companion to the newer install-and-run.sh (kept for
+    direct-shell usage).
+  - Run > Run on Android and Run > Android Setup Wizard land in the
+    same submenu so the flow is obvious: Wizard once, then Run on
+    Android as many times as needed.
+
+  OUT OF SCOPE (roadmap)
+  - Inline download progress inside the IDE dialog (today the
+    installer shell window shows curl/sdkmanager output live,
+    which is honest and easy to follow).
+  - macOS and Linux wizard port (same script, different URLs/paths
+    and PowerShell replaced with unzip).
+  - Multi-ABI prebuilt zips (x86_64, armeabi-v7a).
+
+---
+
 2026-04-14 (Android iteration 1b + 1c: form designer -> APK with working click handlers, colors and fonts)
 
   FEATURES

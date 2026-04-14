@@ -2768,19 +2768,18 @@ return nil
 
 // Android Setup Wizard
 //
-// Reports which toolchain components are present and offers to install
-// the pieces we ship prebuilt (Harbour-for-Android libs). External
-// toolchains (NDK/SDK/JDK) still need the manual steps in
-// source/backends/android/SETUP.md - downloading several GB of Google
-// binaries inside the IDE is roadmap iter 6.
+// Reports which toolchain components are present and, if anything is
+// missing, offers to run setup-android-toolchain.sh in a dedicated
+// terminal window. That script downloads and installs JDK, NDK, SDK
+// cmdline-tools + packages, creates the HarbourBuilderAVD, and
+// extracts the prebuilt Harbour-for-Android libs from releases/.
 static function AndroidSetupWizard()
 
    local cReport := "Android toolchain status:" + Chr(10) + Chr(10)
    local lNdk, lSdk, lBT, lPT, lEmu, lJdk, lBash, lHbAnd, lAvd
-   local cZipSrc := "C:\HarbourBuilder\releases\harbour-android-arm64-v8a.zip"
    local cHbRoot := "C:\HarbourAndroid\harbour-core"
    local cAvdDir := GetEnv( "USERPROFILE" ) + "\.android\avd\HarbourBuilderAVD.avd"
-   local cCmd, cTag, cQ2 := Chr(39)
+   local cCmd
 
    lNdk   := hb_DirExists( "C:\Android\android-ndk-r26d" )
    lSdk   := hb_DirExists( "C:\Android\Sdk\platforms\android-34" )
@@ -2802,47 +2801,40 @@ static function AndroidSetupWizard()
    cReport += "  Harbour-Android " + iif( lHbAnd, "OK", "MISSING" ) + Chr(10)
    cReport += "  AVD             " + iif( lAvd,   "OK", "MISSING" ) + Chr(10)
 
-   // Offer to install the only piece we ship prebuilt.
-   if ! lHbAnd .and. File( cZipSrc )
-      cReport += Chr(10) + "Harbour-for-Android is MISSING but the repo ships a " + ;
-                 "prebuilt 3.6 MB zip." + Chr(10) + ;
-                 "Install it into " + cHbRoot + " now?"
-      if MsgYesNo( cReport, "Android Setup Wizard" )
-         // Create target dir, extract zip via PowerShell Expand-Archive,
-         // and copy the inner layout out (the zip contains a top-level
-         // harbour-android-arm64-v8a/ folder).
-         W32_ShellExec( "mkdir " + Chr(34) + "C:\HarbourAndroid" + Chr(34) + " 2>nul" )
-         W32_ShellExec( "mkdir " + Chr(34) + cHbRoot + Chr(34) + " 2>nul" )
-         cCmd := "powershell -NoProfile -Command " + Chr(34) + ;
-                 "Expand-Archive -Force -LiteralPath " + cQ2 + cZipSrc + cQ2 + ;
-                 " -DestinationPath " + cQ2 + "C:\HarbourAndroid\tmp-hb-extract" + cQ2 + ;
-                 Chr(34)
-         W32_ShellExec( cCmd )
-         W32_ShellExec( "xcopy /E /Y /I " + Chr(34) + ;
-                        "C:\HarbourAndroid\tmp-hb-extract\harbour-android-arm64-v8a\*" + ;
-                        Chr(34) + " " + Chr(34) + cHbRoot + Chr(34) )
-         W32_ShellExec( "rmdir /S /Q " + Chr(34) + "C:\HarbourAndroid\tmp-hb-extract" + Chr(34) )
-
-         if hb_DirExists( cHbRoot + "\lib\android\clang-android-arm64-v8a" )
-            MsgInfo( "Harbour-for-Android installed at " + cHbRoot + Chr(10) + ;
-                     "You can now Run > Run on Android.", "Android Setup Wizard" )
-         else
-            MsgInfo( "Extraction reported success but the target folder is " + ;
-                     "still empty. Check releases/harbour-android-arm64-v8a.zip " + ;
-                     "and retry manually.", "Android Setup Wizard" )
-         endif
-      endif
+   // Everything present?
+   if lNdk .and. lSdk .and. lBT .and. lPT .and. lEmu .and. lJdk .and. lBash .and. lHbAnd .and. lAvd
+      MsgInfo( cReport + Chr(10) + "Toolchain is complete. Ready to Run on Android.", ;
+               "Android Setup Wizard" )
       return nil
    endif
 
-   cTag := Chr(10) + "The remaining missing items are external toolchains." + ;
-           Chr(10) + "See source/backends/android/SETUP.md for the download links."
-   if lNdk .and. lSdk .and. lBT .and. lPT .and. lEmu .and. lJdk .and. lBash .and. lHbAnd
-      cTag := Chr(10) + "Toolchain is complete. " + ;
-              iif( lAvd, "Ready to build and run.", ;
-                         "Create an AVD named HarbourBuilderAVD to run on an emulator." )
+   // Git Bash is required for the installer script itself
+   if ! lBash
+      MsgInfo( cReport + Chr(10) + "Git Bash is required to run the installer." + ;
+               Chr(10) + "Install from https://git-scm.com/download/win and " + ;
+               "re-open this wizard.", "Android Setup Wizard" )
+      return nil
    endif
-   MsgInfo( cReport + cTag, "Android Setup Wizard" )
+
+   // Offer the full installer (downloads JDK, NDK, SDK, creates AVD,
+   // extracts shipped Harbour libs). Runs in its own terminal window.
+   cReport += Chr(10) + "Download + install the missing components now?" + Chr(10) + ;
+              "(Up to 2.8 GB on a fresh machine, 5-20 min. Runs in its own " + ;
+              "terminal so you can watch progress and accept the Android " + ;
+              "SDK license prompts.)"
+   if ! MsgYesNo( cReport, "Android Setup Wizard" )
+      return nil
+   endif
+
+   cCmd := "start " + Chr(34) + "HarbourBuilder - Android setup" + Chr(34) + " " + ;
+           Chr(34) + "C:\Program Files\Git\bin\bash.exe" + Chr(34) + " -lc " + ;
+           Chr(34) + ;
+           "bash /c/HarbourBuilder/source/backends/android/setup-android-toolchain.sh; " + ;
+           "exec bash" + Chr(34)
+   hb_run( cCmd )
+
+   MsgInfo( "Setup terminal launched. When it says 'All done', close it " + ;
+            "and try Run > Run on Android...", "Android Setup Wizard" )
 
 return nil
 
