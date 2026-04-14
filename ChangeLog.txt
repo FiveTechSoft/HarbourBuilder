@@ -1,6 +1,25 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-14 (Windows: TFolder page inspector view + designer drop-on-page)
+
+  FEATURES
+  - Inspector: selecting an "oFolderN:aPages[N] AS TFolderPage" entry in
+    the combo now shows the page's own properties (cCaption, nPage) in a
+    dedicated "Page" category instead of the folder's. cCaption is
+    projected live from the folder's aTabs[N] so editing the label round-
+    trips through the designer and the generated code.
+  - Designer: when a palette component is pending, clicking on a TFolder
+    no longer selects/drags the folder — it arcs straight into the
+    rubber-band drop. The drop hit-tests the folder rect and tags the new
+    control with (FPageOwner=folder, FPageIndex=active page), so the
+    control becomes part of that page automatically and shows/hides with
+    the tab. Codegen was already emitting OF ::oFolderN:aPages[N] for
+    page-owned controls, so round-trip just works.
+  - Inspector C API: new HB_FUNCs INS_SetFolderPage / INS_AddRow /
+    INS_AddCategoryRow / INS_Rebuild let Harbour push synthetic rows into
+    the inspector without InsPopulate overwriting them.
+
 2026-04-14 (Windows: TLabel transparency, form-position save/restore, runtime error dialog, dropdown UX, sample improvements)
 
   FEATURES

@@ -775,6 +775,10 @@ HB_FUNC( UI_SETPROP )
       p->FTransparent = hb_parl(3);
       if( p->FHandle ) InvalidateRect( p->FHandle, NULL, TRUE );
    }
+   else if( lstrcmpi( szProp, "aTabs" ) == 0 && p->FControlType == CT_TABCONTROL2 && HB_ISCHAR(3) )
+   {
+      ((TTabControl2*)p)->SetTabs( hb_parc(3) );
+   }
    else if( lstrcmpi( szProp, "lToolWindow" ) == 0 && p->FControlType == CT_FORM )
       ((TForm*)p)->FToolWindow = hb_parl(3);
    else if( lstrcmpi( szProp, "nBorderStyle" ) == 0 && p->FControlType == CT_FORM )
@@ -1061,6 +1065,8 @@ HB_FUNC( UI_GETPROP )
       hb_retl( p->FActive );
    else if( lstrcmpi( szProp, "lTransparent" ) == 0 )
       hb_retl( p->FTransparent );
+   else if( lstrcmpi( szProp, "aTabs" ) == 0 && p->FControlType == CT_TABCONTROL2 )
+      hb_retc( ((TTabControl2*)p)->FTabs );
    else if( lstrcmpi( szProp, "nBorderStyle" ) == 0 && p->FControlType == CT_FORM )
       hb_retni( ((TForm*)p)->FBorderStyle );
    else if( lstrcmpi( szProp, "nBorderIcons" ) == 0 && p->FControlType == CT_FORM )
@@ -1744,6 +1750,19 @@ HB_FUNC( UI_GETALLPROPS )
          ADD_PROP_S( "cFileName", p->FFileName, "Data" );
          ADD_PROP_S( "cRDD",      p->FRDD,      "Data" );
          ADD_PROP_L( "lActive",   p->FActive,   "Data" );
+         break;
+      case CT_TABCONTROL2:
+         /* Pipe-separated list of tab labels; the inspector renders 'A'
+            as an array editor (multi-line dialog, one item per line). */
+         {
+            pRow = hb_itemArrayNew(4);
+            hb_arraySetC( pRow, 1, "aTabs" );
+            hb_arraySetC( pRow, 2, ((TTabControl2*)p)->FTabs );
+            hb_arraySetC( pRow, 3, "Behavior" );
+            hb_arraySetC( pRow, 4, "A" );
+            hb_arrayAdd( pArray, pRow );
+            hb_itemRelease( pRow );
+         }
          break;
       case CT_BUTTON:
          ADD_PROP_L( "lDefault", ((TButton*)p)->FDefault, "Behavior" );
@@ -6480,13 +6499,104 @@ HB_FUNC( GIT_STASHLIST )
 }
 
 /* ------------------------------------------------------------------------- */
-/* TPageControl / page-ownership stubs                                       */
-/* The Cocoa backend tracks which page of a TPageControl owns each child.    */
-/* The Win32 backend does not implement page ownership yet; these stubs let  */
-/* classes.prg link and behave as no-ops (nPage always 1, no owner).         */
+/* TPageControl / page ownership                                             */
+/* TFolderPage:hCpp calls UI_SetPendingPageOwner before returning the form's */
+/* hCpp, so the next control created with `OF ::oFolder:aPages[N]` becomes a */
+/* form child but is tagged with (FPageOwner=folder, FPageIndex=page) the    */
+/* moment AddChild attaches it. WM_NOTIFY/TCN_SELCHANGE switches visibility. */
 /* ------------------------------------------------------------------------- */
-HB_FUNC( UI_SETCTRLOWNER )         { /* (hCtrl, hOwner, nPage) */ }
-HB_FUNC( UI_GETCTRLOWNER )         { hb_retptr( NULL ); }
-HB_FUNC( UI_GETCTRLPAGE )          { hb_retni( 1 ); }
-HB_FUNC( UI_SETPENDINGPAGEOWNER )  { /* (hFolder, nPage) */ }
-HB_FUNC( UI_TABCONTROLNEW )        { hb_retptr( NULL ); }
+
+/* Module globals: the next AddChild consumes them and resets to NULL/0. */
+static TControl * g_pendingPageOwner = NULL;
+static int        g_pendingPageIndex = 0;
+
+/* Called from tform.cpp designer drop: sets the pending owner so the next
+   AddChild tags the new control with (FPageOwner, FPageIndex). */
+void HbSetPendingPageOwner( TControl * pOwner, int nPage )
+{
+   g_pendingPageOwner = pOwner;
+   g_pendingPageIndex = nPage;
+}
+
+void HbApplyPendingPageOwner( TControl * pCtrl )
+{
+   if( pCtrl && g_pendingPageOwner )
+   {
+      pCtrl->FPageOwner = g_pendingPageOwner;
+      pCtrl->FPageIndex = g_pendingPageIndex;
+      g_pendingPageOwner = NULL;
+      g_pendingPageIndex = 0;
+      /* Hide immediately if not on the active page. */
+      if( pCtrl->FHandle )
+      {
+         TTabControl2 * pPC = (TTabControl2 *) pCtrl->FPageOwner;
+         if( pPC->FHandle &&
+             pCtrl->FPageIndex != (int) SendMessageA( pPC->FHandle, TCM_GETCURSEL, 0, 0 ) )
+            ShowWindow( pCtrl->FHandle, SW_HIDE );
+      }
+   }
+}
+
+HB_FUNC( UI_TABCONTROLNEW )
+{
+   /* (hParent, nLeft, nTop, nWidth, nHeight) -> hCtrl */
+   TForm * pForm = GetForm( 1 );
+   TTabControl2 * pPC = new TTabControl2();
+   pPC->FLeft   = HB_ISNUM(2) ? hb_parni(2) : 0;
+   pPC->FTop    = HB_ISNUM(3) ? hb_parni(3) : 0;
+   pPC->FWidth  = HB_ISNUM(4) ? hb_parni(4) : 300;
+   pPC->FHeight = HB_ISNUM(5) ? hb_parni(5) : 200;
+   if( pForm ) pForm->AddChild( pPC );
+   RetCtrl( pPC );
+}
+
+HB_FUNC( UI_SETCTRLOWNER )
+{
+   /* (hCtrl, hOwner, nPage). hOwner accepted as numeric handle (the
+      same form GetCtrl returns) or as a raw pointer. */
+   TControl * pCtrl = GetCtrl(1);
+   TControl * pOwner = NULL;
+   if( HB_ISNUM(2) )      pOwner = (TControl*)(HB_PTRUINT) hb_parnint(2);
+   else if( HB_ISPOINTER(2) ) pOwner = (TControl*) hb_parptr(2);
+   if( !pCtrl ) return;
+   pCtrl->FPageOwner = pOwner;
+   pCtrl->FPageIndex = HB_ISNUM(3) ? hb_parni(3) : 0;
+}
+
+HB_FUNC( UI_GETCTRLOWNER )
+{
+   /* Return as numeric so it round-trips equality-comparable with the
+      handles returned by UI_GetChild (also numeric). */
+   TControl * pCtrl = GetCtrl(1);
+   hb_retnint( (HB_PTRUINT)( pCtrl ? pCtrl->FPageOwner : NULL ) );
+}
+
+HB_FUNC( UI_GETCTRLPAGE )
+{
+   TControl * pCtrl = GetCtrl(1);
+   hb_retni( pCtrl ? pCtrl->FPageIndex : 0 );
+}
+
+HB_FUNC( UI_SETPENDINGPAGEOWNER )
+{
+   /* (hFolder, nPage) - the next AddChild applies this owner.
+      hFolder is whatever UI_GetChild returns (numeric handle). */
+   if( HB_ISNUM(1) )      g_pendingPageOwner = (TControl*)(HB_PTRUINT) hb_parnint(1);
+   else if( HB_ISPOINTER(1) ) g_pendingPageOwner = (TControl*) hb_parptr(1);
+   else                   g_pendingPageOwner = NULL;
+   g_pendingPageIndex = HB_ISNUM(2) ? hb_parni(2) : 0;
+}
+
+/* UI_TabControlSetSel( hFolder, nPageIdx ) - switch active tab + refresh
+   page visibility. Used by the inspector combo when the user picks an
+   "oFolderN:aPages[N]" entry. */
+HB_FUNC( UI_TABCONTROLSETSEL )
+{
+   TControl * pCtrl = GetCtrl(1);
+   int nIdx = HB_ISNUM(2) ? hb_parni(2) : 0;
+   if( pCtrl && pCtrl->FControlType == CT_TABCONTROL2 && pCtrl->FHandle )
+   {
+      SendMessageA( pCtrl->FHandle, TCM_SETCURSEL, nIdx, 0 );
+      ((TTabControl2*)pCtrl)->ApplyPageVisibility();
+   }
+}

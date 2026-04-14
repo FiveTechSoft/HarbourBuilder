@@ -236,7 +236,13 @@ public:
    char         FFileName[260];
    char         FRDD[16];
    BOOL         FActive;
-   BOOL         FTransparent;  /* TRUE: WM_CTLCOLORSTATIC returns NULL_BRUSH so the parent's bg shows through (TLabel default) */
+   BOOL         FTransparent;
+
+   /* TPageControl ownership: when this control was created with
+      `OF ::oFolder:aPages[N]`, FPageOwner points to the TPageControl
+      and FPageIndex is the 0-based page. NULL owner = not paged. */
+   TControl *   FPageOwner;
+   int          FPageIndex;  /* TRUE: WM_CTLCOLORSTATIC returns NULL_BRUSH so the parent's bg shows through (TLabel default) */
 
    /* Harbour event codeblocks */
    PHB_ITEM     FOnClick;
@@ -678,14 +684,23 @@ public:
 };
 
 /*
- * TTabControl (C++Builder Win32 tab)
+ * TTabControl2 - aka TFolder/TPageControl. Wraps SysTabControl32 and
+ * tracks per-page child ownership: children created with
+ * `OF ::oFolder:aPages[N]` carry FPageOwner=this + FPageIndex=N and
+ * are auto shown/hidden when the user clicks a tab.
  */
 class TTabControl2 : public TControl
 {
 public:
+   char FTabs[1024];     /* "Tab1|Tab2|Tab3" */
+   int  FPageCount;
+
    TTabControl2();
    void CreateParams( DWORD * pdwStyle, DWORD * pdwExStyle, const char ** pszClass );
    const PROPDESC * GetPropDescs( int * pnCount );
+   void SetTabs( const char * szTabs );
+   int  GetActivePage();
+   void ApplyPageVisibility();
 };
 
 /*
@@ -755,6 +770,8 @@ public:
    void CreateParams( DWORD * pdwStyle, DWORD * pdwExStyle, const char ** pszClass );
    const PROPDESC * GetPropDescs( int * pnCount );
 };
+
+/* TPageControl removed - functionality merged into TTabControl2 above. */
 
 /*
  * TListView - List/report control (C++Builder Win32 tab)

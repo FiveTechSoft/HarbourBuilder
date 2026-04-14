@@ -761,9 +761,80 @@ const PROPDESC* TLabeledEdit::GetPropDescs(int*n) { return TEdit::GetPropDescs(n
 /* ======================================================================
  * TTabControl2 (Win32)
  * ====================================================================== */
-TTabControl2::TTabControl2() { lstrcpy(FClassName,"TTabControl"); FControlType=CT_TABCONTROL2; FWidth=200; FHeight=150; }
-void TTabControl2::CreateParams(DWORD*s,DWORD*e,const char**c) { *c=WC_TABCONTROLA; *s=WS_CHILD|WS_VISIBLE|WS_CLIPSIBLINGS|TCS_TABS; *e=0; }
-const PROPDESC* TTabControl2::GetPropDescs(int*n) { return TControl::GetPropDescs(n); }
+TTabControl2::TTabControl2()
+{
+   lstrcpy( FClassName, "TFolder" );
+   FControlType = CT_TABCONTROL2;
+   FWidth = 300; FHeight = 200;
+   FTabs[0] = '\0';
+   FPageCount = 0;
+}
+
+void TTabControl2::CreateParams( DWORD * pdwStyle, DWORD * pdwExStyle, const char ** pszClass )
+{
+   *pszClass = WC_TABCONTROLA;
+   *pdwStyle = WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | TCS_TABS;
+   *pdwExStyle = 0;
+}
+
+const PROPDESC * TTabControl2::GetPropDescs( int * pnCount )
+{
+   return TControl::GetPropDescs( pnCount );
+}
+
+void TTabControl2::SetTabs( const char * szTabs )
+{
+   const char * p, * start;
+   char buf[256];
+   if( !szTabs ) szTabs = "";
+   lstrcpynA( FTabs, szTabs, sizeof(FTabs) );
+   FPageCount = 0;
+   if( !FHandle ) return;
+   SendMessageA( FHandle, TCM_DELETEALLITEMS, 0, 0 );
+   start = szTabs;
+   for( p = szTabs; ; p++ )
+   {
+      if( *p == '|' || *p == 0 )
+      {
+         int len = (int)( p - start );
+         if( len > (int)sizeof(buf) - 1 ) len = sizeof(buf) - 1;
+         memcpy( buf, start, len );
+         buf[len] = 0;
+
+         TCITEMA tci = {0};
+         tci.mask = TCIF_TEXT;
+         tci.pszText = buf;
+         SendMessageA( FHandle, TCM_INSERTITEMA, FPageCount, (LPARAM) &tci );
+         FPageCount++;
+
+         if( *p == 0 ) break;
+         start = p + 1;
+      }
+   }
+   ApplyPageVisibility();
+}
+
+int TTabControl2::GetActivePage()
+{
+   if( !FHandle ) return 0;
+   return (int) SendMessageA( FHandle, TCM_GETCURSEL, 0, 0 );
+}
+
+void TTabControl2::ApplyPageVisibility()
+{
+   int i, sel;
+   TForm * pForm;
+   if( !FHandle || !FCtrlParent ) return;
+   pForm = (TForm *) FCtrlParent;
+   if( pForm->FControlType != CT_FORM ) return;
+   sel = GetActivePage();
+   for( i = 0; i < pForm->FChildCount; i++ )
+   {
+      TControl * c = pForm->FChildren[i];
+      if( c && c->FPageOwner == this && c->FHandle )
+         ShowWindow( c->FHandle, ( c->FPageIndex == sel ) ? SW_SHOW : SW_HIDE );
+   }
+}
 
 /* ======================================================================
  * TTrackBar (Win32)
@@ -962,6 +1033,8 @@ const PROPDESC * TTreeView::GetPropDescs( int * pnCount )
 {
    return TControl::GetPropDescs( pnCount );
 }
+
+/* TPageControl class removed - logic merged into TTabControl2 above. */
 
 /* ======================================================================
  * TListView (C++Builder Win32 tab)

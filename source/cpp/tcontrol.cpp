@@ -62,7 +62,9 @@ TControl::TControl()
    FFileName[0] = '\0';
    lstrcpyA( FRDD, "DBFCDX" );
    FActive = FALSE;
-   FTransparent = FALSE;   /* TLabel overrides to TRUE in its own ctor */
+   FTransparent = FALSE;
+   FPageOwner = NULL;
+   FPageIndex = 0;   /* TLabel overrides to TRUE in its own ctor */
    FCtrlParent = NULL;
    FChildCount = 0;
    memset( FChildren, 0, sizeof(FChildren) );
@@ -119,6 +121,21 @@ void TControl::CreateHandle( HWND hParent )
       {
          if( !FBkBrush ) FBkBrush = CreateSolidBrush( FClrPane );
       }
+
+      /* Replay any per-class state that was set BEFORE the HWND existed.
+         For TFolder/TPageControl: SetTabs called from SetPrompts() during
+         CreateForm just stored FTabs (FHandle was NULL at that point);
+         now that the window exists we can push the tab items into it. */
+      if( FControlType == CT_TABCONTROL2 )
+      {
+         TTabControl2 * pPC = (TTabControl2 *) this;
+         if( pPC->FTabs[0] )
+         {
+            char saved[1024];
+            lstrcpynA( saved, pPC->FTabs, sizeof(saved) );
+            pPC->SetTabs( saved );
+         }
+      }
    }
 }
 
@@ -131,6 +148,8 @@ void TControl::DestroyHandle()
    }
 }
 
+extern void HbApplyPendingPageOwner( TControl * pCtrl );
+
 void TControl::AddChild( TControl * pChild )
 {
    if( FChildCount < MAX_CHILDREN )
@@ -138,6 +157,9 @@ void TControl::AddChild( TControl * pChild )
       FChildren[FChildCount++] = pChild;
       pChild->FCtrlParent = this;
       pChild->FParent = this;
+      /* If a TFolderPage:hCpp call set a pending owner just before
+         this AddChild, claim ownership for that page now. */
+      HbApplyPendingPageOwner( pChild );
    }
 }
 

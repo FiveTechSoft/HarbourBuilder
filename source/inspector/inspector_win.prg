@@ -58,7 +58,7 @@ return nil
 function InspectorPopulateCombo( hForm )
    local h := _InsGetData()
    local i, j, nCount, hChild, cName, cClass, cEntry, nColCount
-   local aMap
+   local aMap, cTabsStr, aTabsArr, jj
 
    if h == 0 .or. hForm == 0
       return nil
@@ -96,6 +96,21 @@ function InspectorPopulateCombo( hForm )
                INS_ComboAdd( h, cEntry )
                AAdd( aMap, { 2, hChild, j - 1 } )  // 0-based col index
             next
+         endif
+
+         // If it's a Folder/TPageControl, add its pages as sub-entries
+         // "oFolderN:aPages[N] AS TFolderPage"
+         if UI_GetType( hChild ) == 33  // CT_TABCONTROL2
+            cTabsStr := UI_GetProp( hChild, "aTabs" )
+            if ! Empty( cTabsStr )
+               aTabsArr := hb_ATokens( cTabsStr, "|" )
+               for jj := 1 to Len( aTabsArr )
+                  cEntry := "o" + cName + ":aPages[" + LTrim( Str( jj ) ) + ;
+                            "] AS TFolderPage  /* " + aTabsArr[jj] + " */"
+                  INS_ComboAdd( h, cEntry )
+                  AAdd( aMap, { 3, hChild, jj - 1 } )  // 0-based page idx
+               next
+            endif
          endif
       endif
    next
@@ -253,6 +268,7 @@ typedef struct {
    int    nActiveTab;   /* 0=Properties, 1=Events */
    int    bDebugMode;  /* 1=showing Vars/CallStack/Watch */
    int    nBrowseCol;  /* -1 = not editing column, >= 0 = column index */
+   int    nFolderPage; /* -1 = normal view, >= 0 = showing TFolderPage N */
    PHB_ITEM pOnComboSel; /* callback when combo selection changes: {|nIndex| ... } */
    PHB_ITEM pOnEventDblClick; /* callback when event double-clicked: {|hCtrl, cEvent| ... } */
    PHB_ITEM pOnPropChanged;   /* callback when property value changes: {|| ... } */
@@ -1364,6 +1380,12 @@ static void InsPopulate( INSDATA * d )
    int nCats = 0, j;
    BOOL bNew;
 
+   /* Folder page view: the Harbour side of the combo handler cleared
+      rows, pushed 2 synthetic entries (cCaption, nPage) via INS_AddRow
+      and set nFolderPage before calling InsRebuild. Don't clobber them. */
+   if( d->nFolderPage >= 0 && d->nRows > 0 )
+      return;
+
    d->nRows = 0;
 
    if( d->hCtrl == 0 ) return;
@@ -1547,6 +1569,7 @@ HB_FUNC( INS_CREATE )
    d->nActiveTab = 0;
    d->hFormCtrl = 0;
    d->nBrowseCol = -1;
+   d->nFolderPage = -1;
    d->pOnComboSel = NULL;
    d->pOnEventDblClick = NULL;
    d->pOnPropChanged = NULL;
@@ -1657,6 +1680,7 @@ HB_FUNC( INS_REFRESHWITHDATA )
 
    d->hCtrl = (HB_PTRUINT) hb_parnint(2);
    d->nBrowseCol = -1;  /* reset; InspectorRefreshColumn sets it after */
+   d->nFolderPage = -1; /* reset; INS_SetFolderPage sets it after */
    d->nRows = 0;
 
    if( d->hCtrl == 0 || !pArray || hb_arrayLen(pArray) == 0 )
@@ -2184,6 +2208,65 @@ HB_FUNC( INS_COMBOCLEAR )
    INSDATA * d = (INSDATA *) (HB_PTRUINT) hb_parnint(1);
    if( d && d->hCombo )
       SendMessage( d->hCombo, CB_RESETCONTENT, 0, 0 );
+}
+
+/* INS_SetFolderPage( hInsData, hFolder, nPageIdx ) - switch inspector to
+   "TFolderPage" view. Clears existing rows; next InsRebuild will honor
+   nFolderPage >= 0 and not overwrite the rows Harbour pushed via
+   INS_AddRow. hFolder is stored as d->hCtrl so the caller can keep
+   editing folder-level state. */
+HB_FUNC( INS_SETFOLDERPAGE )
+{
+   INSDATA * d = (INSDATA *) (HB_PTRUINT) hb_parnint(1);
+   if( !d ) return;
+   d->hCtrl = (HB_PTRUINT) hb_parnint(2);
+   d->nFolderPage = HB_ISNUM(3) ? hb_parni(3) : -1;
+   d->nRows = 0;
+}
+
+/* INS_AddRow( hInsData, cName, cValue, cCategory, cType ) - append one
+   synthetic row to the inspector. Used for folder-page view; Harbour
+   drives the layout, then calls InsRebuild. */
+HB_FUNC( INS_ADDROW )
+{
+   INSDATA * d;
+   IROW * r;
+   d = (INSDATA *) (HB_PTRUINT) hb_parnint(1);
+   if( !d || d->nRows >= MAX_ROWS - 1 ) return;
+
+   r = &d->rows[d->nRows++];
+   lstrcpynA( r->szName,     HB_ISCHAR(2) ? hb_parc(2) : "", 32 );
+   lstrcpynA( r->szValue,    HB_ISCHAR(3) ? hb_parc(3) : "", 256 );
+   lstrcpynA( r->szCategory, HB_ISCHAR(4) ? hb_parc(4) : "General", 32 );
+   r->cType = ( HB_ISCHAR(5) && hb_parc(5)[0] ) ? hb_parc(5)[0] : 'S';
+   r->bIsCat = FALSE;
+   r->bCollapsed = FALSE;
+   r->bVisible = TRUE;
+}
+
+/* INS_AddCategoryRow( hInsData, cName ) - header/divider row */
+HB_FUNC( INS_ADDCATEGORYROW )
+{
+   INSDATA * d;
+   IROW * r;
+   d = (INSDATA *) (HB_PTRUINT) hb_parnint(1);
+   if( !d || d->nRows >= MAX_ROWS - 1 ) return;
+
+   r = &d->rows[d->nRows++];
+   lstrcpynA( r->szName,     HB_ISCHAR(2) ? hb_parc(2) : "", 32 );
+   r->szValue[0] = 0;
+   lstrcpynA( r->szCategory, HB_ISCHAR(2) ? hb_parc(2) : "", 32 );
+   r->cType = 0;
+   r->bIsCat = TRUE;
+   r->bCollapsed = FALSE;
+   r->bVisible = TRUE;
+}
+
+/* INS_Rebuild( hInsData ) - refresh layout after Harbour pushes rows */
+HB_FUNC( INS_REBUILD )
+{
+   INSDATA * d = (INSDATA *) (HB_PTRUINT) hb_parnint(1);
+   if( d ) InsRebuild( d );
 }
 
 HB_FUNC( INS_BRINGTOFRONT )

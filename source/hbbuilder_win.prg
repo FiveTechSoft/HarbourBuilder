@@ -374,7 +374,9 @@ function Main()
    INS_SetOnComboSel( _InsGetData(), { |nSel| OnComboSelect( nSel ) } )
    INS_SetOnEventDblClick( _InsGetData(), ;
       { |hCtrl, cEvent| OnEventDblClick( hCtrl, cEvent ) } )
-   INS_SetOnPropChanged( _InsGetData(), { || SyncDesignerToCode() } )
+   INS_SetOnPropChanged( _InsGetData(), ;
+      { || SyncDesignerToCode(), ;
+            InspectorPopulateCombo( oDesignForm:hCpp ) } )
    INS_SetPos( _InsGetData(), -8, nInsTop, nInsW + 8, nBottomY - nInsTop )
 
    WireDesignForm()
@@ -429,7 +431,7 @@ static function CreatePalette()
 
    // Win32 tab (C++Builder: native OS controls)
    nTab := oPal:AddTab( "Win32" )
-   oPal:AddComp( nTab, "Tab",  "TabControl",  33 )
+   oPal:AddComp( nTab, "Fol",  "Folder",      33 )
    oPal:AddComp( nTab, "TV",   "TreeView",    20 )
    oPal:AddComp( nTab, "LV",   "ListView",    21 )
    oPal:AddComp( nTab, "PB",   "ProgressBar", 22 )
@@ -592,6 +594,7 @@ return nil
 static function OnComboSelect( nSel )
 
    local hTarget, aMap, aEntry
+   local cTabs, aLabels, cCap, hIns
 
    aMap := InspectorGetComboMap()
 
@@ -602,6 +605,23 @@ static function OnComboSelect( nSel )
          // aEntry = { 2, hBrowse, nColIdx }
          UI_FormSelectCtrl( oDesignForm:hCpp, aEntry[2] )
          InspectorRefreshColumn( aEntry[2], aEntry[3] )
+         return nil
+      endif
+
+      if aEntry[1] == 3  // Folder page
+         // aEntry = { 3, hFolder, nPageIdx } - switch tab and show
+         // page-level properties (cCaption, nPage) in the inspector.
+         cTabs := UI_GetProp( aEntry[2], "aTabs" )
+         aLabels := iif( Empty( cTabs ), {}, hb_ATokens( cTabs, "|" ) )
+         cCap := iif( aEntry[3]+1 <= Len(aLabels), aLabels[aEntry[3]+1], "" )
+         UI_FormSelectCtrl( oDesignForm:hCpp, aEntry[2] )
+         UI_TabControlSetSel( aEntry[2], aEntry[3] )
+         hIns := _InsGetData()
+         INS_SetFolderPage( hIns, aEntry[2], aEntry[3] )
+         INS_AddCategoryRow( hIns, "Page" )
+         INS_AddRow( hIns, "cCaption", cCap, "Page", "S" )
+         INS_AddRow( hIns, "nPage", LTrim(Str(aEntry[3]+1)), "Page", "N" )
+         INS_Rebuild( hIns )
          return nil
       endif
 
@@ -697,6 +717,7 @@ static function RegenerateFormCode( cName, hForm )
    local cDatas := "", cCreate := "", cEvents := ""
    local cExistingCode, aEvents, j, cEvName, cEvSuffix, cHandlerName
    local cVal, aHdrs, kk, nColCount, aColProps, nColW, nInterval
+   local aCtrlMap := {}, cOf, hOwner, nPg, kk2, nLen0, cSlice
 
    // Read existing code to find declared event handlers
    cExistingCode := ""
@@ -723,6 +744,20 @@ static function RegenerateFormCode( cName, hForm )
       cAppTitle := ""
    endif
 
+   // First pass: collect every control's name keyed by its hCtrl pointer
+   // so that for children of a TFolder we can emit
+   // OF ::oFolderName:aPages[N] instead of OF Self.
+   if hForm != 0
+      nCount := UI_GetChildCount( hForm )
+      for i := 1 to nCount
+         hCtrl := UI_GetChild( hForm, i )
+         if hCtrl == 0; loop; endif
+         cCtrlName := AllTrim( UI_GetProp( hCtrl, "cName" ) )
+         if Empty( cCtrlName ); cCtrlName := "ctrl" + LTrim(Str(i)); endif
+         AAdd( aCtrlMap, { hCtrl, cCtrlName } )
+      next
+   endif
+
    // Enumerate child controls
    if hForm != 0
       nCount := UI_GetChildCount( hForm )
@@ -735,6 +770,22 @@ static function RegenerateFormCode( cName, hForm )
          nType      := UI_GetType( hCtrl )
          if Empty( cCtrlName ); cCtrlName := "ctrl" + LTrim(Str(i)); endif
 
+         // Build OF clause: usually "Self", but if the control belongs
+         // to a TFolder page we emit "::oFolderName:aPages[N]" so the
+         // page ownership round-trips through Save / Open.
+         cOf := "Self"
+         hOwner := UI_GetCtrlOwner( hCtrl )
+         if ValType( hOwner ) == "N" .and. hOwner != 0
+            nPg := UI_GetCtrlPage( hCtrl )
+            for kk2 := 1 to Len( aCtrlMap )
+               if aCtrlMap[kk2][1] == hOwner
+                  cOf := "::o" + aCtrlMap[kk2][2] + ":aPages[" + ;
+                         LTrim( Str( nPg + 1 ) ) + "]"
+                  exit
+               endif
+            next
+         endif
+
          // DATA declaration
          cDatas += "   DATA o" + cCtrlName + "   // " + cCtrlClass + e
 
@@ -744,6 +795,11 @@ static function RegenerateFormCode( cName, hForm )
          nCW := UI_GetProp( hCtrl, "nWidth" )
          nCH := UI_GetProp( hCtrl, "nHeight" )
          cText := UI_GetProp( hCtrl, "cText" )
+
+         // Snapshot cCreate length so we can post-process only the
+         // slice the do case below emits: replace "OF Self" with "OF
+         // <cOf>" when the control belongs to a TFolder page.
+         nLen0 := Len( cCreate )
 
          do case
             case nType == 1  // Label
@@ -770,6 +826,19 @@ static function RegenerateFormCode( cName, hForm )
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' GROUPBOX ::o' + cCtrlName + ' PROMPT "' + cText + '" OF Self SIZE ' + ;
                   LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
+            case nType == 33  // Folder / TPageControl (CT_TABCONTROL2)
+               cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
+                  ' FOLDER ::o' + cCtrlName + ' OF Self SIZE ' + ;
+                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH))
+               cVal := UI_GetProp( hCtrl, "aTabs" )
+               if ! Empty( cVal )
+                  cCreate += ' PROMPTS '
+                  for kk := 1 to Len( hb_ATokens( cVal, "|" ) )
+                     if kk > 1; cCreate += ', '; endif
+                     cCreate += '"' + hb_ATokens( cVal, "|" )[ kk ] + '"'
+                  next
+               endif
+               cCreate += e
             case nType == 7  // ListBox
                cCreate += '   // ::o' + cCtrlName + ' (TListBox) at ' + ;
                   LTrim(Str(nL)) + ',' + LTrim(Str(nT)) + ' SIZE ' + ;
@@ -880,6 +949,14 @@ static function RegenerateFormCode( cName, hForm )
                      LTrim(Str(nCW)) + ',' + LTrim(Str(nCH)) + e
                endif
          endcase
+
+         // Page ownership: rewrite "OF Self" to "OF ::oFolderN:aPages[N]"
+         // for controls whose FPageOwner points at a TFolder.
+         if cOf != "Self" .and. Len( cCreate ) > nLen0
+            cSlice := SubStr( cCreate, nLen0 + 1 )
+            cSlice := StrTran( cSlice, " OF Self ", " OF " + cOf + " " )
+            cCreate := Left( cCreate, nLen0 ) + cSlice
+         endif
 
          // Non-visual components don't support visual DATAs like nClrPane or oFont
          if ! IsNonVisual( nType )
@@ -1205,7 +1282,7 @@ static function OnComponentDrop( hForm, nType, nL, nT, nW, nH )
       case nType == 21; cName := "ListView"       + LTrim(Str(aCnt[nType]))
       case nType == 22; cName := "ProgressBar"    + LTrim(Str(aCnt[nType]))
       case nType == 23; cName := "RichEdit"       + LTrim(Str(aCnt[nType]))
-      case nType == 33; cName := "TabControl"     + LTrim(Str(aCnt[nType]))
+      case nType == 33; cName := "Folder"         + LTrim(Str(aCnt[nType]))
       case nType == 34; cName := "TrackBar"       + LTrim(Str(aCnt[nType]))
       case nType == 35; cName := "UpDown"         + LTrim(Str(aCnt[nType]))
       case nType == 36; cName := "DateTimePicker"  + LTrim(Str(aCnt[nType]))
@@ -1678,6 +1755,7 @@ static function RestoreFormFromCode( hForm, cCode )
    local aLines, cLine, cTrim, i, nType, kk
    local nT, nL, nW, nH, cText, cName, hCtrl, cVal
    local nPos, nPos2, cTitle, nCh, cProp, cTypeStr
+   local cFolderName, hFolder, nPageIdx, kkF, hChildN
 
    if Empty( cCode ) .or. hForm == 0
       return nil
@@ -1800,9 +1878,49 @@ static function RestoreFormFromCode( hForm, cCode )
       endif
       if nH < 1; nH := 24; endif
 
+      // OF ::oFolderN:aPages[N] -> set pending page owner BEFORE creating
+      // so the new control auto-attaches to that page.
+      if At( "OF ::o", cTrim ) > 0 .and. ":aPages[" $ cTrim
+         cVal := SubStr( cTrim, At( "OF ::o", cTrim ) + 6 )
+         cFolderName := Left( cVal, At( ":aPages[", cVal ) - 1 )
+         nPageIdx    := Val( SubStr( cVal, At( ":aPages[", cVal ) + 8 ) )
+         hFolder := 0
+         hChildN := UI_GetChildCount( hForm )
+         for kkF := 1 to hChildN
+            if AllTrim( UI_GetProp( UI_GetChild( hForm, kkF ), "cName" ) ) == cFolderName
+               hFolder := UI_GetChild( hForm, kkF )
+               exit
+            endif
+         next
+         if hFolder != 0
+            UI_SetPendingPageOwner( hFolder, nPageIdx - 1 )
+         endif
+      endif
+
       // Determine control type and create it
       hCtrl := 0
       do case
+         case " FOLDER " $ Upper( cTrim )
+            hCtrl := UI_TabControlNew( hForm, nL, nT, nW, nH )
+            // Parse PROMPTS "tab1", "tab2", ... -> aTabs ("tab1|tab2|...")
+            nPos := At( "PROMPTS ", Upper( cTrim ) )
+            if nPos > 0 .and. hCtrl != 0
+               cText := SubStr( cTrim, nPos + 8 )
+               cVal := ""
+               do while ! Empty( cText )
+                  nPos2 := At( '"', cText )
+                  if nPos2 == 0; exit; endif
+                  cText := SubStr( cText, nPos2 + 1 )
+                  nPos2 := At( '"', cText )
+                  if nPos2 == 0; exit; endif
+                  if ! Empty( cVal ); cVal += "|"; endif
+                  cVal += Left( cText, nPos2 - 1 )
+                  cText := SubStr( cText, nPos2 + 1 )
+               enddo
+               if ! Empty( cVal )
+                  UI_SetProp( hCtrl, "aTabs", cVal )
+               endif
+            endif
          case " SAY " $ Upper( cTrim )
             hCtrl := UI_LabelNew( hForm, cText, nL, nT, nW, nH )
          case " BUTTON " $ Upper( cTrim )

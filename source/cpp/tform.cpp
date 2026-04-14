@@ -787,6 +787,21 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
       case WM_NOTIFY:
       {
          LPNMHDR pNMH = (LPNMHDR) lParam;
+         /* Tab control selection changed: switch the visible page on
+            the originating TPageControl. */
+         if( pNMH->code == TCN_SELCHANGE )
+         {
+            int i;
+            for( i = 0; i < FChildCount; i++ )
+            {
+               TControl * c = FChildren[i];
+               if( c && c->FControlType == CT_TABCONTROL2 && c->FHandle == pNMH->hwndFrom )
+               {
+                  ((TTabControl2*)c)->ApplyPageVisibility();
+                  break;
+               }
+            }
+         }
          if( pNMH->code == TTN_GETDISPINFOA )
          {
             LPNMTTDISPINFOA pTTDI = (LPNMTTDISPINFOA) lParam;
@@ -872,7 +887,10 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
                }
             }
 
-            pHit = HitTest( mx, my );
+            /* If a palette component is pending, drop always wins over
+               hit-test: rubber-band on top of any existing control (so you
+               can place a child inside a TFolder page, for example). */
+            pHit = ( FPendingControlType >= 0 ) ? NULL : HitTest( mx, my );
 
             if( pHit )
             {
@@ -1139,6 +1157,30 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
                      newCtrl->FWidth = rw;
                      newCtrl->FHeight = rh;
                      newCtrl->FFont = FFormFont;
+
+                     /* If the drop falls inside a TFolder's client area, tag
+                        the new control with that folder's active page so it
+                        becomes part of the page (unless we're dropping the
+                        folder itself). */
+                     if( ctrlType != CT_TABCONTROL2 )
+                     {
+                        extern void HbSetPendingPageOwner( TControl *, int );
+                        int j;
+                        for( j = 0; j < FChildCount; j++ )
+                        {
+                           TControl * pF = FChildren[j];
+                           if( pF && pF->FControlType == CT_TABCONTROL2 &&
+                               rx1 >= pF->FLeft && rx1 < pF->FLeft + pF->FWidth &&
+                               ry1 >= pF->FTop  && ry1 < pF->FTop  + pF->FHeight )
+                           {
+                              int nPage = pF->FHandle
+                                 ? (int) SendMessageA( pF->FHandle, TCM_GETCURSEL, 0, 0 )
+                                 : 0;
+                              HbSetPendingPageOwner( pF, nPage < 0 ? 0 : nPage );
+                              break;
+                           }
+                        }
+                     }
                      AddChild( newCtrl );
 
                      /* Create the Win32 control */
