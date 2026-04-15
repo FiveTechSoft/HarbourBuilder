@@ -1,7 +1,7 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
-2026-04-15 (iOS: native UIKit backend, Harbour cross-compilation, .app build)
+2026-04-15 (iOS: native UIKit backend, IDE integration, form designer fixes)
 
   FEATURES
   - iOS backend: new source/backends/ios/ with native UIKit controls.
@@ -21,11 +21,36 @@ HarbourBuilder - Cross-platform visual IDE for Harbour
   - setup-ios-toolchain.sh: verifies Xcode, iOS SDK, simulator runtime,
     and Harbour iOS libs; offers to install missing components.
   - install-and-run.sh: installs .app on iOS simulator and launches it.
-  - iOS sample project: samples/projects/ios/ with Project1.prg and
-    Form1.prg demonstrating the UI_* API.
-  - iOS platform documentation: docs/en/platform-ios.html and
-    docs/es/platform-ios.html.
+  - "Run on iOS..." menu item in macOS IDE: generates UI_* PRG code
+    from the visual form design, builds .app via build-ios-app.sh,
+    and installs/launches on the iPhone Simulator.
+  - "iOS Setup Wizard..." menu item in macOS IDE: checks toolchain
+    status (Xcode, iOS SDK, simulator, Harbour host, Harbour iOS libs)
+    and offers to run setup-ios-toolchain.sh in Terminal.app.
+  - GenerateiOSPRG(): converts visual form design to UI_* API calls
+    for iOS target, with 50px vertical offset for safe area, proper
+    control type mapping (Label/Edit/Button), and button click handlers.
+  - iOS sample project: samples/projects/ios/ with Project1.prg,
+    Form1.prg, Project1.hbp, and README.md.
+  - iOS platform documentation: docs/en/platform-ios.html,
+    docs/es/platform-ios.html, and docs/pt/platform-ios.html.
+  - Android platform docs in Portuguese: docs/pt/platform-android.html.
+  - Updated landing page (docs/index.html) with iOS availability.
   - harbour-ios-arm64.zip: pre-built Harbour iOS libraries in releases/.
+  - iOS backend copied to app bundle via build_mac.sh.
+
+  FIXES
+  - macOS form designer: buttons now resize correctly with the rubber
+    band. Changed from NSBezelStyleRounded (which constrains height to
+    intrinsic content size) to NSBezelStyleRegularSquare with layer-based
+    rounded corners (cornerRadius=6), so the button respects explicit
+    frame dimensions from resize handles.
+  - iOS button styling: light gray background (0.82,0.82,0.84) with
+    black text and rounded corners, matching the macOS form designer.
+  - GenerateiOSPRG: fixed swapped control types (nType==2 is Edit,
+    nType==3 is Button), fixed cVarName→cName property name, fixed
+    UI_GetProp("nType")→UI_GetType() API, and only binds UI_OnClick
+    for buttons to prevent undefined symbol linker errors.
 
   FILES ADDED
   - source/backends/ios/ios_core.m
@@ -36,9 +61,12 @@ HarbourBuilder - Cross-platform visual IDE for Harbour
   - source/backends/ios/install-and-run.sh
   - samples/projects/ios/Project1.prg
   - samples/projects/ios/Form1.prg
+  - samples/projects/ios/Project1.hbp
   - samples/projects/ios/README.md
   - docs/en/platform-ios.html
   - docs/es/platform-ios.html
+  - docs/pt/platform-ios.html
+  - docs/pt/platform-android.html
   - releases/harbour-ios-arm64.zip
 
 2026-04-14 (macOS: Label OnClick, button caption update, nClrPane fixes)
