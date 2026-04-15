@@ -628,9 +628,13 @@ HarbourBuilder is open source and welcomes contributions:
 
 ---
 
-## ⚡ Built with Claude Code
+## ⚡ Built with AI
 
-This entire framework — from the C++ core and native backends to the Harbour OOP layer, visual designer, AI assistant, and 20-page documentation — was **vibe coded 100% using [Claude Code](https://claude.ai/claude-code)**.
+This entire framework — from the C++ core and native backends to the Harbour OOP layer, visual designer, AI assistant, and 20-page documentation — was **vibe coded using**:
+
+- [Claude Code](https://claude.ai/claude-code) — Anthropic's AI coding assistant
+- [GLM 5.1](https://z.ai) — Zhipu AI's coding model
+- [Qwen CLI](https://github.com/QwenLM/qwen-cli) — Alibaba's Qwen coding assistant
 
 A new paradigm in software development.
 
@@ -646,6 +650,6 @@ MIT License — free for personal and commercial use.
 
 **⭐ Star this repo if you believe in the future of Harbour development!**
 
-Made with ❤️ by [Antonio Linares](https://github.com/FiveTechSoft) and [Claude Code](https://claude.ai/claude-code)
+Made with ❤️ by [Antonio Linares](https://github.com/FiveTechSoft) using [Claude Code](https://claude.ai/claude-code) · [GLM 5.1](https://z.ai) · [Qwen CLI](https://github.com/QwenLM/qwen-cli)
 
 </div>
