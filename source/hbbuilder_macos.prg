@@ -862,6 +862,12 @@ static function RegenerateFormCode( cName, hForm )
                cCreate += '   ::o' + cCtrlName + ':nClrPane := ' + LTrim( Str( nCtrlClr ) ) + e
             endif
 
+            // Emit nClrText if non-default (default = 0xFFFFFFFF = 4294967295)
+            nCtrlClr := UI_GetProp( hCtrl, "nClrText" )
+            if nCtrlClr != 4294967295
+               cCreate += '   ::o' + cCtrlName + ':nClrText := ' + LTrim( Str( nCtrlClr ) ) + e
+            endif
+
             // Emit lTransparent for labels when not default (.F. instead of default .T.)
             if nType == 1 .and. UI_GetProp( hCtrl, "lTransparent" ) == .F.
                cCreate += '   ::o' + cCtrlName + ':lTransparent := .F.' + e
@@ -899,10 +905,10 @@ static function RegenerateFormCode( cName, hForm )
                   j := At( Chr(10), cLine )
                   if j > 0; cLine := Left( cLine, j - 1 ); endif
                   cLine := AllTrim( StrTran( cLine, Chr(13), "" ) )
-                  // Skip properties already managed by codegen (nClrPane, lTransparent,
-                  // nAlign, oFont) to prevent accumulation when values change
-                  if ":nClrPane" $ cLine .or. ":lTransparent" $ cLine .or. ;
-                     ":nAlign" $ cLine .or. ":oFont" $ cLine
+                  // Skip properties already managed by codegen (nClrPane, nClrText,
+                  // lTransparent, nAlign, oFont) to prevent accumulation when values change
+                  if ":nClrPane" $ cLine .or. ":nClrText" $ cLine .or. ;
+                     ":lTransparent" $ cLine .or. ":nAlign" $ cLine .or. ":oFont" $ cLine
                      nPos += Len( cEvName )
                      loop
                   endif
@@ -1550,6 +1556,8 @@ static function RestoreFormFromCode( hForm, cCode )
 
       if cVal == "nClrPane" .or. cVal == "Color"
          UI_SetProp( hCtrl, "nClrPane", Val( cText ) )
+      elseif cVal == "nClrText"
+         UI_SetProp( hCtrl, "nClrText", Val( cText ) )
       elseif cVal == "oFont"
          if Left( cText, 1 ) == '"'
             cText := SubStr( cText, 2, Len( cText ) - 2 )

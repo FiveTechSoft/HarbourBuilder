@@ -3758,7 +3758,12 @@ HB_FUNC( UI_SETPROP )
    else if( strcasecmp(szProp,"lTransparent")==0 ) {
       p->FTransparent = hb_parl(3);
       if( p->FView && [p->FView isKindOfClass:[NSTextField class]] && p->FControlType == CT_LABEL )
+      {
          [(NSTextField *)p->FView setDrawsBackground:!p->FTransparent];
+         /* When switching to non-transparent, apply nClrPane background if set */
+         if( !p->FTransparent && p->FClrPane != 0xFFFFFFFF && p->FBgColor )
+            [(NSTextField *)p->FView setBackgroundColor:p->FBgColor];
+      }
    }
    else if( strcasecmp(szProp,"nAlign")==0 && HB_ISNUM(3) ) {
       p->nAlign = hb_parni(3);
@@ -4063,7 +4068,9 @@ HB_FUNC( UI_SETPROP )
       {
          if( [p->FView isKindOfClass:[NSTextField class]] ) {
             [(NSTextField *)p->FView setBackgroundColor:p->FBgColor];
-            [(NSTextField *)p->FView setDrawsBackground:YES];
+            /* Respect lTransparent for labels — don't force drawsBackground if transparent */
+            if( !( p->FControlType == CT_LABEL && p->FTransparent ) )
+               [(NSTextField *)p->FView setDrawsBackground:YES];
          }
          else
             [p->FView setNeedsDisplay:YES];
@@ -4377,6 +4384,7 @@ HB_FUNC( UI_GETALLPROPS )
          ADD_L("lCancel",((HBButton*)p)->FCancel,"Behavior"); break;
       case CT_CHECKBOX: ADD_L("lChecked",((HBCheckBox*)p)->FChecked,"Data"); break;
       case CT_LABEL: ADD_L("lTransparent",p->FTransparent,"Appearance");
+         ADD_C("nClrText",p->FClrText,"Appearance");
          ADD_D("nAlign",p->nAlign,"Left|Center|Right","Appearance"); break;
       case CT_EDIT:
          ADD_L("lReadOnly",((HBEdit*)p)->FReadOnly,"Behavior");

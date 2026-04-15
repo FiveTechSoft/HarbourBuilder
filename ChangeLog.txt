@@ -1,6 +1,20 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-15 (macOS: Label nClrText, lTransparent fix, iOS UIKit backend, form designer fixes)
+
+  FIXES
+  - Label nClrText: foreground (text) color property now exposed in the
+    Object Inspector for labels. Added nClrText to the CT_LABEL property
+    list in UI_GetAllProps, added ACCESS/ASSIGN in classes.prg, added
+    code generation and property-change handling in hbbuilder_macos.prg.
+  - Label lTransparent: setting nClrPane on a label no longer forces
+    drawsBackground:YES when lTransparent=.T. — the nClrPane setter now
+    respects the transparent flag. Switching lTransparent from .T. to
+    .F. now also applies the stored nClrPane background color.
+  - Docs: Architecture pages (EN, ES, PT) updated to include iOS in all
+    diagrams, tables, event system, file structure, and build pipeline.
+
 2026-04-15 (iOS: native UIKit backend, IDE integration, form designer fixes)
 
   FEATURES

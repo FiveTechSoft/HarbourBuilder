@@ -1205,7 +1205,13 @@ static int         s_pendingPage   = 0;
    NSTextField * tf = [[NSTextField alloc] initWithFrame:
       NSMakeRect( FLeft, FTop, FWidth, FHeight )];
    [tf setStringValue:[NSString stringWithUTF8String:FText]];
-   [tf setBezeled:NO]; [tf setDrawsBackground:!FTransparent];
+   [tf setBezeled:NO];
+   if( FClrPane != 0xFFFFFFFF ) {
+      [tf setDrawsBackground:YES];
+      if( FBgColor ) [tf setBackgroundColor:FBgColor];
+   } else {
+      [tf setDrawsBackground:!FTransparent];
+   }
    [tf setEditable:NO]; [tf setSelectable:NO];
    if( nAlign == 1 ) [tf setAlignment:NSTextAlignmentCenter];
    else if( nAlign == 2 ) [tf setAlignment:NSTextAlignmentRight];
@@ -1224,8 +1230,18 @@ static int         s_pendingPage   = 0;
       r.origin.x = FLeft; r.origin.y = FTop; r.size.width = FWidth;
       [tf setFrame:r];
    }
+   [tf setAllowsEditingTextAttributes:NO];
+   /* Enable click handling for OnClick at runtime */
+   NSClickGestureRecognizer * click = [[NSClickGestureRecognizer alloc]
+      initWithTarget:self action:@selector(labelClicked:)];
+   [tf addGestureRecognizer:click];
    [parentView addSubview:tf];
    FView = tf;
+}
+
+- (void)labelClicked:(id)sender
+{
+   if( FOnClick ) [self fireEvent:FOnClick];
 }
 
 @end
@@ -1286,11 +1302,15 @@ static int         s_pendingPage   = 0;
    NSString * title = [[NSString stringWithUTF8String:FText]
       stringByReplacingOccurrencesOfString:@"&" withString:@""];
    [btn setTitle:title];
-   [btn setBezelStyle:NSBezelStyleRounded];
+   [btn setBezelStyle:NSBezelStyleRegularSquare];
    [btn setButtonType:NSButtonTypeMomentaryPushIn];
    if( FDefault ) [btn setKeyEquivalent:@"\r"];
    if( FCancel )  [btn setKeyEquivalent:@"\033"];
    if( FFont ) [btn setFont:FFont];
+   btn.wantsLayer = YES;
+   btn.layer.masksToBounds = YES;
+   btn.layer.cornerRadius = 6.0;
+   btn.layer.backgroundColor = [[NSColor controlColor] CGColor];
    [btn setTarget:self]; [btn setAction:@selector(buttonClicked:)];
    [parentView addSubview:btn];
    FView = btn;
@@ -3709,10 +3729,10 @@ HB_FUNC( UI_SETPROP )
             tv = (NSTextView *)v;
          if( tv ) [tv setString:[NSString stringWithUTF8String:p->FText]];
       }
+      else if( p->FView && [p->FView isKindOfClass:[NSButton class]] )
+         [(NSButton *)p->FView setTitle:[NSString stringWithUTF8String:p->FText]];
       else if( p->FView && [p->FView respondsToSelector:@selector(setStringValue:)] )
          [(id)p->FView setStringValue:[NSString stringWithUTF8String:p->FText]];
-      else if( p->FView && [p->FView respondsToSelector:@selector(setTitle:)] )
-         [(id)p->FView setTitle:[NSString stringWithUTF8String:p->FText]];
    }
    else if( strcasecmp(szProp,"nLeft")==0 )   {
       p->FLeft = hb_parni(3);
@@ -3738,7 +3758,12 @@ HB_FUNC( UI_SETPROP )
    else if( strcasecmp(szProp,"lTransparent")==0 ) {
       p->FTransparent = hb_parl(3);
       if( p->FView && [p->FView isKindOfClass:[NSTextField class]] && p->FControlType == CT_LABEL )
+      {
          [(NSTextField *)p->FView setDrawsBackground:!p->FTransparent];
+         /* When switching to non-transparent, apply nClrPane background if set */
+         if( !p->FTransparent && p->FClrPane != 0xFFFFFFFF && p->FBgColor )
+            [(NSTextField *)p->FView setBackgroundColor:p->FBgColor];
+      }
    }
    else if( strcasecmp(szProp,"nAlign")==0 && HB_ISNUM(3) ) {
       p->nAlign = hb_parni(3);
@@ -4041,8 +4066,12 @@ HB_FUNC( UI_SETPROP )
       }
       else if( p->FView )
       {
-         if( [p->FView isKindOfClass:[NSTextField class]] )
+         if( [p->FView isKindOfClass:[NSTextField class]] ) {
             [(NSTextField *)p->FView setBackgroundColor:p->FBgColor];
+            /* Respect lTransparent for labels — don't force drawsBackground if transparent */
+            if( !( p->FControlType == CT_LABEL && p->FTransparent ) )
+               [(NSTextField *)p->FView setDrawsBackground:YES];
+         }
          else
             [p->FView setNeedsDisplay:YES];
       }
@@ -4355,6 +4384,7 @@ HB_FUNC( UI_GETALLPROPS )
          ADD_L("lCancel",((HBButton*)p)->FCancel,"Behavior"); break;
       case CT_CHECKBOX: ADD_L("lChecked",((HBCheckBox*)p)->FChecked,"Data"); break;
       case CT_LABEL: ADD_L("lTransparent",p->FTransparent,"Appearance");
+         ADD_C("nClrText",p->FClrText,"Appearance");
          ADD_D("nAlign",p->nAlign,"Left|Center|Right","Appearance"); break;
       case CT_EDIT:
          ADD_L("lReadOnly",((HBEdit*)p)->FReadOnly,"Behavior");

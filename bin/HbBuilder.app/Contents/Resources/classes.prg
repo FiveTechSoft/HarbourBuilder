@@ -50,6 +50,9 @@ CLASS TControl
    ACCESS nClrPane         INLINE UI_GetProp( ::hCpp, "nClrPane" )
    ASSIGN nClrPane( n )    INLINE UI_SetProp( ::hCpp, "nClrPane", n )
 
+   ACCESS nClrText         INLINE UI_GetProp( ::hCpp, "nClrText" )
+   ASSIGN nClrText( n )    INLINE UI_SetProp( ::hCpp, "nClrText", n )
+
    ACCESS lTransparent     INLINE UI_GetProp( ::hCpp, "lTransparent" )
    ASSIGN lTransparent( l ) INLINE UI_SetProp( ::hCpp, "lTransparent", l )
 
