@@ -1,6 +1,41 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-16 (macOS: CheckBox/RadioButton CHECKED persistence, codegen robustness)
+
+  FEATURES
+  - CHECKBOX / RADIOBUTTON codegen now emits the CHECKED clause when
+    lChecked is true in the designer, and the form-loader parses
+    " CHECKED" back into UI_SetProp("lChecked", .T.). Runtime state
+    now matches what the user sees in the Inspector.
+  - TRadioButton lChecked fully wired on macOS: new FRadioChecked
+    field on HBControl (default NO) persists the checked state even
+    when UI_SetProp is called before the NSButton exists. Applied
+    in createViewInParent on the CT_RADIO branch, mirroring the
+    HBCheckBox FChecked pattern.
+  - TRadioButton Checked exposed in the Inspector: UI_GetAllProps
+    adds an lChecked row for CT_RADIO reading the live NSButton
+    state (or FRadioChecked when the view isn't created yet).
+  - UI_GetProp / UI_SetProp now handle "lChecked" on CT_RADIO
+    (previously only CT_CHECKBOX), so ::oRadio:Checked works both
+    at design-time and runtime.
+
+  FIXES
+  - Codegen no longer emits property assignments for controls
+    whose creation line was only a comment placeholder. For types
+    without a dedicated case (TScrollBar, TPanel, TBevel, TShape,
+    TImage, TBitBtn, TSpeedButton, TMaskEdit, TStringGrid,
+    TScrollBox, TStaticText, TLabeledEdit, TListView, TProgressBar,
+    TRichEdit, TTrackBar, TUpDown, TDateTimePicker, TMonthCalendar,
+    TPaintBox, TWebView), RegenerateFormCode emits
+        // ::oCtrl (TScrollBar) at L,T SIZE W,H
+    followed by an empty DATA slot — and previously also emitted
+    ::oCtrl:oFont := "...", ::oCtrl:nClrPane := N, etc. At runtime
+    those assignments sent messages to a nil DATA, which Harbour
+    reported as "No exported variable" (BASE 1005, Operation OFONT).
+    A new lCommented flag is set in the commented-only branch and
+    the property-emit section is skipped via `loop`.
+
 2026-04-16 (macOS: TListBox/TComboBox aItems+nItemIndex, TForm nBorderStyle live update)
 
   FEATURES

@@ -637,6 +637,7 @@ static function RegenerateFormCode( cName, hForm )
    local aHdrs, kk, nColCount, aColProps, nColW, nCtrlClr, nInterval
    local cParent, nOwnerH, nPos, nPos2, cLine
    local aMethodNames, cMethodName
+   local lCommented
 
    // Read existing code to find declared event handlers
    cExistingCode := ""
@@ -703,6 +704,7 @@ static function RegenerateFormCode( cName, hForm )
             next
          endif
 
+         lCommented := .F.
          do case
             case nType == 1  // Label
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
@@ -719,7 +721,11 @@ static function RegenerateFormCode( cName, hForm )
             case nType == 4  // CheckBox
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' CHECKBOX ::o' + cCtrlName + ' PROMPT "' + cText + '" OF ' + cParent + ' SIZE ' + ;
-                  LTrim(Str(nCW)) + e
+                  LTrim(Str(nCW))
+               if UI_GetProp( hCtrl, "lChecked" )
+                  cCreate += ' CHECKED'
+               endif
+               cCreate += e
             case nType == 5  // ComboBox
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' COMBOBOX ::o' + cCtrlName + ' OF ' + cParent
@@ -754,7 +760,11 @@ static function RegenerateFormCode( cName, hForm )
             case nType == 8  // RadioButton
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' RADIOBUTTON ::o' + cCtrlName + ' PROMPT "' + cText + '" OF ' + cParent + ' SIZE ' + ;
-                  LTrim(Str(nCW)) + e
+                  LTrim(Str(nCW))
+               if UI_GetProp( hCtrl, "lChecked" )
+                  cCreate += ' CHECKED'
+               endif
+               cCreate += e
             case nType == 24  // Memo
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' MEMO ::o' + cCtrlName + ' OF ' + cParent + ' SIZE ' + ;
@@ -861,8 +871,15 @@ static function RegenerateFormCode( cName, hForm )
                   cCreate += '   // ::o' + cCtrlName + ' (' + cCtrlClass + ') at ' + ;
                      LTrim(Str(nL)) + ',' + LTrim(Str(nT)) + ' SIZE ' + ;
                      LTrim(Str(nCW)) + ',' + LTrim(Str(nCH)) + e
+                  lCommented := .T.
                endif
          endcase
+
+         // Skip property emits when creation was only a comment placeholder;
+         // assigning to ::oXxx would send messages to a nil DATA slot.
+         if lCommented
+            loop
+         endif
 
          // Emit visual properties only for visual controls
          if ! IsNonVisual( nType )
@@ -1409,6 +1426,9 @@ static function RestoreFormFromCode( hForm, cCode )
             hCtrl := UI_EditNew( hForm, cText, nL, nT, nW, nH )
          case " CHECKBOX " $ Upper( cTrim )
             hCtrl := UI_CheckBoxNew( hForm, cText, nL, nT, nW, nH )
+            if " CHECKED" $ Upper( cTrim ) .and. hCtrl != 0
+               UI_SetProp( hCtrl, "lChecked", .T. )
+            endif
          case " COMBOBOX " $ Upper( cTrim )
             hCtrl := UI_ComboBoxNew( hForm, nL, nT, nW, nH )
             // Parse ITEMS { "A", "B", ... }
@@ -1451,6 +1471,9 @@ static function RestoreFormFromCode( hForm, cCode )
             endif
          case " RADIOBUTTON " $ Upper( cTrim )
             hCtrl := UI_RadioButtonNew( hForm, cText, nL, nT, nW, nH )
+            if " CHECKED" $ Upper( cTrim ) .and. hCtrl != 0
+               UI_SetProp( hCtrl, "lChecked", .T. )
+            endif
          case " MEMO " $ Upper( cTrim )
             hCtrl := UI_MemoNew( hForm, "", nL, nT, nW, nH )
          case " TREEVIEW " $ Upper( cTrim )

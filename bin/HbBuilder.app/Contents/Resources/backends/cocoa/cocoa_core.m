@@ -327,6 +327,7 @@ void EnsureNSApp( void )
    BOOL        FTransparent; /* TRUE = don't draw background (labels default TRUE) */
    int         nAlign;      /* 0=Left, 1=Center, 2=Right (text alignment) */
    int         FListSelIndex; /* TListBox selected row (1-based, clamped 1..count) */
+   BOOL        FRadioChecked; /* TRadioButton check state (CT_RADIO only) */
 }
 - (void)addChild:(HBControl *)child;
 - (void)setText:(const char *)text;
@@ -811,6 +812,7 @@ static int         s_pendingPage   = 0;
       memset( FChildren, 0, sizeof(FChildren) );
       FOwnerCtrl = nil; FOwnerPage = 0; FAutoPage = NO; FTransparent = NO; nAlign = 0;
       FListSelIndex = 1;
+      FRadioChecked = NO;
    }
    return self;
 }
@@ -882,6 +884,7 @@ static int         s_pendingPage   = 0;
             initWithString:[NSString stringWithUTF8String:FText]
             attributes:@{ NSForegroundColorAttributeName: [NSColor blackColor] }];
          [rb setAttributedTitle:rbTitle];
+         if( FRadioChecked ) [rb setState:NSControlStateValueOn];
          v = rb; break;
       }
       case CT_SCROLLBAR: {
@@ -3910,6 +3913,12 @@ HB_FUNC( UI_SETPROP )
       ((HBButton *)p)->FCancel = hb_parl(3);
    else if( strcasecmp(szProp,"lChecked")==0 && p->FControlType == CT_CHECKBOX )
       [(HBCheckBox *)p setChecked:hb_parl(3)];
+   else if( strcasecmp(szProp,"lChecked")==0 && p->FControlType == CT_RADIO ) {
+      p->FRadioChecked = hb_parl(3);
+      if( p->FView )
+         [(NSButton *)p->FView setState:
+            ( p->FRadioChecked ? NSControlStateValueOn : NSControlStateValueOff )];
+   }
    else if( strcasecmp(szProp,"cName")==0 && HB_ISCHAR(3) )
       strncpy( p->FName, hb_parc(3), sizeof(p->FName)-1 );
    else if( strcasecmp(szProp,"cFileName")==0 && HB_ISCHAR(3) )
@@ -4363,6 +4372,10 @@ HB_FUNC( UI_GETPROP )
       hb_retl( ((HBButton *)p)->FCancel );
    else if( strcasecmp(szProp,"lChecked")==0 && p->FControlType==CT_CHECKBOX )
       hb_retl( ((HBCheckBox *)p)->FChecked );
+   else if( strcasecmp(szProp,"lChecked")==0 && p->FControlType==CT_RADIO )
+      hb_retl( p->FView
+         ? ( [(NSButton *)p->FView state] == NSControlStateValueOn )
+         : p->FRadioChecked );
    else if( strcasecmp(szProp,"cName")==0 )      hb_retc( p->FName );
    else if( strcasecmp(szProp,"cClassName")==0 ) hb_retc( p->FClassName );
    else if( strcasecmp(szProp,"cFileName")==0 )  hb_retc( p->FFileName );
@@ -4591,6 +4604,10 @@ HB_FUNC( UI_GETALLPROPS )
          ADD_L("lDefault",((HBButton*)p)->FDefault,"Behavior");
          ADD_L("lCancel",((HBButton*)p)->FCancel,"Behavior"); break;
       case CT_CHECKBOX: ADD_L("lChecked",((HBCheckBox*)p)->FChecked,"Data"); break;
+      case CT_RADIO: {
+         BOOL on = p->FView && [(NSButton *)p->FView state] == NSControlStateValueOn;
+         ADD_L("lChecked", on, "Data"); break;
+      }
       case CT_LABEL: ADD_L("lTransparent",p->FTransparent,"Appearance");
          ADD_C("nClrText",p->FClrText,"Appearance");
          ADD_D("nAlign",p->nAlign,"Left|Center|Right","Appearance"); break;
