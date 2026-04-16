@@ -328,6 +328,10 @@ void EnsureNSApp( void )
    int         nAlign;      /* 0=Left, 1=Center, 2=Right (text alignment) */
    int         FListSelIndex; /* TListBox selected row (1-based, clamped 1..count) */
    BOOL        FRadioChecked; /* TRadioButton check state (CT_RADIO only) */
+   int         FKind;              /* TBitBtn Kind (bkCustom..bkAll) */
+   int         FBitBtnModalResult; /* TBitBtn ModalResult (mrNone..mrClose) */
+   char        FPicture[512];      /* TBitBtn image path */
+   BOOL        FFlat;              /* TSpeedButton Flat (NO = show border) */
 }
 - (void)addChild:(HBControl *)child;
 - (void)setText:(const char *)text;
@@ -793,6 +797,36 @@ static int         s_pendingPage   = 0;
 }
 @end
 
+/* Resolve a TBitBtn NSImage from either Kind (bkOK..bkAll) via SF Symbol,
+ * or cPicture file path. Returns nil for bkCustom + empty picture. */
+static NSImage * HBResolveBitBtnImage( int kind, const char * picture )
+{
+   if( picture && picture[0] ) {
+      NSString * path = [NSString stringWithUTF8String:picture];
+      NSImage * img = [[NSImage alloc] initWithContentsOfFile:path];
+      if( img ) return img;
+   }
+   if( kind <= 0 ) return nil;
+   if( @available( macOS 11.0, * ) ) {
+      NSString * sym = nil;
+      switch( kind ) {
+         case 1:  sym = @"checkmark.circle.fill";       break; /* bkOK */
+         case 2:  sym = @"xmark.circle.fill";           break; /* bkCancel */
+         case 3:  sym = @"questionmark.circle.fill";    break; /* bkHelp */
+         case 4:  sym = @"checkmark";                   break; /* bkYes */
+         case 5:  sym = @"xmark";                       break; /* bkNo */
+         case 6:  sym = @"xmark.square.fill";           break; /* bkClose */
+         case 7:  sym = @"exclamationmark.octagon.fill";break; /* bkAbort */
+         case 8:  sym = @"arrow.clockwise";             break; /* bkRetry */
+         case 9:  sym = @"minus.circle";                break; /* bkIgnore */
+         case 10: sym = @"checkmark.rectangle.stack.fill"; break; /* bkAll */
+      }
+      if( sym )
+         return [NSImage imageWithSystemSymbolName:sym accessibilityDescription:nil];
+   }
+   return nil;
+}
+
 @implementation HBControl
 
 - (instancetype)init
@@ -813,6 +847,7 @@ static int         s_pendingPage   = 0;
       FOwnerCtrl = nil; FOwnerPage = 0; FAutoPage = NO; FTransparent = NO; nAlign = 0;
       FListSelIndex = 1;
       FRadioChecked = NO;
+      FKind = 0; FBitBtnModalResult = 0; FPicture[0] = '\0'; FFlat = NO;
    }
    return self;
 }
@@ -896,11 +931,39 @@ static int         s_pendingPage   = 0;
          [btn setTitle:[NSString stringWithUTF8String:FText]];
          [btn setBezelStyle:NSBezelStyleRounded];
          if( FControlType == CT_SPEEDBTN ) [btn setBordered:NO];
+         {
+            NSImage * img = HBResolveBitBtnImage( FKind, FPicture );
+            if( img ) {
+               [btn setImage:img];
+               [btn setImagePosition:( FText[0] ? NSImageLeft : NSImageOnly )];
+            }
+         }
+         /* NSButton ignores backgroundColor; use a CALayer so nClrPane paints. */
+         if( FClrPane != 0xFFFFFFFF && FBgColor ) {
+            [btn setWantsLayer:YES];
+            btn.layer.backgroundColor = [FBgColor CGColor];
+         }
+         /* SpeedButton: show a 1px grey border unless Flat is set */
+         if( FControlType == CT_SPEEDBTN && !FFlat ) {
+            [btn setWantsLayer:YES];
+            btn.layer.borderWidth = 1.0;
+            btn.layer.borderColor = [[NSColor colorWithCalibratedWhite:0.5 alpha:1.0] CGColor];
+            btn.layer.cornerRadius = 3.0;
+         }
          v = btn; break;
       }
       case CT_IMAGE: {
          NSImageView * iv = [[NSImageView alloc] initWithFrame:NSMakeRect(FLeft,FTop,FWidth,FHeight)];
-         [iv setImageFrameStyle:NSImageFrameGrayBezel]; v = iv; break;
+         [iv setImageFrameStyle:NSImageFrameGrayBezel];
+         if( FPicture[0] ) {
+            NSImage * img = [[NSImage alloc] initWithContentsOfFile:
+               [NSString stringWithUTF8String:FPicture]];
+            if( img ) {
+               [iv setImage:img];
+               [iv setImageScaling:NSImageScaleProportionallyUpOrDown];
+            }
+         }
+         v = iv; break;
       }
       case CT_SHAPE: case CT_PAINTBOX: {
          NSView * dv = [[NSView alloc] initWithFrame:NSMakeRect(FLeft,FTop,FWidth,FHeight)];
@@ -2314,6 +2377,14 @@ static HBPaletteTarget * s_palTarget = nil;
                      p->FLeft=rx1; p->FTop=ry1;
                      p->FWidth = rw > 10 ? rw : defs[i].dw;
                      p->FHeight = rh > 10 ? rh : defs[i].dh;
+                     /* Delphi TSpeedButton defaults: btnFace bg, non-flat */
+                     if( ctrlType == CT_SPEEDBTN ) {
+                        p->FClrPane = 0x00F0F0F0;
+                        p->FBgColor = [NSColor colorWithCalibratedRed:0xF0/255.0
+                                                                green:0xF0/255.0
+                                                                 blue:0xF0/255.0 alpha:1.0];
+                        p->FFlat = NO;
+                     }
                      newCtrl = p;
                      break;
                   }
@@ -3421,8 +3492,29 @@ HB_FUNC( UI_BITBTNNEW )
 {
    HBForm * pForm = GetForm(1); HBControl * p = [[HBControl alloc] init];
    p->FControlType = CT_BITBTN;
-   if( HB_ISNUM(2) ) p->FLeft = hb_parni(2);   if( HB_ISNUM(3) ) p->FTop = hb_parni(3);
-   if( HB_ISNUM(4) ) p->FWidth = hb_parni(4);  if( HB_ISNUM(5) ) p->FHeight = hb_parni(5);
+   p->FWidth = 88; p->FHeight = 26;
+   strncpy( p->FClassName, "TBitBtn", sizeof(p->FClassName) - 1 );
+   if( HB_ISCHAR(2) ) [p setText:hb_parc(2)];
+   if( HB_ISNUM(3) ) p->FLeft = hb_parni(3);   if( HB_ISNUM(4) ) p->FTop = hb_parni(4);
+   if( HB_ISNUM(5) ) p->FWidth = hb_parni(5);  if( HB_ISNUM(6) ) p->FHeight = hb_parni(6);
+   if( pForm ) [pForm addChild:p]; RetCtrl( p );
+}
+
+HB_FUNC( UI_SPEEDBTNNEW )
+{
+   HBForm * pForm = GetForm(1); HBControl * p = [[HBControl alloc] init];
+   p->FControlType = CT_SPEEDBTN;
+   p->FWidth = 23; p->FHeight = 22;
+   strncpy( p->FClassName, "TSpeedButton", sizeof(p->FClassName) - 1 );
+   /* Delphi-like defaults: btnFace background + non-flat (bordered) */
+   p->FClrPane = 0x00F0F0F0;
+   p->FBgColor = [NSColor colorWithCalibratedRed:0xF0/255.0
+                                           green:0xF0/255.0
+                                            blue:0xF0/255.0 alpha:1.0];
+   p->FFlat = NO;
+   if( HB_ISCHAR(2) ) [p setText:hb_parc(2)];
+   if( HB_ISNUM(3) ) p->FLeft = hb_parni(3);   if( HB_ISNUM(4) ) p->FTop = hb_parni(4);
+   if( HB_ISNUM(5) ) p->FWidth = hb_parni(5);  if( HB_ISNUM(6) ) p->FHeight = hb_parni(6);
    if( pForm ) [pForm addChild:p]; RetCtrl( p );
 }
 
@@ -3919,6 +4011,79 @@ HB_FUNC( UI_SETPROP )
          [(NSButton *)p->FView setState:
             ( p->FRadioChecked ? NSControlStateValueOn : NSControlStateValueOff )];
    }
+   else if( p->FControlType == CT_IMAGE &&
+            ( strcasecmp(szProp,"cPicture")==0 || strcasecmp(szProp,"cFileName")==0 ) )
+   {
+      if( HB_ISCHAR(3) )
+         strncpy( p->FPicture, hb_parc(3), sizeof(p->FPicture)-1 );
+      if( p->FView ) {
+         NSImage * img = p->FPicture[0]
+            ? [[NSImage alloc] initWithContentsOfFile:
+               [NSString stringWithUTF8String:p->FPicture]]
+            : nil;
+         [(NSImageView *)p->FView setImage:img];
+         if( img ) [(NSImageView *)p->FView setImageScaling:NSImageScaleProportionallyUpOrDown];
+      }
+   }
+   else if( ( p->FControlType == CT_BITBTN || p->FControlType == CT_SPEEDBTN ) &&
+            ( strcasecmp(szProp,"nKind")==0 || strcasecmp(szProp,"cPicture")==0 ) )
+   {
+      if( strcasecmp(szProp,"nKind")==0 ) p->FKind = hb_parni(3);
+      else if( HB_ISCHAR(3) )
+         strncpy( p->FPicture, hb_parc(3), sizeof(p->FPicture)-1 );
+      if( p->FView ) {
+         NSButton * btn = (NSButton *) p->FView;
+         NSImage * img = HBResolveBitBtnImage( p->FKind, p->FPicture );
+         if( img ) {
+            [btn setImage:img];
+            [btn setImagePosition:( p->FText[0] ? NSImageLeft : NSImageOnly )];
+         } else {
+            [btn setImage:nil];
+            [btn setImagePosition:NSNoImage];
+         }
+      }
+      /* Apply C++Builder Kind defaults (Caption / Default / Cancel / ModalResult) */
+      if( strcasecmp(szProp,"nKind")==0 ) {
+         const char * cap = NULL;
+         int mr = 0, def = 0, cancel = 0;
+         switch( p->FKind ) {
+            case 1:  cap="OK";     def=1; mr=1; break; /* bkOK */
+            case 2:  cap="Cancel"; cancel=1; mr=2; break;
+            case 3:  cap="Help";                 break;
+            case 4:  cap="Yes";    def=1; mr=6; break;
+            case 5:  cap="No";     cancel=1; mr=7; break;
+            case 6:  cap="Close"; mr=9;          break;
+            case 7:  cap="Abort"; mr=3;          break;
+            case 8:  cap="Retry"; mr=4;          break;
+            case 9:  cap="Ignore"; mr=5;         break;
+            case 10: cap="All";   mr=8;          break;
+         }
+         if( cap && p->FText[0] == 0 ) {
+            strncpy( p->FText, cap, sizeof(p->FText) - 1 );
+            if( p->FView ) [(NSButton *)p->FView setTitle:[NSString stringWithUTF8String:cap]];
+         }
+         p->FBitBtnModalResult = mr;
+         /* Default/Cancel bits are stored on HBButton, not on CT_BITBTN —
+          * expose via separate lDefault/lCancel setters if desired. */
+         (void)def; (void)cancel;
+      }
+   }
+   else if( strcasecmp(szProp,"nModalResult")==0 && p->FControlType == CT_BITBTN )
+      p->FBitBtnModalResult = hb_parni(3);
+   else if( strcasecmp(szProp,"lFlat")==0 && p->FControlType == CT_SPEEDBTN ) {
+      p->FFlat = hb_parl(3);
+      if( p->FView ) {
+         NSView * v = (NSView *) p->FView;
+         [v setWantsLayer:YES];
+         if( p->FFlat ) {
+            v.layer.borderWidth = 0;
+         } else {
+            v.layer.borderWidth = 1.0;
+            v.layer.borderColor = [[NSColor colorWithCalibratedWhite:0.5 alpha:1.0] CGColor];
+            v.layer.cornerRadius = 3.0;
+         }
+      }
+   }
    else if( strcasecmp(szProp,"cName")==0 && HB_ISCHAR(3) )
       strncpy( p->FName, hb_parc(3), sizeof(p->FName)-1 );
    else if( strcasecmp(szProp,"cFileName")==0 && HB_ISCHAR(3) )
@@ -4276,6 +4441,14 @@ HB_FUNC( UI_SETPROP )
             }
          }
       }
+      else if( p->FControlType == CT_SPEEDBTN || p->FControlType == CT_BITBTN ||
+               p->FControlType == CT_BUTTON )
+      {
+         if( p->FView ) {
+            [p->FView setWantsLayer:YES];
+            ((NSView *)p->FView).layer.backgroundColor = [p->FBgColor CGColor];
+         }
+      }
       else if( p->FView )
       {
          if( [p->FView isKindOfClass:[NSTextField class]] ) {
@@ -4376,6 +4549,17 @@ HB_FUNC( UI_GETPROP )
       hb_retl( p->FView
          ? ( [(NSButton *)p->FView state] == NSControlStateValueOn )
          : p->FRadioChecked );
+   else if( strcasecmp(szProp,"nKind")==0 &&
+            ( p->FControlType==CT_BITBTN || p->FControlType==CT_SPEEDBTN ) )
+      hb_retni( p->FKind );
+   else if( strcasecmp(szProp,"cPicture")==0 &&
+            ( p->FControlType==CT_BITBTN || p->FControlType==CT_SPEEDBTN ||
+              p->FControlType==CT_IMAGE ) )
+      hb_retc( p->FPicture );
+   else if( strcasecmp(szProp,"nModalResult")==0 && p->FControlType==CT_BITBTN )
+      hb_retni( p->FBitBtnModalResult );
+   else if( strcasecmp(szProp,"lFlat")==0 && p->FControlType==CT_SPEEDBTN )
+      hb_retl( p->FFlat );
    else if( strcasecmp(szProp,"cName")==0 )      hb_retc( p->FName );
    else if( strcasecmp(szProp,"cClassName")==0 ) hb_retc( p->FClassName );
    else if( strcasecmp(szProp,"cFileName")==0 )  hb_retc( p->FFileName );
@@ -4608,6 +4792,20 @@ HB_FUNC( UI_GETALLPROPS )
          BOOL on = p->FView && [(NSButton *)p->FView state] == NSControlStateValueOn;
          ADD_L("lChecked", on, "Data"); break;
       }
+      case CT_BITBTN:
+         ADD_D("nKind", p->FKind,
+            "bkCustom|bkOK|bkCancel|bkHelp|bkYes|bkNo|bkClose|bkAbort|bkRetry|bkIgnore|bkAll",
+            "Appearance");
+         ADD_P("cPicture", p->FPicture, "Appearance");
+         ADD_N("nModalResult", p->FBitBtnModalResult, "Behavior"); break;
+      case CT_SPEEDBTN:
+         ADD_D("nKind", p->FKind,
+            "bkCustom|bkOK|bkCancel|bkHelp|bkYes|bkNo|bkClose|bkAbort|bkRetry|bkIgnore|bkAll",
+            "Appearance");
+         ADD_P("cPicture", p->FPicture, "Appearance");
+         ADD_L("lFlat", p->FFlat, "Appearance"); break;
+      case CT_IMAGE:
+         ADD_P("cPicture", p->FPicture, "Appearance"); break;
       case CT_LABEL: ADD_L("lTransparent",p->FTransparent,"Appearance");
          ADD_C("nClrText",p->FClrText,"Appearance");
          ADD_D("nAlign",p->nAlign,"Left|Center|Right","Appearance"); break;

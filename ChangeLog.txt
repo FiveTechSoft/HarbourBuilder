@@ -1,6 +1,60 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-16 (macOS: TBitBtn/TSpeedButton/TImage with Kind+Picture, SpeedButton palette fix)
+
+  FEATURES
+  - TBitBtn: full C++Builder parity on macOS. Properties Kind
+    (bkCustom..bkAll), cPicture, Glyph (alias), ModalResult,
+    Default, Cancel. Kind auto-populates Caption + ModalResult
+    (bkOK -> "OK"+mrOk, bkCancel -> "Cancel"+mrCancel, etc.).
+    Images resolved via SF Symbols on macOS 11+ when Kind is set
+    and cPicture is empty (checkmark.circle.fill for bkOK, etc.).
+    New BITBTN command:
+        @ T, L BITBTN ::oCtrl [PROMPT c] OF parent SIZE W, H
+                       [KIND n] [PICTURE cPath]
+    Codegen + parser round-trip; inspector exposes nKind (dropdown),
+    cPicture (file picker), nModalResult.
+  - TSpeedButton: dedicated class, backend function UI_SpeedBtnNew,
+    SPEEDBUTTON command mirroring BITBTN. Delphi-style defaults on
+    creation: btnFace background (0x00F0F0F0) and Flat=False so a
+    1px grey border with cornerRadius=3 appears by default. Flat
+    property toggles the border live. Palette drop also applies
+    these defaults so dragging from the palette produces the
+    expected look, not an invisible button.
+  - TImage: class with cPicture/Picture properties; backend loads
+    NSImage from the path in createViewInParent and applies
+    NSImageScaleProportionallyUpOrDown. UI_SetProp("cPicture") or
+    ("cFileName") on CT_IMAGE reloads the live image. New IMAGE
+    command; codegen + parser. Inspector file picker now filters by
+    image extensions (png/jpg/jpeg/gif/bmp/tiff/tif/icns) when the
+    row is cPicture.
+  - Constants in hbbuilder.ch: clBtnFace, clBtnShadow, clBlack,
+    clWhite, clRed, clGreen, clBlue (BGR byte order, C++Builder
+    system color parity); bkCustom..bkAll; mrNone..mrClose.
+  - nClrPane now applies to buttons (CT_BUTTON, CT_BITBTN,
+    CT_SPEEDBTN). NSButton ignores backgroundColor, so the setter
+    routes through wantsLayer + layer.backgroundColor.
+
+  FIXES
+  - SpeedButton palette type mismatch: the palette registered
+    TSpeedButton with type 27, but CT_SPEEDBTN is 13. Dropping from
+    the palette produced nothing because the dispatcher in
+    OnComponentDrop couldn't find the type in its defs[] table.
+    Changed the palette registration to 13.
+  - BITBTN command emission was broken when only KIND or only
+    PICTURE was present. Harbour's `[; ... ]` output gating does
+    NOT suppress the line when its marker is absent; it emits the
+    line with the marker replaced by empty, producing
+    "::oBtn:cPicture := " with no RHS (E0020 Incomplete statement).
+    Rewrote the xcommand to pass optional values as positional
+    args to TBitBtn():New(), which Harbour does accept as empty
+    (`,,`). TBitBtn:New applies each only when non-nil. Same
+    pattern for SPEEDBUTTON and IMAGE.
+  - Codegen nClrPane bug: the condition "nCtrlClr != 4294967295
+    .and. nCtrlClr != 0" excluded pure black (0) from being
+    emitted. Now only the sentinel 0xFFFFFFFF is suppressed.
+
 2026-04-16 (macOS: CheckBox/RadioButton CHECKED persistence, codegen robustness)
 
   FEATURES

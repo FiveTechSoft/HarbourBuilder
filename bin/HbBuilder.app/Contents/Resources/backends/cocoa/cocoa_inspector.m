@@ -538,6 +538,11 @@ static HBFontPickerTarget * s_fontTarget = nil;
       [panel setAllowedFileTypes:@[@"dbf"]];
       [panel setTitle:@"Select DBF File"];
    }
+   else if( strcmp( d->rows[nReal].szName, "cPicture" ) == 0 )
+   {
+      [panel setAllowedFileTypes:@[@"png",@"jpg",@"jpeg",@"gif",@"bmp",@"tiff",@"tif",@"icns"]];
+      [panel setTitle:@"Select Image File"];
+   }
 
    /* Set initial directory from current value */
    const char * curVal = d->rows[nReal].szValue;

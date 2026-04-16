@@ -307,6 +307,110 @@ METHOD New( oParent, cText, nLeft, nTop, nWidth, nHeight ) CLASS TButton
 return Self
 
 //----------------------------------------------------------------------------//
+// TBitBtn — button with image or predefined Kind (C++Builder parity)
+//----------------------------------------------------------------------------//
+
+CLASS TBitBtn INHERIT TControl
+
+   ACCESS Kind            INLINE UI_GetProp( ::hCpp, "nKind" )
+   ASSIGN Kind( n )       INLINE UI_SetProp( ::hCpp, "nKind", n )
+
+   ACCESS cPicture        INLINE UI_GetProp( ::hCpp, "cPicture" )
+   ASSIGN cPicture( c )   INLINE UI_SetProp( ::hCpp, "cPicture", c )
+
+   ACCESS Glyph           INLINE UI_GetProp( ::hCpp, "cPicture" )
+   ASSIGN Glyph( c )      INLINE UI_SetProp( ::hCpp, "cPicture", c )
+
+   ACCESS ModalResult     INLINE UI_GetProp( ::hCpp, "nModalResult" )
+   ASSIGN ModalResult( n ) INLINE UI_SetProp( ::hCpp, "nModalResult", n )
+
+   ACCESS Default         INLINE UI_GetProp( ::hCpp, "lDefault" )
+   ASSIGN Default( l )    INLINE UI_SetProp( ::hCpp, "lDefault", l )
+
+   ACCESS Cancel          INLINE UI_GetProp( ::hCpp, "lCancel" )
+   ASSIGN Cancel( l )     INLINE UI_SetProp( ::hCpp, "lCancel", l )
+
+   METHOD New( oParent, cText, nLeft, nTop, nWidth, nHeight, nKind, cPic )
+
+ENDCLASS
+
+METHOD New( oParent, cText, nLeft, nTop, nWidth, nHeight, nKind, cPic ) CLASS TBitBtn
+
+   if nWidth == nil;  nWidth := 88; endif
+   if nHeight == nil; nHeight := 26; endif
+
+   ::oParent := oParent
+   ::hCpp := UI_BitBtnNew( oParent:hCpp, cText, nLeft, nTop, nWidth, nHeight )
+
+   if nKind != nil;  ::Kind     := nKind;  endif
+   if cPic  != nil;  ::cPicture := cPic;   endif
+
+return Self
+
+//----------------------------------------------------------------------------//
+// TSpeedButton — borderless button with image/kind (C++Builder parity)
+//----------------------------------------------------------------------------//
+
+CLASS TSpeedButton INHERIT TControl
+
+   ACCESS Kind            INLINE UI_GetProp( ::hCpp, "nKind" )
+   ASSIGN Kind( n )       INLINE UI_SetProp( ::hCpp, "nKind", n )
+
+   ACCESS cPicture        INLINE UI_GetProp( ::hCpp, "cPicture" )
+   ASSIGN cPicture( c )   INLINE UI_SetProp( ::hCpp, "cPicture", c )
+
+   ACCESS Glyph           INLINE UI_GetProp( ::hCpp, "cPicture" )
+   ASSIGN Glyph( c )      INLINE UI_SetProp( ::hCpp, "cPicture", c )
+
+   ACCESS Flat            INLINE UI_GetProp( ::hCpp, "lFlat" )
+   ASSIGN Flat( l )       INLINE UI_SetProp( ::hCpp, "lFlat", l )
+
+   METHOD New( oParent, cText, nLeft, nTop, nWidth, nHeight, nKind, cPic )
+
+ENDCLASS
+
+METHOD New( oParent, cText, nLeft, nTop, nWidth, nHeight, nKind, cPic ) CLASS TSpeedButton
+
+   if nWidth == nil;  nWidth := 23; endif
+   if nHeight == nil; nHeight := 22; endif
+
+   ::oParent := oParent
+   ::hCpp := UI_SpeedBtnNew( oParent:hCpp, cText, nLeft, nTop, nWidth, nHeight )
+
+   if nKind != nil;  ::Kind     := nKind;  endif
+   if cPic  != nil;  ::cPicture := cPic;   endif
+
+return Self
+
+//----------------------------------------------------------------------------//
+// TImage — image viewer (NSImageView on macOS)
+//----------------------------------------------------------------------------//
+
+CLASS TImage INHERIT TControl
+
+   ACCESS cPicture        INLINE UI_GetProp( ::hCpp, "cPicture" )
+   ASSIGN cPicture( c )   INLINE UI_SetProp( ::hCpp, "cPicture", c )
+
+   ACCESS Picture         INLINE UI_GetProp( ::hCpp, "cPicture" )
+   ASSIGN Picture( c )    INLINE UI_SetProp( ::hCpp, "cPicture", c )
+
+   METHOD New( oParent, nLeft, nTop, nWidth, nHeight, cPic )
+
+ENDCLASS
+
+METHOD New( oParent, nLeft, nTop, nWidth, nHeight, cPic ) CLASS TImage
+
+   if nWidth == nil;  nWidth := 100; endif
+   if nHeight == nil; nHeight := 100; endif
+
+   ::oParent := oParent
+   ::hCpp := UI_ImageNew( oParent:hCpp, nLeft, nTop, nWidth, nHeight )
+
+   if cPic != nil;  ::cPicture := cPic;  endif
+
+return Self
+
+//----------------------------------------------------------------------------//
 // TCheckBox
 //----------------------------------------------------------------------------//
 

@@ -39,6 +39,40 @@
 #define fsMDIChild       2
 #define fsMDIForm        3
 
+// System colors (C++Builder style, BGR byte order)
+#define clBtnFace        15790320    // 0x00F0F0F0
+#define clBtnShadow       8421504    // 0x00808080
+#define clBlack                 0
+#define clWhite          16777215    // 0x00FFFFFF
+#define clRed                 255    // 0x000000FF (BGR)
+#define clGreen             65280    // 0x0000FF00
+#define clBlue           16711680    // 0x00FF0000
+
+// BitBtn Kind (C++Builder TBitBtnKind)
+#define bkCustom         0
+#define bkOK             1
+#define bkCancel         2
+#define bkHelp           3
+#define bkYes            4
+#define bkNo             5
+#define bkClose          6
+#define bkAbort          7
+#define bkRetry          8
+#define bkIgnore         9
+#define bkAll           10
+
+// ModalResult (C++Builder TModalResult)
+#define mrNone           0
+#define mrOk             1
+#define mrCancel         2
+#define mrAbort          3
+#define mrRetry          4
+#define mrIgnore         5
+#define mrYes            6
+#define mrNo             7
+#define mrAll            8
+#define mrClose          9
+
 // Cursor constants (C++Builder TCursor)
 #define crDefault        0
 #define crArrow          1
@@ -105,6 +139,36 @@
       <oCtrl> := TButton():New( <oParent>, <cText>, <nLeft>, <nTop>, <nWidth>, <nHeight> ) ;
       [; <oCtrl>:Default := <.default.> ] ;
       [; <oCtrl>:Cancel := <.cancel.> ]
+
+// BitBtn (button with image/kind)
+#xcommand @ <nTop>, <nLeft> BITBTN <oCtrl> ;
+      [ PROMPT <cText> ] ;
+      OF <oParent> ;
+      SIZE <nWidth>, <nHeight> ;
+      [ KIND <nKind> ] ;
+      [ PICTURE <cPic> ] ;
+   => ;
+      <oCtrl> := TBitBtn():New( <oParent>, <cText>, <nLeft>, <nTop>, ;
+                                <nWidth>, <nHeight>, <nKind>, <cPic> )
+
+// SpeedButton (borderless button with image/kind)
+#xcommand @ <nTop>, <nLeft> SPEEDBUTTON <oCtrl> ;
+      [ PROMPT <cText> ] ;
+      OF <oParent> ;
+      SIZE <nWidth>, <nHeight> ;
+      [ KIND <nKind> ] ;
+      [ PICTURE <cPic> ] ;
+   => ;
+      <oCtrl> := TSpeedButton():New( <oParent>, <cText>, <nLeft>, <nTop>, ;
+                                     <nWidth>, <nHeight>, <nKind>, <cPic> )
+
+// Image
+#xcommand @ <nTop>, <nLeft> IMAGE <oCtrl> ;
+      OF <oParent> ;
+      SIZE <nWidth>, <nHeight> ;
+      [ PICTURE <cPic> ] ;
+   => ;
+      <oCtrl> := TImage():New( <oParent>, <nLeft>, <nTop>, <nWidth>, <nHeight>, <cPic> )
 
 // Memo
 #xcommand @ <nTop>, <nLeft> MEMO <oCtrl> ;

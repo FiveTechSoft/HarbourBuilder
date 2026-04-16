@@ -335,7 +335,7 @@ static function CreatePalette()
    // Additional tab (C++Builder)
    nTab := oPal:AddTab( "Additional" )
    oPal:AddComp( nTab, "BBt",  "BitBtn",      12 )
-   oPal:AddComp( nTab, "Spd",  "SpeedButton", 27 )
+   oPal:AddComp( nTab, "Spd",  "SpeedButton", 13 )
    oPal:AddComp( nTab, "Img",  "Image",       14 )
    oPal:AddComp( nTab, "Shp",  "Shape",       15 )
    oPal:AddComp( nTab, "Bvl",  "Bevel",       16 )
@@ -774,6 +774,32 @@ static function RegenerateFormCode( cName, hForm )
                      StrTran( StrTran( cText, '"', '""' ), Chr(10), '" + Chr(10) + "' ) + ;
                      '"' + e
                endif
+            case nType == 14  // Image
+               cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
+                  ' IMAGE ::o' + cCtrlName + ' OF ' + cParent + ' SIZE ' + ;
+                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH))
+               cVal := UI_GetProp( hCtrl, "cPicture" )
+               if ! Empty( cVal )
+                  cCreate += ' PICTURE "' + cVal + '"'
+               endif
+               cCreate += e
+            case nType == 12 .or. nType == 13  // BitBtn / SpeedButton
+               cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
+                  If( nType == 12, ' BITBTN ', ' SPEEDBUTTON ' ) + '::o' + cCtrlName
+               if ! Empty( cText )
+                  cCreate += ' PROMPT "' + cText + '"'
+               endif
+               cCreate += ' OF ' + cParent + ' SIZE ' + ;
+                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH))
+               cVal := UI_GetProp( hCtrl, "nKind" )
+               if ValType( cVal ) == "N" .and. cVal > 0
+                  cCreate += ' KIND ' + LTrim( Str( cVal ) )
+               endif
+               cVal := UI_GetProp( hCtrl, "cPicture" )
+               if ! Empty( cVal )
+                  cCreate += ' PICTURE "' + cVal + '"'
+               endif
+               cCreate += e
             case nType == 20  // TreeView
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' TREEVIEW ::o' + cCtrlName + ' OF ' + cParent + ' SIZE ' + ;
@@ -885,7 +911,7 @@ static function RegenerateFormCode( cName, hForm )
          if ! IsNonVisual( nType )
             // Emit nClrPane if non-default (default = 0xFFFFFFFF = 4294967295)
             nCtrlClr := UI_GetProp( hCtrl, "nClrPane" )
-            if nCtrlClr != 4294967295 .and. nCtrlClr != 0
+            if nCtrlClr != 4294967295
                cCreate += '   ::o' + cCtrlName + ':nClrPane := ' + LTrim( Str( nCtrlClr ) ) + e
             endif
 
@@ -1428,6 +1454,42 @@ static function RestoreFormFromCode( hForm, cCode )
             hCtrl := UI_CheckBoxNew( hForm, cText, nL, nT, nW, nH )
             if " CHECKED" $ Upper( cTrim ) .and. hCtrl != 0
                UI_SetProp( hCtrl, "lChecked", .T. )
+            endif
+         case " IMAGE " $ Upper( cTrim )
+            hCtrl := UI_ImageNew( hForm, nL, nT, nW, nH )
+            if hCtrl != 0
+               nPos := At( 'PICTURE "', cTrim )
+               if nPos > 0
+                  cVal := SubStr( cTrim, nPos + 9 )
+                  nPos2 := At( '"', cVal )
+                  if nPos2 > 0
+                     UI_SetProp( hCtrl, "cPicture", Left( cVal, nPos2 - 1 ) )
+                  endif
+               endif
+            endif
+         case " BITBTN " $ Upper( cTrim ) .or. " SPEEDBUTTON " $ Upper( cTrim )
+            // PROMPT is optional — don't inherit cText from a previous
+            // iteration when this line has no PROMPT clause.
+            if ! ( 'PROMPT "' $ cTrim ); cText := ""; endif
+            if " SPEEDBUTTON " $ Upper( cTrim )
+               hCtrl := UI_SpeedBtnNew( hForm, cText, nL, nT, nW, nH )
+            else
+               hCtrl := UI_BitBtnNew( hForm, cText, nL, nT, nW, nH )
+            endif
+            if hCtrl != 0
+               nPos := At( " KIND ", Upper( cTrim ) )
+               if nPos > 0
+                  UI_SetProp( hCtrl, "nKind", ;
+                     Val( AllTrim( SubStr( cTrim, nPos + 6 ) ) ) )
+               endif
+               nPos := At( 'PICTURE "', cTrim )
+               if nPos > 0
+                  cVal := SubStr( cTrim, nPos + 9 )
+                  nPos2 := At( '"', cVal )
+                  if nPos2 > 0
+                     UI_SetProp( hCtrl, "cPicture", Left( cVal, nPos2 - 1 ) )
+                  endif
+               endif
             endif
          case " COMBOBOX " $ Upper( cTrim )
             hCtrl := UI_ComboBoxNew( hForm, nL, nT, nW, nH )
