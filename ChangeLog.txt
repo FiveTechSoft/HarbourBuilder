@@ -1,6 +1,27 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-16 (Windows: Inspector enum dropdown — TrackPopupMenu + BorderStyle codegen)
+
+  FIXES
+  - Inspector enum dropdowns (nBorderStyle, nCursor, nAlignment, etc.) could
+    not be used reliably: the in-place ComboBox child of the ListView lost
+    focus immediately (WM_KILLFOCUS fired before the user could interact)
+    because the ListView parent reclaimed focus after NM_CLICK handling.
+    Replaced the in-place ComboBox with TrackPopupMenu — the same reliable
+    approach already used for boolean properties. The popup menu appears
+    below the value cell, checkmarks the current value, and commits
+    immediately on selection with no focus issues.
+  - After selecting an enum value the Inspector row was not repainted to
+    show the new string name. Added InsRebuild() call after InsApplyValue()
+    in the TrackPopupMenu path (mirrors the existing boolean handler).
+  - RegenerateFormCode (Windows) did not emit ::BorderStyle when nBorderStyle
+    != 2 (bsSizeable). Running a project that had bsDialog/bsSingle/etc. set
+    in the designer always produced a resizable window because the generated
+    .prg code never assigned the property. Now emits
+    "   ::BorderStyle := N" for any non-default value, matching the macOS
+    backend behaviour.
+
 2026-04-16 (Windows: TForm nBorderStyle — bsDialog + enum display fix)
 
   FIXES

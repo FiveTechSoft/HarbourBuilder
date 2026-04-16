@@ -276,6 +276,7 @@ typedef struct {
    PHB_ITEM pOnComboSel; /* callback when combo selection changes: {|nIndex| ... } */
    PHB_ITEM pOnEventDblClick; /* callback when event double-clicked: {|hCtrl, cEvent| ... } */
    PHB_ITEM pOnPropChanged;   /* callback when property value changes: {|| ... } */
+   BOOL   bComboReady;  /* TRUE once the in-place combo is ready for user interaction */
 } INSDATA;
 
 /* Forward */
@@ -336,15 +337,16 @@ static LRESULT CALLBACK InsEditProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM 
    if( msg == WM_KEYDOWN && wParam == VK_RETURN ) { InsEndEdit( d, TRUE ); return 0; }
    if( msg == WM_KEYDOWN && wParam == VK_ESCAPE ) { InsEndEdit( d, FALSE ); return 0; }
 
-   /* CBS_DROPDOWNLIST: the internal ComboLBox sends WM_COMMAND/CBN_SELCHANGE
-      to the ComboBox on every hover and arrow-key move, not just on a final
-      click.  Let the original WndProc run first — it closes the dropdown when
-      the user actually clicks an item.  Only commit if the dropdown is now
-      closed (= real pick), ignore if it is still open (= hover / navigation). */
+   /* CBS_DROPDOWNLIST: CB_SETCURSEL fires a spurious CBN_SELCHANGE during
+      setup (before the user opens the dropdown).  bComboReady is FALSE until
+      InsStartEdit posts WM_USER+202 which sets it TRUE.  Ignore any
+      CBN_SELCHANGE that arrives before the combo is ready.
+      After that, commit only when the dropdown has actually closed (real
+      pick by click or Enter), not while still open (hover / key navigation). */
    if( msg == WM_COMMAND && HIWORD(wParam) == CBN_SELCHANGE )
    {
       LRESULT r = CallWindowProc( d->oldEditProc, hWnd, msg, wParam, lParam );
-      if( !SendMessage( hWnd, CB_GETDROPPEDSTATE, 0, 0 ) )
+      if( d->bComboReady && !SendMessage( hWnd, CB_GETDROPPEDSTATE, 0, 0 ) )
          PostMessage( d->hWnd, WM_USER + 200, 0, 0 );
       return r;
    }
@@ -1096,6 +1098,11 @@ static LRESULT CALLBACK InsWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
          if( d ) InsEndEdit( d, TRUE );
          return 0;
 
+      case WM_USER + 202:
+         /* Mark the in-place combo as ready; ignores CB_SETCURSEL's spurious CBN_SELCHANGE */
+         if( d ) d->bComboReady = TRUE;
+         return 0;
+
       case WM_CLOSE:
          ShowWindow( hWnd, SW_HIDE );
          return 0;
@@ -1182,25 +1189,19 @@ static void InsStartEdit( INSDATA * d, int nLVRow )
    ListView_GetSubItemRect( d->hList, nLVRow, 1, LVIR_LABEL, &rc );
 
    /* Dropdown path: either a named enum, a string enum, or any
-      PT_LOGICAL property which all get a synthetic Yes/No picker. */
+      PT_LOGICAL property which all get a synthetic Yes/No picker.
+      We use TrackPopupMenu (same as the boolean handler) to avoid
+      in-place ComboBox focus fights with the ListView parent. */
    pEnum = InsGetEnum( d->rows[nReal].szName );
    if( !pEnum && d->rows[nReal].cType == 'L' )
       pEnum = &s_boolEnum;
    if( pEnum )
    {
-      int i, nSel = -1;
-      { FILE*f=fopen("c:\\HarbourBuilder\\inspector_trace.log","a");
-        if(f){fprintf(f,"  OPEN COMBO prop='%s' type='%c' val='%s' bIsString=%d count=%d\n",
-          d->rows[nReal].szName, d->rows[nReal].cType, d->rows[nReal].szValue,
-          pEnum->bIsString, pEnum->nCount); fclose(f);} }
-      d->hEdit = CreateWindowExA( 0, "COMBOBOX", NULL,
-         WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL,
-         rc.left, rc.top - 2, rc.right - rc.left, 200,
-         d->hList, NULL, GetModuleHandle(NULL), NULL );
-      SendMessage( d->hEdit, WM_SETFONT, (WPARAM) d->hFont, TRUE );
-      for( i = 0; i < pEnum->nCount; i++ )
-         SendMessageA( d->hEdit, CB_ADDSTRING, 0, (LPARAM) pEnum->aValues[i] );
-      /* Compute initial selection */
+      HMENU hMenu = CreatePopupMenu();
+      POINT pt;
+      int i, nSel = -1, nCmd;
+      char szVal[256];
+      /* Compute current selection index for checkmark */
       if( d->rows[nReal].cType == 'L' )
          nSel = ( lstrcmpiA( d->rows[nReal].szValue, ".T." ) == 0 ) ? 1 : 0;
       else if( pEnum->bIsString )
@@ -1211,13 +1212,28 @@ static void InsStartEdit( INSDATA * d, int nLVRow )
       }
       else
          nSel = atoi( d->rows[nReal].szValue );
+      for( i = 0; i < pEnum->nCount; i++ )
+         AppendMenuA( hMenu, MF_STRING, i + 1, pEnum->aValues[i] );
       if( nSel >= 0 && nSel < pEnum->nCount )
-         SendMessage( d->hEdit, CB_SETCURSEL, nSel, 0 );
-      SetFocus( d->hEdit );
-      SetPropA( d->hEdit, "InsData", (HANDLE) d );
-      d->oldEditProc = (WNDPROC) SetWindowLongPtr( d->hEdit, GWLP_WNDPROC, (LONG_PTR) InsEditProc );
-      /* Open the dropdown immediately — user clicked to edit, show choices at once */
-      SendMessage( d->hEdit, CB_SHOWDROPDOWN, TRUE, 0 );
+         CheckMenuItem( hMenu, nSel + 1, MF_CHECKED );
+      pt.x = rc.left; pt.y = rc.bottom;
+      ClientToScreen( d->hList, &pt );
+      d->nEditRow = -1;  /* no in-place control */
+      nCmd = TrackPopupMenu( hMenu, TPM_RETURNCMD | TPM_NONOTIFY, pt.x, pt.y, 0, d->hWnd, NULL );
+      DestroyMenu( hMenu );
+      if( nCmd > 0 )
+      {
+         nSel = nCmd - 1;
+         if( d->rows[nReal].cType == 'L' )
+            lstrcpyA( szVal, nSel == 1 ? ".T." : ".F." );
+         else if( pEnum->bIsString )
+            lstrcpynA( szVal, pEnum->aValues[nSel], sizeof(szVal) );
+         else
+            sprintf( szVal, "%d", nSel );
+         lstrcpynA( d->rows[nReal].szValue, szVal, sizeof(d->rows[0].szValue) );
+         InsApplyValue( d, nReal, szVal );
+         InsRebuild( d );
+      }
       return;
    }
 

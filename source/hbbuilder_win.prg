@@ -711,7 +711,7 @@ static function RegenerateFormCode( cName, hForm )
    local cSep := "//" + Replicate( "-", 68 ) + e
    local cClass := "T" + cName  // TForm1, TForm2...
    local i, nCount, hCtrl, cCtrlName, cCtrlClass, nType
-   local nW, nH, nFL, nFT, cTitle, nClr, cAppTitle
+   local nW, nH, nFL, nFT, cTitle, nClr, cAppTitle, nBStyle
    local nL, nT, nCW, nCH, cText, nCtrlClr
    local cDatas := "", cCreate := "", cEvents := ""
    local cExistingCode, aEvents, j, cEvName, cEvSuffix, cHandlerName
@@ -1087,6 +1087,10 @@ static function RegenerateFormCode( cName, hForm )
    cCode += "   ::Height := " + LTrim(Str(nH)) + e
    cCode += '   ::FontName := "Segoe UI"' + e
    cCode += "   ::FontSize := 9" + e
+   nBStyle := UI_GetProp( hForm, "nBorderStyle" )
+   if ValType( nBStyle ) == "N" .and. nBStyle != 2  // != bsSizeable (default)
+      cCode += "   ::BorderStyle := " + LTrim( Str( nBStyle ) ) + e
+   endif
    if nClr != 15790320  // non-default color
       cCode += "   ::Color  := " + LTrim(Str(nClr)) + e
    endif
