@@ -505,8 +505,13 @@ public:
 class TListBox : public TControl
 {
 public:
+   char FItems[64][64];  /* max 64 items, 64 chars each */
+   int  FItemCount;
+   int  FItemIndex;
+
    TListBox();
    void CreateParams( DWORD * pdwStyle, DWORD * pdwExStyle, const char ** pszClass );
+   void CreateHandle( HWND hParent );
    const PROPDESC * GetPropDescs( int * pnCount );
 };
 
@@ -520,6 +525,7 @@ public:
 
    TRadioButton();
    void CreateParams( DWORD * pdwStyle, DWORD * pdwExStyle, const char ** pszClass );
+   void CreateHandle( HWND hParent );
    const PROPDESC * GetPropDescs( int * pnCount );
 };
 

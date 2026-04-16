@@ -1,6 +1,28 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-16 (Windows: fix ListBox/ComboBox nItemIndex inspector + runtime)
+
+  FIXES
+  - Inspector showed "0" after typing "1" into nItemIndex for ListBox or
+    ComboBox. Root cause: OnPropChanged (fired from InsEndEdit via
+    InsApplyValue) was calling InspectorRefresh, which triggered
+    INS_RefreshWithData resetting d->nRows=0 and rebuilding all property
+    rows. The stale nReal index InsEndEdit still held then caused
+    WM_KILLFOCUS to re-enter InsEndEdit with d->nEditRow=-1, clobbering
+    the displayed value. Fix: removed InspectorRefresh from OnPropChanged.
+    The inspector cell repaints correctly from d->rows[nReal].szValue once
+    d->hEdit is destroyed — no explicit refresh needed.
+  - Runtime: selected item was not restored when running a project that had
+    nItemIndex > 0 set in the designer. Added UI_SetProp case for ComboBox
+    nItemIndex (was missing — only GET existed). Unified FItemIndex to
+    1-based convention across TListBox and TComboBox (1 = first item,
+    0 = nothing selected). TComboBox::CreateHandle and SetItemIndex now
+    apply FItemIndex-1 as the CB_SETCURSEL index. Codegen emits
+    "::oCtrl:Value := N" as a separate line after the @ COMBOBOX/LISTBOX
+    line; RestoreFormFromCode parses those lines to reload FItemIndex into
+    the designer on re-open.
+
 2026-04-16 (macOS: Media tab — TMap / TScene3D / TEarthView)
 
   FEATURES

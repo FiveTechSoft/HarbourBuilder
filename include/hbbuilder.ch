@@ -322,11 +322,11 @@
 // ComboBox
 #xcommand @ <nTop>, <nLeft> COMBOBOX <oCtrl> ;
       [ OF <oParent> ] ;
-      [ ITEMS <aItems> ] ;
       [ SIZE <nWidth> [, <nHeight>] ] ;
+      [ ITEMS <items,...> ] ;
    => ;
       <oCtrl> := TComboBox():New( <oParent>, <nLeft>, <nTop>, <nWidth>, <nHeight> ) ;
-      [; <oCtrl>:FillItems( <aItems> ) ]
+      [; <oCtrl>:FillItems( \{ <items> \} ) ]
 
 // RadioButton
 #xcommand @ <nTop>, <nLeft> RADIOBUTTON <oCtrl> ;

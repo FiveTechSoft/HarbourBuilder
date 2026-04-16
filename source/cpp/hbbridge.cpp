@@ -359,6 +359,20 @@ HB_FUNC( UI_BITBTNNEW )
    RetCtrl( p );
 }
 
+/* UI_SpeedBtnNew( hParent, cText, nLeft, nTop, nWidth, nHeight ) --> hCtrl */
+HB_FUNC( UI_SPEEDBTNNEW )
+{
+   TForm * pForm = GetForm(1);
+   TSpeedButton * p = new TSpeedButton();
+   if( HB_ISCHAR(2) ) p->SetText( hb_parc(2) );
+   if( HB_ISNUM(3) ) p->FLeft = hb_parni(3);
+   if( HB_ISNUM(4) ) p->FTop = hb_parni(4);
+   if( HB_ISNUM(5) ) p->FWidth = hb_parni(5);
+   if( HB_ISNUM(6) ) p->FHeight = hb_parni(6);
+   if( pForm ) pForm->AddChild( p );
+   RetCtrl( p );
+}
+
 /* UI_ImageNew( hParent, nLeft, nTop, nWidth, nHeight ) --> hCtrl */
 HB_FUNC( UI_IMAGENEW )
 {
@@ -756,6 +770,54 @@ HB_FUNC( UI_SETPROP )
       ((TButton*)p)->FCancel = hb_parl(3);
    else if( lstrcmpi( szProp, "lChecked" ) == 0 && p->FControlType == CT_CHECKBOX )
       ((TCheckBox*)p)->SetChecked( hb_parl(3) );
+   else if( lstrcmpi( szProp, "lChecked" ) == 0 && p->FControlType == CT_RADIO )
+   {  ((TRadioButton*)p)->FChecked = hb_parl(3);
+      if( p->FHandle ) SendMessage( p->FHandle, BM_SETCHECK, hb_parl(3) ? BST_CHECKED : BST_UNCHECKED, 0 ); }
+   else if( lstrcmpi( szProp, "aItems" ) == 0 && p->FControlType == CT_LISTBOX && HB_ISCHAR(3) )
+   {  TListBox * lb = (TListBox*)p;
+      const char * s = hb_parc(3); char buf[128]; int j = 0;
+      lb->FItemCount = 0;
+      if( lb->FHandle ) SendMessage( lb->FHandle, LB_RESETCONTENT, 0, 0 );
+      while( *s && lb->FItemCount < 64 ) {
+         if( *s == '|' ) {
+            buf[j] = 0; lstrcpynA( lb->FItems[lb->FItemCount], buf, 64 );
+            if( lb->FHandle ) SendMessage( lb->FHandle, LB_ADDSTRING, 0, (LPARAM) buf );
+            lb->FItemCount++; j = 0;
+         } else if( j < 63 ) { buf[j++] = *s; }
+         s++;
+      }
+      if( j > 0 && lb->FItemCount < 64 ) {
+         buf[j] = 0; lstrcpynA( lb->FItems[lb->FItemCount], buf, 64 );
+         if( lb->FHandle ) SendMessage( lb->FHandle, LB_ADDSTRING, 0, (LPARAM) buf );
+         lb->FItemCount++;
+      }
+   }
+   else if( lstrcmpi( szProp, "nItemIndex" ) == 0 && p->FControlType == CT_LISTBOX )
+   {  ((TListBox*)p)->FItemIndex = hb_parni(3);
+      if( p->FHandle ) SendMessage( p->FHandle, LB_SETCURSEL, hb_parni(3) - 1, 0 ); }
+   else if( lstrcmpi( szProp, "nItemIndex" ) == 0 && p->FControlType == CT_COMBOBOX )
+   {  int nIdx = hb_parni(3);
+      ((TComboBox*)p)->FItemIndex = nIdx;
+      if( p->FHandle ) SendMessage( p->FHandle, CB_SETCURSEL, nIdx > 0 ? nIdx - 1 : -1, 0 ); }
+   else if( lstrcmpi( szProp, "aItems" ) == 0 && p->FControlType == CT_COMBOBOX && HB_ISCHAR(3) )
+   {  TComboBox * cb = (TComboBox*)p;
+      const char * s = hb_parc(3); char buf[64]; int j = 0;
+      cb->FItemCount = 0;
+      if( cb->FHandle ) SendMessage( cb->FHandle, CB_RESETCONTENT, 0, 0 );
+      while( *s && cb->FItemCount < 32 ) {
+         if( *s == '|' ) {
+            buf[j] = 0; lstrcpynA( cb->FItems[cb->FItemCount], buf, 64 );
+            if( cb->FHandle ) SendMessageA( cb->FHandle, CB_ADDSTRING, 0, (LPARAM) buf );
+            cb->FItemCount++; j = 0;
+         } else if( j < 63 ) { buf[j++] = *s; }
+         s++;
+      }
+      if( j > 0 && cb->FItemCount < 32 ) {
+         buf[j] = 0; lstrcpynA( cb->FItems[cb->FItemCount], buf, 64 );
+         if( cb->FHandle ) SendMessageA( cb->FHandle, CB_ADDSTRING, 0, (LPARAM) buf );
+         cb->FItemCount++;
+      }
+   }
    else if( lstrcmpi( szProp, "cName" ) == 0 && HB_ISCHAR(3) )
       lstrcpynA( p->FName, hb_parc(3), sizeof(p->FName) );
    else if( lstrcmpi( szProp, "lSizable" ) == 0 && p->FControlType == CT_FORM )
@@ -1047,6 +1109,18 @@ HB_FUNC( UI_GETPROP )
       hb_retl( ((TButton*)p)->FCancel );
    else if( lstrcmpi( szProp, "lChecked" ) == 0 && p->FControlType == CT_CHECKBOX )
       hb_retl( ((TCheckBox*)p)->FChecked );
+   else if( lstrcmpi( szProp, "lChecked" ) == 0 && p->FControlType == CT_RADIO )
+      hb_retl( ((TRadioButton*)p)->FChecked );
+   else if( lstrcmpi( szProp, "aItems" ) == 0 && p->FControlType == CT_LISTBOX )
+   {  TListBox * lb = (TListBox*)p; char szAll[4096] = ""; int ci;
+      for( ci = 0; ci < lb->FItemCount; ci++ ) {
+         if( ci > 0 ) lstrcatA( szAll, "|" );
+         lstrcatA( szAll, lb->FItems[ci] );
+      }
+      hb_retc( szAll );
+   }
+   else if( lstrcmpi( szProp, "nItemIndex" ) == 0 && p->FControlType == CT_LISTBOX )
+      hb_retni( ((TListBox*)p)->FItemIndex );
    else if( lstrcmpi( szProp, "cName" ) == 0 )
       hb_retc( p->FName );
    else if( lstrcmpi( szProp, "cClassName" ) == 0 )
@@ -1116,6 +1190,14 @@ HB_FUNC( UI_GETPROP )
       } else hb_retni( 12 ); }
    else if( lstrcmpi( szProp, "nItemIndex" ) == 0 && p->FControlType == CT_COMBOBOX )
       hb_retni( ((TComboBox*)p)->FItemIndex );
+   else if( lstrcmpi( szProp, "aItems" ) == 0 && p->FControlType == CT_COMBOBOX )
+   {  TComboBox * cb = (TComboBox*)p; char szAll[4096] = ""; int ci;
+      for( ci = 0; ci < cb->FItemCount; ci++ ) {
+         if( ci > 0 ) lstrcatA( szAll, "|" );
+         lstrcatA( szAll, cb->FItems[ci] );
+      }
+      hb_retc( szAll );
+   }
    else if( lstrcmpi( szProp, "aColumns" ) == 0 && p->FControlType == CT_BROWSE )
    {
       TBrowse * br = (TBrowse *) p;
@@ -1771,14 +1853,47 @@ HB_FUNC( UI_GETALLPROPS )
       case CT_CHECKBOX:
          ADD_PROP_L( "lChecked", ((TCheckBox*)p)->FChecked, "Data" );
          break;
+      case CT_RADIO:
+         ADD_PROP_L( "lChecked", ((TRadioButton*)p)->FChecked, "Data" );
+         break;
       case CT_EDIT:
          ADD_PROP_L( "lReadOnly", ((TEdit*)p)->FReadOnly, "Behavior" );
          ADD_PROP_L( "lPassword", ((TEdit*)p)->FPassword, "Behavior" );
          break;
       case CT_COMBOBOX:
-         ADD_PROP_N( "nItemIndex", ((TComboBox*)p)->FItemIndex, "Data" );
-         ADD_PROP_N( "nItemCount", ((TComboBox*)p)->FItemCount, "Data" );
+      {  TComboBox * cb = (TComboBox*)p;
+         char szAll[4096] = ""; int ci;
+         for( ci = 0; ci < cb->FItemCount; ci++ ) {
+            if( ci > 0 ) lstrcatA( szAll, "|" );
+            lstrcatA( szAll, cb->FItems[ci] );
+         }
+         pRow = hb_itemArrayNew(4);
+         hb_arraySetC( pRow, 1, "aItems" );
+         hb_arraySetC( pRow, 2, szAll );
+         hb_arraySetC( pRow, 3, "Data" );
+         hb_arraySetC( pRow, 4, "A" );
+         hb_arrayAdd( pArray, pRow );
+         hb_itemRelease( pRow );
+         ADD_PROP_N( "nItemIndex", cb->FItemIndex, "Data" );
          break;
+      }
+      case CT_LISTBOX:
+      {  TListBox * lb = (TListBox*)p;
+         char szAll[4096] = ""; int ci;
+         for( ci = 0; ci < lb->FItemCount; ci++ ) {
+            if( ci > 0 ) lstrcatA( szAll, "|" );
+            lstrcatA( szAll, lb->FItems[ci] );
+         }
+         pRow = hb_itemArrayNew(4);
+         hb_arraySetC( pRow, 1, "aItems" );
+         hb_arraySetC( pRow, 2, szAll );
+         hb_arraySetC( pRow, 3, "Data" );
+         hb_arraySetC( pRow, 4, "A" );
+         hb_arrayAdd( pArray, pRow );
+         hb_itemRelease( pRow );
+         ADD_PROP_N( "nItemIndex", lb->FItemIndex, "Data" );
+         break;
+      }
       case CT_BROWSE:
       {
          TBrowse * br = (TBrowse *) p;

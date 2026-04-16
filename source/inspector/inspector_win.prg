@@ -55,10 +55,11 @@ return nil
 // Populate combo with all controls from the design form
 // Combo map: maps combo index -> { nType, hCtrl, nColIdx }
 //   nType: 0=form, 1=control, 2=browse column
-function InspectorPopulateCombo( hForm )
+// hSelect: if non-zero, select this control in the combo after populating
+function InspectorPopulateCombo( hForm, hSelect )
    local h := _InsGetData()
    local i, j, nCount, hChild, cName, cClass, cEntry, nColCount
-   local aMap, cTabsStr, aTabsArr, jj
+   local aMap, cTabsStr, aTabsArr, jj, nSelIdx
 
    if h == 0 .or. hForm == 0
       return nil
@@ -67,6 +68,7 @@ function InspectorPopulateCombo( hForm )
    INS_ComboClear( h )
    INS_SetFormCtrl( h, hForm )
    aMap := {}
+   nSelIdx := 0  // default: select form
 
    // Add the form itself: "oForm1 AS TForm1"
    cName  := UI_GetProp( hForm, "cName" )
@@ -75,6 +77,7 @@ function InspectorPopulateCombo( hForm )
    cEntry := "o" + cName + " AS T" + cName
    INS_ComboAdd( h, cEntry )
    AAdd( aMap, { 0, hForm, 0 } )
+   if hSelect != nil .and. hSelect == hForm; nSelIdx := 0; endif
 
    // Add all child controls: "oButton1 AS TButton"
    nCount := UI_GetChildCount( hForm )
@@ -87,6 +90,7 @@ function InspectorPopulateCombo( hForm )
          cEntry := "o" + cName + " AS " + cClass
          INS_ComboAdd( h, cEntry )
          AAdd( aMap, { 1, hChild, 0 } )
+         if hSelect != nil .and. hSelect == hChild; nSelIdx := Len( aMap ) - 1; endif
 
          // If it's a Browse, add its columns as sub-entries
          if UI_GetType( hChild ) == 79  // CT_BROWSE
@@ -117,8 +121,8 @@ function InspectorPopulateCombo( hForm )
 
    _InsSetComboMap( aMap )
 
-   // Select form (first entry)
-   INS_ComboSelect( h, 0 )
+   // Select the target control (or form if not specified)
+   INS_ComboSelect( h, nSelIdx )
 
 return nil
 
@@ -2279,6 +2283,13 @@ HB_FUNC( INS_BRINGTOFRONT )
       SetWindowPos( d->hWnd, HWND_NOTOPMOST, 0, 0, 0, 0,
          SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE );
    }
+}
+
+/* INS_GetCurrentCtrl( hInsData ) - return currently displayed control handle */
+HB_FUNC( INS_GETCURRENTCTRL )
+{
+   INSDATA * d = (INSDATA *) (HB_PTRUINT) hb_parnint(1);
+   hb_retnint( d ? (HB_PTRUINT) d->hCtrl : 0 );
 }
 
 /* INS_Destroy( hInsData ) */

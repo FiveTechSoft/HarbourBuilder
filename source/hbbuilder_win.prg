@@ -375,8 +375,7 @@ function Main()
    INS_SetOnEventDblClick( _InsGetData(), ;
       { |hCtrl, cEvent| OnEventDblClick( hCtrl, cEvent ) } )
    INS_SetOnPropChanged( _InsGetData(), ;
-      { || SyncDesignerToCode(), ;
-            InspectorPopulateCombo( oDesignForm:hCpp ) } )
+      { || OnPropChanged() } )
    INS_SetPos( _InsGetData(), -8, nInsTop, nInsW + 8, nBottomY - nInsTop )
 
    WireDesignForm()
@@ -717,7 +716,7 @@ static function RegenerateFormCode( cName, hForm )
    local cDatas := "", cCreate := "", cEvents := ""
    local cExistingCode, aEvents, j, cEvName, cEvSuffix, cHandlerName
    local cVal, aHdrs, kk, nColCount, aColProps, nColW, nInterval
-   local aCtrlMap := {}, cOf, hOwner, nPg, kk2, nLen0, cSlice
+   local aCtrlMap := {}, cOf, hOwner, nPg, kk2, nLen0, cSlice, lRealCreate, nVal
 
    // Read existing code to find declared event handlers
    cExistingCode := ""
@@ -817,11 +816,28 @@ static function RegenerateFormCode( cName, hForm )
             case nType == 4  // CheckBox
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' CHECKBOX ::o' + cCtrlName + ' PROMPT "' + cText + '" OF Self SIZE ' + ;
-                  LTrim(Str(nCW)) + e
+                  LTrim(Str(nCW))
+               if ValType( UI_GetProp( hCtrl, "lChecked" ) ) == "L" .and. UI_GetProp( hCtrl, "lChecked" )
+                  cCreate += ' CHECKED'
+               endif
+               cCreate += e
             case nType == 5  // ComboBox
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' COMBOBOX ::o' + cCtrlName + ' OF Self SIZE ' + ;
-                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
+                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH))
+               cVal := UI_GetProp( hCtrl, "aItems" )
+               if ValType( cVal ) == "C" .and. ! Empty( cVal )
+                  cCreate += ' ITEMS '
+                  for kk := 1 to Len( hb_ATokens( cVal, "|" ) )
+                     if kk > 1; cCreate += ', '; endif
+                     cCreate += '"' + hb_ATokens( cVal, "|" )[ kk ] + '"'
+                  next
+               endif
+               cCreate += e
+               nVal := UI_GetProp( hCtrl, "nItemIndex" )
+               if ValType( nVal ) == "N" .and. nVal > 0
+                  cCreate += '   ::o' + cCtrlName + ':Value := ' + LTrim( Str( nVal ) ) + e
+               endif
             case nType == 6  // GroupBox
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' GROUPBOX ::o' + cCtrlName + ' PROMPT "' + cText + '" OF Self SIZE ' + ;
@@ -840,24 +856,42 @@ static function RegenerateFormCode( cName, hForm )
                endif
                cCreate += e
             case nType == 7  // ListBox
-               cCreate += '   // ::o' + cCtrlName + ' (TListBox) at ' + ;
-                  LTrim(Str(nL)) + ',' + LTrim(Str(nT)) + ' SIZE ' + ;
-                  LTrim(Str(nCW)) + ',' + LTrim(Str(nCH)) + e
+               cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
+                  ' LISTBOX ::o' + cCtrlName + ' OF Self SIZE ' + ;
+                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH))
+               cVal := UI_GetProp( hCtrl, "aItems" )
+               if ValType( cVal ) == "C" .and. ! Empty( cVal )
+                  cCreate += ' ITEMS '
+                  for kk := 1 to Len( hb_ATokens( cVal, "|" ) )
+                     if kk > 1; cCreate += ', '; endif
+                     cCreate += '"' + hb_ATokens( cVal, "|" )[ kk ] + '"'
+                  next
+               endif
+               cCreate += e
+               nVal := UI_GetProp( hCtrl, "nItemIndex" )
+               if ValType( nVal ) == "N" .and. nVal > 0
+                  cCreate += '   ::o' + cCtrlName + ':Value := ' + LTrim( Str( nVal ) ) + e
+               endif
             case nType == 8  // RadioButton
-               cCreate += '   // ::o' + cCtrlName + ' (TRadioButton) "' + cText + '" at ' + ;
-                  LTrim(Str(nL)) + ',' + LTrim(Str(nT)) + e
+               cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
+                  ' RADIOBUTTON ::o' + cCtrlName + ' PROMPT "' + cText + '" OF Self SIZE ' + ;
+                  LTrim(Str(nCW))
+               if ValType( UI_GetProp( hCtrl, "lChecked" ) ) == "L" .and. UI_GetProp( hCtrl, "lChecked" )
+                  cCreate += ' CHECKED'
+               endif
+               cCreate += e
             case nType == 12  // BitBtn
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
-                  ' BUTTON ::o' + cCtrlName + ' PROMPT "' + cText + '" OF Self SIZE ' + ;
+                  ' BITBTN ::o' + cCtrlName + ' PROMPT "' + cText + '" OF Self SIZE ' + ;
                   LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
             case nType == 14  // Image
-               cCreate += '   // ::o' + cCtrlName + ' (TImage) at ' + ;
-                  LTrim(Str(nL)) + ',' + LTrim(Str(nT)) + ' SIZE ' + ;
-                  LTrim(Str(nCW)) + ',' + LTrim(Str(nCH)) + e
+               cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
+                  ' IMAGE ::o' + cCtrlName + ' OF Self SIZE ' + ;
+                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
             case nType == 15  // Shape
-               cCreate += '   // ::o' + cCtrlName + ' (TShape) at ' + ;
-                  LTrim(Str(nL)) + ',' + LTrim(Str(nT)) + ' SIZE ' + ;
-                  LTrim(Str(nCW)) + ',' + LTrim(Str(nCH)) + e
+               cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
+                  ' SHAPE ::o' + cCtrlName + ' OF Self SIZE ' + ;
+                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
             case nType == 16  // Bevel
                cCreate += '   // ::o' + cCtrlName + ' (TBevel) at ' + ;
                   LTrim(Str(nL)) + ',' + LTrim(Str(nT)) + ' SIZE ' + ;
@@ -958,8 +992,12 @@ static function RegenerateFormCode( cName, hForm )
             cCreate := Left( cCreate, nLen0 ) + cSlice
          endif
 
-         // Non-visual components don't support visual DATAs like nClrPane or oFont
-         if ! IsNonVisual( nType )
+         // Non-visual components and comment-only placeholders don't support
+         // visual DATAs like nClrPane or oFont — only emit when a real creation
+         // line was generated (slice exists and does NOT start with "// ")
+         lRealCreate := Len( cCreate ) > nLen0 .and. ;
+            Left( AllTrim( SubStr( cCreate, nLen0 + 1 ) ), 2 ) != "//"
+         if ! IsNonVisual( nType ) .and. lRealCreate
             // nClrPane for any control (CLR_INVALID = -1 on 32-bit or 4294967295 on 64-bit)
             nCtrlClr := UI_GetProp( hCtrl, "nClrPane" )
             if nCtrlClr != -1 .and. nCtrlClr != 4294967295 .and. nCtrlClr > 0
@@ -1430,6 +1468,22 @@ static function WireDesignForm()
 
 return nil
 
+// Called when inspector edits a property: sync code and repopulate combo.
+// NOTE: do NOT call InspectorRefresh here — this callback fires from within
+// InsEndEdit (via InsApplyValue -> pOnPropChanged). Calling InspectorRefresh
+// triggers INS_RefreshWithData which resets d->nRows=0, invalidating the nReal
+// index InsEndEdit still holds. DestroyWindow(d->hEdit) then fires WM_KILLFOCUS
+// re-entrantly with d->nEditRow=-1, corrupting the displayed value.
+// The inspector cell repaints correctly on its own once d->hEdit is destroyed.
+static function OnPropChanged()
+
+   local hCtrl := INS_GetCurrentCtrl( _InsGetData() )
+
+   SyncDesignerToCode()
+   InspectorPopulateCombo( oDesignForm:hCpp, hCtrl )
+
+return nil
+
 // Two-way sync: regenerate code from designer state
 static function SyncDesignerToCode()
 
@@ -1767,6 +1821,15 @@ static function RestoreFormFromCode( hForm, cCode )
       cLine := aLines[i]
       cTrim := StrTran( AllTrim( cLine ), Chr(13), "" )
 
+      // ::oCtrlName:Value := N  — restore nItemIndex for ListBox/ComboBox
+      if "::o" $ cTrim .and. ":Value :=" $ cTrim .and. hCtrl != 0
+         nPos := At( ":=", cTrim )
+         if nPos > 0
+            UI_SetProp( hCtrl, "nItemIndex", Val( AllTrim( SubStr( cTrim, nPos + 2 ) ) ) )
+         endif
+         loop
+      endif
+
       // Parse form properties: ::Title, ::Width, ::Height, ::Left, ::Top, ::Color
       if '::Title' $ cTrim .and. ':=' $ cTrim
          nPos := At( '"', cTrim )
@@ -1935,14 +1998,60 @@ static function RestoreFormFromCode( hForm, cCode )
             hCtrl := UI_EditNew( hForm, cText, nL, nT, nW, nH )
          case " CHECKBOX " $ Upper( cTrim )
             hCtrl := UI_CheckBoxNew( hForm, cText, nL, nT, nW, nH )
+            if " CHECKED" $ Upper( cTrim ) .and. hCtrl != 0
+               UI_SetProp( hCtrl, "lChecked", .T. )
+            endif
          case " COMBOBOX " $ Upper( cTrim )
             hCtrl := UI_ComboBoxNew( hForm, nL, nT, nW, nH )
+            // Extract ITEMS "a", "b", "c"
+            nPos := At( "ITEMS ", Upper( cTrim ) )
+            if nPos > 0 .and. hCtrl != 0
+               cText := SubStr( cTrim, nPos + 6 )
+               cVal := ""
+               do while ! Empty( cText )
+                  nPos2 := At( '"', cText )
+                  if nPos2 == 0; exit; endif
+                  cText := SubStr( cText, nPos2 + 1 )
+                  nPos2 := At( '"', cText )
+                  if nPos2 == 0; exit; endif
+                  UI_ComboAddItem( hCtrl, Left( cText, nPos2 - 1 ) )
+                  cText := SubStr( cText, nPos2 + 1 )
+               enddo
+            endif
          case " GROUPBOX " $ Upper( cTrim )
             hCtrl := UI_GroupBoxNew( hForm, cText, nL, nT, nW, nH )
          case " LISTBOX " $ Upper( cTrim )
             hCtrl := UI_ListBoxNew( hForm, nL, nT, nW, nH )
+            // Extract ITEMS "a", "b", "c"
+            nPos := At( "ITEMS ", Upper( cTrim ) )
+            if nPos > 0 .and. hCtrl != 0
+               cText := SubStr( cTrim, nPos + 6 )
+               cVal := ""
+               do while ! Empty( cText )
+                  nPos2 := At( '"', cText )
+                  if nPos2 == 0; exit; endif
+                  cText := SubStr( cText, nPos2 + 1 )
+                  nPos2 := At( '"', cText )
+                  if nPos2 == 0; exit; endif
+                  if ! Empty( cVal ); cVal += "|"; endif
+                  cVal += Left( cText, nPos2 - 1 )
+                  cText := SubStr( cText, nPos2 + 1 )
+               enddo
+               if ! Empty( cVal )
+                  UI_SetProp( hCtrl, "aItems", cVal )
+               endif
+            endif
          case " RADIOBUTTON " $ Upper( cTrim )
             hCtrl := UI_RadioButtonNew( hForm, cText, nL, nT, nW, nH )
+            if " CHECKED" $ Upper( cTrim ) .and. hCtrl != 0
+               UI_SetProp( hCtrl, "lChecked", .T. )
+            endif
+         case " BITBTN " $ Upper( cTrim )
+            hCtrl := UI_BitBtnNew( hForm, cText, nL, nT, nW, nH )
+         case " IMAGE " $ Upper( cTrim )
+            hCtrl := UI_ImageNew( hForm, nL, nT, nW, nH )
+         case " SHAPE " $ Upper( cTrim )
+            hCtrl := UI_ShapeNew( hForm, nL, nT, nW, nH )
          case " MEMO " $ Upper( cTrim )
             hCtrl := UI_MemoNew( hForm, "", nL, nT, nW, nH )
          case " BROWSE " $ Upper( cTrim )
@@ -2738,6 +2847,16 @@ static function TBRun()
    cAllPrg += 'HB_FUNC( UI_MSGYESNO )      { hb_retl( MessageBoxA( GetActiveWindow(), hb_parc(1), hb_parc(2) ? hb_parc(2) : "Confirm", 0x24 ) == 6 ); }' + Chr(10)
    cAllPrg += 'HB_FUNC( MAC_RUNTIMEERRORDIALOG ) { hb_retni( 0 ); }' + Chr(10)
    cAllPrg += 'HB_FUNC( MAC_APPTERMINATE )  { }' + Chr(10)
+   cAllPrg += 'HB_FUNC( UI_SCENE3DNEW )    { hb_retnint( 0 ); }' + Chr(10)
+   cAllPrg += 'HB_FUNC( UI_EARTHVIEWNEW )  { hb_retnint( 0 ); }' + Chr(10)
+   cAllPrg += 'HB_FUNC( UI_MAPNEW )        { hb_retnint( 0 ); }' + Chr(10)
+   cAllPrg += 'HB_FUNC( UI_MAPSETREGION )  { }' + Chr(10)
+   cAllPrg += 'HB_FUNC( UI_MAPADDPIN )     { }' + Chr(10)
+   cAllPrg += 'HB_FUNC( UI_MAPCLEARPINS )  { }' + Chr(10)
+   cAllPrg += 'HB_FUNC( UI_MASKEDITNEW )   { hb_retnint( 0 ); }' + Chr(10)
+   cAllPrg += 'HB_FUNC( UI_STRINGGRIDNEW ) { hb_retnint( 0 ); }' + Chr(10)
+   cAllPrg += 'HB_FUNC( UI_GRIDSETCELL )   { }' + Chr(10)
+   cAllPrg += 'HB_FUNC( UI_GRIDGETCELL )   { hb_retc( "" ); }' + Chr(10)
    cAllPrg += 'HB_FUNC( W32_ERRORDIALOG ) {' + Chr(10)
    cAllPrg += '  const char * raw = hb_parc(1);' + Chr(10)
    cAllPrg += '  char msg[16384]; int ri, mi = 0;' + Chr(10)
@@ -3867,6 +3986,16 @@ static function TBDebugRun()
    cAllPrg += 'HB_FUNC( UI_MSGYESNO )      { hb_retl( MessageBoxA( GetActiveWindow(), hb_parc(1), hb_parc(2) ? hb_parc(2) : "Confirm", 0x24 ) == 6 ); }' + Chr(10)
    cAllPrg += 'HB_FUNC( MAC_RUNTIMEERRORDIALOG ) { hb_retni( 0 ); }' + Chr(10)
    cAllPrg += 'HB_FUNC( MAC_APPTERMINATE )  { }' + Chr(10)
+   cAllPrg += 'HB_FUNC( UI_SCENE3DNEW )    { hb_retnint( 0 ); }' + Chr(10)
+   cAllPrg += 'HB_FUNC( UI_EARTHVIEWNEW )  { hb_retnint( 0 ); }' + Chr(10)
+   cAllPrg += 'HB_FUNC( UI_MAPNEW )        { hb_retnint( 0 ); }' + Chr(10)
+   cAllPrg += 'HB_FUNC( UI_MAPSETREGION )  { }' + Chr(10)
+   cAllPrg += 'HB_FUNC( UI_MAPADDPIN )     { }' + Chr(10)
+   cAllPrg += 'HB_FUNC( UI_MAPCLEARPINS )  { }' + Chr(10)
+   cAllPrg += 'HB_FUNC( UI_MASKEDITNEW )   { hb_retnint( 0 ); }' + Chr(10)
+   cAllPrg += 'HB_FUNC( UI_STRINGGRIDNEW ) { hb_retnint( 0 ); }' + Chr(10)
+   cAllPrg += 'HB_FUNC( UI_GRIDSETCELL )   { }' + Chr(10)
+   cAllPrg += 'HB_FUNC( UI_GRIDGETCELL )   { hb_retc( "" ); }' + Chr(10)
    cAllPrg += 'HB_FUNC( W32_ERRORDIALOG ) {' + Chr(10)
    cAllPrg += '  const char * msg = hb_parc(1);' + Chr(10)
    cAllPrg += '  HWND hDlg, hEdit, hBtn;' + Chr(10)
@@ -9146,5 +9275,17 @@ HB_FUNC( UI_MEMONEW )        { hb_retnint( 0 ); }
 HB_FUNC( MAC_RUNTIMEERRORDIALOG ) { hb_retni( 0 ); }
 HB_FUNC( MAC_APPTERMINATE )  { }
 HB_FUNC( W32_ERRORDIALOG ) { /* IDE shows errors via its own dialog */ }
+
+/* Stubs for macOS-only media/grid controls — not implemented on Windows */
+HB_FUNC( UI_SCENE3DNEW )    { hb_retnint( 0 ); }
+HB_FUNC( UI_EARTHVIEWNEW )  { hb_retnint( 0 ); }
+HB_FUNC( UI_MAPNEW )        { hb_retnint( 0 ); }
+HB_FUNC( UI_MAPSETREGION )  { }
+HB_FUNC( UI_MAPADDPIN )     { }
+HB_FUNC( UI_MAPCLEARPINS )  { }
+HB_FUNC( UI_MASKEDITNEW )   { hb_retnint( 0 ); }
+HB_FUNC( UI_STRINGGRIDNEW ) { hb_retnint( 0 ); }
+HB_FUNC( UI_GRIDSETCELL )   { }
+HB_FUNC( UI_GRIDGETCELL )   { hb_retc( "" ); }
 
 #pragma ENDDUMP

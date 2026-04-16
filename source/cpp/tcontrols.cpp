@@ -250,8 +250,9 @@ void TComboBox::CreateHandle( HWND hParent )
       for( i = 0; i < FItemCount; i++ )
          SendMessageA( FHandle, CB_ADDSTRING, 0, (LPARAM) FItems[i] );
 
-      if( FItemIndex >= 0 )
-         SendMessage( FHandle, CB_SETCURSEL, FItemIndex, 0 );
+      /* FItemIndex is 1-based (1=first item, 0=nothing selected) */
+      if( FItemIndex > 0 )
+         SendMessage( FHandle, CB_SETCURSEL, FItemIndex - 1, 0 );
    }
 }
 
@@ -268,9 +269,10 @@ void TComboBox::AddItem( const char * szItem )
 
 void TComboBox::SetItemIndex( int nIndex )
 {
+   /* nIndex is 1-based (1=first item, 0=no selection) */
    FItemIndex = nIndex;
    if( FHandle )
-      SendMessage( FHandle, CB_SETCURSEL, nIndex, 0 );
+      SendMessage( FHandle, CB_SETCURSEL, nIndex > 0 ? nIndex - 1 : -1, 0 );
 }
 
 const PROPDESC * TComboBox::GetPropDescs( int * pnCount )
@@ -880,6 +882,9 @@ TListBox::TListBox()
    lstrcpy( FClassName, "TListBox" );
    FControlType = CT_LISTBOX;
    FWidth = 120; FHeight = 80;
+   FItemCount = 0;
+   FItemIndex  = 0;
+   memset( FItems, 0, sizeof(FItems) );
 }
 
 void TListBox::CreateParams( DWORD * pdwStyle, DWORD * pdwExStyle, const char ** pszClass )
@@ -887,6 +892,17 @@ void TListBox::CreateParams( DWORD * pdwStyle, DWORD * pdwExStyle, const char **
    *pszClass = "LISTBOX";
    *pdwStyle = WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | LBS_NOTIFY;
    *pdwExStyle = WS_EX_CLIENTEDGE;
+}
+
+void TListBox::CreateHandle( HWND hParent )
+{
+   TControl::CreateHandle( hParent );
+   if( FHandle ) {
+      for( int i = 0; i < FItemCount; i++ )
+         SendMessage( FHandle, LB_ADDSTRING, 0, (LPARAM) FItems[i] );
+      if( FItemIndex > 0 )
+         SendMessage( FHandle, LB_SETCURSEL, FItemIndex - 1, 0 );
+   }
 }
 
 const PROPDESC * TListBox::GetPropDescs( int * pnCount )
@@ -905,6 +921,13 @@ TRadioButton::TRadioButton()
    lstrcpy( FText, "RadioButton" );
    FWidth = 120; FHeight = 20;
    FChecked = FALSE;
+}
+
+void TRadioButton::CreateHandle( HWND hParent )
+{
+   TControl::CreateHandle( hParent );
+   if( FHandle && FChecked )
+      SendMessage( FHandle, BM_SETCHECK, BST_CHECKED, 0 );
 }
 
 void TRadioButton::CreateParams( DWORD * pdwStyle, DWORD * pdwExStyle, const char ** pszClass )
