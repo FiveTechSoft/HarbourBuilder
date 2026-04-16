@@ -336,14 +336,17 @@ static LRESULT CALLBACK InsEditProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM 
    if( msg == WM_KEYDOWN && wParam == VK_RETURN ) { InsEndEdit( d, TRUE ); return 0; }
    if( msg == WM_KEYDOWN && wParam == VK_ESCAPE ) { InsEndEdit( d, FALSE ); return 0; }
 
-   /* For CBS_DROPDOWNLIST: intercept WM_COMMAND that the ComboBox receives
-      from its internal listbox. CBN_SELCHANGE fires only when the user
-      picks a final item (not during keyboard navigation inside the list),
-      so committing here is safe and gives immediate "close on pick". */
+   /* CBS_DROPDOWNLIST: the internal ComboLBox sends WM_COMMAND/CBN_SELCHANGE
+      to the ComboBox on every hover and arrow-key move, not just on a final
+      click.  Let the original WndProc run first — it closes the dropdown when
+      the user actually clicks an item.  Only commit if the dropdown is now
+      closed (= real pick), ignore if it is still open (= hover / navigation). */
    if( msg == WM_COMMAND && HIWORD(wParam) == CBN_SELCHANGE )
    {
-      PostMessage( d->hWnd, WM_USER + 200, 0, 0 );
-      return CallWindowProc( d->oldEditProc, hWnd, msg, wParam, lParam );
+      LRESULT r = CallWindowProc( d->oldEditProc, hWnd, msg, wParam, lParam );
+      if( !SendMessage( hWnd, CB_GETDROPPEDSTATE, 0, 0 ) )
+         PostMessage( d->hWnd, WM_USER + 200, 0, 0 );
+      return r;
    }
 
    if( msg == WM_KILLFOCUS )
