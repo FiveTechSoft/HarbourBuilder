@@ -336,11 +336,9 @@ static LRESULT CALLBACK InsEditProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM 
    if( msg == WM_KEYDOWN && wParam == VK_RETURN ) { InsEndEdit( d, TRUE ); return 0; }
    if( msg == WM_KEYDOWN && wParam == VK_ESCAPE ) { InsEndEdit( d, FALSE ); return 0; }
 
-   /* Note: we USED to post WM_USER+200 on CBN_SELCHANGE to end the edit
-      as soon as a combo item was picked. That destroyed the combobox
-      mid-drop, leaving the dropdown list hanging visibly on screen. The
-      WM_KILLFOCUS path below commits the change cleanly once focus
-      leaves the combo naturally. */
+   /* Enum combos are parented to d->hWnd (ID=202) so CBN_CLOSEUP fires
+      in the Inspector WndProc → PostMessage(WM_USER+200) → InsEndEdit.
+      WM_KILLFOCUS below is the fallback for text/font/file edits. */
 
    if( msg == WM_KILLFOCUS )
    {
@@ -1053,6 +1051,12 @@ static LRESULT CALLBACK InsWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
       {
          WORD wId = LOWORD(wParam);
          WORD wNotify = HIWORD(wParam);
+         /* Property edit combo closed: commit selection immediately */
+         if( wId == 202 && wNotify == CBN_CLOSEUP && d && d->hEdit )
+         {
+            PostMessage( hWnd, WM_USER + 200, 0, 0 );
+            break;
+         }
          /* ComboBox selection changed - select control in design form */
          if( wId == 101 && wNotify == CBN_SELCHANGE && d && d->hCombo && d->hFormCtrl )
          {
@@ -1155,6 +1159,7 @@ static ENUMDEF * InsGetEnum( const char * szName )
 static void InsStartEdit( INSDATA * d, int nLVRow )
 {
    RECT rc;
+   POINT ptMap;
    int nReal, nBtnW;
    ENUMDEF * pEnum;
    BOOL bNeedsBtn;
@@ -1186,10 +1191,12 @@ static void InsStartEdit( INSDATA * d, int nLVRow )
         if(f){fprintf(f,"  OPEN COMBO prop='%s' type='%c' val='%s' bIsString=%d count=%d\n",
           d->rows[nReal].szName, d->rows[nReal].cType, d->rows[nReal].szValue,
           pEnum->bIsString, pEnum->nCount); fclose(f);} }
+      ptMap.x = rc.left; ptMap.y = rc.top - 2;
+      MapWindowPoints( d->hList, d->hWnd, &ptMap, 1 );
       d->hEdit = CreateWindowExA( 0, "COMBOBOX", NULL,
          WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL,
-         rc.left, rc.top - 2, rc.right - rc.left, 200,
-         d->hList, NULL, GetModuleHandle(NULL), NULL );
+         ptMap.x, ptMap.y, rc.right - rc.left, 200,
+         d->hWnd, (HMENU) 202, GetModuleHandle(NULL), NULL );
       SendMessage( d->hEdit, WM_SETFONT, (WPARAM) d->hFont, TRUE );
       for( i = 0; i < pEnum->nCount; i++ )
          SendMessageA( d->hEdit, CB_ADDSTRING, 0, (LPARAM) pEnum->aValues[i] );
