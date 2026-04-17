@@ -17,6 +17,8 @@ CLASS TForm1 FROM TForm
    METHOD OnStartClick()
    METHOD OnStopClick()
    METHOD OnBrowserClick()
+   METHOD RouteHome()
+   METHOD RouteApiInfo()
 
 ENDCLASS
 //--------------------------------------------------------------------
@@ -24,12 +26,13 @@ ENDCLASS
 METHOD CreateForm() CLASS TForm1
 
    ::Title  := "HIX App Demo"
+   ::Left   := 976
+   ::Top    := 251
    ::Width  := 900
    ::Height := 650
 
    COMPONENT ::oWebServer1 TYPE CT_WEBSERVER OF Self  // TWebServer @ 808,8
    ::oWebServer1:nPort := 8081
-
    @ 10, 10 BUTTON ::oBtnStart PROMPT "Start Server" OF Self SIZE 120, 32
    ::oBtnStart:oFont := ".AppleSystemUIFont,12"
    @ 10, 140 BUTTON ::oBtnStop PROMPT "Stop Server" OF Self SIZE 120, 32
@@ -52,35 +55,9 @@ return nil
 //--------------------------------------------------------------------
 
 METHOD OnStartClick() CLASS TForm1
-
    ::oWebServer1:aRoutes := {}
-
-   ::oWebServer1:AddRoute( "GET", "/", {|| ;
-      local aTickets := { ;
-         { "TKT-001", "Login button broken",    "Open"        }, ;
-         { "TKT-002", "Dashboard loads slowly", "In Progress" }, ;
-         { "TKT-003", "Export CSV not working", "Open"        }, ;
-         { "TKT-004", "Dark mode contrast",     "Closed"      } }, ;
-      cUser := iif( Empty( UGet("user") ), "Guest", UGet("user") ) ; ;
-      UWrite( '<!DOCTYPE html><html><head><title>HIX App</title>' + ;
-         '<style>body{font-family:sans-serif;padding:1.5em;background:#f8f8f8}' + ;
-         'table{border-collapse:collapse;width:100%}' + ;
-         'th,td{border:1px solid #ccc;padding:8px 12px;text-align:left}' + ;
-         'th{background:#336699;color:#fff}.closed{color:#888}</style></head><body>' + ;
-         '<h2>HIX App — Welcome, ' + cUser + '</h2>' + ;
-         '<table><tr><th>ID</th><th>Title</th><th>Status</th></tr>' ) ; ;
-      AEval( aTickets, {|r| ;
-         UWrite( '<tr' + iif(r[3]=="Closed",' class="closed"','') + '>' + ;
-            '<td>' + r[1] + '</td><td>' + r[2] + '</td><td>' + r[3] + '</td></tr>' ) } ) ; ;
-      UWrite( '</table><p><a href="/api/info">/api/info</a></p></body></html>' ) } )
-
-   ::oWebServer1:AddRoute( "GET", "/api/info", {|| ;
-      UWrite( hb_jsonEncode( { ;
-         "server" => "HarbourBuilder/HIX", ;
-         "time"   => Time(), ;
-         "date"   => DToC( Date() ), ;
-         "port"   => ::oWebServer1:nPort } ) ) } )
-
+   ::oWebServer1:AddRoute( "GET", "/",         { || ::RouteHome() } )
+   ::oWebServer1:AddRoute( "GET", "/api/info", { || ::RouteApiInfo() } )
    ::oWebServer1:Start()
    if ::oWebServer1:lRunning
       ::oLabel:Text := "Running: http://localhost:" + hb_ntos( ::oWebServer1:nPort ) + "/"
@@ -89,7 +66,6 @@ METHOD OnStartClick() CLASS TForm1
       ::oBtnStop:Enabled    := .T.
       ::oBtnBrowser:Enabled := .T.
    endif
-
 return nil
 
 METHOD OnStopClick() CLASS TForm1
@@ -103,4 +79,38 @@ return nil
 
 METHOD OnBrowserClick() CLASS TForm1
    MAC_ShellExec( "open http://localhost:" + hb_ntos( ::oWebServer1:nPort ) + "/" )
+return nil
+
+METHOD RouteHome() CLASS TForm1
+   local aTickets := { ;
+      { "TKT-001", "Login button broken",    "Open"        }, ;
+      { "TKT-002", "Dashboard loads slowly", "In Progress" }, ;
+      { "TKT-003", "Export CSV not working", "Open"        }, ;
+      { "TKT-004", "Dark mode contrast",     "Closed"      } }
+   local cUser := iif( Empty( UGet("user") ), "Guest", UGet("user") )
+   local i
+
+   UWrite( '<!DOCTYPE html><html><head><title>HIX App</title>' + ;
+      '<style>body{font-family:sans-serif;padding:1.5em;background:#f8f8f8}' + ;
+      'table{border-collapse:collapse;width:100%}' + ;
+      'th,td{border:1px solid #ccc;padding:8px 12px;text-align:left}' + ;
+      'th{background:#336699;color:#fff}.closed{color:#888}' + ;
+      '</style></head><body>' + ;
+      '<h2>HIX App &mdash; Welcome, ' + UHtmlEncode( cUser ) + '</h2>' + ;
+      '<table><tr><th>ID</th><th>Title</th><th>Status</th></tr>' )
+   for i := 1 to Len( aTickets )
+      UWrite( '<tr' + iif( aTickets[i][3] == "Closed", ' class="closed"', '' ) + '>' + ;
+         '<td>' + aTickets[i][1] + '</td>' + ;
+         '<td>' + aTickets[i][2] + '</td>' + ;
+         '<td>' + aTickets[i][3] + '</td></tr>' )
+   next
+   UWrite( '</table><p><a href="/api/info">/api/info</a></p></body></html>' )
+return nil
+
+METHOD RouteApiInfo() CLASS TForm1
+   UWrite( hb_jsonEncode( { ;
+      "server" => "HarbourBuilder/HIX", ;
+      "time"   => Time(), ;
+      "date"   => DToC( Date() ), ;
+      "port"   => ::oWebServer1:nPort } ) )
 return nil
