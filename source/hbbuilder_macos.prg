@@ -822,6 +822,23 @@ static function RegenerateFormCode( cName, hForm )
                if ValType( cVal ) == "N" .and. cVal > 0
                   cCreate += '   ::o' + cCtrlName + ':MapType := ' + LTrim( Str( cVal ) ) + e
                endif
+            case nType == 62  // WebView
+               cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
+                  ' WEBVIEW ::o' + cCtrlName + ' OF ' + cParent + ' SIZE ' + ;
+                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH))
+               cVal := UI_GetProp( hCtrl, "cUrl" )
+               if ! Empty( cVal )
+                  cCreate += ' URL "' + cVal + '"'
+               endif
+               cCreate += e
+            case nType == 36  // DateTimePicker
+               cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
+                  ' DATETIMEPICKER ::o' + cCtrlName + ' OF ' + cParent + ' SIZE ' + ;
+                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
+            case nType == 37  // MonthCalendar
+               cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
+                  ' MONTHCALENDAR ::o' + cCtrlName + ' OF ' + cParent + ' SIZE ' + ;
+                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
             case nType == 29  // StringGrid
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' STRINGGRID ::o' + cCtrlName + ' OF ' + cParent + ' SIZE ' + ;
@@ -1067,6 +1084,12 @@ static function RegenerateFormCode( cName, hForm )
                cCreate += '   ::o' + cCtrlName + ':nAlign := ' + LTrim( Str( cVal ) ) + e
             endif
 
+            // Emit ControlAlign if non-default (0=alNone)
+            cVal := UI_GetProp( hCtrl, "nControlAlign" )
+            if ValType( cVal ) == "N" .and. cVal != 0
+               cCreate += '   ::o' + cCtrlName + ':ControlAlign := ' + LTrim( Str( cVal ) ) + e
+            endif
+
             // Emit oFont if non-default
             cVal := UI_GetProp( hCtrl, "oFont" )
             if ! Empty( cVal ) .and. cVal != "System,12" .and. cVal != ".LucidaGrande,13"
@@ -1096,7 +1119,8 @@ static function RegenerateFormCode( cName, hForm )
                   // Skip properties already managed by codegen (nClrPane, nClrText,
                   // lTransparent, nAlign, oFont) to prevent accumulation when values change
                   if ":nClrPane" $ cLine .or. ":nClrText" $ cLine .or. ;
-                     ":lTransparent" $ cLine .or. ":nAlign" $ cLine .or. ":oFont" $ cLine
+                     ":lTransparent" $ cLine .or. ":nAlign" $ cLine .or. ;
+                     ":ControlAlign" $ cLine .or. ":oFont" $ cLine
                      nPos += Len( cEvName )
                      loop
                   endif
@@ -3159,7 +3183,7 @@ static function TBRun()
               " -lrddntx -lrddnsx -lrddcdx -lrddfpt" + ;
               " -lhbhsx -lhbsix -lhbusrrdd" + ;
               " -lgtcgi -lgtstd" + ;
-              " -framework Cocoa -framework QuartzCore -framework MapKit -framework CoreLocation -framework SceneKit" + If( Val( MAC_ShellExec( "sw_vers -productVersion | cut -d. -f1" ) ) >= 11, " -framework UniformTypeIdentifiers", "" ) + ;
+              " -framework Cocoa -framework QuartzCore -framework MapKit -framework CoreLocation -framework SceneKit -framework WebKit" + If( Val( MAC_ShellExec( "sw_vers -productVersion | cut -d. -f1" ) ) >= 11, " -framework UniformTypeIdentifiers", "" ) + ;
               " -lm -lpthread -lc++ -lsqlite3 2>&1"
       cOutput := MAC_ShellExec( cCmd )
       if "error" $ Lower( cOutput )
@@ -3414,7 +3438,7 @@ static function TBDebugRun()
               " -lrddntx -lrddnsx -lrddcdx -lrddfpt" + ;
               " -lhbhsx -lhbsix -lhbusrrdd" + ;
               " -lgtcgi -lgtstd" + ;
-              " -framework Cocoa -framework QuartzCore -framework MapKit -framework CoreLocation -framework SceneKit" + If( Val( MAC_ShellExec( "sw_vers -productVersion | cut -d. -f1" ) ) >= 11, " -framework UniformTypeIdentifiers", "" ) + ;
+              " -framework Cocoa -framework QuartzCore -framework MapKit -framework CoreLocation -framework SceneKit -framework WebKit" + If( Val( MAC_ShellExec( "sw_vers -productVersion | cut -d. -f1" ) ) >= 11, " -framework UniformTypeIdentifiers", "" ) + ;
               " -lm -lpthread -lc++ -lsqlite3 2>&1"
       cOutput := MAC_ShellExec( cCmd )
       if "error" $ Lower( cOutput )

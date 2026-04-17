@@ -1,6 +1,20 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-17 (macOS: Align property — C++Builder-style dock layout)
+
+  FEATURES
+  - All visual controls now support a ControlAlign property (alNone, alTop,
+    alBottom, alLeft, alRight, alClient), matching C++Builder's Align.
+  - Setting ControlAlign in the Inspector's new "Layout" category causes the
+    control to auto-fill the available edge or remaining client area of its
+    parent form at runtime.
+  - ApplyDockAlign() performs a 5-pass layout (Top→Bottom→Left→Right→Client)
+    on form creation and on every windowDidResize: event.
+  - TControl gains ControlAlign ACCESS/ASSIGN routed through nControlAlign.
+  - Codegen emits ::oCtrl:ControlAlign := n for any non-zero value; the
+    property is skipped when nControlAlign is 0 (alNone = default).
+
 2026-04-17 (macOS: Inspector string properties get "..." multiline editor)
 
   FEATURES

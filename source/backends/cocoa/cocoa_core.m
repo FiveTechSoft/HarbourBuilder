@@ -8,6 +8,7 @@
 #import <Cocoa/Cocoa.h>
 #import <MapKit/MapKit.h>
 #import <SceneKit/SceneKit.h>
+#import <WebKit/WebKit.h>
 #if __has_include(<UniformTypeIdentifiers/UniformTypeIdentifiers.h>)
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #define HAS_UTTYPE 1
@@ -382,6 +383,14 @@ void EnsureNSApp( void )
    BOOL FGridTitleClick;           /* Options: dgTitleClick (default YES) */
    BOOL FGridTitleHotTrack;        /* Options: dgTitleHotTrack (default NO) */
    BOOL FGridReadOnly;             /* Options: lReadOnly (default NO) */
+   /* Layout Align (like C++Builder TAlign) */
+   int  FDockAlign;               /* 0=alNone,1=alTop,2=alBottom,3=alLeft,4=alRight,5=alClient */
+   /* TWebView */
+   char FUrl[1024];               /* URL to navigate to */
+   PHB_ITEM FOnNavigate;          /* fires when navigation starts (cURL passed) */
+   PHB_ITEM FOnLoadFinish;        /* fires when page finishes loading */
+   PHB_ITEM FOnLoadError;         /* fires on navigation error */
+   id       FWebViewDelegate;     /* strong ref — prevents ARC from deallocating WKNavigationDelegate */
 }
 - (void)addChild:(HBControl *)child;
 - (void)setText:(const char *)text;
@@ -395,6 +404,14 @@ void EnsureNSApp( void )
 - (void)stopTimer;
 - (void)timerFired:(NSTimer *)timer;
 @end
+
+/* Align constants (match C++Builder TAlign) */
+#define ALIGN_NONE   0
+#define ALIGN_TOP    1
+#define ALIGN_BOTTOM 2
+#define ALIGN_LEFT   3
+#define ALIGN_RIGHT  4
+#define ALIGN_CLIENT 5
 
 /* BorderStyle constants (match C++Builder) */
 #define BS_NONE        0
@@ -525,6 +542,15 @@ void EnsureNSApp( void )
 @end
 
 static void UndoPushSnapshot( HBForm * pForm );   /* forward declaration */
+static void ApplyDockAlign( HBForm * form );      /* forward declaration */
+
+/* TWebView navigation delegate */
+@interface HBWebViewDelegate : NSObject <WKNavigationDelegate>
+{
+@public
+   HBControl * __unsafe_unretained pCtrl;
+}
+@end
 
 /* Form content view: fires form OnClick/OnMouseDown/OnMouseUp events at runtime */
 @interface HBFormContentView : HBFlippedView
@@ -668,6 +694,46 @@ static void HBUpdateTabVisibility( HBControl * owner );
 @public
    __weak HBControl * ownerCtrl;
 }
+@end
+
+@implementation HBWebViewDelegate
+
+- (void)webView:(WKWebView *)webView decidePolicyForNavigationAction:(WKNavigationAction *)action
+                                                    decisionHandler:(void (^)(WKNavigationActionPolicy))handler
+{
+   (void)action;
+   handler( WKNavigationActionPolicyAllow );
+   if( pCtrl && pCtrl->FOnNavigate ) {
+      NSString * urlStr = action.request.URL.absoluteString;
+      const char * cUrl = urlStr ? [urlStr UTF8String] : "";
+      if( hb_vmRequestReenter() ) {
+         hb_vmPushEvalSym();
+         hb_vmPush( pCtrl->FOnNavigate );
+         hb_vmPushString( cUrl, strlen(cUrl) );
+         hb_vmSend( 1 );
+         hb_vmRequestRestore();
+      }
+   }
+}
+
+- (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation
+{
+   (void)webView; (void)navigation;
+   if( pCtrl ) [pCtrl fireEvent:pCtrl->FOnLoadFinish];
+}
+
+- (void)webView:(WKWebView *)webView didFailNavigation:(WKNavigation *)navigation withError:(NSError *)error
+{
+   (void)webView; (void)navigation; (void)error;
+   if( pCtrl ) [pCtrl fireEvent:pCtrl->FOnLoadError];
+}
+
+- (void)webView:(WKWebView *)webView didFailProvisionalNavigation:(WKNavigation *)navigation withError:(NSError *)error
+{
+   (void)webView; (void)navigation; (void)error;
+   if( pCtrl ) [pCtrl fireEvent:pCtrl->FOnLoadError];
+}
+
 @end
 
 @implementation HBTabDelegate
@@ -1619,6 +1685,27 @@ static NSImage * HBResolveBitBtnImage( int kind, const char * picture )
          [mv setRegion:region animated:NO];
          v = mv; break;
       }
+      case CT_WEBVIEW: {
+         WKWebViewConfiguration * cfg = [[WKWebViewConfiguration alloc] init];
+         WKWebView * wv = [[WKWebView alloc] initWithFrame:NSMakeRect(FLeft,FTop,FWidth,FHeight)
+                                             configuration:cfg];
+         HBWebViewDelegate * del = [[HBWebViewDelegate alloc] init];
+         del->pCtrl = self;
+         [wv setNavigationDelegate:del];
+         FWebViewDelegate = del;   /* strong ref — keeps delegate alive */
+         if( FUrl[0] ) {
+            NSString * s = [NSString stringWithUTF8String:FUrl];
+            NSURL * url = [NSURL URLWithString:s];
+            if( !url ) url = [NSURL fileURLWithPath:s];
+            [wv loadRequest:[NSURLRequest requestWithURL:url]];
+         } else {
+            [wv loadHTMLString:@"<html><body style='background:#1a1a2e;color:#eee;"
+                                "font-family:system-ui;display:flex;align-items:center;"
+                                "justify-content:center;height:100vh;margin:0'>"
+                                "<span>TWebView</span></body></html>" baseURL:nil];
+         }
+         v = wv; break;
+      }
       case CT_LISTVIEW: {
          NSScrollView * sv = [[NSScrollView alloc] initWithFrame:NSMakeRect(FLeft,FTop,FWidth,FHeight)];
          NSTableView * tv = [[NSTableView alloc] initWithFrame:NSMakeRect(0,0,FWidth,FHeight)];
@@ -1947,7 +2034,10 @@ static NSImage * HBResolveBitBtnImage( int kind, const char * picture )
    else if( strcasecmp( event, "OnChange" ) == 0 )  ppTarget = &FOnChange;
    else if( strcasecmp( event, "OnInit" ) == 0 )    ppTarget = &FOnInit;
    else if( strcasecmp( event, "OnClose" ) == 0 )   ppTarget = &FOnClose;
-   else if( strcasecmp( event, "OnTimer" ) == 0 )   ppTarget = &FOnTimer;
+   else if( strcasecmp( event, "OnTimer" ) == 0 )       ppTarget = &FOnTimer;
+   else if( strcasecmp( event, "OnNavigate" ) == 0 )    ppTarget = &FOnNavigate;
+   else if( strcasecmp( event, "OnLoad" ) == 0 )        ppTarget = &FOnLoadFinish;
+   else if( strcasecmp( event, "OnError" ) == 0 )       ppTarget = &FOnLoadError;
    /* Form-specific events */
    else if( FControlType == CT_FORM ) {
       HBForm * f = (HBForm *)self;
@@ -1996,7 +2086,11 @@ static NSImage * HBResolveBitBtnImage( int kind, const char * picture )
    if( FOnChange ) { hb_itemRelease( FOnChange ); FOnChange = NULL; }
    if( FOnInit )   { hb_itemRelease( FOnInit );   FOnInit = NULL; }
    if( FOnClose )  { hb_itemRelease( FOnClose );  FOnClose = NULL; }
-   if( FOnTimer )  { hb_itemRelease( FOnTimer );  FOnTimer = NULL; }
+   if( FOnTimer )       { hb_itemRelease( FOnTimer );       FOnTimer = NULL; }
+   if( FOnNavigate )    { hb_itemRelease( FOnNavigate );    FOnNavigate = NULL; }
+   if( FOnLoadFinish )  { hb_itemRelease( FOnLoadFinish );  FOnLoadFinish = NULL; }
+   if( FOnLoadError )   { hb_itemRelease( FOnLoadError );   FOnLoadError = NULL; }
+   FWebViewDelegate = nil;
    FPendingRowData = nil;
    [self stopTimer];
 }
@@ -3459,7 +3553,10 @@ static HBPaletteTarget * s_palTarget = nil;
          [FContentView addSubview:grid];
       }
       [self createAllChildren];
-      if( !FDesignMode ) [self loadAllDBGrids];
+      if( !FDesignMode ) {
+         [self loadAllDBGrids];
+         ApplyDockAlign( self );
+      }
 
       if( FDesignMode ) {
          HBOverlayView * ov = [[HBOverlayView alloc] initWithFrame:[FContentView bounds]];
@@ -3537,7 +3634,10 @@ static HBPaletteTarget * s_palTarget = nil;
    [FWindow setContentView:FContentView];
 
    [self createAllChildren];
-   if( !FDesignMode ) [self loadAllDBGrids];
+   if( !FDesignMode ) {
+      [self loadAllDBGrids];
+      ApplyDockAlign( self );
+   }
 
    if( FDesignMode ) {
       HBOverlayView * ov = [[HBOverlayView alloc] initWithFrame:[FContentView bounds]];
@@ -3899,6 +3999,7 @@ static void FlushPendingDBGrids( HBControl * node )
       FWidth = (int)fr.size.width;
       FHeight = (int)fr.size.height;
    }
+   if( !FDesignMode ) ApplyDockAlign( self );
    if( FOnResize ) [self fireEvent:FOnResize];
 }
 
@@ -4462,6 +4563,142 @@ HB_FUNC( UI_DBGRIDNEW )
    if( pForm ) [pForm addChild:p]; RetCtrl( p );
 }
 
+HB_FUNC( UI_DATETIMEPICKERNEW )
+{
+   HBForm * pForm = GetForm(1); HBControl * p = [[HBControl alloc] init];
+   p->FControlType = CT_DATETIMEPICKER; p->FWidth = 186; p->FHeight = 24;
+   strcpy( p->FClassName, "TDateTimePicker" );
+   if( HB_ISNUM(2) ) p->FLeft = hb_parni(2);   if( HB_ISNUM(3) ) p->FTop = hb_parni(3);
+   if( HB_ISNUM(4) ) p->FWidth = hb_parni(4);  if( HB_ISNUM(5) ) p->FHeight = hb_parni(5);
+   if( pForm ) [pForm addChild:p]; RetCtrl( p );
+}
+
+HB_FUNC( UI_MONTHCALENDARNEW )
+{
+   HBForm * pForm = GetForm(1); HBControl * p = [[HBControl alloc] init];
+   p->FControlType = CT_MONTHCALENDAR; p->FWidth = 227; p->FHeight = 155;
+   strcpy( p->FClassName, "TMonthCalendar" );
+   if( HB_ISNUM(2) ) p->FLeft = hb_parni(2);   if( HB_ISNUM(3) ) p->FTop = hb_parni(3);
+   if( HB_ISNUM(4) ) p->FWidth = hb_parni(4);  if( HB_ISNUM(5) ) p->FHeight = hb_parni(5);
+   if( pForm ) [pForm addChild:p]; RetCtrl( p );
+}
+
+/* -----------------------------------------------------------------------
+ * TWebView HB_FUNCs
+ * ----------------------------------------------------------------------- */
+
+/* UI_WebViewNew( hForm, nLeft, nTop, nWidth, nHeight ) --> hCtrl */
+HB_FUNC( UI_WEBVIEWNEW )
+{
+   HBForm * pForm = GetForm(1); HBControl * p = [[HBControl alloc] init];
+   p->FControlType = CT_WEBVIEW; p->FWidth = 320; p->FHeight = 240;
+   strcpy( p->FClassName, "TWebView" );
+   if( HB_ISNUM(2) ) p->FLeft = hb_parni(2);   if( HB_ISNUM(3) ) p->FTop = hb_parni(3);
+   if( HB_ISNUM(4) ) p->FWidth = hb_parni(4);  if( HB_ISNUM(5) ) p->FHeight = hb_parni(5);
+   if( pForm ) [pForm addChild:p]; RetCtrl( p );
+}
+
+/* UI_WebViewLoad( hCtrl, cURL ) — navigate to URL */
+HB_FUNC( UI_WEBVIEWLOAD )
+{
+   HBControl * p = GetCtrl(1);
+   const char * cUrl = hb_parc(2);
+   if( !p || !cUrl ) return;
+   strncpy( p->FUrl, cUrl, sizeof(p->FUrl) - 1 );
+   WKWebView * wv = (WKWebView *)p->FView;
+   if( ![wv isKindOfClass:[WKWebView class]] ) return;
+   NSString * s = [NSString stringWithUTF8String:cUrl];
+   NSURL * url = [NSURL URLWithString:s];
+   if( !url || !url.scheme ) url = [NSURL fileURLWithPath:s];
+   [wv loadRequest:[NSURLRequest requestWithURL:url]];
+}
+
+/* UI_WebViewLoadHTML( hCtrl, cHTML, [cBaseURL] ) — load raw HTML */
+HB_FUNC( UI_WEBVIEWLOADHTML )
+{
+   HBControl * p = GetCtrl(1);
+   const char * cHtml = hb_parc(2);
+   if( !p || !cHtml ) return;
+   WKWebView * wv = (WKWebView *)p->FView;
+   if( ![wv isKindOfClass:[WKWebView class]] ) return;
+   NSString * html = [NSString stringWithUTF8String:cHtml];
+   NSURL * base = nil;
+   if( HB_ISCHAR(3) )
+      base = [NSURL URLWithString:[NSString stringWithUTF8String:hb_parc(3)]];
+   [wv loadHTMLString:html baseURL:base];
+}
+
+/* UI_WebViewGoBack( hCtrl ) */
+HB_FUNC( UI_WEBVIEWGOBACK )
+{
+   HBControl * p = GetCtrl(1);
+   WKWebView * wv = p ? (WKWebView *)p->FView : nil;
+   if( [wv isKindOfClass:[WKWebView class]] ) [wv goBack];
+}
+
+/* UI_WebViewGoForward( hCtrl ) */
+HB_FUNC( UI_WEBVIEWGOFORWARD )
+{
+   HBControl * p = GetCtrl(1);
+   WKWebView * wv = p ? (WKWebView *)p->FView : nil;
+   if( [wv isKindOfClass:[WKWebView class]] ) [wv goForward];
+}
+
+/* UI_WebViewReload( hCtrl ) */
+HB_FUNC( UI_WEBVIEWRELOAD )
+{
+   HBControl * p = GetCtrl(1);
+   WKWebView * wv = p ? (WKWebView *)p->FView : nil;
+   if( [wv isKindOfClass:[WKWebView class]] ) [wv reload];
+}
+
+/* UI_WebViewStop( hCtrl ) */
+HB_FUNC( UI_WEBVIEWSTOP )
+{
+   HBControl * p = GetCtrl(1);
+   WKWebView * wv = p ? (WKWebView *)p->FView : nil;
+   if( [wv isKindOfClass:[WKWebView class]] ) [wv stopLoading];
+}
+
+/* UI_WebViewEvaluateJS( hCtrl, cScript ) — fire-and-forget */
+HB_FUNC( UI_WEBVIEWEVALUATEJS )
+{
+   HBControl * p = GetCtrl(1);
+   const char * cScript = hb_parc(2);
+   WKWebView * wv = p ? (WKWebView *)p->FView : nil;
+   if( ![wv isKindOfClass:[WKWebView class]] || !cScript ) return;
+   NSString * script = [NSString stringWithUTF8String:cScript];
+   [wv evaluateJavaScript:script completionHandler:nil];
+}
+
+/* UI_WebViewGetURL( hCtrl ) --> cURL */
+HB_FUNC( UI_WEBVIEWGETURL )
+{
+   HBControl * p = GetCtrl(1);
+   WKWebView * wv = p ? (WKWebView *)p->FView : nil;
+   if( [wv isKindOfClass:[WKWebView class]] ) {
+      NSString * url = wv.URL.absoluteString;
+      hb_retc( url ? [url UTF8String] : "" );
+   } else
+      hb_retc( p ? p->FUrl : "" );
+}
+
+/* UI_WebViewCanGoBack( hCtrl ) --> lBool */
+HB_FUNC( UI_WEBVIEWCANGOBACK )
+{
+   HBControl * p = GetCtrl(1);
+   WKWebView * wv = p ? (WKWebView *)p->FView : nil;
+   hb_retl( [wv isKindOfClass:[WKWebView class]] && [wv canGoBack] );
+}
+
+/* UI_WebViewCanGoForward( hCtrl ) --> lBool */
+HB_FUNC( UI_WEBVIEWCANGOFORWARD )
+{
+   HBControl * p = GetCtrl(1);
+   WKWebView * wv = p ? (WKWebView *)p->FView : nil;
+   hb_retl( [wv isKindOfClass:[WKWebView class]] && [wv canGoForward] );
+}
+
 /* UI_BrowseAddCol( hBrowse, cTitle, cField, nWidth, nAlign ) --> nColIdx */
 HB_FUNC( UI_BROWSEADDCOL )
 {
@@ -4988,6 +5225,26 @@ HB_FUNC( UI_SETPROP )
             : nil;
          [(NSImageView *)p->FView setImage:img];
          if( img ) [(NSImageView *)p->FView setImageScaling:NSImageScaleProportionallyUpOrDown];
+      }
+   }
+   else if( strcasecmp(szProp,"nControlAlign")==0 && HB_ISNUM(3) )
+   {
+      p->FDockAlign = hb_parni(3);
+      /* Immediately apply if form is already visible */
+      if( p->FCtrlParent && [p->FCtrlParent isKindOfClass:[HBForm class]] )
+         ApplyDockAlign( (HBForm *)p->FCtrlParent );
+   }
+   else if( p->FControlType == CT_WEBVIEW && strcasecmp(szProp,"cUrl")==0 )
+   {
+      if( HB_ISCHAR(3) ) {
+         strncpy( p->FUrl, hb_parc(3), sizeof(p->FUrl)-1 );
+         WKWebView * wv = (WKWebView *)p->FView;
+         if( [wv isKindOfClass:[WKWebView class]] && p->FUrl[0] ) {
+            NSString * s = [NSString stringWithUTF8String:p->FUrl];
+            NSURL * url = [NSURL URLWithString:s];
+            if( !url || !url.scheme ) url = [NSURL fileURLWithPath:s];
+            [wv loadRequest:[NSURLRequest requestWithURL:url]];
+         }
       }
    }
    else if( p->FControlType == CT_SCENE3D &&
@@ -5820,6 +6077,10 @@ HB_FUNC( UI_GETPROP )
             ( p->FControlType==CT_BITBTN || p->FControlType==CT_SPEEDBTN ||
               p->FControlType==CT_IMAGE ) )
       hb_retc( p->FPicture );
+   else if( strcasecmp(szProp,"nControlAlign")==0 )
+      hb_retni( p->FDockAlign );
+   else if( strcasecmp(szProp,"cUrl")==0 && p->FControlType==CT_WEBVIEW )
+      hb_retc( p->FUrl );
    else if( strcasecmp(szProp,"cSceneFile")==0 && p->FControlType==CT_SCENE3D )
       hb_retc( p->FPicture );
    else if( strcasecmp(szProp,"nModalResult")==0 && p->FControlType==CT_BITBTN )
@@ -6092,6 +6353,8 @@ HB_FUNC( UI_GETALLPROPS )
    ADD_N("nWidth",p->FWidth,"Position"); ADD_N("nHeight",p->FHeight,"Position");
    ADD_L("lVisible",p->FVisible,"Behavior"); ADD_L("lEnabled",p->FEnabled,"Behavior");
    ADD_L("lTabStop",p->FTabStop,"Behavior");
+   if( p->FControlType != CT_FORM )
+      ADD_D("nControlAlign",p->FDockAlign,"alNone|alTop|alBottom|alLeft|alRight|alClient","Layout");
 
    { char sf[192]="System,12";
      if(p->FFont) {
@@ -6184,6 +6447,8 @@ HB_FUNC( UI_GETALLPROPS )
          ADD_D("nMapType", p->FMapType,
             "mtStandard|mtSatellite|mtHybrid|mtMutedStandard", "Appearance"); break;
       }
+      case CT_WEBVIEW:
+         ADD_S("cUrl", p->FUrl, "Data"); break;
       case CT_SCENE3D:
          ADD_P("cSceneFile", p->FPicture, "Data"); break;
       case CT_EARTHVIEW: {
@@ -6389,6 +6654,12 @@ HB_FUNC( UI_GETALLEVENTS )
          ADD_E("OnMouseDown",   0,                     "Mouse");
          ADD_E("OnMouseUp",     0,                     "Mouse");
          ADD_E("OnMouseMove",   0,                     "Mouse");
+         break;
+      case CT_WEBVIEW:
+         ADD_E("OnNavigate",    p->FOnNavigate != NULL,   "Navigation");
+         ADD_E("OnLoad",        p->FOnLoadFinish != NULL, "Navigation");
+         ADD_E("OnError",       p->FOnLoadError != NULL,  "Navigation");
+         ADD_E("OnClick",       p->FOnClick != NULL,      "Mouse");
          break;
       default:
          /* Generic fallback */
@@ -6883,10 +7154,16 @@ HB_FUNC( UI_PALETTELOADIMAGES )
          for( int i = 0; i < pd->tabs[t].nBtnCount; i++ ) {
             NSString * sym = nil;
             int ct = pd->tabs[t].btns[i].nControlType;
-            if( ct == CT_MASKEDIT2 ) sym = @"textformat.123";
-            else if( ct == CT_MAP )       sym = @"map.fill";
-            else if( ct == CT_SCENE3D )   sym = @"cube.transparent.fill";
-            else if( ct == CT_EARTHVIEW ) sym = @"globe.americas.fill";
+            if( ct == CT_MASKEDIT2 )       sym = @"textformat.123";
+            else if( ct == CT_MAP )        sym = @"map.fill";
+            else if( ct == CT_SCENE3D )    sym = @"cube.transparent.fill";
+            else if( ct == CT_EARTHVIEW )  sym = @"globe.americas.fill";
+            else if( ct == CT_TIMER )      sym = @"timer";
+            else if( ct == CT_UPDOWN )     sym = @"chevron.up.chevron.down";
+            else if( ct == CT_DATETIMEPICKER ) sym = @"calendar.badge.clock";
+            else if( ct == CT_MONTHCALENDAR )  sym = @"calendar";
+            else if( ct == CT_TRACKBAR )   sym = @"slider.horizontal.3";
+            else if( ct == CT_PAINTBOX )   sym = @"paintpalette.fill";
             if( sym && flat < (int)[icons count] ) {
                NSImage * glyph = [NSImage imageWithSystemSymbolName:sym
                   accessibilityDescription:nil];
@@ -7730,6 +8007,79 @@ typedef struct {
 static UNDO_SNAPSHOT s_undoStack[UNDO_MAX_STEPS];
 static int s_undoPos = -1;
 static int s_undoCount = 0;
+
+/* -----------------------------------------------------------------------
+ * Layout: ApplyDockAlign — resize/reposition children by their FDockAlign.
+ * Processes in C++Builder order: Top → Bottom → Left → Right → Client.
+ * Called at runtime after window creation and on every resize.
+ * ----------------------------------------------------------------------- */
+static void ApplyDockAlign( HBForm * form )
+{
+   if( !form || !form->FContentView ) return;
+
+   NSRect bounds = [(NSView *)form->FContentView bounds];
+   int totalW = (int)bounds.size.width;
+   int totalH = (int)bounds.size.height;
+
+   /* Available area in flipped-view coordinates (y=0 is top visually) */
+   int cTop    = form->FClientTop;   /* below toolbars */
+   int cBottom = totalH;
+   int cLeft   = 0;
+   int cRight  = totalW;
+
+   /* Pass 1 — alTop */
+   for( int i = 0; i < form->FChildCount; i++ ) {
+      HBControl * c = form->FChildren[i];
+      if( c->FDockAlign != ALIGN_TOP || c->FAutoPage || !c->FView ) continue;
+      c->FLeft  = cLeft;
+      c->FTop   = cTop - form->FClientTop;
+      c->FWidth = cRight - cLeft;
+      [(NSView*)c->FView setFrame:NSMakeRect(cLeft, cTop, cRight - cLeft, c->FHeight)];
+      cTop += c->FHeight;
+   }
+   /* Pass 2 — alBottom */
+   for( int i = form->FChildCount - 1; i >= 0; i-- ) {
+      HBControl * c = form->FChildren[i];
+      if( c->FDockAlign != ALIGN_BOTTOM || c->FAutoPage || !c->FView ) continue;
+      int vy = cBottom - c->FHeight;
+      c->FLeft  = cLeft;
+      c->FTop   = vy - form->FClientTop;
+      c->FWidth = cRight - cLeft;
+      [(NSView*)c->FView setFrame:NSMakeRect(cLeft, vy, cRight - cLeft, c->FHeight)];
+      cBottom -= c->FHeight;
+   }
+   /* Pass 3 — alLeft */
+   for( int i = 0; i < form->FChildCount; i++ ) {
+      HBControl * c = form->FChildren[i];
+      if( c->FDockAlign != ALIGN_LEFT || c->FAutoPage || !c->FView ) continue;
+      c->FLeft   = cLeft;
+      c->FTop    = cTop - form->FClientTop;
+      c->FHeight = cBottom - cTop;
+      [(NSView*)c->FView setFrame:NSMakeRect(cLeft, cTop, c->FWidth, cBottom - cTop)];
+      cLeft += c->FWidth;
+   }
+   /* Pass 4 — alRight */
+   for( int i = form->FChildCount - 1; i >= 0; i-- ) {
+      HBControl * c = form->FChildren[i];
+      if( c->FDockAlign != ALIGN_RIGHT || c->FAutoPage || !c->FView ) continue;
+      int vx = cRight - c->FWidth;
+      c->FLeft   = vx;
+      c->FTop    = cTop - form->FClientTop;
+      c->FHeight = cBottom - cTop;
+      [(NSView*)c->FView setFrame:NSMakeRect(vx, cTop, c->FWidth, cBottom - cTop)];
+      cRight -= c->FWidth;
+   }
+   /* Pass 5 — alClient (fills remaining area) */
+   for( int i = 0; i < form->FChildCount; i++ ) {
+      HBControl * c = form->FChildren[i];
+      if( c->FDockAlign != ALIGN_CLIENT || c->FAutoPage || !c->FView ) continue;
+      c->FLeft   = cLeft;
+      c->FTop    = cTop - form->FClientTop;
+      c->FWidth  = cRight - cLeft;
+      c->FHeight = cBottom - cTop;
+      [(NSView*)c->FView setFrame:NSMakeRect(cLeft, cTop, cRight - cLeft, cBottom - cTop)];
+   }
+}
 
 static void UndoPushSnapshot( HBForm * pForm )
 {

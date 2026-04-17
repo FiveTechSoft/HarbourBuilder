@@ -59,6 +59,9 @@ CLASS TControl
    ACCESS nAlign           INLINE UI_GetProp( ::hCpp, "nAlign" )
    ASSIGN nAlign( n )      INLINE UI_SetProp( ::hCpp, "nAlign", n )
 
+   ACCESS ControlAlign     INLINE UI_GetProp( ::hCpp, "nControlAlign" )
+   ASSIGN ControlAlign( n ) INLINE UI_SetProp( ::hCpp, "nControlAlign", n )
+
    // TPageControl ownership
    ASSIGN oOwner( o )      INLINE UI_SetCtrlOwner( ::hCpp, ;
                                   If( o == nil, 0, o:hCpp ), ;
@@ -885,6 +888,110 @@ METHOD SetItems( aLabels ) CLASS TTreeView
       ::aItems := aLabels
       UI_SetProp( ::hCpp, "aItems", cVal )
    endif
+
+return Self
+
+//----------------------------------------------------------------------------//
+
+CLASS TWebView INHERIT TControl
+
+   DATA cUrl    INIT ""
+
+   METHOD New( oParent, nLeft, nTop, nWidth, nHeight )
+   METHOD Navigate( cUrl )
+   METHOD LoadHTML( cHTML, cBaseUrl )
+   METHOD GoBack()
+   METHOD GoForward()
+   METHOD Reload()
+   METHOD Stop()
+   METHOD EvaluateJS( cScript )
+   METHOD GetUrl()
+   METHOD CanGoBack()
+   METHOD CanGoForward()
+
+ENDCLASS
+
+METHOD New( oParent, nLeft, nTop, nWidth, nHeight ) CLASS TWebView
+
+   if nWidth  == nil; nWidth  := 320; endif
+   if nHeight == nil; nHeight := 240; endif
+
+   ::oParent := oParent
+   ::hCpp := UI_WebViewNew( oParent:hCpp, nLeft, nTop, nWidth, nHeight )
+
+return Self
+
+METHOD Navigate( cUrl ) CLASS TWebView
+   ::cUrl := cUrl
+   UI_WebViewLoad( ::hCpp, cUrl )
+return Self
+
+METHOD LoadHTML( cHTML, cBaseUrl ) CLASS TWebView
+   UI_WebViewLoadHTML( ::hCpp, cHTML, cBaseUrl )
+return Self
+
+METHOD GoBack() CLASS TWebView
+   UI_WebViewGoBack( ::hCpp )
+return Self
+
+METHOD GoForward() CLASS TWebView
+   UI_WebViewGoForward( ::hCpp )
+return Self
+
+METHOD Reload() CLASS TWebView
+   UI_WebViewReload( ::hCpp )
+return Self
+
+METHOD Stop() CLASS TWebView
+   UI_WebViewStop( ::hCpp )
+return Self
+
+METHOD EvaluateJS( cScript ) CLASS TWebView
+   UI_WebViewEvaluateJS( ::hCpp, cScript )
+return Self
+
+METHOD GetUrl() CLASS TWebView
+return UI_WebViewGetUrl( ::hCpp )
+
+METHOD CanGoBack() CLASS TWebView
+return UI_WebViewCanGoBack( ::hCpp )
+
+METHOD CanGoForward() CLASS TWebView
+return UI_WebViewCanGoForward( ::hCpp )
+
+//----------------------------------------------------------------------------//
+
+CLASS TDateTimePicker INHERIT TControl
+
+   METHOD New( oParent, nLeft, nTop, nWidth, nHeight )
+
+ENDCLASS
+
+METHOD New( oParent, nLeft, nTop, nWidth, nHeight ) CLASS TDateTimePicker
+
+   if nWidth  == nil; nWidth  := 186; endif
+   if nHeight == nil; nHeight := 24;  endif
+
+   ::oParent := oParent
+   ::hCpp := UI_DateTimePickerNew( oParent:hCpp, nLeft, nTop, nWidth, nHeight )
+
+return Self
+
+//----------------------------------------------------------------------------//
+
+CLASS TMonthCalendar INHERIT TControl
+
+   METHOD New( oParent, nLeft, nTop, nWidth, nHeight )
+
+ENDCLASS
+
+METHOD New( oParent, nLeft, nTop, nWidth, nHeight ) CLASS TMonthCalendar
+
+   if nWidth  == nil; nWidth  := 227; endif
+   if nHeight == nil; nHeight := 155; endif
+
+   ::oParent := oParent
+   ::hCpp := UI_MonthCalendarNew( oParent:hCpp, nLeft, nTop, nWidth, nHeight )
 
 return Self
 
