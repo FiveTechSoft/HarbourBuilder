@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>HarbourBuilder WebServer Demo</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 20px; }
+  h1   { color: #2c5282; }
+  pre  { background: #f7f7f7; padding: 12px; border-radius: 6px; }
+  button { padding: 8px 16px; margin: 4px; cursor: pointer; }
+</style>
+</head>
+<body>
+<h1>HarbourBuilder TWebServer</h1>
+<p>Server is running on <strong>http://localhost:8080/</strong></p>
+
+<h2>API: Current Time</h2>
+<button onclick="fetchTime()">GET /api/time</button>
+<pre id="time-result">—</pre>
+
+<h2>API: Echo</h2>
+<button onclick="fetchEcho()">POST /api/echo</button>
+<pre id="echo-result">—</pre>
+
+<script>
+async function fetchTime() {
+  const r = await fetch('/api/time');
+  document.getElementById('time-result').textContent = JSON.stringify(await r.json(), null, 2);
+}
+async function fetchEcho() {
+  const r = await fetch('/api/echo', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body: 'name=Harbour&version=3'
+  });
+  document.getElementById('echo-result').textContent = JSON.stringify(await r.json(), null, 2);
+}
+</script>
+</body>
+</html>
