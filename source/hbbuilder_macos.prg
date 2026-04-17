@@ -2022,6 +2022,7 @@ static function RestoreFormFromCode( hForm, cCode )
                      UI_SetProp( hCtrl, "cBandType", Left( cVal, nPos2 - 1 ) )
                   endif
                endif
+               UI_BandSetLayout( hCtrl )
             endif
          case " WEBVIEW " $ Upper( cTrim )
             hCtrl := UI_WebViewNew( hForm, nL, nT, nW, nH )

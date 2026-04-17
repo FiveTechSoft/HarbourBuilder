@@ -127,10 +127,10 @@ static void SuppressCursorWarnings(void)
 #define CT_PRINTDIALOG 107
 #define CT_REPORTVIEWER 108
 #define CT_BARCODEPRINTER 109
+#define CT_BAND           132   // Report designer band
 #define CT_MAP            140
 #define CT_SCENE3D        141
 #define CT_EARTHVIEW      142
-#define CT_BAND           132
 #define CT_THREAD     63
 #define CT_MUTEX      64
 #define CT_SEMAPHORE  65
@@ -2774,6 +2774,7 @@ static NSImage * HBResolveBitBtnImage( int kind, const char * picture )
    if( ctrlType == CT_MAP ) isNonVisual = 0; /* TMap is visual */
    if( ctrlType == CT_SCENE3D ) isNonVisual = 0; /* TScene3D is visual */
    if( ctrlType == CT_EARTHVIEW ) isNonVisual = 0; /* TEarthView is visual */
+   if( ctrlType == CT_BAND ) isNonVisual = 0; /* TBand is visual */
 
    NSLog(@"[HB] isNonVisual=%d", isNonVisual);
    if( isNonVisual )

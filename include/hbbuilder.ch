@@ -435,6 +435,14 @@
 #xcommand BAND <oVar> TYPE <cType> OF <oParent> HEIGHT <nH> => ;
    <oVar> := TBand():New( <oParent>, <cType>, <nH> )
 
+#xcommand @ <nTop>, <nLeft> BAND <oCtrl> OF <oParent> SIZE <nWidth>, <nHeight> TYPE <cType> => ;
+   <oCtrl> := TBand():New( <oParent>, <cType>, <nHeight> ) ; ;
+   <oCtrl>:nLeft := <nLeft> ; <oCtrl>:nTop := <nTop>
+
+#xcommand @ <nTop>, <nLeft> BAND <oCtrl> OF <oParent> SIZE <nWidth>, <nHeight> => ;
+   <oCtrl> := TBand():New( <oParent>, "Detail", <nHeight> ) ; ;
+   <oCtrl>:nLeft := <nLeft> ; <oCtrl>:nTop := <nTop>
+
 #xcommand REPORTFIELD <oVar> TYPE <cType> ;
       [ PROMPT <cText> ] ;
       [ FIELD <cField> ] ;
