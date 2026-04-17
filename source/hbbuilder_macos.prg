@@ -425,6 +425,7 @@ static function CreatePalette()
    oPal:AddComp( nTab, "PDl",  "PrintDialog",   107 )
    oPal:AddComp( nTab, "RVw",  "ReportViewer",  108 )
    oPal:AddComp( nTab, "BPr",  "BarcodePrinter", 109 )
+   oPal:AddComp( nTab, "Bnd",  "Band",          132 )
 
    // ERP tab (enterprise / business components)
    nTab := oPal:AddTab( "ERP" )
@@ -993,6 +994,15 @@ static function RegenerateFormCode( cName, hForm )
                if ! Empty( cVal )
                   cCreate += '   ::o' + cCtrlName + ':cDataSource := "' + cVal + '"' + e
                endif
+            case nType == 132  // Band
+               cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
+                  ' BAND ::o' + cCtrlName + ' OF ' + cParent + ' SIZE ' + ;
+                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH))
+               cVal := UI_GetProp( hCtrl, "cBandType" )
+               if ! Empty( cVal ) .and. cVal != "Detail"
+                  cCreate += ' TYPE "' + cVal + '"'
+               endif
+               cCreate += e
             case nType == 80  // DBGrid
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' DBGRID ::o' + cCtrlName + ' OF ' + cParent + ' SIZE ' + ;
@@ -1999,6 +2009,18 @@ static function RestoreFormFromCode( hForm, cCode )
                enddo
                if hCtrl != 0 .and. ! Empty( cVal )
                   UI_SetProp( hCtrl, "aColumns", cVal )
+               endif
+            endif
+         case " BAND " $ Upper( cTrim )
+            hCtrl := UI_BandNew( hForm, "Detail", nL, nT, nW, nH )
+            if hCtrl != 0
+               nPos := At( 'TYPE "', cTrim )
+               if nPos > 0
+                  cVal := SubStr( cTrim, nPos + 6 )
+                  nPos2 := At( '"', cVal )
+                  if nPos2 > 0
+                     UI_SetProp( hCtrl, "cBandType", Left( cVal, nPos2 - 1 ) )
+                  endif
                endif
             endif
          case " WEBVIEW " $ Upper( cTrim )
@@ -4114,6 +4136,7 @@ static function IsNonVisual( nType )
    // CT_DBEDIT=83, CT_DBCOMBOBOX=84, CT_DBCHECKBOX=85, CT_DBIMAGE=86,
    // CT_WEBVIEW=62
    if nType == 62 .or. ( nType >= 79 .and. nType <= 86 ) .or. ;
+      nType == 132 .or. ;
       nType == 140 .or. nType == 141 .or. nType == 142
       return .F.
    endif
@@ -4212,6 +4235,7 @@ static function ComponentTypeName( nType )
       case nType == 129; return "CT_GITBLAME"
       case nType == 130; return "CT_GITMERGE"
       case nType == 131; return "CT_COMPARRAY"
+      case nType == 132; return "CT_BAND"
    endcase
 return LTrim(Str(nType))
 
@@ -4258,7 +4282,8 @@ static function ResolveComponentType( cName )
       { "CT_GITDIFF", 125 }, { "CT_GITREMOTE", 126 }, ;
       { "CT_GITSTASH", 127 }, { "CT_GITTAG", 128 }, ;
       { "CT_GITBLAME", 129 }, { "CT_GITMERGE", 130 }, ;
-      { "CT_COMPARRAY", 131 } }
+      { "CT_COMPARRAY", 131 }, ;
+      { "CT_BAND", 132 } }
    for i := 1 to Len( aMap )
       if Upper( cName ) == aMap[i][1]
          return aMap[i][2]

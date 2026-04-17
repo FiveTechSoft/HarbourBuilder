@@ -130,6 +130,7 @@ static void SuppressCursorWarnings(void)
 #define CT_MAP            140
 #define CT_SCENE3D        141
 #define CT_EARTHVIEW      142
+#define CT_BAND           132
 #define CT_THREAD     63
 #define CT_MUTEX      64
 #define CT_SEMAPHORE  65
@@ -1376,6 +1377,53 @@ static NSString * HBMaskApply( const char * mask, NSString * input )
 }
 @end
 
+/* --- HBBandView --- */
+/* Backing NSView for TBand: colored background + centered type label.
+ * Band type is read from the owning HBControl's FText field. */
+@interface HBBandView : NSView
+{
+@public
+   __weak HBControl * owner;
+}
+@end
+
+@implementation HBBandView
+- (BOOL)isFlipped { return YES; }
+- (void)drawRect:(NSRect)dirtyRect
+{
+   (void)dirtyRect;
+   HBControl * o = owner;
+   NSString * btype = o && o->FText[0] ?
+      [NSString stringWithUTF8String:o->FText] : @"Detail";
+
+   NSColor * bg;
+   if      ([btype isEqualToString:@"Header"])     bg = [NSColor colorWithRed:0.678 green:0.847 blue:0.902 alpha:1.0];
+   else if ([btype isEqualToString:@"PageHeader"]) bg = [NSColor colorWithRed:0.565 green:0.933 blue:0.565 alpha:1.0];
+   else if ([btype isEqualToString:@"PageFooter"]) bg = [NSColor colorWithRed:0.565 green:0.933 blue:0.565 alpha:1.0];
+   else if ([btype isEqualToString:@"Footer"])     bg = [NSColor colorWithRed:0.827 green:0.827 blue:0.827 alpha:1.0];
+   else                                             bg = [NSColor whiteColor];
+   [bg setFill];
+   NSRectFill(self.bounds);
+
+   NSDictionary * attrs = @{
+      NSFontAttributeName:            [NSFont systemFontOfSize:10],
+      NSForegroundColorAttributeName: [NSColor colorWithWhite:0.3 alpha:0.7]
+   };
+   NSString * label = [NSString stringWithFormat:@"[ %@ ]", btype];
+   NSSize sz = [label sizeWithAttributes:attrs];
+   CGFloat x = (self.bounds.size.width  - sz.width)  / 2;
+   CGFloat y = (self.bounds.size.height - sz.height) / 2;
+   [label drawAtPoint:NSMakePoint(x, y) withAttributes:attrs];
+
+   [[NSColor colorWithWhite:0.5 alpha:0.5] setStroke];
+   NSBezierPath * path = [NSBezierPath bezierPath];
+   [path moveToPoint:NSMakePoint(0, self.bounds.size.height - 1)];
+   [path lineToPoint:NSMakePoint(self.bounds.size.width, self.bounds.size.height - 1)];
+   [path setLineWidth:1.0];
+   [path stroke];
+}
+@end
+
 /* Resolve a TBitBtn NSImage from either Kind (bkOK..bkAll) via SF Symbol,
  * or cPicture file path. Returns nil for bkCustom + empty picture. */
 static NSImage * HBResolveBitBtnImage( int kind, const char * picture )
@@ -1960,6 +2008,12 @@ static NSImage * HBResolveBitBtnImage( int kind, const char * picture )
          }
 
          v = sv; break;
+      }
+      case CT_BAND: {
+         /* Report designer band: colored background + centered type label. */
+         HBBandView * bv = [[HBBandView alloc] initWithFrame:NSMakeRect(FLeft,FTop,FWidth,FHeight)];
+         bv->owner = self;
+         v = bv; break;
       }
       default: {
          /* Non-visual (Timer, Dialogs, DB components) or unknown.
@@ -3106,6 +3160,16 @@ static HBPaletteTarget * s_palTarget = nil;
             case CT_GROUPBOX: {
                HBGroupBox * p = [[HBGroupBox alloc] init];
                [p setText:"GroupBox"]; p->FLeft=rx1; p->FTop=ry1; p->FWidth=rw; p->FHeight=rh;
+               newCtrl = p; break;
+            }
+            case CT_BAND: {
+               HBControl * p = [[HBControl alloc] init];
+               strcpy( p->FClassName, "TBand" );
+               p->FControlType = CT_BAND;
+               strcpy( p->FText, "Detail" );
+               p->FLeft = rx1; p->FTop = ry1;
+               p->FWidth  = rw > 10 ? rw : 600;
+               p->FHeight = rh > 10 ? rh : 24;
                newCtrl = p; break;
             }
             default: {
@@ -4720,6 +4784,91 @@ HB_FUNC( UI_WEBVIEWCANGOFORWARD )
    hb_retl( [wv isKindOfClass:[WKWebView class]] && [wv canGoForward] );
 }
 
+/* -----------------------------------------------------------------------
+ * TBand HB_FUNCs
+ * ----------------------------------------------------------------------- */
+
+/* UI_BandNew( hForm, cType, nLeft, nTop, nWidth, nHeight ) --> hCtrl */
+HB_FUNC( UI_BANDNEW )
+{
+   HBForm * pForm = GetForm(1);
+   const char * cType = HB_ISCHAR(2) ? hb_parc(2) : "Detail";
+   HBControl * p = [[HBControl alloc] init];
+   p->FControlType = CT_BAND;
+   strcpy( p->FClassName, "TBand" );
+   strncpy( p->FText, cType, sizeof(p->FText) - 1 );
+   p->FWidth = 600; p->FHeight = 24;
+   if( HB_ISNUM(3) ) p->FLeft = hb_parni(3);
+   if( HB_ISNUM(4) ) p->FTop  = hb_parni(4);
+   if( HB_ISNUM(5) ) p->FWidth  = hb_parni(5);
+   if( HB_ISNUM(6) ) p->FHeight = hb_parni(6);
+   if( pForm ) [pForm addChild:p];
+   RetCtrl( p );
+}
+
+/* UI_BandGetType( hCtrl ) --> cType */
+HB_FUNC( UI_BANDGETTYPE )
+{
+   HBControl * p = GetCtrl(1);
+   hb_retc( p && p->FText[0] ? p->FText : "Detail" );
+}
+
+/* UI_BandSetType( hCtrl, cType ) */
+HB_FUNC( UI_BANDSETTYPE )
+{
+   HBControl * p = GetCtrl(1);
+   const char * cType = hb_parc(2);
+   if( p && cType ) {
+      strncpy( p->FText, cType, sizeof(p->FText) - 1 );
+      if( p->FView ) [p->FView setNeedsDisplay:YES];
+   }
+}
+
+/* UI_BandSetLayout( hCtrl )
+ * Restack all TBand siblings by band-type order (Header→Detail→Footer).
+ * Bands are sorted and repositioned vertically at x=0, stacked top-down. */
+HB_FUNC( UI_BANDSETLAYOUT )
+{
+   HBControl * band = GetCtrl(1);
+   if( !band ) return;
+   HBControl * parent = band->FCtrlParent;
+   if( !parent ) return;
+
+   /* Collect all band siblings */
+   NSMutableArray * bands = [NSMutableArray array];
+   for( int i = 0; i < parent->FChildCount; i++ ) {
+      HBControl * c = parent->FChildren[i];
+      if( c && c->FControlType == CT_BAND ) [bands addObject:c];
+   }
+
+   /* Sort by band type order */
+   NSDictionary * order = @{
+      @"Header":     @1, @"PageHeader": @2, @"Detail":     @3,
+      @"PageFooter": @4, @"Footer":     @5
+   };
+   [bands sortUsingComparator:^NSComparisonResult(HBControl * a, HBControl * b) {
+      NSString * ka = a->FText[0] ? [NSString stringWithUTF8String:a->FText] : @"Detail";
+      NSString * kb = b->FText[0] ? [NSString stringWithUTF8String:b->FText] : @"Detail";
+      NSNumber * na = order[ka] ? order[ka] : @3;
+      NSNumber * nb = order[kb] ? order[kb] : @3;
+      return [na compare:nb];
+   }];
+
+   /* Reposition bands stacked vertically */
+   CGFloat y = 0;
+   for( HBControl * b in bands ) {
+      b->FLeft = 0;
+      b->FTop  = (int)y;
+      if( [parent isKindOfClass:[HBForm class]] ) {
+         HBForm * f = (HBForm *)parent;
+         b->FWidth = (int)f->FWindow.frame.size.width;
+      }
+      y += b->FHeight;
+      [b updateViewFrame];
+      if( b->FView ) [b->FView setNeedsDisplay:YES];
+   }
+}
+
 /* UI_BrowseAddCol( hBrowse, cTitle, cField, nWidth, nAlign ) --> nColIdx */
 HB_FUNC( UI_BROWSEADDCOL )
 {
@@ -5054,6 +5203,7 @@ HB_FUNC( UI_DROPNONVISUAL )
          { CT_SEMAPHORE, "TSemaphore" }, { CT_THREADPOOL, "TThreadPool" },
          { CT_PRINTER, "TPrinter" }, { CT_REPORT, "TReport" },
          { CT_COMPARRAY, "TCompArray" },
+         { CT_BAND, "TBand" },
          { CT_BROWSE, "TBrowse" }, { CT_DBGRID, "TDbGrid" },
          { CT_DBNAVIGATOR, "TDbNavigator" },
          { 112, "TPython" }, { 113, "TSwift" }, { 114, "TGo" },
@@ -5269,6 +5419,13 @@ HB_FUNC( UI_SETPROP )
             if( !url || !url.scheme ) url = [NSURL fileURLWithPath:s];
             [wv loadRequest:[NSURLRequest requestWithURL:url]];
          }
+      }
+   }
+   else if( p->FControlType == CT_BAND && strcasecmp(szProp,"cBandType")==0 )
+   {
+      if( HB_ISCHAR(3) ) {
+         strncpy( p->FText, hb_parc(3), sizeof(p->FText)-1 );
+         if( p->FView ) [p->FView setNeedsDisplay:YES];
       }
    }
    else if( p->FControlType == CT_SCENE3D &&
@@ -6114,6 +6271,8 @@ HB_FUNC( UI_GETPROP )
       hb_retc( p->FPicture );
    else if( strcasecmp(szProp,"nControlAlign")==0 )
       hb_retni( p->FDockAlign );
+   else if( strcasecmp(szProp,"cBandType")==0 && p->FControlType==CT_BAND )
+      hb_retc( p->FText[0] ? p->FText : "Detail" );
    else if( strcasecmp(szProp,"cUrl")==0 && p->FControlType==CT_WEBVIEW )
       hb_retc( p->FUrl );
    else if( strcasecmp(szProp,"cSceneFile")==0 && p->FControlType==CT_SCENE3D )
@@ -6493,6 +6652,8 @@ HB_FUNC( UI_GETALLPROPS )
          ADD_D("nMapType", p->FMapType,
             "mtStandard|mtSatellite|mtHybrid|mtMutedStandard", "Appearance"); break;
       }
+      case CT_BAND:
+         ADD_S("cBandType", p->FText, "Data"); break;
       case CT_WEBVIEW:
          ADD_S("cUrl", p->FUrl, "Data"); break;
       case CT_SCENE3D:
