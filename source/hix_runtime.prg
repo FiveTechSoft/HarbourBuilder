@@ -101,8 +101,11 @@ FUNCTION UAddHeader( cType, uValue )
 return nil
 
 FUNCTION UView( cTpl, ... )
-   local aArgs := hb_aParams()
+   local i, aArgs := Array( PCount() - 1 )
    local cRoot, cFile, cHtml
+   for i := 1 to Len( aArgs )
+      aArgs[i] := hb_pValue( i + 1 )
+   next
    cRoot := HIX_GetRoot()
    cFile := cRoot + "/" + cTpl
    if ! File( cFile )
@@ -159,7 +162,7 @@ FUNCTION UUrlDecode( c )
    enddo
 return cOut
 
-FUNCTION Ulink( cText, cUrl )
+FUNCTION ULink( cText, cUrl )
 return "<a href='" + cUrl + "'>" + cText + "</a>"
 
 FUNCTION ULoadHtml( cFile )
@@ -177,7 +180,9 @@ FUNCTION UExecuteHtml( cFile )
 return nil
 
 FUNCTION UExecutePrg( cFile )
-   HIX_ExecPrg( cFile )
+   local cRoot := HIX_GetRoot()
+   local cPath := iif( File(cFile), cFile, cRoot + "/" + cFile )
+   HIX_ExecPrg( cPath )
 return nil
 
 FUNCTION _d( ... )
@@ -228,7 +233,7 @@ FUNCTION HIX_ExecPrg( cFile )
       return nil
    endif
    cCode := MemoRead( cFile )
-   pHrb  := hb_compileStr( cCode, "-n", "-w", "-q" )
+   pHrb  := hb_compileFromBuf( cCode, "-n", "-w", "-q" )
    if pHrb != nil
       hb_hrbDo( hb_hrbLoad( pHrb ) )
    else
