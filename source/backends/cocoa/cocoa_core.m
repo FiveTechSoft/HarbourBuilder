@@ -3999,7 +3999,8 @@ static void FlushPendingDBGrids( HBControl * node )
       FWidth = (int)fr.size.width;
       FHeight = (int)fr.size.height;
    }
-   if( !FDesignMode ) ApplyDockAlign( self );
+   ApplyDockAlign( self );
+   if( FDesignMode && FOverlayView ) [(NSView *)FOverlayView setNeedsDisplay:YES];
    if( FOnResize ) [self fireEvent:FOnResize];
 }
 
