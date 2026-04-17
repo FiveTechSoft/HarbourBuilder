@@ -99,9 +99,8 @@ function Main()
    MENUITEM "Exit"       OF oFile ACTION oIDE:Close()               ACCEL "q"
 
    DEFINE POPUP oEdit PROMPT "Edit" OF oIDE
-   MENUITEM "Undo"  OF oEdit ACTION CodeEditorUndo( hCodeEditor )  ACCEL "z"
-   MENUITEM "Redo"  OF oEdit ACTION CodeEditorRedo( hCodeEditor )  ACCEL "y"
-   MENUITEM "Undo Design"  OF oEdit ACTION UndoDesign()
+   MENUITEM "Undo"  OF oEdit ACTION SmartUndo()  ACCEL "z"
+   MENUITEM "Redo"  OF oEdit ACTION SmartRedo()  ACCEL "y"
    MENUSEPARATOR OF oEdit
    MENUITEM "Cut"   OF oEdit ACTION CodeEditorCut( hCodeEditor )   ACCEL "x"
    MENUITEM "Copy"  OF oEdit ACTION CodeEditorCopy( hCodeEditor )  ACCEL "c"
@@ -155,6 +154,10 @@ function Main()
    MENUSEPARATOR OF oFormat
    MENUITEM "Space Evenly Horizontal" OF oFormat ACTION AlignControls( 7 )
    MENUITEM "Space Evenly Vertical"   OF oFormat ACTION AlignControls( 8 )
+   MENUSEPARATOR OF oFormat
+   MENUITEM "Same Width"              OF oFormat ACTION AlignControls( 9 )
+   MENUITEM "Same Height"             OF oFormat ACTION AlignControls( 10 )
+   MENUITEM "Same Size"               OF oFormat ACTION AlignControls( 11 )
    MENUSEPARATOR OF oFormat
    MENUITEM "Tab Order..."           OF oFormat ACTION ShowTabOrder()
 
@@ -233,8 +236,8 @@ function Main()
    BUTTON "Copy"  OF oTB TOOLTIP "Copy (Cmd+C)"         ACTION CodeEditorCopy( hCodeEditor )
    BUTTON "Paste" OF oTB TOOLTIP "Paste (Cmd+V)"        ACTION CodeEditorPaste( hCodeEditor )
    SEPARATOR OF oTB
-   BUTTON "Undo"  OF oTB TOOLTIP "Undo (Cmd+Z)"         ACTION CodeEditorUndo( hCodeEditor )
-   BUTTON "Redo"  OF oTB TOOLTIP "Redo (Cmd+Y)"         ACTION CodeEditorRedo( hCodeEditor )
+   BUTTON "Undo"  OF oTB TOOLTIP "Undo (Cmd+Z)"         ACTION SmartUndo()
+   BUTTON "Redo"  OF oTB TOOLTIP "Redo (Cmd+Y)"         ACTION SmartRedo()
    SEPARATOR OF oTB
    BUTTON "Run"   OF oTB TOOLTIP "Run project (F9)"      ACTION TBRun()
    SEPARATOR OF oTB
@@ -3814,13 +3817,19 @@ static function ShowTabOrder()
    endif
 return nil
 
-// === Undo Design ===
+// === Undo/Redo (context-aware: design first, then code editor) ===
 
-static function UndoDesign()
-   if oDesignForm != nil
+static function SmartUndo()
+   if oDesignForm != nil .and. UI_FormUndoCount() > 0
       UI_FormUndo( oDesignForm:hCpp )
       SyncDesignerToCode()
+   else
+      CodeEditorUndo( hCodeEditor )
    endif
+return nil
+
+static function SmartRedo()
+   CodeEditorRedo( hCodeEditor )
 return nil
 
 // === Helpers ===

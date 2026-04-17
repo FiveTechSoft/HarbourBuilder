@@ -1,6 +1,28 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-17 (macOS: Undo/Redo wired to toolbar buttons + design undo fixes)
+
+  FEATURES
+  - Toolbar Undo/Redo buttons and Edit menu Redo now route through SmartUndo()
+    / SmartRedo(): Undo checks the design-undo stack first and falls back to
+    the code-editor undo; Redo delegates to the code editor (design redo stack
+    not yet implemented).
+
+  FIXES
+  - UndoPushSnapshot forward declaration was placed before the HBForm
+    @interface, causing the compiler to resolve HBForm* to the deprecated
+    AppKit NSForm class and emit a "conflicting types" error. Moved the
+    forward declaration to after the HBForm @interface definition.
+  - UI_FormUndo was decrementing the stack pointer before restoring the
+    snapshot, so it restored from an uninitialised slot. Fixed restore-then-
+    decrement order.
+  - UndoPushSnapshot was never called before drag-move or resize operations,
+    so those actions could not be undone. Push is now performed in mouseDown
+    before both resize and drag paths.
+  - Cmd+Z was wired directly to CodeEditorUndo; replaced with SmartUndo()
+    so the designer undo stack is drained first.
+
 2026-04-17 (macOS: TDBGrid — cell content visible at runtime from datasource)
 
   FEATURES

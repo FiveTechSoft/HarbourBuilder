@@ -524,6 +524,8 @@ void EnsureNSApp( void )
 - (void)applyStyleMask;
 @end
 
+static void UndoPushSnapshot( HBForm * pForm );   /* forward declaration */
+
 /* Form content view: fires form OnClick/OnMouseDown/OnMouseUp events at runtime */
 @interface HBFormContentView : HBFlippedView
 {
@@ -2809,6 +2811,7 @@ static HBPaletteTarget * s_palTarget = nil;
       if( form->FSelCount == 1 && form->FSelected[0]->FAutoPage ) {
          return;
       }
+      UndoPushSnapshot( form );   /* save state before resize/drag */
       /* Block resize for non-visual components (32x32 fixed) */
       if( form->FSelCount == 1 &&
           form->FSelected[0]->FWidth == 32 && form->FSelected[0]->FHeight == 32 )
@@ -2862,6 +2865,7 @@ static HBPaletteTarget * s_palTarget = nil;
             [form selectControl:hit add:YES];
       } else {
          if( ![form isSelected:hit] ) [form selectControl:hit add:NO];
+         UndoPushSnapshot( form );   /* save state before drag-move */
          form->FDragging = YES;
          form->FDragStartX = (int)pt.x; form->FDragStartY = (int)pt.y;
       }
@@ -7615,17 +7619,38 @@ HB_FUNC( UI_FORMALIGNSELECTED )
          }
          break;
       }
+      case 9: /* Same Width — use first selected control as reference */
+      {
+         int refW = pForm->FSelected[0]->FWidth;
+         for( i = 1; i < n; i++ ) pForm->FSelected[i]->FWidth = refW;
+         break;
+      }
+      case 10: /* Same Height */
+      {
+         int refH = pForm->FSelected[0]->FHeight;
+         for( i = 1; i < n; i++ ) pForm->FSelected[i]->FHeight = refH;
+         break;
+      }
+      case 11: /* Same Size */
+      {
+         int refW = pForm->FSelected[0]->FWidth;
+         int refH = pForm->FSelected[0]->FHeight;
+         for( i = 1; i < n; i++ ) {
+            pForm->FSelected[i]->FWidth  = refW;
+            pForm->FSelected[i]->FHeight = refH;
+         }
+         break;
+      }
    }
 
-   /* Update all views — reposition NSViews to match new FLeft/FTop */
+   /* Update all views — sync NSView frame to match new FLeft/FTop/FWidth/FHeight */
    for( i = 0; i < n; i++ )
    {
       HBControl * c = pForm->FSelected[i];
       if( c->FView )
       {
-         NSRect f = [(NSView *)c->FView frame];
-         f.origin.x = c->FLeft;
-         f.origin.y = c->FTop + pForm->FClientTop;
+         NSRect f = NSMakeRect( c->FLeft, c->FTop + pForm->FClientTop,
+                                c->FWidth, c->FHeight );
          [(NSView *)c->FView setFrame:f];
       }
    }
@@ -7699,6 +7724,12 @@ static void UndoRestoreSnapshot( HBForm * pForm, UNDO_SNAPSHOT * snap )
       [(NSView *)pForm->FOverlayView setNeedsDisplay:YES];
 }
 
+/* UI_FormUndoCount() — how many design undo steps are available */
+HB_FUNC( UI_FORMUNDOCOUNT )
+{
+   hb_retni( s_undoCount );
+}
+
 /* UI_FormUndoPush( hForm ) — save state before operation */
 HB_FUNC( UI_FORMUNDOPUSH )
 {
@@ -7711,10 +7742,12 @@ HB_FUNC( UI_FORMUNDO )
 {
    HBForm * pForm = (__bridge HBForm *)(void *)(HB_PTRUINT) hb_parnint(1);
    if( !pForm || s_undoCount <= 0 ) return;
+   /* Restore from the snapshot at s_undoPos (saved BEFORE the last operation),
+      then retreat the pointer so the next undo goes one step further back. */
+   UndoRestoreSnapshot( pForm, &s_undoStack[s_undoPos] );
    s_undoPos--;
    if( s_undoPos < 0 ) s_undoPos = UNDO_MAX_STEPS - 1;
    s_undoCount--;
-   UndoRestoreSnapshot( pForm, &s_undoStack[s_undoPos] );
 }
 
 
