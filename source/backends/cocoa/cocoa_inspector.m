@@ -260,7 +260,7 @@ static HBFontPickerTarget * s_fontTarget = nil;
    else if( [[col identifier] isEqualToString:@"button"] )
    {
       if( d->rows[nReal].bIsCat ) return @"";
-      if( d->rows[nReal].cType == 'C' || d->rows[nReal].cType == 'F' || d->rows[nReal].cType == 'P' ) return @"...";
+      if( d->rows[nReal].cType == 'C' || d->rows[nReal].cType == 'F' || d->rows[nReal].cType == 'P' || d->rows[nReal].cType == 'S' ) return @"...";
       return @"";
    }
    else
@@ -297,6 +297,10 @@ static HBFontPickerTarget * s_fontTarget = nil;
             if( *p == '|' ) count++;
          return [NSString stringWithFormat:@"(%d items)", count];
       }
+
+      /* Logical: show Yes/No instead of .T./.F. */
+      if( d->rows[nReal].cType == 'L' )
+         return ( strcasecmp( d->rows[nReal].szValue, ".T." ) == 0 ) ? @"Yes" : @"No";
 
       return [NSString stringWithUTF8String:d->rows[nReal].szValue];
    }
@@ -591,6 +595,98 @@ static HBFontPickerTarget * s_fontTarget = nil;
    }];
 }
 
+- (void)openTextEditorForRow:(int)nReal
+{
+   NSString * curVal = [NSString stringWithUTF8String:d->rows[nReal].szValue];
+
+   NSWindow * sheet = [[NSWindow alloc]
+      initWithContentRect:NSMakeRect(0, 0, 420, 240)
+      styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable
+      backing:NSBackingStoreBuffered defer:NO];
+   [sheet setTitle:[NSString stringWithFormat:@"Edit: %s", d->rows[nReal].szName]];
+
+   NSScrollView * scrollView = [[NSScrollView alloc]
+      initWithFrame:NSMakeRect(10, 50, 400, 180)];
+   [scrollView setHasVerticalScroller:YES];
+   [scrollView setBorderType:NSBezelBorder];
+
+   NSTextView * textView = [[NSTextView alloc]
+      initWithFrame:NSMakeRect(0, 0, 380, 160)];
+   [textView setMinSize:NSMakeSize(380, 160)];
+   [textView setMaxSize:NSMakeSize(FLT_MAX, FLT_MAX)];
+   [textView setVerticallyResizable:YES];
+   [[textView textContainer] setWidthTracksTextView:YES];
+   [textView setFont:[NSFont systemFontOfSize:13]];
+   [textView setString:curVal];
+   [textView setEditable:YES];
+   [textView setRichText:NO];
+   [textView setAutomaticQuoteSubstitutionEnabled:NO];
+   [textView setAutomaticDashSubstitutionEnabled:NO];
+
+   /* Dark appearance */
+   [textView setBackgroundColor:[NSColor colorWithCalibratedWhite:0.15 alpha:1.0]];
+   [textView setTextColor:[NSColor colorWithCalibratedWhite:0.9 alpha:1.0]];
+   [textView setInsertionPointColor:[NSColor whiteColor]];
+
+   [scrollView setDocumentView:textView];
+   [[sheet contentView] addSubview:scrollView];
+
+   /* OK button */
+   NSButton * okBtn = [[NSButton alloc] initWithFrame:NSMakeRect(330, 10, 80, 30)];
+   [okBtn setTitle:@"OK"];
+   [okBtn setBezelStyle:NSBezelStyleRounded];
+   [okBtn setKeyEquivalent:@"\r"];
+   [okBtn setTarget:NSApp];
+   [okBtn setAction:@selector(stopModal)];
+   [[sheet contentView] addSubview:okBtn];
+
+   /* Cancel button */
+   NSButton * cancelBtn = [[NSButton alloc] initWithFrame:NSMakeRect(240, 10, 80, 30)];
+   [cancelBtn setTitle:@"Cancel"];
+   [cancelBtn setBezelStyle:NSBezelStyleRounded];
+   [cancelBtn setKeyEquivalent:@"\033"];
+   [cancelBtn setTarget:NSApp];
+   [cancelBtn setAction:@selector(abortModal)];
+   [[sheet contentView] addSubview:cancelBtn];
+
+   [sheet center];
+   [sheet makeKeyAndOrderFront:nil];
+   [sheet makeFirstResponder:textView];
+   [NSApp activateIgnoringOtherApps:YES];
+   NSModalResponse response = [NSApp runModalForWindow:sheet];
+
+   if( response == NSModalResponseAbort ) { [sheet orderOut:nil]; return; }
+
+   /* Select all text in textView to get final string */
+   NSString * result = [textView string];
+   const char * szResult = [result UTF8String];
+   if( !szResult ) szResult = "";
+
+   strncpy( d->rows[nReal].szValue, szResult, sizeof(d->rows[nReal].szValue) - 1 );
+   d->rows[nReal].szValue[sizeof(d->rows[nReal].szValue) - 1] = '\0';
+
+   /* Push to control */
+   if( d->hCtrl )
+   {
+      hb_vmPushDynSym( hb_dynsymFind( "UI_SETPROP" ) );
+      hb_vmPushNil();
+      hb_vmPushNumInt( (HB_MAXINT) d->hCtrl );
+      hb_vmPushString( d->rows[nReal].szName, strlen(d->rows[nReal].szName) );
+      hb_vmPushString( szResult, strlen(szResult) );
+      hb_vmDo( 3 );
+   }
+
+   [d->tableView reloadData];
+   if( d->pOnPropChanged )
+   {
+      hb_vmPushEvalSym();
+      hb_vmPush( d->pOnPropChanged );
+      hb_vmSend( 0 );
+   }
+
+   [sheet orderOut:nil];
+}
+
 - (void)openArrayEditorForRow:(int)nReal
 {
    /* Convert "|"-separated value to newline-separated text */
@@ -876,7 +972,7 @@ static int s_dropdownChoice = -1;
       /* Show "..." button for color and font properties, hide for others */
       if( [[col identifier] isEqualToString:@"button"] )
       {
-         if( d->rows[nReal].cType == 'C' || d->rows[nReal].cType == 'F' || d->rows[nReal].cType == 'P' || d->rows[nReal].cType == 'A' )
+         if( d->rows[nReal].cType == 'C' || d->rows[nReal].cType == 'F' || d->rows[nReal].cType == 'P' || d->rows[nReal].cType == 'A' || d->rows[nReal].cType == 'S' )
          {
             [cell setTitle:@"..."];
             [cell setTransparent:NO];
@@ -957,6 +1053,8 @@ static int s_dropdownChoice = -1;
             [self openFilePickerForRow:nReal];
          else if( d->rows[nReal].cType == 'A' )
             [self openArrayEditorForRow:nReal];
+         else if( d->rows[nReal].cType == 'S' )
+            [self openTextEditorForRow:nReal];
       }
       /* Click on value column for dropdown properties */
       if( [[clickedCol identifier] isEqualToString:@"value"] && d->rows[nReal].cType == 'D' )
@@ -1035,9 +1133,10 @@ static int s_dropdownChoice = -1;
       }
       if( valColIdx < 0 ) return;
 
-      /* Color/Font: open picker instead */
+      /* Picker types: open dialog instead of inline edit */
       if( d->rows[nReal].cType == 'C' ) { [self openColorPickerForRow:nReal]; return; }
       if( d->rows[nReal].cType == 'F' ) { [self openFontPickerForRow:nReal]; return; }
+      if( d->rows[nReal].cType == 'S' ) { [self openTextEditorForRow:nReal]; return; }
 
       /* Defer edit to next runloop to avoid conflict with doubleAction */
       dispatch_async( dispatch_get_main_queue(), ^{

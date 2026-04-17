@@ -1,6 +1,17 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-17 (macOS: Inspector string properties get "..." multiline editor)
+
+  FEATURES
+  - String properties (type 'S') in the Inspector now show a "..." button.
+    Clicking it (or double-clicking the row) opens a modal multiline text
+    editor (NSTextView) for comfortable editing of long captions, hints,
+    and similar text. On OK the value is pushed to the control and the
+    code is synced.
+  - Color, Font, Path, and Array properties already had their own "..."
+    dialogs and are unaffected.
+
 2026-04-17 (macOS: Smart Cut/Copy/Paste + paste renders controls)
 
   FEATURES
