@@ -7156,45 +7156,69 @@ HB_FUNC( UI_PALETTELOADIMAGES )
       int flat = 0;
       for( int t = 0; t < pd->nTabCount; t++ ) {
          for( int i = 0; i < pd->tabs[t].nBtnCount; i++ ) {
-            NSString * sym = nil;
+            NSString * sym   = nil;
+            NSColor  * clr   = nil;   /* nil = multicolor / default */
             int ct = pd->tabs[t].btns[i].nControlType;
-            if( ct == CT_MASKEDIT2 )       sym = @"textformat.123";
-            else if( ct == CT_MAP )        sym = @"map.fill";
-            else if( ct == CT_SCENE3D )    sym = @"cube.transparent.fill";
-            else if( ct == CT_EARTHVIEW )  sym = @"globe.americas.fill";
-            else if( ct == CT_TIMER )      sym = @"timer";
-            else if( ct == CT_UPDOWN )     sym = @"chevron.up.chevron.down";
-            else if( ct == CT_DATETIMEPICKER ) sym = @"calendar.badge.clock";
-            else if( ct == CT_MONTHCALENDAR )  sym = @"calendar";
-            else if( ct == CT_TRACKBAR )   sym = @"slider.horizontal.3";
-            else if( ct == CT_PAINTBOX )   sym = @"paintpalette.fill";
-            else if( ct == CT_WEBVIEW )    sym = @"safari";
+            if( ct == CT_MASKEDIT2 )           { sym = @"textformat.123";         clr = [NSColor systemBlueColor];   }
+            else if( ct == CT_MAP )            { sym = @"map.fill";               clr = [NSColor systemGreenColor];  }
+            else if( ct == CT_SCENE3D )        { sym = @"cube.transparent.fill";  clr = [NSColor systemPurpleColor]; }
+            else if( ct == CT_EARTHVIEW )      { sym = @"globe.americas.fill";    clr = nil; /* multicolor */        }
+            else if( ct == CT_TIMER )          { sym = @"timer";                  clr = [NSColor systemOrangeColor]; }
+            else if( ct == CT_UPDOWN )         { sym = @"chevron.up.chevron.down"; clr = [NSColor systemIndigoColor];}
+            else if( ct == CT_DATETIMEPICKER ) { sym = @"calendar.badge.clock";   clr = nil; /* multicolor */        }
+            else if( ct == CT_MONTHCALENDAR )  { sym = @"calendar";               clr = [NSColor systemRedColor];    }
+            else if( ct == CT_TRACKBAR )       { sym = @"slider.horizontal.3";    clr = [NSColor systemBlueColor];   }
+            else if( ct == CT_PAINTBOX )       { sym = @"paintpalette.fill";      clr = nil; /* multicolor */        }
+            else if( ct == CT_WEBVIEW )        { sym = @"safari";                 clr = nil; /* multicolor */        }
             if( sym && flat < (int)[icons count] ) {
                NSImage * glyph = [NSImage imageWithSystemSymbolName:sym
                   accessibilityDescription:nil];
                if( glyph ) {
+                  /* Apply color configuration on macOS 12+ */
+                  if( @available(macOS 12.0, *) ) {
+                     NSImageSymbolConfiguration * cfg;
+                     if( clr )
+                        cfg = [NSImageSymbolConfiguration
+                               configurationWithHierarchicalColor:clr];
+                     else
+                        cfg = [NSImageSymbolConfiguration
+                               configurationPreferringMulticolor];
+                     glyph = [glyph imageWithSymbolConfiguration:cfg];
+                  } else {
+                     /* macOS 11: monochrome tinted with the chosen color */
+                     glyph = [glyph copy];
+                     [glyph setTemplate:YES];
+                  }
+
                   NSImage * composed = [[NSImage alloc] initWithSize:NSMakeSize(32, 32)];
                   [composed lockFocus];
-                  /* Low-profile light-grey pill, height matches other
-                   * icons' visual weight (~18px) centered vertically. */
-                  CGFloat bgH = 18, bgY = ( 32 - bgH ) / 2.0;
+                  /* Light-grey rounded-rect background */
+                  CGFloat bgH = 22, bgY = (32 - bgH) / 2.0;
                   NSBezierPath * bg = [NSBezierPath bezierPathWithRoundedRect:
-                     NSMakeRect(2, bgY, 28, bgH) xRadius:3 yRadius:3];
-                  [[NSColor colorWithCalibratedWhite:0.92 alpha:1.0] setFill];
+                     NSMakeRect(2, bgY, 28, bgH) xRadius:4 yRadius:4];
+                  [[NSColor colorWithCalibratedWhite:0.93 alpha:1.0] setFill];
                   [bg fill];
-                  [[NSColor colorWithCalibratedWhite:0.60 alpha:1.0] setStroke];
-                  [bg setLineWidth:1.0];
+                  [[NSColor colorWithCalibratedWhite:0.75 alpha:1.0] setStroke];
+                  [bg setLineWidth:0.5];
                   [bg stroke];
-                  /* Glyph centered, height equal to the pill */
+                  /* Symbol centered inside the background */
                   CGFloat gH = bgH - 4;
-                  NSRect gRect = NSMakeRect((32-gH)/2.0, bgY + 2, gH, gH);
-                  NSImage * tinted = [glyph copy];
-                  [tinted setTemplate:YES];
-                  [[NSColor colorWithCalibratedWhite:0.15 alpha:1.0] set];
-                  NSRect srcRect = NSMakeRect(0, 0, [tinted size].width, [tinted size].height);
-                  [tinted drawInRect:gRect fromRect:srcRect
-                     operation:NSCompositingOperationSourceOver fraction:1.0
-                     respectFlipped:YES hints:nil];
+                  NSRect gRect = NSMakeRect((32 - gH) / 2.0, bgY + 2, gH, gH);
+                  if( @available(macOS 12.0, *) ) {
+                     /* Colored image — draw directly, no template */
+                     NSRect srcRect = NSMakeRect(0, 0, [glyph size].width, [glyph size].height);
+                     [glyph drawInRect:gRect fromRect:srcRect
+                        operation:NSCompositingOperationSourceOver fraction:1.0
+                        respectFlipped:YES hints:nil];
+                  } else {
+                     /* macOS 11: use template + color or dark grey */
+                     NSColor * drawClr = clr ? clr : [NSColor colorWithCalibratedWhite:0.15 alpha:1.0];
+                     [drawClr set];
+                     NSRect srcRect = NSMakeRect(0, 0, [glyph size].width, [glyph size].height);
+                     [glyph drawInRect:gRect fromRect:srcRect
+                        operation:NSCompositingOperationSourceOver fraction:1.0
+                        respectFlipped:YES hints:nil];
+                  }
                   [composed unlockFocus];
                   icons[flat] = composed;
                }
