@@ -1691,6 +1691,12 @@ static void InsPopulateEvents( INSDATA * d )
          AC("Action");
          AE("OnChange"); AE("OnClick");
          break;
+      case 62: /* CT_WEBVIEW */
+         AC("Navigation");
+         AE("OnNavigate"); AE("OnLoad"); AE("OnError");
+         AC("Mouse");
+         AE("OnClick");
+         break;
       case 14: /* CT_IMAGE */
          AC("Action");
          AE("OnClick"); AE("OnDblClick");
