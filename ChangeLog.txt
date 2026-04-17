@@ -1,6 +1,18 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-17 (macOS: colored SF Symbol icons in component palette)
+
+  FEATURES
+  - Palette icons for Map, Scene3D, EarthView, Timer, UpDown, DateTimePicker,
+    MonthCalendar, TrackBar, PaintBox, MaskEdit and WebView now render in color
+    on macOS 12+. Multicolor symbols (EarthView, DateTimePicker, PaintBox,
+    WebView/Safari) use configurationPreferringMulticolor; the rest use
+    configurationWithHierarchicalColor: with a per-control accent color
+    (green, purple, orange, indigo, red, blue…).
+  - On macOS 11 the same symbols render with a color tint instead of plain dark
+    grey.
+
 2026-04-17 (macOS: WebView fixes + sample project)
 
   FIXES
