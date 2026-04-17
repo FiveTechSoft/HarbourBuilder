@@ -2713,38 +2713,99 @@ return cCode
 //============================================================================//
 
 CLASS TWebServer
-   DATA nPort        INIT 8080
-   DATA cRoot        INIT "."       // Document root
-   DATA lRunning     INIT .F.
-   DATA bOnRequest   INIT nil       // { |cMethod, cPath, cBody| cResponse }
-   DATA aRoutes      INIT {}        // { { cMethod, cPath, bHandler }, ... }
+   DATA nPort          INIT 8080
+   DATA nPortSSL       INIT 8443
+   DATA cRoot          INIT "."
+   DATA lHTTPS         INIT .F.
+   DATA cSSLCert       INIT ""
+   DATA cSSLKey        INIT ""
+   DATA lRunning       INIT .F.
+   DATA lTrace         INIT .F.
+   DATA nTimeout       INIT 30
+   DATA nMaxUpload     INIT 10485760
+   DATA cSessionCookie INIT "HIXSID"
+   DATA nSessionTTL    INIT 3600
+   DATA aRoutes        INIT {}
+   DATA hErrorPages    INIT { => }
+
+   DATA bOnStart       INIT nil
+   DATA bOnStop        INIT nil
+   DATA bOnError       INIT nil
+
    METHOD New() CONSTRUCTOR
-   METHOD AddRoute( cMethod, cPath, bHandler )
    METHOD Start()
    METHOD Stop()
-   METHOD ServeStatic( cPath )
+   METHOD AddRoute( cMethod, cPath, xHandler )
+   METHOD SetSSL( cCert, cKey )
+   METHOD SetErrorPage( nCode, cFile )
+   METHOD Dispatch( cMethod, cPath, cQuery, cBody, cIP )
 ENDCLASS
 
 METHOD New() CLASS TWebServer
 return Self
 
-METHOD AddRoute( cMethod, cPath, bHandler ) CLASS TWebServer
-   AAdd( ::aRoutes, { Upper(cMethod), cPath, bHandler } )
-return nil
-
 METHOD Start() CLASS TWebServer
-   ::lRunning := .T.
-return nil
+   if UI_WebServerStart( ::nPort, ::nPortSSL, ::cRoot, ::lTrace, Self )
+      ::lRunning := .T.
+      if ::bOnStart != nil; Eval( ::bOnStart ); endif
+   endif
+return Self
 
 METHOD Stop() CLASS TWebServer
+   UI_WebServerStop()
    ::lRunning := .F.
-return nil
+   if ::bOnStop != nil; Eval( ::bOnStop ); endif
+return Self
 
-METHOD ServeStatic( cPath ) CLASS TWebServer
-   if File( ::cRoot + "/" + cPath )
-      return MemoRead( ::cRoot + "/" + cPath )
+METHOD AddRoute( cMethod, cPath, xHandler ) CLASS TWebServer
+   AAdd( ::aRoutes, { Upper(cMethod), cPath, xHandler } )
+return Self
+
+METHOD SetSSL( cCert, cKey ) CLASS TWebServer
+   ::cSSLCert := cCert
+   ::cSSLKey  := cKey
+   ::lHTTPS   := .T.
+return Self
+
+METHOD SetErrorPage( nCode, cFile ) CLASS TWebServer
+   ::hErrorPages[ nCode ] := cFile
+return Self
+
+METHOD Dispatch( cMethod, cPath, cQuery, cBody, cIP ) CLASS TWebServer
+   local i, aRoute, xHandler
+   local cFilePath
+
+   // Set cRoot for UView() and static file helpers
+   HIX_SetRoot( ::cRoot )
+
+   // Try registered routes first
+   for i := 1 to Len( ::aRoutes )
+      aRoute := ::aRoutes[ i ]
+      if ( aRoute[1] == "*" .or. Upper(aRoute[1]) == Upper(cMethod) ) .and. aRoute[2] == cPath
+         xHandler := aRoute[3]
+         if ValType( xHandler ) == "B"
+            Eval( xHandler )
+         elseif ValType( xHandler ) == "C"
+            HIX_ExecPrg( ::cRoot + "/" + xHandler )
+         endif
+         return nil
+      endif
+   next
+
+   // Fall back to static file
+   cFilePath := ::cRoot + cPath
+   if cPath == "/"
+      cFilePath := ::cRoot + "/index.html"
    endif
-return "404 Not Found"
+   if File( cFilePath )
+      HIX_ServeStatic( cFilePath )
+   else
+      UI_HIX_SETSTATUS( 404 )
+      UI_HIX_WRITE( "<h1>404 Not Found</h1><p>" + cPath + "</p>" )
+      if ::bOnError != nil; Eval( ::bOnError, 404, cPath ); endif
+   endif
+
+return nil
 
 //----------------------------------------------------------------------------//
 
