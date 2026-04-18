@@ -2669,9 +2669,11 @@ static function OnComponentDrop( hForm, nType, nL, nT, nW, nH )
          endif
       next
       if nBands == 1
-         UI_SetProp( hForm, "cText", "Report" )
+         UI_SetProp( hForm, "cText",   "Report" )
          UI_SetProp( hForm, "nWidth",  850 )
          UI_SetProp( hForm, "nHeight", 450 )
+         UI_SetProp( hForm, "nLeft",   769 )
+         UI_SetProp( hForm, "nTop",    300 )
       endif
       hCtrl  := UI_GetChild( hForm, nCount )
       if hCtrl != 0

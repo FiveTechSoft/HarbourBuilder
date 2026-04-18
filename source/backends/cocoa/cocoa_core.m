@@ -5525,15 +5525,25 @@ HB_FUNC( UI_SETPROP )
       else if( p->FView && [p->FView respondsToSelector:@selector(setStringValue:)] )
          [(id)p->FView setStringValue:[NSString stringWithUTF8String:p->FText]];
    }
-   else if( strcasecmp(szProp,"nLeft")==0 )   {
+   else if( strcasecmp(szProp,"nLeft")==0 ) {
       p->FLeft = hb_parni(3);
-      if( p->FControlType == CT_FORM ) { ((HBForm *)p)->FCenter = NO; ((HBForm *)p)->FPosition = POS_DESIGNED; }
-      [p updateViewFrame];
+      if( p->FControlType == CT_FORM && ((HBForm *)p)->FWindow ) {
+         ((HBForm *)p)->FCenter = NO; ((HBForm *)p)->FPosition = POS_DESIGNED;
+         NSRect scr = [[NSScreen mainScreen] frame];
+         NSRect fr  = [((HBForm *)p)->FWindow frame];
+         [((HBForm *)p)->FWindow setFrameOrigin:NSMakePoint(p->FLeft,
+            scr.size.height - p->FTop - fr.size.height)];
+      } else [p updateViewFrame];
    }
-   else if( strcasecmp(szProp,"nTop")==0 )    {
+   else if( strcasecmp(szProp,"nTop")==0 ) {
       p->FTop = hb_parni(3);
-      if( p->FControlType == CT_FORM ) { ((HBForm *)p)->FCenter = NO; ((HBForm *)p)->FPosition = POS_DESIGNED; }
-      [p updateViewFrame];
+      if( p->FControlType == CT_FORM && ((HBForm *)p)->FWindow ) {
+         ((HBForm *)p)->FCenter = NO; ((HBForm *)p)->FPosition = POS_DESIGNED;
+         NSRect scr = [[NSScreen mainScreen] frame];
+         NSRect fr  = [((HBForm *)p)->FWindow frame];
+         [((HBForm *)p)->FWindow setFrameOrigin:NSMakePoint(p->FLeft,
+            scr.size.height - p->FTop - fr.size.height)];
+      } else [p updateViewFrame];
    }
    else if( strcasecmp(szProp,"nWidth")==0 ) {
       p->FWidth = hb_parni(3);
