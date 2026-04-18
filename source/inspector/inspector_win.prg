@@ -292,6 +292,60 @@ static void InsPopulateEvents( INSDATA * d );
 static void InsUpdateCombo( INSDATA * d );  /* updates combo from current rows data */
 static void InsArrayEdit( INSDATA * d, int nLVRow );
 
+static int ShowMLEditDialog( HWND hParent, char * szValue, int nMaxLen )
+{
+   HWND hDlg, hEdit, hOK, hCancel;
+   int nResult;
+   MSG msg;
+
+   hDlg = CreateWindowExA( WS_EX_DLGMODALFRAME | WS_EX_TOPMOST,
+      "STATIC", "Edit Text",
+      WS_POPUP | WS_CAPTION | WS_SYSMENU,
+      100, 100, 440, 280,
+      hParent, NULL, GetModuleHandleA(NULL), NULL );
+   if( !hDlg ) return IDCANCEL;
+
+   hEdit = CreateWindowExA( WS_EX_CLIENTEDGE, "EDIT", szValue,
+      WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN,
+      10, 10, 410, 200, hDlg, (HMENU) 101, GetModuleHandleA(NULL), NULL );
+
+   hOK = CreateWindowExA( 0, "BUTTON", "OK",
+      WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
+      250, 220, 80, 26, hDlg, (HMENU) IDOK, GetModuleHandleA(NULL), NULL );
+
+   hCancel = CreateWindowExA( 0, "BUTTON", "Cancel",
+      WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+      340, 220, 80, 26, hDlg, (HMENU) IDCANCEL, GetModuleHandleA(NULL), NULL );
+
+   (void) hOK; (void) hCancel;
+   SetFocus( hEdit );
+   SendMessage( hEdit, EM_SETSEL, 0, -1 );
+   ShowWindow( hDlg, SW_SHOW );
+   UpdateWindow( hDlg );
+
+   nResult = IDCANCEL;
+   while( GetMessage( &msg, NULL, 0, 0 ) )
+   {
+      if( msg.message == WM_COMMAND )
+      {
+         int id = LOWORD( msg.wParam );
+         if( id == IDOK )
+         {
+            GetWindowTextA( hEdit, szValue, nMaxLen );
+            nResult = IDOK;
+            break;
+         }
+         else if( id == IDCANCEL ) break;
+      }
+      else if( msg.message == WM_KEYDOWN && msg.wParam == VK_ESCAPE ) break;
+      TranslateMessage( &msg );
+      DispatchMessage( &msg );
+   }
+
+   DestroyWindow( hDlg );
+   return nResult;
+}
+
 static LRESULT CALLBACK InsBtnProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 {
    INSDATA * d = (INSDATA *) GetPropA( hWnd, "InsData" );
@@ -312,6 +366,17 @@ static LRESULT CALLBACK InsBtnProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
          InsArrayEdit( d, nLV );
       else if( cType == 'S' && lstrcmpiA( szName, "cFileName" ) == 0 )
          InsFilePick( d, nLV );
+      else if( cType == 'S' && lstrcmpiA( szName, "cFileName" ) != 0 )
+      {
+         char szVal[4096];
+         lstrcpynA( szVal, d->rows[nReal].szValue, sizeof(szVal) );
+         if( ShowMLEditDialog( d->hWnd, szVal, sizeof(szVal) - 1 ) == IDOK )
+         {
+            lstrcpynA( d->rows[nReal].szValue, szVal, sizeof(d->rows[0].szValue) );
+            InsApplyValue( d, nReal, szVal );
+            InsRebuild( d );
+         }
+      }
       return r;
    }
    return CallWindowProc( oldProc, hWnd, msg, wParam, lParam );
@@ -1244,8 +1309,7 @@ static void InsStartEdit( INSDATA * d, int nLVRow )
    bNeedsBtn = ( d->rows[nReal].cType == 'C' ||
                  d->rows[nReal].cType == 'F' ||
                  d->rows[nReal].cType == 'A' ||
-                 ( d->rows[nReal].cType == 'S' &&
-                   lstrcmpiA( d->rows[nReal].szName, "cFileName" ) == 0 ) );
+                 d->rows[nReal].cType == 'S' );
    nBtnW = bNeedsBtn ? 22 : 0;
    { FILE*f=fopen("c:\\HarbourBuilder\\inspector_trace.log","a");
      if(f){fprintf(f,"  bNeedsBtn=%d nBtnW=%d\n",(int)bNeedsBtn,nBtnW);fclose(f);} }
