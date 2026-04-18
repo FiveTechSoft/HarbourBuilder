@@ -15,6 +15,10 @@
 #include "hbide.h"
 #include <string.h>
 
+/* Forward declaration — defined in tform.cpp */
+class TForm;
+void ApplyDockAlign( TForm * form );
+
 /* ---- CT_BAND helpers ---------------------------------------------------- */
 static COLORREF BandColor( const char * szType )
 {
@@ -1170,7 +1174,11 @@ HB_FUNC( UI_SETPROP )
    else if( lstrcmpi( szProp, "aData" ) == 0 && p->FControlType == CT_BAND && HB_ISCHAR(3) )
       lstrcpynA( p->FData, hb_parc(3), sizeof(p->FData) - 1 );
    else if( lstrcmpi( szProp, "nControlAlign" ) == 0 && HB_ISNUM(3) )
+   {
       p->FDockAlign = hb_parni(3);
+      if( p->FCtrlParent && p->FCtrlParent->FControlType == CT_FORM )
+         ApplyDockAlign( (TForm *) p->FCtrlParent );
+   }
    else if( lstrcmpi( szProp, "lTransparent" ) == 0 )
    {
       p->FTransparent = hb_parl(3);

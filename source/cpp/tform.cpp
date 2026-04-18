@@ -250,6 +250,83 @@ void TForm::CreateHandle( HWND hParent )
    }
 }
 
+void ApplyDockAlign( TForm * form )
+{
+   if( !form || form->FDesignMode || !form->FHandle ) return;
+
+   RECT rcClient;
+   GetClientRect( form->FHandle, &rcClient );
+
+   int cTop    = form->FClientTop;
+   int cBottom = rcClient.bottom;
+   int cLeft   = 0;
+   int cRight  = rcClient.right;
+   int i;
+
+   /* Pass 1 — alTop */
+   for( i = 0; i < form->FChildCount; i++ )
+   {
+      TControl * c = form->FChildren[i];
+      if( !c || c->FDockAlign != ALIGN_TOP || !c->FHandle ) continue;
+      c->FLeft  = cLeft;
+      c->FTop   = cTop;
+      c->FWidth = cRight - cLeft;
+      SetWindowPos( c->FHandle, NULL, cLeft, cTop, cRight - cLeft, c->FHeight,
+         SWP_NOZORDER | SWP_NOACTIVATE );
+      cTop += c->FHeight;
+   }
+   /* Pass 2 — alBottom */
+   for( i = form->FChildCount - 1; i >= 0; i-- )
+   {
+      TControl * c = form->FChildren[i];
+      if( !c || c->FDockAlign != ALIGN_BOTTOM || !c->FHandle ) continue;
+      int vy = cBottom - c->FHeight;
+      c->FLeft  = cLeft;
+      c->FTop   = vy;
+      c->FWidth = cRight - cLeft;
+      SetWindowPos( c->FHandle, NULL, cLeft, vy, cRight - cLeft, c->FHeight,
+         SWP_NOZORDER | SWP_NOACTIVATE );
+      cBottom -= c->FHeight;
+   }
+   /* Pass 3 — alLeft */
+   for( i = 0; i < form->FChildCount; i++ )
+   {
+      TControl * c = form->FChildren[i];
+      if( !c || c->FDockAlign != ALIGN_LEFT || !c->FHandle ) continue;
+      c->FLeft   = cLeft;
+      c->FTop    = cTop;
+      c->FHeight = cBottom - cTop;
+      SetWindowPos( c->FHandle, NULL, cLeft, cTop, c->FWidth, cBottom - cTop,
+         SWP_NOZORDER | SWP_NOACTIVATE );
+      cLeft += c->FWidth;
+   }
+   /* Pass 4 — alRight */
+   for( i = form->FChildCount - 1; i >= 0; i-- )
+   {
+      TControl * c = form->FChildren[i];
+      if( !c || c->FDockAlign != ALIGN_RIGHT || !c->FHandle ) continue;
+      int vx = cRight - c->FWidth;
+      c->FLeft   = vx;
+      c->FTop    = cTop;
+      c->FHeight = cBottom - cTop;
+      SetWindowPos( c->FHandle, NULL, vx, cTop, c->FWidth, cBottom - cTop,
+         SWP_NOZORDER | SWP_NOACTIVATE );
+      cRight -= c->FWidth;
+   }
+   /* Pass 5 — alClient (fills remaining area) */
+   for( i = 0; i < form->FChildCount; i++ )
+   {
+      TControl * c = form->FChildren[i];
+      if( !c || c->FDockAlign != ALIGN_CLIENT || !c->FHandle ) continue;
+      c->FLeft   = cLeft;
+      c->FTop    = cTop;
+      c->FWidth  = cRight - cLeft;
+      c->FHeight = cBottom - cTop;
+      SetWindowPos( c->FHandle, NULL, cLeft, cTop, cRight - cLeft, cBottom - cTop,
+         SWP_NOZORDER | SWP_NOACTIVATE );
+   }
+}
+
 LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
 {
    switch( msg )
@@ -799,6 +876,7 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
          FInSizeMove = FALSE;
          /* Fire a single OnResize to capture the final position/size */
          FireEvent( FOnResize );
+         ApplyDockAlign( this );
          break;
 
       case WM_NOTIFY:
@@ -1432,10 +1510,14 @@ void TForm::Run()
    if( g_bDarkIDE ) SetDarkTitleBar( FHandle, TRUE );
 
    if( FAppBar )
+   {
       ShowWindow( FHandle, SW_SHOWMAXIMIZED );
+      ApplyDockAlign( this );
+   }
    else
    {
       ShowWindow( FHandle, SW_SHOW );
+      ApplyDockAlign( this );
       /* Force to front: TOPMOST then NOTOPMOST trick (always works) */
       SetWindowPos( FHandle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE );
       SetWindowPos( FHandle, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE );
@@ -1491,9 +1573,15 @@ void TForm::Show()
       Center();
 
    if( FAppBar )
+   {
       ShowWindow( FHandle, SW_SHOWMAXIMIZED );
+      ApplyDockAlign( this );
+   }
    else
+   {
       ShowWindow( FHandle, SW_SHOW );
+      ApplyDockAlign( this );
+   }
    UpdateWindow( FHandle );
 
    /* Menu bar dark mode is applied later via UI_MenuBarSetDark
