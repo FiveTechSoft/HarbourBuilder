@@ -15,6 +15,208 @@
 #include "hbide.h"
 #include <string.h>
 
+/* ---- CT_BAND helpers ---------------------------------------------------- */
+static COLORREF BandColor( const char * szType )
+{
+   if( lstrcmpiA( szType, "Header" ) == 0 )     return RGB(59, 130, 246);
+   if( lstrcmpiA( szType, "PageHeader" ) == 0 ) return RGB(34, 197, 94);
+   if( lstrcmpiA( szType, "PageFooter" ) == 0 ) return RGB(34, 197, 94);
+   if( lstrcmpiA( szType, "Footer" ) == 0 )     return RGB(107, 114, 128);
+   return RGB(240, 240, 240);
+}
+
+static LRESULT CALLBACK BandWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
+{
+   if( msg == WM_PAINT )
+   {
+      PAINTSTRUCT ps;
+      HDC hdc = BeginPaint( hWnd, &ps );
+      RECT rc;
+      GetClientRect( hWnd, &rc );
+      TControl * p = (TControl *) GetWindowLongPtr( hWnd, GWLP_USERDATA );
+      const char * szType = (p && p->FText[0]) ? p->FText : "Detail";
+      COLORREF clr = BandColor( szType );
+      HBRUSH hBr = CreateSolidBrush( clr );
+      FillRect( hdc, &rc, hBr );
+      DeleteObject( hBr );
+      HPEN hPen = CreatePen( PS_SOLID, 1, RGB(180,180,180) );
+      HPEN hOld = (HPEN) SelectObject( hdc, hPen );
+      MoveToEx( hdc, rc.left, rc.bottom - 1, NULL );
+      LineTo( hdc, rc.right, rc.bottom - 1 );
+      SelectObject( hdc, hOld );
+      DeleteObject( hPen );
+      SetBkMode( hdc, TRANSPARENT );
+      SetTextColor( hdc, RGB(255,255,255) );
+      DrawTextA( hdc, szType, -1, &rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE );
+      EndPaint( hWnd, &ps );
+      return 0;
+   }
+   return DefWindowProc( hWnd, msg, wParam, lParam );
+}
+
+static LRESULT CALLBACK RulerWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
+{
+   if( msg == WM_PAINT )
+   {
+      PAINTSTRUCT ps;
+      HDC hdc = BeginPaint( hWnd, &ps );
+      RECT rc;
+      GetClientRect( hWnd, &rc );
+      BOOL bHoriz = (BOOL)(INT_PTR) GetPropA( hWnd, "Horiz" );
+      HBRUSH hBr = CreateSolidBrush( RGB(230, 230, 230) );
+      FillRect( hdc, &rc, hBr );
+      DeleteObject( hBr );
+      SetBkMode( hdc, TRANSPARENT );
+      SetTextColor( hdc, RGB(80, 80, 80) );
+      HFONT hFont = CreateFontA( 8, 0, 0, 0, FW_NORMAL, 0, 0, 0,
+         ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+         DEFAULT_QUALITY, DEFAULT_PITCH, "Arial" );
+      HFONT hFontOld = (HFONT) SelectObject( hdc, hFont );
+      int span = bHoriz ? rc.right : rc.bottom;
+      int i;
+      for( i = 0; i <= span; i += 10 )
+      {
+         int tick = (i % 100 == 0) ? 6 : 3;
+         if( bHoriz )
+         {
+            MoveToEx( hdc, i, rc.bottom, NULL );
+            LineTo( hdc, i, rc.bottom - tick );
+            if( i % 100 == 0 && i > 0 )
+            {
+               char szNum[8];
+               RECT rLabel = { i + 1, 0, i + 30, rc.bottom - tick };
+               wsprintfA( szNum, "%d", i );
+               DrawTextA( hdc, szNum, -1, &rLabel, DT_LEFT | DT_TOP | DT_SINGLELINE );
+            }
+         }
+         else
+         {
+            MoveToEx( hdc, rc.right, i, NULL );
+            LineTo( hdc, rc.right - tick, i );
+            if( i % 100 == 0 && i > 0 )
+            {
+               char szNum[8];
+               RECT rLabel = { 0, i + 1, rc.right - tick, i + 14 };
+               wsprintfA( szNum, "%d", i );
+               DrawTextA( hdc, szNum, -1, &rLabel, DT_LEFT | DT_TOP | DT_SINGLELINE );
+            }
+         }
+      }
+      if( bHoriz )
+      {
+         RECT rcCorner = { 0, 0, 20, rc.bottom };
+         HBRUSH hCorn = CreateSolidBrush( RGB(200, 200, 200) );
+         FillRect( hdc, &rcCorner, hCorn );
+         DeleteObject( hCorn );
+      }
+      SelectObject( hdc, hFontOld );
+      DeleteObject( hFont );
+      EndPaint( hWnd, &ps );
+      return 0;
+   }
+   return DefWindowProc( hWnd, msg, wParam, lParam );
+}
+
+static void RegisterBandClasses()
+{
+   static BOOL bRegistered = FALSE;
+   if( bRegistered ) return;
+   bRegistered = TRUE;
+   WNDCLASSA wc = {0};
+   HINSTANCE hInst = GetModuleHandleA(NULL);
+   wc.lpfnWndProc   = BandWndProc;
+   wc.hInstance     = hInst;
+   wc.hCursor       = LoadCursor(NULL, IDC_ARROW);
+   wc.hbrBackground = NULL;
+   wc.lpszClassName = "HBBandView";
+   RegisterClassA( &wc );
+   wc.lpfnWndProc   = RulerWndProc;
+   wc.lpszClassName = "HBRulerView";
+   RegisterClassA( &wc );
+}
+
+#define RULER_H_PROP "RulerH"
+#define RULER_V_PROP "RulerV"
+
+static void BandStackAll( HWND hParent )
+{
+   if( !hParent ) return;
+   RECT rcParent;
+   GetClientRect( hParent, &rcParent );
+   int formW = rcParent.right - rcParent.left;
+   TForm * pForm = (TForm *) GetWindowLongPtr( hParent, GWLP_USERDATA );
+   if( !pForm ) return;
+   static const char * s_order[] = { "Header","PageHeader","Detail","PageFooter","Footer", NULL };
+   int yPos = 20;
+   int bandW = formW - 20;
+   int o, i;
+   for( o = 0; s_order[o]; o++ )
+   {
+      for( i = 0; i < pForm->FChildCount; i++ )
+      {
+         TControl * c = pForm->FChildren[i];
+         if( !c || c->FControlType != CT_BAND ) continue;
+         if( lstrcmpiA( c->FText, s_order[o] ) != 0 ) continue;
+         c->FLeft = 20;
+         c->FTop  = yPos;
+         c->FWidth = bandW;
+         if( c->FHandle )
+            SetWindowPos( c->FHandle, NULL, 20, yPos, bandW, c->FHeight,
+               SWP_NOZORDER | SWP_NOACTIVATE );
+         yPos += c->FHeight;
+      }
+   }
+}
+
+static void UI_BandRulersUpdate( TForm * pForm )
+{
+   if( !pForm || !pForm->FHandle ) return;
+   BOOL bHasBand = FALSE;
+   int i;
+   for( i = 0; i < pForm->FChildCount; i++ )
+      if( pForm->FChildren[i] && pForm->FChildren[i]->FControlType == CT_BAND )
+         { bHasBand = TRUE; break; }
+   HWND hRH = (HWND)(INT_PTR) GetPropA( pForm->FHandle, RULER_H_PROP );
+   HWND hRV = (HWND)(INT_PTR) GetPropA( pForm->FHandle, RULER_V_PROP );
+   if( bHasBand )
+   {
+      RegisterBandClasses();
+      RECT rcClient;
+      GetClientRect( pForm->FHandle, &rcClient );
+      HINSTANCE hInst = GetModuleHandleA(NULL);
+      if( !hRH )
+      {
+         hRH = CreateWindowExA( 0, "HBRulerView", "",
+            WS_CHILD | WS_VISIBLE,
+            20, 0, rcClient.right - 20, 20,
+            pForm->FHandle, NULL, hInst, NULL );
+         if( hRH ) {
+            SetPropA( hRH, "Horiz", (HANDLE)(INT_PTR) TRUE );
+            SetPropA( pForm->FHandle, RULER_H_PROP, (HANDLE)(INT_PTR) hRH );
+         }
+      }
+      if( !hRV )
+      {
+         hRV = CreateWindowExA( 0, "HBRulerView", "",
+            WS_CHILD | WS_VISIBLE,
+            0, 0, 20, rcClient.bottom,
+            pForm->FHandle, NULL, hInst, NULL );
+         if( hRV ) {
+            SetPropA( hRV, "Horiz", (HANDLE)(INT_PTR) FALSE );
+            SetPropA( pForm->FHandle, RULER_V_PROP, (HANDLE)(INT_PTR) hRV );
+         }
+      }
+      if( hRH ) SetWindowPos( hRH, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE|SWP_NOSIZE );
+      if( hRV ) SetWindowPos( hRV, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE|SWP_NOSIZE );
+   }
+   else
+   {
+      if( hRH ) { DestroyWindow( hRH ); RemovePropA( pForm->FHandle, RULER_H_PROP ); }
+      if( hRV ) { DestroyWindow( hRV ); RemovePropA( pForm->FHandle, RULER_V_PROP ); }
+   }
+}
+/* ---- end CT_BAND helpers ------------------------------------------------ */
+
 TComponentPalette * g_palette = NULL;
 
 #ifndef __GNUC__
@@ -581,6 +783,60 @@ HB_FUNC( UI_DBGRIDNEW )
 
 HB_FUNC( UI_DBGRIDSETCACHE ) { (void)hb_param(1,HB_IT_ANY); }
 
+/* UI_BandNew( hForm, cType, nLeft, nTop, nWidth, nHeight ) --> hCtrl */
+HB_FUNC( UI_BANDNEW )
+{
+   TForm * pForm = (TForm *) GetCtrl(1);
+   if( !pForm || pForm->FControlType != CT_FORM ) { hb_retni(0); return; }
+   RegisterBandClasses();
+   TControl * p = new TControl();
+   p->FControlType = CT_BAND;
+   lstrcpyA( p->FClassName, "TBand" );
+   const char * szType = HB_ISCHAR(2) ? hb_parc(2) : "Detail";
+   lstrcpynA( p->FText, szType, sizeof(p->FText) );
+   p->FLeft   = HB_ISNUM(3) ? hb_parni(3) : 20;
+   p->FTop    = HB_ISNUM(4) ? hb_parni(4) : 20;
+   p->FWidth  = HB_ISNUM(5) ? hb_parni(5) : 400;
+   p->FHeight = (HB_ISNUM(6) && hb_parni(6) > 0) ? hb_parni(6) : 65;
+   p->FHandle = CreateWindowExA( 0, "HBBandView", szType,
+      WS_CHILD | WS_VISIBLE,
+      p->FLeft, p->FTop, p->FWidth, p->FHeight,
+      pForm->FHandle, NULL, GetModuleHandleA(NULL), NULL );
+   if( !p->FHandle ) { delete p; hb_retni(0); return; }
+   SetWindowLongPtr( p->FHandle, GWLP_USERDATA, (LONG_PTR) p );
+   pForm->AddChild( p );
+   p->FCtrlParent = (TControl *) pForm;
+   UI_BandRulersUpdate( pForm );
+   BandStackAll( pForm->FHandle );
+   RetCtrl( p );
+}
+
+/* UI_BandGetType( hCtrl ) --> cType */
+HB_FUNC( UI_BANDGETTYPE )
+{
+   TControl * p = GetCtrl(1);
+   hb_retc( (p && p->FControlType == CT_BAND) ? p->FText : "" );
+}
+
+/* UI_BandSetType( hCtrl, cType ) */
+HB_FUNC( UI_BANDSETTYPE )
+{
+   TControl * p = GetCtrl(1);
+   if( p && p->FControlType == CT_BAND && HB_ISCHAR(2) )
+   {
+      lstrcpynA( p->FText, hb_parc(2), sizeof(p->FText) );
+      if( p->FHandle ) InvalidateRect( p->FHandle, NULL, TRUE );
+   }
+}
+
+/* UI_BandSetLayout( hCtrl ) - restack all bands in parent form */
+HB_FUNC( UI_BANDSETLAYOUT )
+{
+   TControl * p = GetCtrl(1);
+   if( p && p->FCtrlParent && p->FControlType == CT_BAND && p->FCtrlParent->FHandle )
+      BandStackAll( p->FCtrlParent->FHandle );
+}
+
 /* UI_BrowseAddCol( hBrowse, cTitle, cField, nWidth, nAlign ) --> nColIdx */
 HB_FUNC( UI_BROWSEADDCOL )
 {
@@ -906,6 +1162,15 @@ HB_FUNC( UI_SETPROP )
       lstrcpynA( p->FRDD, hb_parc(3), sizeof( p->FRDD ) );
    else if( lstrcmpi( szProp, "lActive" ) == 0 )
       p->FActive = hb_parl(3);
+   else if( lstrcmpi( szProp, "cBandType" ) == 0 && p->FControlType == CT_BAND && HB_ISCHAR(3) )
+   {
+      lstrcpynA( p->FText, hb_parc(3), sizeof(p->FText) );
+      if( p->FHandle ) InvalidateRect( p->FHandle, NULL, TRUE );
+   }
+   else if( lstrcmpi( szProp, "aData" ) == 0 && p->FControlType == CT_BAND && HB_ISCHAR(3) )
+      lstrcpynA( p->FData, hb_parc(3), sizeof(p->FData) - 1 );
+   else if( lstrcmpi( szProp, "nControlAlign" ) == 0 && HB_ISNUM(3) )
+      p->FDockAlign = hb_parni(3);
    else if( lstrcmpi( szProp, "lTransparent" ) == 0 )
    {
       p->FTransparent = hb_parl(3);
@@ -1231,6 +1496,12 @@ HB_FUNC( UI_GETPROP )
       hb_retc( p->FRDD );
    else if( lstrcmpi( szProp, "lActive" ) == 0 )
       hb_retl( p->FActive );
+   else if( lstrcmpi( szProp, "cBandType" ) == 0 && p->FControlType == CT_BAND )
+      hb_retc( p->FText );
+   else if( lstrcmpi( szProp, "aData" ) == 0 && p->FControlType == CT_BAND )
+      hb_retc( p->FData );
+   else if( lstrcmpi( szProp, "nControlAlign" ) == 0 )
+      hb_retni( p->FDockAlign );
    else if( lstrcmpi( szProp, "lTransparent" ) == 0 )
       hb_retl( p->FTransparent );
    else if( lstrcmpi( szProp, "aTabs" ) == 0 && p->FControlType == CT_TABCONTROL2 )
@@ -1879,6 +2150,18 @@ HB_FUNC( UI_GETALLPROPS )
    ADD_PROP_L( "lEnabled", p->FEnabled, "Behavior" );
    ADD_PROP_L( "lTabStop", p->FTabStop, "Behavior" );
 
+   /* ControlAlign (all controls) */
+   {
+      static const char * szAlignEnum = "alNone|alTop|alBottom|alLeft|alRight|alClient";
+      pRow = hb_itemArrayNew(4);
+      hb_arraySetC( pRow, 1, "nControlAlign" );
+      hb_arraySetNI( pRow, 2, p->FDockAlign );
+      hb_arraySetC( pRow, 3, "Layout" );
+      hb_arraySetC( pRow, 4, szAlignEnum );
+      hb_arrayAdd( pArray, pRow );
+      hb_itemRelease( pRow );
+   }
+
    /* Font property */
    {
       char szFont[128] = "Segoe UI,12";
@@ -2012,6 +2295,19 @@ HB_FUNC( UI_GETALLPROPS )
       case CT_TIMER:
          ADD_PROP_N( "nInterval", p->FInterval, "Behavior" );
          break;
+      case CT_BAND:
+      {
+         static const char * szBandEnum = "Header|PageHeader|Detail|PageFooter|Footer";
+         pRow = hb_itemArrayNew(4);
+         hb_arraySetC( pRow, 1, "cBandType" );
+         hb_arraySetC( pRow, 2, p->FText );
+         hb_arraySetC( pRow, 3, "Band" );
+         hb_arraySetC( pRow, 4, szBandEnum );
+         hb_arrayAdd( pArray, pRow );
+         hb_itemRelease( pRow );
+         ADD_PROP_S( "aData", p->FData, "Band" );
+         break;
+      }
    }
 
    hb_itemReturnRelease( pArray );
