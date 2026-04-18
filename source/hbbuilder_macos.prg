@@ -2620,7 +2620,7 @@ return nil
 
 static function OnComponentDrop( hForm, nType, nL, nT, nW, nH )
 
-   local cName, nCount, hCtrl, hDbg
+   local cName, nCount, hCtrl, hDbg, nBands, iBand
    static aCnt := nil
    static nBandCnt := 0
    static aNames := { ;
@@ -2661,6 +2661,16 @@ static function OnComponentDrop( hForm, nType, nL, nT, nW, nH )
       nBandCnt++
       cName := "Band" + LTrim( Str( nBandCnt ) )
       nCount := UI_GetChildCount( hForm )
+      // First band on this form → rename form to "Report"
+      nBands := 0
+      for iBand := 1 to nCount
+         if UI_GetType( UI_GetChild( hForm, iBand ) ) == CT_BAND
+            nBands++
+         endif
+      next
+      if nBands == 1
+         UI_SetProp( hForm, "cText", "Report" )
+      endif
       hCtrl  := UI_GetChild( hForm, nCount )
       if hCtrl != 0
          UI_SetProp( hCtrl, "cName", cName )
