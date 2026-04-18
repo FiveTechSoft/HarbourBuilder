@@ -14,6 +14,7 @@
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #define HAS_UTTYPE 1
 #endif
+#include <objc/runtime.h>
 #include <hbapi.h>
 #include <hbapiitm.h>
 #include <hbapicls.h>
@@ -559,6 +560,7 @@ void EnsureNSApp( void )
 static void UndoPushSnapshot( HBForm * pForm );   /* forward declaration */
 static void ApplyDockAlign( HBForm * form );      /* forward declaration */
 static void BandStackAll( HBControl * parent );   /* forward declaration */
+static void UI_BandRulersUpdate( HBControl * form ); /* forward declaration */
 
 /* TWebView navigation delegate */
 @interface HBWebViewDelegate : NSObject <WKNavigationDelegate>
@@ -1424,6 +1426,131 @@ static NSString * HBMaskApply( const char * mask, NSString * input )
    [path stroke];
 }
 @end
+
+/* --- HBRulerView --- */
+/* Thin ruler strip drawn at top (horizontal) or left (vertical) of the report designer.
+ * Appears when the first CT_BAND is placed; removed when no bands remain. */
+
+static const char s_rulerHKey   = 0;   /* associated-object key for horizontal ruler */
+static const char s_rulerVKey   = 0;   /* associated-object key for vertical ruler    */
+static const char s_rulerCrnKey = 0;   /* associated-object key for corner square     */
+
+@interface HBRulerView : NSView
+@property (assign) BOOL isHorizontal;
+@end
+
+@implementation HBRulerView
+- (BOOL)isFlipped { return YES; }
+- (void)drawRect:(NSRect)dirtyRect
+{
+   (void)dirtyRect;
+   [[NSColor colorWithWhite:0.85 alpha:1.0] setFill];
+   NSRectFill(self.bounds);
+
+   NSFont * font = [NSFont systemFontOfSize:8];
+   NSDictionary * attrs = @{ NSFontAttributeName: font,
+                              NSForegroundColorAttributeName: [NSColor darkGrayColor] };
+
+   CGFloat totalLen = self.isHorizontal ? self.bounds.size.width : self.bounds.size.height;
+   CGFloat rulerW   = self.isHorizontal ? self.bounds.size.height : self.bounds.size.width;
+
+   for( int i = 0; i <= (int)totalLen; i += 10 ) {
+      CGFloat tick = (i % 100 == 0) ? rulerW * 0.6 : (i % 50 == 0) ? rulerW * 0.4 : rulerW * 0.2;
+      NSBezierPath * p = [NSBezierPath bezierPath];
+      [[NSColor colorWithWhite:0.5 alpha:1.0] setStroke];
+      if( self.isHorizontal ) {
+         [p moveToPoint:NSMakePoint(i, rulerW - tick)];
+         [p lineToPoint:NSMakePoint(i, rulerW)];
+      } else {
+         [p moveToPoint:NSMakePoint(rulerW - tick, i)];
+         [p lineToPoint:NSMakePoint(rulerW, i)];
+      }
+      [p setLineWidth:0.5];
+      [p stroke];
+      if( i % 100 == 0 && i > 0 ) {
+         NSString * label = [NSString stringWithFormat:@"%d", i];
+         NSPoint pt = self.isHorizontal ? NSMakePoint(i + 2, 1) : NSMakePoint(1, i + 1);
+         [label drawAtPoint:pt withAttributes:attrs];
+      }
+   }
+   /* Bottom/right border line */
+   [[NSColor colorWithWhite:0.4 alpha:1.0] setStroke];
+   NSBezierPath * border = [NSBezierPath bezierPath];
+   if( self.isHorizontal ) {
+      [border moveToPoint:NSMakePoint(0, rulerW - 0.5)];
+      [border lineToPoint:NSMakePoint(totalLen, rulerW - 0.5)];
+   } else {
+      [border moveToPoint:NSMakePoint(rulerW - 0.5, 0)];
+      [border lineToPoint:NSMakePoint(rulerW - 0.5, totalLen)];
+   }
+   [border setLineWidth:1.0];
+   [border stroke];
+}
+@end
+
+/* UI_BandRulersUpdate — show or hide ruler overlay views on the report designer form.
+ * Call after any CT_BAND add/remove/restack operation. */
+static void UI_BandRulersUpdate( HBControl * form )
+{
+   if( !form || ![form isKindOfClass:[HBForm class]] ) return;
+   HBForm * hbf = (HBForm *)form;
+   if( !hbf->FContentView ) return;
+
+   /* Count visible bands (FView != nil means not deleted) */
+   int nBands = 0;
+   for( int i = 0; i < form->FChildCount; i++ )
+      if( form->FChildren[i] && form->FChildren[i]->FControlType == CT_BAND
+            && form->FChildren[i]->FView )
+         nBands++;
+
+   const CGFloat RS = 20.0;
+   HBRulerView * rh = objc_getAssociatedObject(hbf->FContentView, &s_rulerHKey);
+   HBRulerView * rv = objc_getAssociatedObject(hbf->FContentView, &s_rulerVKey);
+
+   if( nBands > 0 && !rh ) {
+      /* Create rulers */
+      NSRect bounds = hbf->FContentView.bounds;
+      HBRulerView * nh = [[HBRulerView alloc] initWithFrame:
+         NSMakeRect(RS, 0, bounds.size.width - RS, RS)];
+      nh.isHorizontal   = YES;
+      nh.autoresizingMask = NSViewWidthSizable;
+      [hbf->FContentView addSubview:nh positioned:NSWindowAbove relativeTo:nil];
+
+      HBRulerView * nv = [[HBRulerView alloc] initWithFrame:
+         NSMakeRect(0, RS, RS, bounds.size.height - RS)];
+      nv.isHorizontal   = NO;
+      nv.autoresizingMask = NSViewHeightSizable;
+      [hbf->FContentView addSubview:nv positioned:NSWindowAbove relativeTo:nil];
+
+      /* Corner square */
+      NSView * corner = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, RS, RS)];
+      corner.wantsLayer = YES;
+      corner.layer.backgroundColor = [[NSColor colorWithWhite:0.75 alpha:1.0] CGColor];
+      [hbf->FContentView addSubview:corner positioned:NSWindowAbove relativeTo:nil];
+
+      objc_setAssociatedObject(hbf->FContentView, &s_rulerHKey,   nh,     OBJC_ASSOCIATION_RETAIN);
+      objc_setAssociatedObject(hbf->FContentView, &s_rulerVKey,   nv,     OBJC_ASSOCIATION_RETAIN);
+      objc_setAssociatedObject(hbf->FContentView, &s_rulerCrnKey, corner, OBJC_ASSOCIATION_RETAIN);
+   }
+   else if( nBands == 0 && rh ) {
+      /* Remove rulers */
+      [rh removeFromSuperview];
+      [rv removeFromSuperview];
+      NSView * corner = objc_getAssociatedObject(hbf->FContentView, &s_rulerCrnKey);
+      if( corner ) [corner removeFromSuperview];
+      objc_setAssociatedObject(hbf->FContentView, &s_rulerHKey,   nil, OBJC_ASSOCIATION_RETAIN);
+      objc_setAssociatedObject(hbf->FContentView, &s_rulerVKey,   nil, OBJC_ASSOCIATION_RETAIN);
+      objc_setAssociatedObject(hbf->FContentView, &s_rulerCrnKey, nil, OBJC_ASSOCIATION_RETAIN);
+   }
+   else if( nBands > 0 && rh ) {
+      /* Resize to match current window size */
+      NSRect bounds = hbf->FContentView.bounds;
+      rh.frame = NSMakeRect(RS, 0, bounds.size.width - RS, RS);
+      rv.frame = NSMakeRect(0, RS, RS, bounds.size.height - RS);
+      [rh setNeedsDisplay:YES];
+      [rv setNeedsDisplay:YES];
+   }
+}
 
 /* Resolve a TBitBtn NSImage from either Kind (bkOK..bkAll) via SF Symbol,
  * or cPicture file path. Returns nil for bkCustom + empty picture. */
@@ -3445,6 +3572,7 @@ static HBPaletteTarget * s_palTarget = nil;
             [form->FSelected[i]->FView removeFromSuperview];
             form->FSelected[i]->FView = nil;
          }
+      UI_BandRulersUpdate( (HBControl *)form );
       [form clearSelection]; return;
    }
 
@@ -4908,6 +5036,7 @@ static void BandStackAll( HBControl * parent )
       [b updateViewFrame];
       if( b->FView ) [b->FView setNeedsDisplay:YES];
    }
+   UI_BandRulersUpdate( parent );
 }
 
 /* UI_BandSetLayout( hCtrl )
