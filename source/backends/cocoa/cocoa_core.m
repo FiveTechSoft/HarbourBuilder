@@ -15,6 +15,7 @@
 #define HAS_UTTYPE 1
 #endif
 #include <objc/runtime.h>
+#import <CoreText/CoreText.h>
 #include <hbapi.h>
 #include <hbapiitm.h>
 #include <hbapicls.h>
@@ -9121,3 +9122,31 @@ HB_FUNC( UI_STACKTOOLBARS )
 
 /* --- DPI stub (macOS handles Retina natively) --- */
 HB_FUNC( SETDPIAWARE ) { /* no-op on macOS */ }
+
+/* =====================================================================
+ * Report Preview / PDF Export — RPT_* HB_FUNCs
+ * ===================================================================== */
+
+static CGContextRef s_pdfCtx       = NULL;
+static CFURLRef     s_pdfURL       = NULL;
+static CGRect       s_pageRect;
+static float        s_pdfScale     = 0.75f;   /* 96 screen px -> 72 PDF pt */
+static char         s_pdfTempPath[1024] = "";
+
+/* RPT_EXPORTPDF( cDestFile ) — close PDF, move temp file to cDestFile */
+HB_FUNC( RPT_EXPORTPDF )
+{
+   const char * szFile = hb_parc(1);
+   if( !s_pdfCtx ) return;
+   CGPDFContextEndPage(s_pdfCtx);
+   CGContextRelease(s_pdfCtx); s_pdfCtx = NULL;
+   if( s_pdfURL ) { CFRelease(s_pdfURL); s_pdfURL = NULL; }
+   if( !szFile || !s_pdfTempPath[0] ) return;
+   if( strcmp(s_pdfTempPath, szFile) != 0 ) {
+      NSString * src = [NSString stringWithUTF8String:s_pdfTempPath];
+      NSString * dst = [NSString stringWithUTF8String:szFile];
+      NSError * err = nil;
+      [[NSFileManager defaultManager] removeItemAtPath:dst error:nil];
+      [[NSFileManager defaultManager] moveItemAtPath:src toPath:dst error:&err];
+   }
+}

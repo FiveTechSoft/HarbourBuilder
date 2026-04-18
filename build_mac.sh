@@ -233,6 +233,7 @@ clang++ -o ${PROG} \
    -lgtcgi -lgttrm -lgtstd \
    -framework Cocoa \
    -framework QuartzCore \
+   -framework CoreText \
    -framework MapKit \
    -framework CoreLocation \
    -framework SceneKit \
