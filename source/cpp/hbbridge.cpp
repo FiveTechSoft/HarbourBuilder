@@ -912,6 +912,10 @@ HB_FUNC( UI_REPORTCTRLNEW )
    int nW   = hb_parni(6), nH = hb_parni(7);
 
    if( !pForm || !pBand ) { hb_retnint(0); return; }
+   if( ct != CT_REPORTLABEL && ct != CT_REPORTFIELD && ct != CT_REPORTIMAGE )
+      { hb_retnint(0); return; }
+   if( pBand->FControlType != CT_BAND )
+      { hb_retnint(0); return; }
    RegisterBandClasses();
 
    TControl * p = new TControl();
@@ -963,14 +967,17 @@ HB_FUNC( UI_SYNCBANDDATA )
    {
       TControl * p = pForm->FChildren[i];
       if( !p || !p->FBandParent ) continue;
+      if( p->FControlType != CT_REPORTLABEL &&
+          p->FControlType != CT_REPORTFIELD &&
+          p->FControlType != CT_REPORTIMAGE ) continue;
 
       const char * szType =
          p->FControlType == CT_REPORTLABEL ? "label" :
          p->FControlType == CT_REPORTFIELD ? "field" : "image";
 
-      char rec[600];
+      char rec[700];
       /* Format: cName|type|cText|cFieldName|cFormat|nTop|nLeft|nW|nH|font|sz|bold|italic|align */
-      wsprintfA( rec, "%s|%s|%s|%s||%d|%d|%d|%d|Sans|10|0|0|0",
+      _snprintf( rec, sizeof(rec)-1, "%s|%s|%s|%s||%d|%d|%d|%d|Sans|10|0|0|0",
          p->FName[0] ? p->FName : "rctrl",
          szType,
          p->FText,
