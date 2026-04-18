@@ -2872,6 +2872,43 @@ static NSImage * HBResolveBitBtnImage( int kind, const char * picture )
       if( targetForm->FOverlayView )
          [targetForm->FOverlayView setNeedsDisplay:YES];
    }
+   else if( ctrlType == CT_BAND )
+   {
+      /* Band: immediate full-width drop, auto-stacked — no rubber-band needed */
+      HBControl * ctrl = [[HBControl alloc] init];
+      ctrl->FControlType = CT_BAND;
+      strncpy( ctrl->FClassName, "TBand", sizeof(ctrl->FClassName) - 1 );
+      strncpy( ctrl->FText, "Detail", sizeof(ctrl->FText) - 1 );
+      ctrl->FLeft   = 0;
+      ctrl->FTop    = 0;
+      ctrl->FWidth  = targetForm->FWidth;
+      ctrl->FHeight = 24;
+
+      KeepAlive( ctrl );
+      [targetForm addChild:ctrl];
+
+      if( targetForm->FContentView )
+         [ctrl createViewInParent:targetForm->FContentView];
+
+      BandStackAll( (HBControl *)targetForm );
+
+      if( targetForm->FOnComponentDrop && HB_IS_BLOCK( targetForm->FOnComponentDrop ) )
+      {
+         hb_vmPushEvalSym();
+         hb_vmPush( targetForm->FOnComponentDrop );
+         hb_vmPushNumInt( (HB_PTRUINT)targetForm );
+         hb_vmPushInteger( CT_BAND );
+         hb_vmPushInteger( 0 );
+         hb_vmPushInteger( 0 );
+         hb_vmPushInteger( ctrl->FWidth );
+         hb_vmPushInteger( ctrl->FHeight );
+         hb_vmSend( 6 );
+      }
+
+      [targetForm selectControl:ctrl add:NO];
+      if( targetForm->FOverlayView )
+         [targetForm->FOverlayView setNeedsDisplay:YES];
+   }
    else
    {
       /* Visual control: set pending, wait for click on form */
