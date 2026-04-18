@@ -5535,8 +5535,18 @@ HB_FUNC( UI_SETPROP )
       if( p->FControlType == CT_FORM ) { ((HBForm *)p)->FCenter = NO; ((HBForm *)p)->FPosition = POS_DESIGNED; }
       [p updateViewFrame];
    }
-   else if( strcasecmp(szProp,"nWidth")==0 )  { p->FWidth = hb_parni(3); [p updateViewFrame]; }
-   else if( strcasecmp(szProp,"nHeight")==0 ) { p->FHeight = hb_parni(3); [p updateViewFrame]; }
+   else if( strcasecmp(szProp,"nWidth")==0 ) {
+      p->FWidth = hb_parni(3);
+      if( p->FControlType == CT_FORM && ((HBForm *)p)->FWindow )
+         [((HBForm *)p)->FWindow setContentSize:NSMakeSize(p->FWidth, p->FHeight)];
+      else [p updateViewFrame];
+   }
+   else if( strcasecmp(szProp,"nHeight")==0 ) {
+      p->FHeight = hb_parni(3);
+      if( p->FControlType == CT_FORM && ((HBForm *)p)->FWindow )
+         [((HBForm *)p)->FWindow setContentSize:NSMakeSize(p->FWidth, p->FHeight)];
+      else [p updateViewFrame];
+   }
    else if( strcasecmp(szProp,"lVisible")==0 ) {
       p->FVisible = hb_parl(3); if( p->FView ) [p->FView setHidden:!p->FVisible]; }
    else if( strcasecmp(szProp,"lEnabled")==0 ) {
