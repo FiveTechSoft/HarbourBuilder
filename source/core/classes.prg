@@ -2613,6 +2613,7 @@ return nil
 METHOD ExportPDF( cFile ) CLASS TReport
    local i, j, oBand, oFld, nY
    if cFile == nil .or. Empty( cFile ); return nil; endif
+   if Empty( ::aDesignBands ); return nil; endif
 
    RPT_PdfOpen( ::nPageWidth, ::nPageHeight, ;
       ::nMarginLeft, ::nMarginRight, ::nMarginTop, ::nMarginBottom )
