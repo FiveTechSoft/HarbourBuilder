@@ -2875,10 +2875,17 @@ static NSImage * HBResolveBitBtnImage( int kind, const char * picture )
    else if( ctrlType == CT_BAND )
    {
       /* Band: immediate full-width drop, auto-stacked — no rubber-band needed */
+      /* Default type: Header if no bands exist yet, otherwise Detail */
+      int nExistingBands = 0;
+      for( int ci = 0; ci < targetForm->FChildCount; ci++ )
+         if( targetForm->FChildren[ci] && targetForm->FChildren[ci]->FControlType == CT_BAND )
+            nExistingBands++;
+      const char * defaultType = (nExistingBands == 0) ? "Header" : "Detail";
+
       HBControl * ctrl = [[HBControl alloc] init];
       ctrl->FControlType = CT_BAND;
       strncpy( ctrl->FClassName, "TBand", sizeof(ctrl->FClassName) - 1 );
-      strncpy( ctrl->FText, "Detail", sizeof(ctrl->FText) - 1 );
+      strncpy( ctrl->FText, defaultType, sizeof(ctrl->FText) - 1 );
       ctrl->FLeft   = 0;
       ctrl->FTop    = 0;
       ctrl->FWidth  = targetForm->FWidth;
