@@ -1296,8 +1296,60 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
                /* Create the control via factory */
                {
                   TControl * newCtrl = CreateControlByType( (BYTE) ctrlType );
-                  if( newCtrl )
+                  BOOL bIsReportCtrl = ( ctrlType == CT_REPORTLABEL ||
+                                         ctrlType == CT_REPORTFIELD ||
+                                         ctrlType == CT_REPORTIMAGE );
+
+                  if( newCtrl && bIsReportCtrl )
                   {
+                     /* Report controls: HWND must be parented to the band HWND,
+                        and FLeft/FTop are band-relative coordinates. */
+                     TControl * pBand = NULL;
+                     { int j;
+                       for( j = 0; j < FChildCount; j++ )
+                       {
+                          TControl * pB = FChildren[j];
+                          if( pB && pB->FControlType == CT_BAND &&
+                              rx1 >= pB->FLeft && rx1 < pB->FLeft + pB->FWidth &&
+                              ry1 >= pB->FTop  && ry1 < pB->FTop  + pB->FHeight )
+                          { pBand = pB; break; }
+                       }
+                     }
+                     if( !pBand )
+                     {
+                        /* Drop not over any band — silently discard */
+                        delete newCtrl;
+                        newCtrl = NULL;
+                     }
+                     else
+                     {
+                        newCtrl->FBandParent = pBand;
+                        newCtrl->FLeft   = rx1 - pBand->FLeft;
+                        newCtrl->FTop    = ry1 - pBand->FTop;
+                        newCtrl->FWidth  = rw < 20 ? 20 : rw;
+                        newCtrl->FHeight = rh < 10 ? 10 : rh;
+                        newCtrl->FFont   = FFormFont;
+                        AddChild( newCtrl );
+
+                        /* Parent the Win32 control to the band HWND */
+                        if( pBand->FHandle )
+                        {
+                           newCtrl->FHandle = CreateWindowExA( 0, "HBReportCtrl", "",
+                              WS_CHILD | WS_VISIBLE,
+                              newCtrl->FLeft, newCtrl->FTop,
+                              newCtrl->FWidth, newCtrl->FHeight,
+                              pBand->FHandle, NULL, GetModuleHandle(NULL), NULL );
+                           if( newCtrl->FHandle )
+                              SetWindowLongPtr( newCtrl->FHandle, GWLP_USERDATA, (LONG_PTR) newCtrl );
+                        }
+
+                        SelectControl( newCtrl, FALSE );
+                        SubclassChildren();
+                     }
+                  }
+                  else if( newCtrl )
+                  {
+                     /* Normal (non-report) controls */
                      newCtrl->FLeft = rx1;
                      newCtrl->FTop = ry1;
                      newCtrl->FWidth = rw;
