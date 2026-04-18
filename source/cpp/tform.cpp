@@ -530,34 +530,21 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
                   }
                   else if( g_designForm && ctrlType == CT_BAND )
                   {
-                     /* First band: rubber-band to define height; subsequent: auto-drop */
-                     int nExistingBands = 0, ci;
-                     for( ci = 0; ci < g_designForm->FChildCount; ci++ )
-                        if( g_designForm->FChildren[ci]->FControlType == CT_BAND )
-                           nExistingBands++;
-
-                     if( nExistingBands == 0 )
+                     /* Band: always auto-drop; UI_BandNew + BandStackAll handle positioning */
+                     if( g_designForm->FOnComponentDrop &&
+                         HB_IS_BLOCK( g_designForm->FOnComponentDrop ) )
                      {
-                        g_designForm->FPendingControlType = ctrlType;
-                        SetCursor( LoadCursor(NULL, IDC_CROSS) );
+                        hb_vmPushEvalSym();
+                        hb_vmPush( g_designForm->FOnComponentDrop );
+                        hb_vmPushNumInt( (HB_PTRUINT) g_designForm );
+                        hb_vmPushInteger( ctrlType );
+                        hb_vmPushInteger( 20 );
+                        hb_vmPushInteger( 20 );
+                        hb_vmPushInteger( g_designForm->FWidth - 20 );
+                        hb_vmPushInteger( 65 );
+                        hb_vmSend( 6 );
                      }
-                     else
-                     {
-                        if( g_designForm->FOnComponentDrop &&
-                            HB_IS_BLOCK( g_designForm->FOnComponentDrop ) )
-                        {
-                           hb_vmPushEvalSym();
-                           hb_vmPush( g_designForm->FOnComponentDrop );
-                           hb_vmPushNumInt( (HB_PTRUINT) g_designForm );
-                           hb_vmPushInteger( ctrlType );
-                           hb_vmPushInteger( 20 );
-                           hb_vmPushInteger( 20 );
-                           hb_vmPushInteger( g_designForm->FWidth - 20 );
-                           hb_vmPushInteger( 65 );
-                           hb_vmSend( 6 );
-                        }
-                        g_designForm->UpdateOverlay();
-                     }
+                     g_designForm->UpdateOverlay();
                   }
                   else if( g_designForm )
                   {

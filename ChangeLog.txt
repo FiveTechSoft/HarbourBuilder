@@ -1,14 +1,13 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
-2026-04-18c (Windows — band drop behaviour: rubber-band for first, auto-drop for rest)
+2026-04-18c (Windows — band always auto-drops; Header height 100px)
 
   REPORT DESIGNER (Windows):
-  - First CT_BAND drop: enters rubber-band mode so user can define the Header
-    height by drawing; OnComponentDrop receives the drawn height and creates a
-    "Header" band with that height (minimum 65 if drawn too small).
-  - Subsequent CT_BAND drops: auto-drop instantly below the last existing band
-    as "Detail" type with default height 65.
+  - CT_BAND palette click always auto-drops instantly (no rubber-band, no
+    extra click on the form required).
+  - First band created as "Header" with height 100px; subsequent bands as
+    "Detail" with height 65px.
 
 2026-04-18b (Windows — band palette icon, inspector cBandType/nControlAlign/cUrl fixes)
 

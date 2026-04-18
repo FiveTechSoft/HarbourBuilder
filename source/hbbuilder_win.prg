@@ -1356,7 +1356,7 @@ static function OnComponentDrop( hForm, nType, nL, nT, nW, nH )
       hCtrl := UI_BandNew( hForm, ;
                   if( nBandCount == 0, "Header", "Detail" ), ;
                   20, 20, UI_GetProp(hForm,"nWidth") - 20, ;
-                  if( nBandCount == 0 .and. nH > 20, nH, 65 ) )
+                  if( nBandCount == 0, 100, 65 ) )
       if hCtrl != 0
          UI_SetProp( hCtrl, "cName", cName )
          if nBandCount == 0
