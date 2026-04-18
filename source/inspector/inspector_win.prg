@@ -292,14 +292,59 @@ static void InsPopulateEvents( INSDATA * d );
 static void InsUpdateCombo( INSDATA * d );  /* updates combo from current rows data */
 static void InsArrayEdit( INSDATA * d, int nLVRow );
 
+/* Sentinel message IDs for MLEdit dialog internal signaling */
+#define WM_MLEDIT_OK     (WM_USER + 501)
+#define WM_MLEDIT_CANCEL (WM_USER + 502)
+
+static LRESULT CALLBACK MLEditWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
+{
+   if( msg == WM_COMMAND )
+   {
+      int id = LOWORD( wParam );
+      if( id == IDOK )
+         PostMessage( hWnd, WM_MLEDIT_OK, 0, 0 );
+      else if( id == IDCANCEL )
+         PostMessage( hWnd, WM_MLEDIT_CANCEL, 0, 0 );
+      return 0;
+   }
+   if( msg == WM_CLOSE )
+   {
+      PostMessage( hWnd, WM_MLEDIT_CANCEL, 0, 0 );
+      return 0;
+   }
+   if( msg == WM_KEYDOWN && wParam == VK_ESCAPE )
+   {
+      PostMessage( hWnd, WM_MLEDIT_CANCEL, 0, 0 );
+      return 0;
+   }
+   return DefWindowProcA( hWnd, msg, wParam, lParam );
+}
+
+static void RegisterMLEditClass( void )
+{
+   static BOOL bDone = FALSE;
+   WNDCLASSA wc;
+   if( bDone ) return;
+   bDone = TRUE;
+   memset( &wc, 0, sizeof(wc) );
+   wc.lpfnWndProc   = MLEditWndProc;
+   wc.hInstance     = GetModuleHandleA( NULL );
+   wc.hCursor       = LoadCursorA( NULL, IDC_ARROW );
+   wc.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
+   wc.lpszClassName = "HBMLEditDlg";
+   RegisterClassA( &wc );
+}
+
 static int ShowMLEditDialog( HWND hParent, char * szValue, int nMaxLen )
 {
    HWND hDlg, hEdit, hOK, hCancel;
    int nResult;
    MSG msg;
 
+   RegisterMLEditClass();
+
    hDlg = CreateWindowExA( WS_EX_DLGMODALFRAME | WS_EX_TOPMOST,
-      "STATIC", "Edit Text",
+      "HBMLEditDlg", "Edit Text",
       WS_POPUP | WS_CAPTION | WS_SYSMENU,
       100, 100, 440, 280,
       hParent, NULL, GetModuleHandleA(NULL), NULL );
@@ -326,18 +371,14 @@ static int ShowMLEditDialog( HWND hParent, char * szValue, int nMaxLen )
    nResult = IDCANCEL;
    while( GetMessage( &msg, NULL, 0, 0 ) )
    {
-      if( msg.message == WM_COMMAND )
+      if( msg.hwnd == hDlg && msg.message == WM_MLEDIT_OK )
       {
-         int id = LOWORD( msg.wParam );
-         if( id == IDOK )
-         {
-            GetWindowTextA( hEdit, szValue, nMaxLen );
-            nResult = IDOK;
-            break;
-         }
-         else if( id == IDCANCEL ) break;
+         GetWindowTextA( hEdit, szValue, nMaxLen );
+         nResult = IDOK;
+         break;
       }
-      else if( msg.message == WM_KEYDOWN && msg.wParam == VK_ESCAPE ) break;
+      if( msg.hwnd == hDlg && msg.message == WM_MLEDIT_CANCEL )
+         break;
       TranslateMessage( &msg );
       DispatchMessage( &msg );
    }
@@ -1304,7 +1345,8 @@ static void InsStartEdit( INSDATA * d, int nLVRow )
 
    /* Rows that need a "..." picker button next to the edit:
       - cType 'C' (color), 'F' (font), 'A' (array) as before
-      - cType 'S' with name cFileName -> file open dialog
+      - cType 'S' with name cFileName  -> file open dialog
+      - cType 'S' other names          -> multiline text editor (ShowMLEditDialog)
       Declared at top-of-function above to keep BCC happy (C89). */
    bNeedsBtn = ( d->rows[nReal].cType == 'C' ||
                  d->rows[nReal].cType == 'F' ||
