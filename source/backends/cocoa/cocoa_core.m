@@ -558,6 +558,7 @@ void EnsureNSApp( void )
 
 static void UndoPushSnapshot( HBForm * pForm );   /* forward declaration */
 static void ApplyDockAlign( HBForm * form );      /* forward declaration */
+static void BandStackAll( HBControl * parent );   /* forward declaration */
 
 /* TWebView navigation delegate */
 @interface HBWebViewDelegate : NSObject <WKNavigationDelegate>
@@ -4085,6 +4086,7 @@ static void FlushPendingDBGrids( HBControl * node )
       FHeight = (int)fr.size.height;
    }
    ApplyDockAlign( self );
+   if( FDesignMode ) BandStackAll( (HBControl *)self );
    if( FDesignMode && FOverlayView ) [(NSView *)FOverlayView setNeedsDisplay:YES];
    if( FOnResize ) [self fireEvent:FOnResize];
 }
@@ -4825,24 +4827,18 @@ HB_FUNC( UI_BANDSETTYPE )
    }
 }
 
-/* UI_BandSetLayout( hCtrl )
- * Restack all TBand siblings by band-type order (Header→Detail→Footer).
- * Bands are sorted and repositioned vertically at x=0, stacked top-down. */
-HB_FUNC( UI_BANDSETLAYOUT )
+/* BandStackAll — restack all CT_BAND children of parent (called on resize too) */
+static void BandStackAll( HBControl * parent )
 {
-   HBControl * band = GetCtrl(1);
-   if( !band ) return;
-   HBControl * parent = band->FCtrlParent;
    if( !parent ) return;
 
-   /* Collect all band siblings */
    NSMutableArray * bands = [NSMutableArray array];
    for( int i = 0; i < parent->FChildCount; i++ ) {
       HBControl * c = parent->FChildren[i];
       if( c && c->FControlType == CT_BAND ) [bands addObject:c];
    }
+   if( [bands count] == 0 ) return;
 
-   /* Sort by band type order */
    NSDictionary * order = @{
       @"Header":     @1, @"PageHeader": @2, @"Detail":     @3,
       @"PageFooter": @4, @"Footer":     @5
@@ -4855,19 +4851,29 @@ HB_FUNC( UI_BANDSETLAYOUT )
       return [na compare:nb];
    }];
 
-   /* Reposition bands stacked vertically */
+   CGFloat formW = 0;
+   if( [parent isKindOfClass:[HBForm class]] )
+      formW = ((HBForm *)parent)->FWindow.frame.size.width;
+
    CGFloat y = 0;
    for( HBControl * b in bands ) {
       b->FLeft = 0;
       b->FTop  = (int)y;
-      if( [parent isKindOfClass:[HBForm class]] ) {
-         HBForm * f = (HBForm *)parent;
-         b->FWidth = (int)f->FWindow.frame.size.width;
-      }
+      if( formW > 0 ) b->FWidth = (int)formW;
       y += b->FHeight;
       [b updateViewFrame];
       if( b->FView ) [b->FView setNeedsDisplay:YES];
    }
+}
+
+/* UI_BandSetLayout( hCtrl )
+ * Restack all TBand siblings by band-type order (Header→Detail→Footer).
+ * Bands are sorted and repositioned vertically at x=0, stacked top-down. */
+HB_FUNC( UI_BANDSETLAYOUT )
+{
+   HBControl * band = GetCtrl(1);
+   if( !band ) return;
+   BandStackAll( band->FCtrlParent );
 }
 
 /* UI_BrowseAddCol( hBrowse, cTitle, cField, nWidth, nAlign ) --> nColIdx */
@@ -5424,10 +5430,16 @@ HB_FUNC( UI_SETPROP )
    }
    else if( p->FControlType == CT_BAND && strcasecmp(szProp,"cBandType")==0 )
    {
-      if( HB_ISCHAR(3) ) {
+      static const char * bNames[] = { "Header","PageHeader","Detail","PageFooter","Footer" };
+      if( HB_ISNUM(3) ) {
+         int idx = hb_parni(3);
+         if( idx >= 0 && idx < 5 )
+            strncpy( p->FText, bNames[idx], sizeof(p->FText)-1 );
+      } else if( HB_ISCHAR(3) ) {
          strncpy( p->FText, hb_parc(3), sizeof(p->FText)-1 );
-         if( p->FView ) [p->FView setNeedsDisplay:YES];
       }
+      if( p->FView ) [p->FView setNeedsDisplay:YES];
+      BandStackAll( p->FCtrlParent );
    }
    else if( p->FControlType == CT_SCENE3D &&
             ( strcasecmp(szProp,"cSceneFile")==0 || strcasecmp(szProp,"cPicture")==0 ) )
@@ -6653,8 +6665,14 @@ HB_FUNC( UI_GETALLPROPS )
          ADD_D("nMapType", p->FMapType,
             "mtStandard|mtSatellite|mtHybrid|mtMutedStandard", "Appearance"); break;
       }
-      case CT_BAND:
-         ADD_S("cBandType", p->FText, "Data"); break;
+      case CT_BAND: {
+         static const char * bNames[] = { "Header","PageHeader","Detail","PageFooter","Footer" };
+         int nBIdx = 2;
+         for( int bi = 0; bi < 5; bi++ )
+            if( strcasecmp(p->FText, bNames[bi]) == 0 ) { nBIdx = bi; break; }
+         ADD_D("cBandType", nBIdx, "Header|PageHeader|Detail|PageFooter|Footer", "Design");
+         break;
+      }
       case CT_WEBVIEW:
          ADD_S("cUrl", p->FUrl, "Data"); break;
       case CT_SCENE3D:

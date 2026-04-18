@@ -2622,6 +2622,7 @@ static function OnComponentDrop( hForm, nType, nL, nT, nW, nH )
 
    local cName, nCount, hCtrl, hDbg
    static aCnt := nil
+   static nBandCnt := 0
    static aNames := { ;
       "Label", "Edit", "Button", "CheckBox", "ComboBox", "GroupBox", ;
       "ListBox", "RadioButton", "", "", "", "BitBtn", "SpeedButton", ;
@@ -2654,6 +2655,23 @@ static function OnComponentDrop( hForm, nType, nL, nT, nW, nH )
 
    if aCnt == nil; aCnt := Array( Len( aNames ) ); AFill(aCnt,0); endif
    UI_FormUndoPush( hForm )
+
+   // CT_BAND (132) is not in aNames — handle it before the bounds check
+   if nType == CT_BAND
+      nBandCnt++
+      cName := "Band" + LTrim( Str( nBandCnt ) )
+      nCount := UI_GetChildCount( hForm )
+      hCtrl  := UI_GetChild( hForm, nCount )
+      if hCtrl != 0
+         UI_SetProp( hCtrl, "cName", cName )
+         UI_BandSetLayout( hCtrl )
+      endif
+      SyncDesignerToCode()
+      InspectorRefresh( hCtrl )
+      InspectorPopulateCombo( hForm )
+      return nil
+   endif
+
    if nType < 1 .or. nType > Len(aNames) .or. Empty(aNames[nType]); return nil; endif
    aCnt[nType]++
    cName := aNames[nType] + LTrim(Str(aCnt[nType]))
