@@ -3294,7 +3294,33 @@ static function TBRun()
    local cResDir, cBackends, cSciInc, cSciCocoa, cLexInc, cSciLib
    local cOldTab, cSepLine, nP1, nP2, cUserCode
    local cAppTitle, cAppName
+   local hForm, nCount, hCtrl, oReport, oBand, cBandType, nBandH
    static nLastHash := 0
+
+   // If the active form is a report (has bands), preview instead of compile+run
+   if nActiveForm > 0 .and. nActiveForm <= Len( aForms ) .and. ;
+      aForms[ nActiveForm ][ 2 ] != nil
+      hForm  := aForms[ nActiveForm ][ 2 ]:hCpp
+      nCount := UI_GetChildCount( hForm )
+      for i := 1 to nCount
+         hCtrl := UI_GetChild( hForm, i )
+         if UI_GetType( hCtrl ) == CT_BAND
+            if oReport == nil
+               oReport := TReport():New()
+               oReport:nPageWidth  := UI_GetProp( hForm, "nWidth" )
+               oReport:nPageHeight := UI_GetProp( hForm, "nHeight" )
+            endif
+            cBandType := UI_GetProp( hCtrl, "cText" )
+            nBandH    := UI_GetProp( hCtrl, "nHeight" )
+            oBand := TBand():New( nil, cBandType, nBandH )
+            oReport:AddDesignBand( oBand )
+         endif
+      next
+      if oReport != nil
+         oReport:Preview()
+         return nil
+      endif
+   endif
 
    // Get AppTitle from the main form (first form)
    cAppTitle := ""
