@@ -142,7 +142,7 @@ echo === Step 2: Compile C sources ===
 "%CCBIN%\bcc32.exe" -c -O2 -tW -w- -I%HBINC% -I%INCDIR% hbbuilder_win.c
 if not exist hbbuilder_win.obj (echo BCC32 FAILED on hbbuilder_win.c & pause & exit /b 1)
 
-for %%f in (tform hbbridge tcontrol tcontrols) do (
+for %%f in (tform hbbridge tcontrol tcontrols stubs_win) do (
    if exist "%CPPDIR%\%%f.cpp" (
       "%CCBIN%\bcc32.exe" -c -O2 -tW -w- -I%HBINC% -I%INCDIR% "%CPPDIR%\%%f.cpp"
       if not exist %%f.obj (echo BCC32 FAILED on %%f.cpp & pause & exit /b 1)
@@ -150,7 +150,7 @@ for %%f in (tform hbbridge tcontrol tcontrols) do (
 )
 
 echo === Step 3: Link ===
-set OBJS=c0w32.obj hbbuilder_win.obj tform.obj hbbridge.obj tcontrol.obj tcontrols.obj
+set OBJS=c0w32.obj hbbuilder_win.obj tform.obj hbbridge.obj tcontrol.obj tcontrols.obj stubs_win.obj
 "%CCBIN%\ilink32.exe" -Tpe -aa -Gn -L%CCLIB%;%PSDKLIB%;%HBLIB% %OBJS%, "%OUTDIR%\hbbuilder_win.exe", , cw32mt.lib import32.lib hbvm.lib hbrtl.lib hbcommon.lib hblang.lib hbrdd.lib hbmacro.lib hbpp.lib rddntx.lib rddcdx.lib rddfpt.lib hbsix.lib hbcpage.lib hbpcre.lib hbzlib.lib gtgui.lib gtwin.lib hbsqlit3.lib sqlite3.lib hbdebug.lib user32.lib kernel32.lib gdi32.lib comctl32.lib comdlg32.lib shell32.lib ole32.lib oleaut32.lib advapi32.lib ws2_32.lib winmm.lib msimg32.lib gdiplus.lib
 if errorlevel 1 (echo LINK FAILED & pause & exit /b 1)
 goto :copy_dlls
@@ -189,7 +189,7 @@ set CL_BASE=/c /O2 /W0 /EHsc /I"%HBINC%" /I"%MSVC_INC%" /I"%UCRT_INC%" /I"%UM_IN
 "%MSVC_BIN%\cl.exe" %CL_BASE% hbbuilder_win.c /Fohbbuilder_win.obj
 if not exist hbbuilder_win.obj (echo CL FAILED on hbbuilder_win.c & pause & exit /b 1)
 
-for %%f in (tform hbbridge tcontrol tcontrols) do (
+for %%f in (tform hbbridge tcontrol tcontrols stubs_win) do (
    if exist "%CPPDIR%\%%f.cpp" (
       "%MSVC_BIN%\cl.exe" %CL_BASE% "%CPPDIR%\%%f.cpp" /Fo%%f.obj
       if not exist %%f.obj (echo CL FAILED on %%f.cpp & pause & exit /b 1)
@@ -197,7 +197,7 @@ for %%f in (tform hbbridge tcontrol tcontrols) do (
 )
 
 echo === Step 3: Link ===
-set OBJS=hbbuilder_win.obj tform.obj hbbridge.obj tcontrol.obj tcontrols.obj
+set OBJS=hbbuilder_win.obj tform.obj hbbridge.obj tcontrol.obj tcontrols.obj stubs_win.obj
 "%MSVC_BIN%\link.exe" /NOLOGO /SUBSYSTEM:WINDOWS /NODEFAULTLIB:LIBCMT /OUT:"%OUTDIR%\hbbuilder_win.exe" /LIBPATH:"%MSVC_LIB%" /LIBPATH:"%UCRT_LIB%" /LIBPATH:"%UM_LIB%" /LIBPATH:"%HBLIB%" %OBJS% hbrtl.lib hbvm.lib hbcpage.lib hblang.lib hbrdd.lib hbmacro.lib hbpp.lib hbcommon.lib hbcplr.lib hbct.lib hbhsx.lib hbsix.lib hbusrrdd.lib rddntx.lib rddnsx.lib rddcdx.lib rddfpt.lib hbdebug.lib hbpcre.lib hbzlib.lib hbsqlit3.lib sqlite3.lib gtwin.lib gtwvt.lib gtgui.lib user32.lib gdi32.lib comctl32.lib comdlg32.lib shell32.lib ole32.lib oleaut32.lib advapi32.lib ws2_32.lib winmm.lib msimg32.lib gdiplus.lib ucrt.lib vcruntime.lib msvcrt.lib
 if errorlevel 1 (echo LINK FAILED & pause & exit /b 1)
 goto :copy_dlls
@@ -218,7 +218,7 @@ echo === Step 2: Compile C sources ===
 "%GCCBIN%\gcc.exe" -c -O2 -I"%HBINC%" -I"%INCDIR%" hbbuilder_win.c -o hbbuilder_win.o
 if not exist hbbuilder_win.o (echo GCC FAILED on hbbuilder_win.c & pause & exit /b 1)
 
-for %%f in (tform hbbridge tcontrol tcontrols) do (
+for %%f in (tform hbbridge tcontrol tcontrols stubs_win) do (
    if exist "%CPPDIR%\%%f.cpp" (
       "%GCCBIN%\g++.exe" -c -O2 -I"%HBINC%" -I"%INCDIR%" "%CPPDIR%\%%f.cpp" -o %%f.o
       if not exist %%f.o (echo G++ FAILED on %%f.cpp & pause & exit /b 1)
@@ -226,7 +226,7 @@ for %%f in (tform hbbridge tcontrol tcontrols) do (
 )
 
 echo === Step 3: Link ===
-set OBJS=hbbuilder_win.o tform.o hbbridge.o tcontrol.o tcontrols.o
+set OBJS=hbbuilder_win.o tform.o hbbridge.o tcontrol.o tcontrols.o stubs_win.o
 "%GCCBIN%\g++.exe" -static -mwindows -o "%OUTDIR%\hbbuilder_win.exe" %OBJS% -L"%HBLIB%" -Wl,--start-group -lhbvm -lhbrtl -lhbcommon -lhblang -lhbrdd -lhbmacro -lhbpp -lhbcpage -lrddntx -lrddcdx -lrddfpt -lhbsix -lhbpcre -lhbzlib -lgtgui -lgtwin -lgtwvt -lhbsqlit3 -lsqlite3 -lhbdebug -Wl,--end-group -luser32 -lgdi32 -lcomctl32 -lcomdlg32 -lshell32 -lole32 -loleaut32 -ladvapi32 -lws2_32 -lwinmm -lmsimg32 -lgdiplus -ldwmapi -liphlpapi -luuid -lwinspool
 if errorlevel 1 (echo LINK FAILED & pause & exit /b 1)
 goto :copy_dlls
