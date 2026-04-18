@@ -3123,7 +3123,7 @@ METHOD New( oParent, cType, nHeight ) CLASS TBand
    ::oParent     := oParent
    ::nType       := CT_BAND
    ::cBandType   := iif( ValType( cType ) == "C", cType, "Detail" )
-   ::nHeight     := iif( ValType( nHeight ) == "N", nHeight, 20 )
+   ::nHeight     := iif( ValType( nHeight ) == "N", nHeight, 65 )
    ::nLeft       := 0
    ::nTop        := 0
    ::nWidth      := iif( oParent != nil, oParent:Width, 600 )

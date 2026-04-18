@@ -2563,6 +2563,7 @@ CLASS TReport
    METHOD AddBand( cName, bBlock )
    METHOD AddColumn( cTitle, cField, nWidth )
    METHOD Preview()
+   METHOD ExportPDF( cFile )
    METHOD Print()
    METHOD AddDesignBand( oBand )
    METHOD RemoveDesignBand( nIndex )
@@ -2607,6 +2608,34 @@ METHOD Preview() CLASS TReport
    next
 
    RPT_PreviewRender()
+return nil
+
+METHOD ExportPDF( cFile ) CLASS TReport
+   local i, j, oBand, oFld, nY
+   if cFile == nil .or. Empty( cFile ); return nil; endif
+   if Empty( ::aDesignBands ); return nil; endif
+
+   RPT_PdfOpen( ::nPageWidth, ::nPageHeight, ;
+      ::nMarginLeft, ::nMarginRight, ::nMarginTop, ::nMarginBottom )
+   RPT_PdfAddPage()
+
+   nY := ::nMarginTop
+
+   for i := 1 to Len( ::aDesignBands )
+      oBand := ::aDesignBands[i]
+      if ! oBand:lVisible; loop; endif
+
+      for j := 1 to Len( oBand:aFields )
+         oFld := oBand:aFields[j]
+         RPT_PdfDrawText( ::nMarginLeft + oFld:nLeft, nY + oFld:nTop, ;
+            iif( ! Empty(oFld:cText), oFld:cText, "[" + oFld:cFieldName + "]" ), ;
+            oFld:cFontName, oFld:nFontSize, oFld:lBold, oFld:lItalic, oFld:nForeColor )
+      next
+
+      nY += oBand:nHeight
+   next
+
+   RPT_ExportPDF( cFile )
 return nil
 
 METHOD Print() CLASS TReport
@@ -3094,7 +3123,7 @@ METHOD New( oParent, cType, nHeight ) CLASS TBand
    ::oParent     := oParent
    ::nType       := CT_BAND
    ::cBandType   := iif( ValType( cType ) == "C", cType, "Detail" )
-   ::nHeight     := iif( ValType( nHeight ) == "N", nHeight, 20 )
+   ::nHeight     := iif( ValType( nHeight ) == "N", nHeight, 65 )
    ::nLeft       := 0
    ::nTop        := 0
    ::nWidth      := iif( oParent != nil, oParent:Width, 600 )

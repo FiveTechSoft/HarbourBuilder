@@ -1,6 +1,37 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-18 (Report preview, PDF export, rulers, and band improvements)
+
+  FEATURES
+  - HBRulerView: horizontal (20px tall) and vertical (20px wide) NSView rulers
+    overlaid on the form content view whenever at least one CT_BAND child is
+    present. Tick marks at 10px intervals, labels at 100px. Corner square at
+    origin intersection.
+  - UI_BandRulersUpdate(): creates/removes ruler pair and adjusts FContentView
+    inset (20px top + left) automatically after band add/delete.
+  - BandStackAll(): bands start at y=20 in design mode (below ruler); mouseUp:
+    snaps any dragged band back into stacked position.
+  - Run on a report form (form with CT_BAND children) opens macOS Preview
+    instead of compile+run pipeline. Builds TReport from design bands and calls
+    TReport:Preview().
+  - Auto-resize: when the first band is dropped on a form, the form is resized
+    to 850×450 and positioned at left=769, top=300. Form title set to "Report".
+  - PDF export pipeline (RPT_PDFOPEN / RPT_PDFADDPAGE / RPT_PDFDRAWTEXT /
+    RPT_PDFDRAWRECT / RPT_EXPORTPDF): CGPDFContext-based rendering to temp file
+    or user path, scale 0.75 (96→72 DPI), CG coordinate flip.
+  - TReport:ExportPDF(cFile): Harbour-level method iterating design bands and
+    fields, rendering text via RPT_PdfDrawText, saving to cFile.
+  - UI_SetProp nWidth/nHeight for CT_FORM now calls setContentSize on FWindow
+    (previously no-op due to FView=nil).
+  - UI_SetProp nLeft/nTop for CT_FORM now calls setFrameOrigin with macOS
+    y-flip coordinate conversion.
+  - Band default height changed from 24 to 65 px (cocoa_core.m drop handler +
+    TBand:New() default).
+  - CT_BAND palette icon: SF Symbol "rectangle.split.3x1" (brown tint) on
+    macOS 11+.
+  - CoreText framework added to build_mac.sh link step.
+
 2026-04-17 (TReport visual designer — Option B, form-based bands)
 
   FEATURES

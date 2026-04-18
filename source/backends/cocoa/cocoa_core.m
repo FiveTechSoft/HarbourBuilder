@@ -3017,7 +3017,7 @@ static NSImage * HBResolveBitBtnImage( int kind, const char * picture )
       ctrl->FLeft   = 0;
       ctrl->FTop    = 0;
       ctrl->FWidth  = targetForm->FWidth;
-      ctrl->FHeight = 24;
+      ctrl->FHeight = 65;
 
       KeepAlive( ctrl );
       [targetForm addChild:ctrl];
@@ -7611,6 +7611,7 @@ HB_FUNC( UI_PALETTELOADIMAGES )
             else if( ct == CT_WEBVIEW )        { sym = @"safari";                 clr = nil; /* multicolor */        }
             else if( ct == CT_WEBSERVER )      { sym = @"network";                clr = [NSColor systemTealColor];   }
             else if( ct == CT_PRINTER )        { sym = @"printer.fill";           clr = [NSColor systemGrayColor];   }
+            else if( ct == CT_BAND )           { sym = @"rectangle.split.3x1";    clr = [NSColor systemBrownColor];  }
             if( sym && flat < (int)[icons count] ) {
                NSImage * glyph = [NSImage imageWithSystemSymbolName:sym
                   accessibilityDescription:nil];

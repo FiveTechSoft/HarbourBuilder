@@ -3017,7 +3017,7 @@ static NSImage * HBResolveBitBtnImage( int kind, const char * picture )
       ctrl->FLeft   = 0;
       ctrl->FTop    = 0;
       ctrl->FWidth  = targetForm->FWidth;
-      ctrl->FHeight = 24;
+      ctrl->FHeight = 65;
 
       KeepAlive( ctrl );
       [targetForm addChild:ctrl];
@@ -3558,6 +3558,12 @@ static HBPaletteTarget * s_palTarget = nil;
 
    if( form->FDragging || form->FResizing ) {
       form->FDragging = NO; form->FResizing = NO; form->FResizeHandle = -1;
+      /* If a band was dragged, snap all bands back to their stacked positions */
+      for( int i = 0; i < form->FSelCount; i++ )
+         if( form->FSelected[i] && form->FSelected[i]->FControlType == CT_BAND ) {
+            BandStackAll( (HBControl *)form );
+            break;
+         }
       [self setNeedsDisplay:YES]; [form notifySelChange];
    }
 }
@@ -5027,10 +5033,14 @@ static void BandStackAll( HBControl * parent )
    }];
 
    CGFloat formW = 0;
-   if( [parent isKindOfClass:[HBForm class]] )
-      formW = ((HBForm *)parent)->FWindow.frame.size.width;
+   BOOL inDesign = NO;
+   if( [parent isKindOfClass:[HBForm class]] ) {
+      formW   = ((HBForm *)parent)->FWindow.frame.size.width;
+      inDesign = ((HBForm *)parent)->FDesignMode;
+   }
 
-   CGFloat y = 0;
+   /* In design mode rulers occupy the top 20px — stack bands below them */
+   CGFloat y = inDesign ? 20.0 : 0.0;
    for( HBControl * b in bands ) {
       b->FLeft = 0;
       b->FTop  = (int)y;
@@ -5515,18 +5525,38 @@ HB_FUNC( UI_SETPROP )
       else if( p->FView && [p->FView respondsToSelector:@selector(setStringValue:)] )
          [(id)p->FView setStringValue:[NSString stringWithUTF8String:p->FText]];
    }
-   else if( strcasecmp(szProp,"nLeft")==0 )   {
+   else if( strcasecmp(szProp,"nLeft")==0 ) {
       p->FLeft = hb_parni(3);
-      if( p->FControlType == CT_FORM ) { ((HBForm *)p)->FCenter = NO; ((HBForm *)p)->FPosition = POS_DESIGNED; }
-      [p updateViewFrame];
+      if( p->FControlType == CT_FORM && ((HBForm *)p)->FWindow ) {
+         ((HBForm *)p)->FCenter = NO; ((HBForm *)p)->FPosition = POS_DESIGNED;
+         NSRect scr = [[NSScreen mainScreen] frame];
+         NSRect fr  = [((HBForm *)p)->FWindow frame];
+         [((HBForm *)p)->FWindow setFrameOrigin:NSMakePoint(p->FLeft,
+            scr.size.height - p->FTop - fr.size.height)];
+      } else [p updateViewFrame];
    }
-   else if( strcasecmp(szProp,"nTop")==0 )    {
+   else if( strcasecmp(szProp,"nTop")==0 ) {
       p->FTop = hb_parni(3);
-      if( p->FControlType == CT_FORM ) { ((HBForm *)p)->FCenter = NO; ((HBForm *)p)->FPosition = POS_DESIGNED; }
-      [p updateViewFrame];
+      if( p->FControlType == CT_FORM && ((HBForm *)p)->FWindow ) {
+         ((HBForm *)p)->FCenter = NO; ((HBForm *)p)->FPosition = POS_DESIGNED;
+         NSRect scr = [[NSScreen mainScreen] frame];
+         NSRect fr  = [((HBForm *)p)->FWindow frame];
+         [((HBForm *)p)->FWindow setFrameOrigin:NSMakePoint(p->FLeft,
+            scr.size.height - p->FTop - fr.size.height)];
+      } else [p updateViewFrame];
    }
-   else if( strcasecmp(szProp,"nWidth")==0 )  { p->FWidth = hb_parni(3); [p updateViewFrame]; }
-   else if( strcasecmp(szProp,"nHeight")==0 ) { p->FHeight = hb_parni(3); [p updateViewFrame]; }
+   else if( strcasecmp(szProp,"nWidth")==0 ) {
+      p->FWidth = hb_parni(3);
+      if( p->FControlType == CT_FORM && ((HBForm *)p)->FWindow )
+         [((HBForm *)p)->FWindow setContentSize:NSMakeSize(p->FWidth, p->FHeight)];
+      else [p updateViewFrame];
+   }
+   else if( strcasecmp(szProp,"nHeight")==0 ) {
+      p->FHeight = hb_parni(3);
+      if( p->FControlType == CT_FORM && ((HBForm *)p)->FWindow )
+         [((HBForm *)p)->FWindow setContentSize:NSMakeSize(p->FWidth, p->FHeight)];
+      else [p updateViewFrame];
+   }
    else if( strcasecmp(szProp,"lVisible")==0 ) {
       p->FVisible = hb_parl(3); if( p->FView ) [p->FView setHidden:!p->FVisible]; }
    else if( strcasecmp(szProp,"lEnabled")==0 ) {
@@ -7581,6 +7611,7 @@ HB_FUNC( UI_PALETTELOADIMAGES )
             else if( ct == CT_WEBVIEW )        { sym = @"safari";                 clr = nil; /* multicolor */        }
             else if( ct == CT_WEBSERVER )      { sym = @"network";                clr = [NSColor systemTealColor];   }
             else if( ct == CT_PRINTER )        { sym = @"printer.fill";           clr = [NSColor systemGrayColor];   }
+            else if( ct == CT_BAND )           { sym = @"rectangle.split.3x1";    clr = [NSColor systemBrownColor];  }
             if( sym && flat < (int)[icons count] ) {
                NSImage * glyph = [NSImage imageWithSystemSymbolName:sym
                   accessibilityDescription:nil];
