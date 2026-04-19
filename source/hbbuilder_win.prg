@@ -7005,6 +7005,11 @@ HB_FUNC( W32_GENERATETOOLBARICONS )
  * About Dialog - custom dialog with logo image
  * ====================================================================== */
 
+#ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
+#define DWMWA_USE_IMMERSIVE_DARK_MODE 20
+#endif
+extern int g_bDarkIDE;
+
 static GpImage * s_aboutLogo = NULL;
 static const char * s_aboutText = NULL;
 
@@ -7012,6 +7017,21 @@ static LRESULT CALLBACK AboutDlgProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM
 {
    switch( msg )
    {
+      case WM_ERASEBKGND:
+      {
+         if( g_bDarkIDE )
+         {
+            RECT rc;
+            HBRUSH hBr;
+            GetClientRect( hWnd, &rc );
+            hBr = CreateSolidBrush( RGB(30, 30, 30) );
+            FillRect( (HDC) wParam, &rc, hBr );
+            DeleteObject( hBr );
+            return 1;
+         }
+         break;
+      }
+
       case WM_PAINT:
       {
          PAINTSTRUCT ps;
@@ -7020,6 +7040,13 @@ static LRESULT CALLBACK AboutDlgProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM
          int imgY = 20;
 
          GetClientRect( hWnd, &rc );
+
+         if( g_bDarkIDE )
+         {
+            HBRUSH hBr = CreateSolidBrush( RGB(30, 30, 30) );
+            FillRect( hDC, &rc, hBr );
+            DeleteObject( hBr );
+         }
 
          /* Draw logo if loaded (PNG via GDI+) */
          if( s_aboutLogo )
@@ -7049,7 +7076,7 @@ static LRESULT CALLBACK AboutDlgProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM
             lstrcpyA( lf.lfFaceName, "Segoe UI" );
             hFont = CreateFontIndirectA( &lf );
             hOldFont = (HFONT) SelectObject( hDC, hFont );
-            SetTextColor( hDC, RGB(40, 40, 40) );
+            SetTextColor( hDC, g_bDarkIDE ? RGB(212, 212, 212) : RGB(40, 40, 40) );
             SetBkMode( hDC, TRANSPARENT );
             rcText.left = 20; rcText.top = imgY;
             rcText.right = rc.right - 20; rcText.bottom = rc.bottom - 46;
@@ -7139,7 +7166,7 @@ HB_FUNC( W32_ABOUTDIALOG )
       wc.lpfnWndProc = AboutDlgProc;
       wc.hInstance = GetModuleHandle(NULL);
       wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-      wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+      wc.hbrBackground = NULL;   /* painted in WM_ERASEBKGND */
       wc.lpszClassName = "HbAboutDlg";
       RegisterClassA( &wc );
       bReg = TRUE;
@@ -7155,6 +7182,13 @@ HB_FUNC( W32_ABOUTDIALOG )
       WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
       x, y, dlgW, dlgH,
       hOwner, NULL, GetModuleHandle(NULL), NULL );
+
+   /* Dark title bar */
+   if( g_bDarkIDE )
+   {
+      BOOL bDark = TRUE;
+      DwmSetWindowAttribute( hDlg, DWMWA_USE_IMMERSIVE_DARK_MODE, &bDark, sizeof(bDark) );
+   }
 
    /* OK button — positioned relative to client bottom */
    {
