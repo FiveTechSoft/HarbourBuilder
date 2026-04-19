@@ -298,6 +298,7 @@ static void InsArrayEdit( INSDATA * d, int nLVRow );
 
 static LRESULT CALLBACK MLEditWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 {
+   static HBRUSH s_hEdBr = NULL;
    if( msg == WM_COMMAND )
    {
       int id = LOWORD( wParam );
@@ -316,6 +317,26 @@ static LRESULT CALLBACK MLEditWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARA
    {
       PostMessage( hWnd, WM_MLEDIT_CANCEL, 0, 0 );
       return 0;
+   }
+   if( msg == WM_ERASEBKGND && s_bDarkIDE )
+   {
+      HDC hdc = (HDC) wParam;
+      RECT rc;
+      HBRUSH hBr;
+      GetClientRect( hWnd, &rc );
+      hBr = CreateSolidBrush( CLR_WND_BG );
+      FillRect( hdc, &rc, hBr );
+      DeleteObject( hBr );
+      return 1;
+   }
+   if( msg == WM_CTLCOLOREDIT && s_bDarkIDE )
+   {
+      HDC hdc = (HDC) wParam;
+      SetBkColor( hdc, CLR_EDIT_BG );
+      SetTextColor( hdc, CLR_EDIT_TEXT );
+      if( s_hEdBr ) DeleteObject( s_hEdBr );
+      s_hEdBr = CreateSolidBrush( CLR_EDIT_BG );
+      return (LRESULT) s_hEdBr;
    }
    return DefWindowProcA( hWnd, msg, wParam, lParam );
 }
@@ -340,27 +361,59 @@ static int ShowMLEditDialog( HWND hParent, char * szValue, int nMaxLen )
    HWND hDlg, hEdit, hOK, hCancel;
    int nResult;
    MSG msg;
+   /* Dialog dimensions */
+   int dlgW = 460, dlgH = 340;
+   int btnW = 90, btnH = 28, btnY = 0, editH = 0;
+   int scrW, scrH, dlgX, dlgY;
+   RECT rcWork;
 
    RegisterMLEditClass();
+
+   /* Center on working area */
+   SystemParametersInfoA( SPI_GETWORKAREA, 0, &rcWork, 0 );
+   scrW = rcWork.right  - rcWork.left;
+   scrH = rcWork.bottom - rcWork.top;
+   dlgX = rcWork.left + ( scrW - dlgW ) / 2;
+   dlgY = rcWork.top  + ( scrH - dlgH ) / 2;
 
    hDlg = CreateWindowExA( WS_EX_DLGMODALFRAME | WS_EX_TOPMOST,
       "HBMLEditDlg", "Edit Text",
       WS_POPUP | WS_CAPTION | WS_SYSMENU,
-      100, 100, 440, 280,
+      dlgX, dlgY, dlgW, dlgH,
       hParent, NULL, GetModuleHandleA(NULL), NULL );
    if( !hDlg ) return IDCANCEL;
 
-   hEdit = CreateWindowExA( WS_EX_CLIENTEDGE, "EDIT", szValue,
-      WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN,
-      10, 10, 410, 200, hDlg, (HMENU) 101, GetModuleHandleA(NULL), NULL );
+   /* Apply dark title bar if needed */
+   if( s_bDarkIDE )
+   {
+      BOOL bDark = TRUE;
+      DwmSetWindowAttribute( hDlg, DWMWA_USE_IMMERSIVE_DARK_MODE, &bDark, sizeof(bDark) );
+   }
 
-   hOK = CreateWindowExA( 0, "BUTTON", "OK",
-      WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
-      250, 220, 80, 26, hDlg, (HMENU) IDOK, GetModuleHandleA(NULL), NULL );
+   /* Layout based on actual client area */
+   {
+      RECT rcCl;
+      int cW, cH;
+      GetClientRect( hDlg, &rcCl );
+      cW = rcCl.right;
+      cH = rcCl.bottom;
+      btnY  = cH - btnH - 10;
+      editH = btnY - 20;   /* 10px top margin + 10px gap above buttons */
 
-   hCancel = CreateWindowExA( 0, "BUTTON", "Cancel",
-      WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-      340, 220, 80, 26, hDlg, (HMENU) IDCANCEL, GetModuleHandleA(NULL), NULL );
+      hEdit = CreateWindowExA( WS_EX_CLIENTEDGE, "EDIT", szValue,
+         WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN,
+         10, 10, cW - 20, editH, hDlg, (HMENU) 101, GetModuleHandleA(NULL), NULL );
+
+      hOK = CreateWindowExA( 0, "BUTTON", "OK",
+         WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
+         cW - btnW*2 - 20, btnY, btnW, btnH,
+         hDlg, (HMENU) IDOK, GetModuleHandleA(NULL), NULL );
+
+      hCancel = CreateWindowExA( 0, "BUTTON", "Cancel",
+         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+         cW - btnW - 10, btnY, btnW, btnH,
+         hDlg, (HMENU) IDCANCEL, GetModuleHandleA(NULL), NULL );
+   }
 
    (void) hOK; (void) hCancel;
    SetFocus( hEdit );
