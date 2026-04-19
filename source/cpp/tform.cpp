@@ -1117,10 +1117,10 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
                POINT p1 = {x1, y1 + FClientTop}, p2 = {x2, y2 + FClientTop};
                ClientToScreen( FHandle, &p1 ); ClientToScreen( FHandle, &p2 );
                HDC hDC = GetDC( NULL );
-               HPEN hPen = CreatePen( PS_SOLID, 2, RGB(255,255,255) );
+               HPEN hPen = CreatePen( PS_SOLID, 2, RGB(0,0,0) );
                HPEN hOld = (HPEN) SelectObject( hDC, hPen );
                SelectObject( hDC, GetStockObject(NULL_BRUSH) );
-               SetROP2( hDC, R2_NOTXORPEN );
+               SetROP2( hDC, R2_NOT );
                Rectangle( hDC, p1.x, p1.y, p2.x, p2.y );
                SelectObject( hDC, hOld ); DeleteObject( hPen );
                ReleaseDC( NULL, hDC );
@@ -1314,10 +1314,10 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
                POINT p1 = {FRubberX1, FRubberY1 + FClientTop}, p2 = {FRubberX2, FRubberY2 + FClientTop};
                ClientToScreen( FHandle, &p1 ); ClientToScreen( FHandle, &p2 );
                HDC hDC = GetDC( NULL );
-               HPEN hPen = CreatePen( PS_SOLID, 2, RGB(255,255,255) );
+               HPEN hPen = CreatePen( PS_SOLID, 2, RGB(0,0,0) );
                HPEN hOld = (HPEN) SelectObject( hDC, hPen );
                SelectObject( hDC, GetStockObject(NULL_BRUSH) );
-               SetROP2( hDC, R2_NOTXORPEN );
+               SetROP2( hDC, R2_NOT );
                Rectangle( hDC, p1.x, p1.y, p2.x, p2.y );
                SelectObject( hDC, hOld ); DeleteObject( hPen );
                ReleaseDC( NULL, hDC );

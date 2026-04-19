@@ -67,9 +67,8 @@ function Main()
 
    // Harbour check moved to TBRun() — auto-download + build on first Run
 
-   // Always regenerate icons on startup so palette reflects current build
+   // Regenerate palette icons on startup so palette reflects current build
    W32_GeneratePaletteIcons( .T. )
-   W32_GenerateToolbarIcons( .T. )
 
    nScreenW := W32_GetScreenWidth()
    nScreenH := W32_GetScreenHeight()
