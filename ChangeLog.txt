@@ -1,6 +1,25 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-19c (Windows — palette icons, sample project)
+
+  PALETTE ICONS:
+  - TPrinter (CT_PRINTER, palette index 64): custom GDI printer icon drawn
+    programmatically — gray body, white paper tray, green LED indicator.
+  - TReport (CT_REPORT, palette index 65): custom GDI document icon —
+    blue header bar, horizontal data lines, vertical column separator.
+
+  SAMPLES:
+  - samples/projects/report1/: new professional sales report sample showing
+    TReport + TReportBand + TReportField API.
+    * Form1.prg: main form with 15-row in-memory sales table (fixed-font
+      listbox), grand total summary, Preview and Export PDF buttons.
+    * Report1.prg: SalesReport() function producing a complete A4 report:
+      Header (company name + title + date), PageHeader (column labels,
+      dark-blue background, white text), Detail (alternating row shading,
+      green total when >= $1,000), Footer (grand total), PageFooter
+      (confidentiality notice + page number).
+
 2026-04-19b (Windows — dark mode for all dialogs)
 
   DARK MODE (Windows):
