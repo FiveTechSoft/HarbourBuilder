@@ -2526,32 +2526,15 @@ HB_FUNC( UI_GETALLPROPS )
          break;
       }
       case CT_REPORTLABEL:
-      {
-         ADD_PROP_S( "cText",     p->FText,   "Text" );
-         ADD_PROP_S( "cFontName", "Sans",     "Font" );
-         ADD_PROP_N( "nFontSize", 10,         "Font" );
-         ADD_PROP_N( "nLeft",     p->FLeft,   "Position" );
-         ADD_PROP_N( "nTop",      p->FTop,    "Position" );
          break;
-      }
       case CT_REPORTFIELD:
       {
-         ADD_PROP_S( "cText",       p->FText,     "Text" );
          ADD_PROP_S( "cFieldName",  p->FFileName, "Data" );
          ADD_PROP_S( "cExpression", p->FData,     "Data" );
-         ADD_PROP_S( "cFontName",   "Sans",       "Font" );
-         ADD_PROP_N( "nFontSize",   10,           "Font" );
-         ADD_PROP_N( "nLeft",       p->FLeft,     "Position" );
-         ADD_PROP_N( "nTop",        p->FTop,      "Position" );
          break;
       }
       case CT_REPORTIMAGE:
-      {
-         ADD_PROP_S( "cFileName", p->FFileName, "Image" );
-         ADD_PROP_N( "nLeft",     p->FLeft,     "Position" );
-         ADD_PROP_N( "nTop",      p->FTop,      "Position" );
          break;
-      }
    }
 
    hb_itemReturnRelease( pArray );
