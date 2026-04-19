@@ -1,6 +1,38 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-19 (Windows — report controls, inspector, toolbar)
+
+  REPORT DESIGNER (Windows):
+  - ReportLabel (133), ReportField (134), ReportImage (135) excluded from
+    non-visual auto-drop path; they now support rubber-band placement inside
+    any band, like standard GUI controls.
+  - Rubber-band drawn on screen DC (GetDC(NULL)) with R2_NOT XOR mode so it
+    is visible over band child windows; XOR draw-twice erases without artifacts.
+  - Cursor shows IDC_CROSS over bands when a report control is pending placement
+    (was incorrectly showing IDC_SIZEALL move cursor).
+  - FClassName set to "TReportLabel" / "TReportField" / "TReportImage" on
+    rubber-band drop (tform.cpp) and in UI_ReportCtrlNew (hbbridge.cpp); was
+    defaulting to empty string, showing "TControl" in the inspector.
+
+  INSPECTOR (Windows):
+  - Removed filter that hid ReportLabel/ReportField/ReportImage (types 133-135)
+    from the inspector combo; they now appear and are editable.
+
+  PALETTE ICON GENERATOR (Windows):
+  - W32_GeneratePaletteIcons output path changed from palette_new.bmp to
+    palette.bmp so icons take effect immediately without manual rename.
+  - Startup regenerates palette only (not toolbar) to avoid overwriting
+    toolbar.bmp on every launch.
+
+  TOOLBAR (Windows):
+  - toolbar.bmp restored from toolbar_old2.bmp (original Silk icon set);
+    was overwritten by the icon generator in a previous session.
+  - toolbar.bmp extended from 9 to 10 icons (288→320 px wide) to add the
+    Form/Toggle icon (tpaintbox.png, pencil) for the Toggle Form/Code button.
+  - W32_GenerateToolbarIcons updated to generate 10 icons (added "tpaintbox"
+    as 10th entry for the Form toggle button).
+
 2026-04-18d (Windows — band: centered label, focus/dots, vertical drag with snap-back)
 
   REPORT DESIGNER (Windows):
