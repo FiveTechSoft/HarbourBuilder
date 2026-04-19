@@ -1881,6 +1881,9 @@ function MsgYesNo( xText, cTitle )
 
 return UI_MsgYesNo( ValToStr( xText ), ValToStr( cTitle ) )
 
+function RGB( nR, nG, nB )
+return nR + nG * 256 + nB * 65536
+
 static function ValToStr( xVal )
    local cType := ValType( xVal )
    do case

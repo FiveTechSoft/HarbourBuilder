@@ -1061,6 +1061,13 @@ static function RegenerateFormCode( cName, hForm )
             if ! Empty( cVal ) .and. cVal != "System,12" .and. cVal != "Segoe UI,9"
                cCreate += '   ::o' + cCtrlName + ':oFont := "' + cVal + '"' + e
             endif
+
+            // Emit lTransparent for labels
+            if nType == 1
+               if ValType( UI_GetProp( hCtrl, "lTransparent" ) ) == "L" .and. UI_GetProp( hCtrl, "lTransparent" )
+                  cCreate += '   ::o' + cCtrlName + ':lTransparent := .T.' + e
+               endif
+            endif
          endif
 
          // ControlAlign (non-zero = non-default)
@@ -1610,6 +1617,8 @@ static function SyncDesignerToCode()
 
    local cNewCode, cOldCode, cMethods, nPos, nPos2
    local cSep := "//" + Replicate( "-", 68 )
+   local cLauncher, nLPos
+   local cSepLine, cFormName, cFormClass
 
    if nActiveForm < 1 .or. nActiveForm > Len( aForms )
       return nil
@@ -1654,10 +1663,33 @@ static function SyncDesignerToCode()
    // Regenerate CLASS + CreateForm
    cNewCode := RegenerateFormCode( aForms[ nActiveForm ][ 1 ], oDesignForm:hCpp )
 
-   // Append preserved METHOD implementations
+   // Strip the auto-generated launcher FUNCTION FormN() from preserved code
+   // (RegenerateFormCode re-appends a fresh one; keeping old copies causes duplicates)
+   if ! Empty( cMethods )
+      cLauncher := "FUNCTION " + aForms[ nActiveForm ][ 1 ] + "()"
+      nLPos := At( Upper( cLauncher ), Upper( cMethods ) )
+      if nLPos > 0
+         cMethods := RTrim( Left( cMethods, nLPos - 1 ) )
+      endif
+   endif
+
+   // Append preserved METHOD implementations (before the launcher)
    if ! Empty( cMethods )
       cNewCode += Chr(13) + Chr(10) + cMethods
    endif
+
+   // Append the form launcher function at the very end (after user methods)
+   // so subsequent saves can find it and strip it from cMethods cleanly
+   cSepLine  := "//" + Replicate( "-", 68 ) + Chr(13) + Chr(10)
+   cFormName := aForms[ nActiveForm ][ 1 ]
+   cFormClass := "T" + cFormName
+   cNewCode += Chr(13) + Chr(10)
+   cNewCode += "FUNCTION " + cFormName + "()" + Chr(13) + Chr(10)
+   cNewCode += "   LOCAL oForm := " + cFormClass + "():New()" + Chr(13) + Chr(10)
+   cNewCode += "   oForm:CreateForm()" + Chr(13) + Chr(10)
+   cNewCode += "   oForm:Activate()" + Chr(13) + Chr(10)
+   cNewCode += "RETURN oForm" + Chr(13) + Chr(10)
+   cNewCode += cSepLine
 
    // Update stored code and editor tab. Guard against the re-entrant
    // loop: CodeEditorSetTabText fires OnEditorTextChange, which calls
@@ -2391,7 +2423,7 @@ static function RestoreFormFromCode( hForm, cCode )
       if ! ( cProp == "nClrPane" .or. cProp == "Color" .or. cProp == "cDataSource" .or. ;
              cProp == "nInterval" .or. cProp == "oFont" .or. ;
              cProp == "cFileName" .or. cProp == "cRDD" .or. cProp == "lActive" .or. ;
-             cProp == "ControlAlign" )
+             cProp == "lTransparent" .or. cProp == "ControlAlign" )
          loop
       endif
 
@@ -2427,6 +2459,8 @@ static function RestoreFormFromCode( hForm, cCode )
          UI_SetProp( hCtrl, cProp, cText )
       elseif cProp == "lActive"
          UI_SetProp( hCtrl, "lActive", Upper( AllTrim( cText ) ) == ".T." )
+      elseif cProp == "lTransparent"
+         UI_SetProp( hCtrl, "lTransparent", Upper( AllTrim( cText ) ) == ".T." )
       elseif cProp == "ControlAlign"
          UI_SetProp( hCtrl, "nControlAlign", Val( cText ) )
       endif
@@ -2961,7 +2995,7 @@ static function TBRun()
    local cBuildDir, cOutput, cLog, i, k, lError
    local cHbDir, cHbBin, cHbInc, cHbLib
    local cCDir, cCC, cLinker
-   local cProjDir, cAllPrg, cCmd, cObjs
+   local cProjDir, cAllPrg, cCmd, cObjs, cFormCode
    local aCppFiles, cCppBase
    local cAllCode, nHash
    local cCompiler, cMsvcBase, cWinKit, cWinKitVer
@@ -3157,10 +3191,18 @@ static function TBRun()
    // is not registered with the RDD subsystem.
    cAllPrg += "REQUEST DBFCDX, DBFNTX, DBFFPT" + Chr(10)
    cAllPrg += "REQUEST RDDSYS" + Chr(10) + Chr(10)
-   cAllPrg += StrTran( MemoRead( cBuildDir + "\Project1.prg" ), ;
-                       '#include "hbbuilder.ch"', "" ) + Chr(10)
+   cFormCode := MemoRead( cBuildDir + "\Project1.prg" )
+   cFormCode := StrTran( cFormCode, '#include "hbbuilder.ch"', "" )
+   cFormCode := StrTran( cFormCode, '#include "classes.prg"', "" )
+   cAllPrg += cFormCode + Chr(10)
    for i := 1 to Len( aForms )
-      cAllPrg += MemoRead( cBuildDir + "\" + aForms[i][1] + ".prg" ) + Chr(10)
+      cFormCode := MemoRead( cBuildDir + "\" + aForms[i][1] + ".prg" )
+      // Strip ---- separators and re-included headers (already in main.prg header)
+      cFormCode := StrTran( cFormCode, Chr(13) + Chr(10) + "----", "" )
+      cFormCode := StrTran( cFormCode, Chr(10) + "----", "" )
+      cFormCode := StrTran( cFormCode, '#include "hbbuilder.ch"', "" )
+      cFormCode := StrTran( cFormCode, '#include "classes.prg"', "" )
+      cAllPrg += cFormCode + Chr(10)
    next
    // Add early DPI awareness (must be before any window creation)
    cAllPrg += Chr(10)
@@ -4287,6 +4329,7 @@ static function TBDebugRun()
    AAdd( aDbgOffsets, { nCurLine, "Project1.prg", 1, 1 } )
    cMainPrg := CodeEditorGetTabText( hCodeEditor, 1 )
    cMainPrg := StrTran( cMainPrg, '#include "hbbuilder.ch"', "" )
+   cMainPrg := StrTran( cMainPrg, '#include "classes.prg"', "" )
    cAllPrg += cMainPrg + Chr(10)
    nCurLine += NumLines( cMainPrg ) + 1
 
@@ -4294,6 +4337,11 @@ static function TBDebugRun()
    for i := 1 to Len( aForms )
       AAdd( aDbgOffsets, { nCurLine, aForms[i][1] + ".prg", i + 1, 2 } )
       cSection := MemoRead( cBuildDir + "\" + aForms[i][1] + ".prg" )
+      // Strip ---- separators and re-included headers
+      cSection := StrTran( cSection, Chr(13) + Chr(10) + "----", "" )
+      cSection := StrTran( cSection, Chr(10) + "----", "" )
+      cSection := StrTran( cSection, '#include "hbbuilder.ch"', "" )
+      cSection := StrTran( cSection, '#include "classes.prg"', "" )
       cAllPrg += cSection + Chr(10)
       nCurLine += NumLines( cSection ) + 1
    next

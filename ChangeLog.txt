@@ -1,6 +1,41 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-19d (Windows — lTransparent, build fixes, report1 sample)
+
+  INSPECTOR / CODE GENERATOR:
+  - lTransparent property: added to inspector for TLabel, emitted by
+    RegenerateFormCode, restored by RestoreFormFromCode second-pass.
+    Labels with lTransparent := .T. no longer paint their background,
+    allowing the form background color to show through.
+
+  BUILD SYSTEM:
+  - Strip "----" IDE separators from form files before assembling main.prg
+    (was causing "Incomplete statement" Harbour parse errors).
+  - Strip duplicate #include "classes.prg" and #include "hbbuilder.ch"
+    from form files and Project1.prg to prevent double-class definitions
+    and linker duplicate-symbol errors.
+  - Same stripping applied to TBDebugRun path.
+  - Declared cFormCode local in TBRun() (Harbour does not allow local
+    inside a for loop).
+
+  CODE GENERATOR / SYNC:
+  - SyncDesignerToCode: FUNCTION FormN() launcher moved to the very end
+    of the generated file, after user methods. On each re-save the old
+    launcher is stripped from cMethods before appending, preventing
+    duplicate FUNCTION definitions accumulating across save cycles.
+  - Fixes linker errors _HB_FUN_BTNPREVCLICK / _HB_FUN_BTNPDFCLICK that
+    appeared when user method implementations were silently dropped.
+
+  SAMPLE PROJECT (report1):
+  - Form1.prg: rewrote in CLASS TForm1 FROM TForm format matching the IDE
+    designer; added SampleData(), BtnPrevClick(), BtnPDFClick() methods.
+  - RGB() function added to classes.prg (used by Report1.prg/SalesReport).
+  - Listbox population moved to function Form1Create(oSelf) wired via
+    ::OnCreate so it runs after child HWNDs exist; IDE auto-detects the
+    function name and regenerates the ::OnCreate event wiring on each save.
+  - Project1.prg: added REQUEST HB_GT_GUI_DEFAULT.
+
 2026-04-19c (Windows — palette icons, sample project)
 
   PALETTE ICONS:

@@ -2456,6 +2456,9 @@ HB_FUNC( UI_GETALLPROPS )
             hb_itemRelease( pRow );
          }
          break;
+      case CT_LABEL:
+         ADD_PROP_L( "lTransparent", p->FTransparent, "Appearance" );
+         break;
       case CT_BUTTON:
          ADD_PROP_L( "lDefault", ((TButton*)p)->FDefault, "Behavior" );
          ADD_PROP_L( "lCancel", ((TButton*)p)->FCancel, "Behavior" );
