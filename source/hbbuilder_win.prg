@@ -6156,10 +6156,36 @@ static int s_formsSel = 0;
 static HWND s_formsListBox = NULL;
 static BOOL s_formsDlgDone = FALSE;
 
+static HBRUSH s_hFormsDlgBrush = NULL;
+static HBRUSH s_hFormsLBBrush  = NULL;
+
 static LRESULT CALLBACK FormsDlgProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 {
    switch( msg )
    {
+      case WM_ERASEBKGND:
+         if( g_bDarkIDE )
+         {
+            RECT rc;
+            GetClientRect( hWnd, &rc );
+            if( !s_hFormsDlgBrush ) s_hFormsDlgBrush = CreateSolidBrush( RGB(30,30,30) );
+            FillRect( (HDC) wParam, &rc, s_hFormsDlgBrush );
+            return 1;
+         }
+         break;
+
+      case WM_CTLCOLORLISTBOX:
+         if( g_bDarkIDE )
+         {
+            HDC hdc = (HDC) wParam;
+            SetBkColor( hdc, RGB(45,45,45) );
+            SetTextColor( hdc, RGB(212,212,212) );
+            if( s_hFormsLBBrush ) DeleteObject( s_hFormsLBBrush );
+            s_hFormsLBBrush = CreateSolidBrush( RGB(45,45,45) );
+            return (LRESULT) s_hFormsLBBrush;
+         }
+         break;
+
       case WM_COMMAND:
       {
          WORD wId = LOWORD(wParam);
@@ -6216,7 +6242,7 @@ HB_FUNC( W32_SELECTFROMLIST )
       wc.lpfnWndProc = FormsDlgProc;
       wc.hInstance = GetModuleHandle(NULL);
       wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-      wc.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
+      wc.hbrBackground = NULL;   /* painted in WM_ERASEBKGND */
       wc.lpszClassName = "HbFormsDlg";
       RegisterClassA( &wc );
       bReg = TRUE;
@@ -6231,6 +6257,12 @@ HB_FUNC( W32_SELECTFROMLIST )
       WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
       x, y, dlgW, dlgH,
       hOwner, NULL, GetModuleHandle(NULL), NULL );
+
+   if( g_bDarkIDE )
+   {
+      BOOL bDark = TRUE;
+      DwmSetWindowAttribute( hDlg, DWMWA_USE_IMMERSIVE_DARK_MODE, &bDark, sizeof(bDark) );
+   }
 
    hFont = (HFONT) GetStockObject( DEFAULT_GUI_FONT );
 
