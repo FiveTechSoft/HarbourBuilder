@@ -1,6 +1,22 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-19b (Windows — dark mode for all dialogs)
+
+  DARK MODE (Windows):
+  - Edit Text dialog (inspector "..." button): centered on screen, dark
+    background/title bar/edit area, height increased to 460px with buttons
+    always fully visible via dynamic GetClientRect positioning.
+  - About dialog: dark background, light text, dark DWM title bar.
+  - Select a form dialog (and all W32_SelectFromList callers): dark
+    background, listbox with dark colors, dark DWM title bar.
+  - Editor Colors dialog: dark background, static labels, edit controls;
+    DWM dark title bar; resized from 480×460 to 500×510; OK/Cancel
+    positioned dynamically so buttons are always visible at any DPI.
+  - Project Options dialog: dark background, static labels, edit controls,
+    DWM dark title bar.
+  - Project Inspector: dark background, DWM dark title bar.
+
 2026-04-19 (Windows — report controls, inspector, toolbar)
 
   REPORT DESIGNER (Windows):
