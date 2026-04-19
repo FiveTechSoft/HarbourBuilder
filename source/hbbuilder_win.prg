@@ -6993,6 +6993,38 @@ HB_FUNC( W32_GENERATEPALETTEICONS )
          }
       }
 
+      /* Printer icon (index 64): body + paper feed + paper tray + LED */
+      if( !bDrawn && i == 64 )
+      {
+         HBRUSH hBr; HPEN hPn;
+         /* Printer body (gray chassis) */
+         hBr = CreateSolidBrush(RGB(155,155,160));
+         hPn = CreatePen(PS_SOLID,1,RGB(90,90,95));
+         SelectObject(hM,hBr); SelectObject(hM,hPn);
+         Rectangle(hM, x+3, 11, x+29, 23);
+         DeleteObject(hBr); DeleteObject(hPn);
+         /* Paper input slot (top - light paper stack) */
+         hBr = CreateSolidBrush(RGB(248,248,240));
+         hPn = CreatePen(PS_SOLID,1,RGB(180,180,170));
+         SelectObject(hM,hBr); SelectObject(hM,hPn);
+         Rectangle(hM, x+8, 5, x+24, 14);
+         DeleteObject(hBr); DeleteObject(hPn);
+         /* Paper output tray (bottom) */
+         hBr = CreateSolidBrush(RGB(248,248,240));
+         hPn = CreatePen(PS_SOLID,1,RGB(180,180,170));
+         SelectObject(hM,hBr); SelectObject(hM,hPn);
+         Rectangle(hM, x+8, 20, x+24, 27);
+         DeleteObject(hBr); DeleteObject(hPn);
+         /* LED indicator (green dot) */
+         hBr = CreateSolidBrush(RGB(50,200,60));
+         hPn = CreatePen(PS_SOLID,1,RGB(30,140,40));
+         SelectObject(hM,hBr); SelectObject(hM,hPn);
+         Ellipse(hM, x+21, 14, x+26, 19);
+         DeleteObject(hBr); DeleteObject(hPn);
+         SelectObject(hM,GetStockObject(NULL_PEN));
+         bDrawn = TRUE;
+      }
+
       /* Band icon (index 72): 3 horizontal stripes like rectangle.split.3x1 */
       if( !bDrawn && i == 72 )
       {
