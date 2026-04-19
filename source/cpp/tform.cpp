@@ -1950,6 +1950,23 @@ void TForm::SubclassChildren()
          SetWindowLongPtr( hChild, GWLP_WNDPROC, (LONG_PTR) DesignChildProc );
       }
    }
+
+   /* Also subclass report control HWNDs (grandchildren via band HWNDs) */
+   for( i = 0; i < FChildCount; i++ )
+   {
+      TControl * pBand = FChildren[i];
+      if( !pBand || pBand->FControlType != CT_BAND ) continue;
+      int j;
+      for( j = 0; j < FChildCount; j++ )
+      {
+         TControl * pRC = FChildren[j];
+         if( !pRC || pRC->FBandParent != pBand || !pRC->FHandle ) continue;
+         WNDPROC pCur = (WNDPROC) GetWindowLongPtr( pRC->FHandle, GWLP_WNDPROC );
+         if( pCur == DesignChildProc ) continue;
+         SetPropA( pRC->FHandle, "OldProc", (HANDLE) pCur );
+         SetWindowLongPtr( pRC->FHandle, GWLP_WNDPROC, (LONG_PTR) DesignChildProc );
+      }
+   }
 }
 
 /* Child subclass - just makes clicks pass through to parent */
