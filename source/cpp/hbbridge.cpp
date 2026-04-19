@@ -1360,6 +1360,18 @@ HB_FUNC( UI_SETPROP )
    }
    else if( lstrcmpi( szProp, "aData" ) == 0 && p->FControlType == CT_BAND && HB_ISCHAR(3) )
       lstrcpynA( p->FData, hb_parc(3), sizeof(p->FData) - 1 );
+   else if( lstrcmpi( szProp, "cFieldName" ) == 0 &&
+            p->FControlType == CT_REPORTFIELD && HB_ISCHAR(3) )
+   {
+      lstrcpynA( p->FFileName, hb_parc(3), sizeof(p->FFileName) );
+      if( p->FHandle ) InvalidateRect( p->FHandle, NULL, TRUE );
+   }
+   else if( lstrcmpi( szProp, "cExpression" ) == 0 &&
+            p->FControlType == CT_REPORTFIELD && HB_ISCHAR(3) )
+   {
+      lstrcpynA( p->FData, hb_parc(3), sizeof(p->FData) - 1 );
+      if( p->FHandle ) InvalidateRect( p->FHandle, NULL, TRUE );
+   }
    else if( lstrcmpi( szProp, "nControlAlign" ) == 0 && HB_ISNUM(3) )
    {
       int nAlign = hb_parni(3);
@@ -1697,6 +1709,12 @@ HB_FUNC( UI_GETPROP )
    else if( lstrcmpi( szProp, "cBandType" ) == 0 && p->FControlType == CT_BAND )
       hb_retc( p->FText );
    else if( lstrcmpi( szProp, "aData" ) == 0 && p->FControlType == CT_BAND )
+      hb_retc( p->FData );
+   else if( lstrcmpi( szProp, "cFieldName" ) == 0 &&
+            p->FControlType == CT_REPORTFIELD )
+      hb_retc( p->FFileName );
+   else if( lstrcmpi( szProp, "cExpression" ) == 0 &&
+            p->FControlType == CT_REPORTFIELD )
       hb_retc( p->FData );
    else if( lstrcmpi( szProp, "nControlAlign" ) == 0 )
       hb_retni( p->FDockAlign );
@@ -2505,6 +2523,33 @@ HB_FUNC( UI_GETALLPROPS )
          hb_arrayAdd( pArray, pRow );
          hb_itemRelease( pRow );
          ADD_PROP_S( "aData", p->FData, "Band" );
+         break;
+      }
+      case CT_REPORTLABEL:
+      {
+         ADD_PROP_S( "cText",     p->FText,   "Text" );
+         ADD_PROP_S( "cFontName", "Sans",     "Font" );
+         ADD_PROP_N( "nFontSize", 10,         "Font" );
+         ADD_PROP_N( "nLeft",     p->FLeft,   "Position" );
+         ADD_PROP_N( "nTop",      p->FTop,    "Position" );
+         break;
+      }
+      case CT_REPORTFIELD:
+      {
+         ADD_PROP_S( "cText",       p->FText,     "Text" );
+         ADD_PROP_S( "cFieldName",  p->FFileName, "Data" );
+         ADD_PROP_S( "cExpression", p->FData,     "Data" );
+         ADD_PROP_S( "cFontName",   "Sans",       "Font" );
+         ADD_PROP_N( "nFontSize",   10,           "Font" );
+         ADD_PROP_N( "nLeft",       p->FLeft,     "Position" );
+         ADD_PROP_N( "nTop",        p->FTop,      "Position" );
+         break;
+      }
+      case CT_REPORTIMAGE:
+      {
+         ADD_PROP_S( "cFileName", p->FFileName, "Image" );
+         ADD_PROP_N( "nLeft",     p->FLeft,     "Position" );
+         ADD_PROP_N( "nTop",      p->FTop,      "Position" );
          break;
       }
    }
