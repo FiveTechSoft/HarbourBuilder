@@ -7025,6 +7025,43 @@ HB_FUNC( W32_GENERATEPALETTEICONS )
          bDrawn = TRUE;
       }
 
+      /* TReport icon (index 65): document with header bar and data lines */
+      if( !bDrawn && i == 65 )
+      {
+         HBRUSH hBr; HPEN hPn;
+         /* Document body (white page with shadow) */
+         hBr = CreateSolidBrush(RGB(220,220,225));
+         hPn = CreatePen(PS_SOLID,1,RGB(140,140,150));
+         SelectObject(hM,hBr); SelectObject(hM,hPn);
+         Rectangle(hM, x+5, 3, x+27, 29);   /* shadow */
+         DeleteObject(hBr);
+         hBr = CreateSolidBrush(RGB(250,250,252));
+         SelectObject(hM,hBr);
+         Rectangle(hM, x+4, 2, x+26, 28);   /* page */
+         DeleteObject(hBr); DeleteObject(hPn);
+         /* Header bar (blue title band) */
+         hBr = CreateSolidBrush(RGB(45,100,200));
+         hPn = CreatePen(PS_NULL,0,0);
+         SelectObject(hM,hBr); SelectObject(hM,hPn);
+         Rectangle(hM, x+4, 2, x+26, 9);
+         DeleteObject(hBr); DeleteObject(hPn);
+         /* Data lines (rows of content) */
+         hPn = CreatePen(PS_SOLID,1,RGB(180,190,210));
+         SelectObject(hM,hPn);
+         MoveToEx(hM,x+7,13,NULL); LineTo(hM,x+23,13);
+         MoveToEx(hM,x+7,17,NULL); LineTo(hM,x+23,17);
+         MoveToEx(hM,x+7,21,NULL); LineTo(hM,x+23,21);
+         MoveToEx(hM,x+7,25,NULL); LineTo(hM,x+16,25); /* partial last line */
+         DeleteObject(hPn);
+         /* Column separator */
+         hPn = CreatePen(PS_SOLID,1,RGB(200,210,230));
+         SelectObject(hM,hPn);
+         MoveToEx(hM,x+16,10,NULL); LineTo(hM,x+16,27);
+         DeleteObject(hPn);
+         SelectObject(hM,GetStockObject(NULL_PEN));
+         bDrawn = TRUE;
+      }
+
       /* Band icon (index 72): 3 horizontal stripes like rectangle.split.3x1 */
       if( !bDrawn && i == 72 )
       {
