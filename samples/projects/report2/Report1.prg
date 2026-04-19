@@ -265,7 +265,7 @@ function CustomerReport( cFile )
    oBand:AddField( oFld )
 
    oFld := TReportField():New( "ftr_line" )
-   oFld:cText := hb_Replicate( Chr(196), 120 )
+   oFld:cText := Replicate( Chr(196), 120 )
    oFld:nTop := 1 ; oFld:nLeft := 0
    oFld:nWidth := 180 ; oFld:nHeight := 2
    oFld:cFontName := "Segoe UI" ; oFld:nFontSize := 6
