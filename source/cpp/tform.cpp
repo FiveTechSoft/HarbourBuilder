@@ -1250,26 +1250,33 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
          if( FDesignMode )
          {
             int mx = (short)LOWORD(lParam), my = (short)HIWORD(lParam) - FClientTop;
-            int nH = HitTestHandle( mx, my );
             LPCTSTR cur = IDC_ARROW;
 
-            if( nH >= 0 )
+            if( FPendingControlType >= 0 )
             {
-               /* Skip resize cursor for non-visual components (32x32) */
-               if( FSelCount > 0 && FSelected[0]->FWidth == 32 &&
-                   FSelected[0]->FHeight == 32 )
-                  cur = IDC_SIZEALL;  /* Move cursor instead */
-               else
-               {
-                  /* Resize cursors per handle: TL TC TR MR BR BC BL ML */
-                  static LPCTSTR aCurs[] = {
-                     IDC_SIZENWSE, IDC_SIZENS, IDC_SIZENESW, IDC_SIZEWE,
-                     IDC_SIZENWSE, IDC_SIZENS, IDC_SIZENESW, IDC_SIZEWE };
-                  cur = aCurs[nH];
-               }
+               cur = IDC_CROSS;  /* placing a control: keep crosshair over everything */
             }
-            else if( HitTest( mx, my ) )
-               cur = IDC_SIZEALL;
+            else
+            {
+               int nH = HitTestHandle( mx, my );
+               if( nH >= 0 )
+               {
+                  /* Skip resize cursor for non-visual components (32x32) */
+                  if( FSelCount > 0 && FSelected[0]->FWidth == 32 &&
+                      FSelected[0]->FHeight == 32 )
+                     cur = IDC_SIZEALL;  /* Move cursor instead */
+                  else
+                  {
+                     /* Resize cursors per handle: TL TC TR MR BR BC BL ML */
+                     static LPCTSTR aCurs[] = {
+                        IDC_SIZENWSE, IDC_SIZENS, IDC_SIZENESW, IDC_SIZEWE,
+                        IDC_SIZENWSE, IDC_SIZENS, IDC_SIZENESW, IDC_SIZEWE };
+                     cur = aCurs[nH];
+                  }
+               }
+               else if( HitTest( mx, my ) )
+                  cur = IDC_SIZEALL;
+            }
 
             SetCursor( LoadCursor( NULL, cur ) );
             return 0;
