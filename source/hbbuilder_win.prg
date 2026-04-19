@@ -5631,6 +5631,16 @@ static LRESULT CALLBACK ProjInsWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPAR
          }
          return 0;
       }
+      case WM_ERASEBKGND:
+         if( g_bDarkIDE ) {
+            RECT rc; HBRUSH hBr;
+            GetClientRect(hWnd, &rc);
+            hBr = CreateSolidBrush(RGB(30,30,30));
+            FillRect((HDC)wParam, &rc, hBr);
+            DeleteObject(hBr);
+            return 1;
+         }
+         break;
       case WM_CLOSE:
          ShowWindow(hWnd, SW_HIDE);
          return 0;
@@ -5661,7 +5671,7 @@ HB_FUNC( W32_PROJECTINSPECTOR )
       wc.lpfnWndProc = ProjInsWndProc;
       wc.hInstance = GetModuleHandle(NULL);
       wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-      wc.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);
+      wc.hbrBackground = NULL;   /* painted in WM_ERASEBKGND */
       wc.lpszClassName = "HbProjInspector";
       RegisterClassA(&wc);
       bReg = TRUE;
@@ -5675,6 +5685,10 @@ HB_FUNC( W32_PROJECTINSPECTOR )
       WS_POPUP|WS_CAPTION|WS_SYSMENU|WS_THICKFRAME|WS_VISIBLE,
       rc.right-260, rc.top+80, 250, 400,
       NULL,NULL,GetModuleHandle(NULL),NULL);
+   if( g_bDarkIDE ) {
+      BOOL bDark = TRUE;
+      DwmSetWindowAttribute(s_hProjWnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &bDark, sizeof(bDark));
+   }
 
    hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
 
@@ -6395,8 +6409,8 @@ HB_FUNC( W32_SHELLEXEC )
  * Editor Settings Dialog (C++Builder: Tools > Editor Options > Colors)
  * ====================================================================== */
 
-#define ES_DLG_W 480
-#define ES_DLG_H 460
+#define ES_DLG_W 500
+#define ES_DLG_H 510
 
 static COLORREF PickColor( HWND hOwner, COLORREF crInit )
 {
@@ -6427,9 +6441,39 @@ static HWND ES_AddColorRow( HWND hDlg, const char * label, COLORREF clr, int y, 
    return hBtn;
 }
 
+static HBRUSH s_hESDlgBrush = NULL;
+static HBRUSH s_hESEditBrush = NULL;
+
 static LRESULT CALLBACK EditorSettingsProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 {
    switch(msg) {
+      case WM_ERASEBKGND:
+         if( g_bDarkIDE ) {
+            RECT rc; GetClientRect(hWnd, &rc);
+            if(!s_hESDlgBrush) s_hESDlgBrush = CreateSolidBrush(RGB(30,30,30));
+            FillRect((HDC)wParam, &rc, s_hESDlgBrush);
+            return 1;
+         }
+         break;
+      case WM_CTLCOLORSTATIC:
+         if( g_bDarkIDE ) {
+            HDC hdc = (HDC)wParam;
+            SetTextColor(hdc, RGB(212,212,212));
+            SetBkColor(hdc, RGB(30,30,30));
+            if(!s_hESDlgBrush) s_hESDlgBrush = CreateSolidBrush(RGB(30,30,30));
+            return (LRESULT)s_hESDlgBrush;
+         }
+         break;
+      case WM_CTLCOLOREDIT:
+         if( g_bDarkIDE ) {
+            HDC hdc = (HDC)wParam;
+            SetTextColor(hdc, RGB(212,212,212));
+            SetBkColor(hdc, RGB(45,45,45));
+            if(s_hESEditBrush) DeleteObject(s_hESEditBrush);
+            s_hESEditBrush = CreateSolidBrush(RGB(45,45,45));
+            return (LRESULT)s_hESEditBrush;
+         }
+         break;
       case WM_COMMAND:
       {
          WORD wId = LOWORD(wParam);
@@ -6473,7 +6517,7 @@ HB_FUNC( W32_EDITORSETTINGSDIALOG )
    if(!bReg) {
       wc.lpfnWndProc=EditorSettingsProc; wc.hInstance=GetModuleHandle(NULL);
       wc.hCursor=LoadCursor(NULL,IDC_ARROW);
-      wc.hbrBackground=(HBRUSH)(COLOR_BTNFACE+1);
+      wc.hbrBackground=NULL;   /* painted in WM_ERASEBKGND */
       wc.lpszClassName="HbEditorSettings"; RegisterClassA(&wc); bReg=TRUE;
    }
 
@@ -6485,6 +6529,10 @@ HB_FUNC( W32_EDITORSETTINGSDIALOG )
       "HbEditorSettings","Editor Colors && Font",
       WS_POPUP|WS_CAPTION|WS_SYSMENU|WS_VISIBLE,
       x,y,ES_DLG_W,ES_DLG_H,hOwner,NULL,GetModuleHandle(NULL),NULL);
+   if( g_bDarkIDE ) {
+      BOOL bDark = TRUE;
+      DwmSetWindowAttribute(hDlg, DWMWA_USE_IMMERSIVE_DARK_MODE, &bDark, sizeof(bDark));
+   }
 
    hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
 
@@ -6557,13 +6605,18 @@ HB_FUNC( W32_EDITORSETTINGSDIALOG )
      SendMessage(h,WM_SETFONT,(WPARAM)hFont,TRUE);
    }
 
-   /* OK / Cancel */
-   hBtn = CreateWindowExA(0,"BUTTON","OK",WS_CHILD|WS_VISIBLE|BS_DEFPUSHBUTTON,
-      ES_DLG_W/2-100,ES_DLG_H-70,90,28,hDlg,(HMENU)IDOK,GetModuleHandle(NULL),NULL);
-   SendMessage(hBtn,WM_SETFONT,(WPARAM)hFont,TRUE);
-   hBtn = CreateWindowExA(0,"BUTTON","Cancel",WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,
-      ES_DLG_W/2+10,ES_DLG_H-70,90,28,hDlg,(HMENU)IDCANCEL,GetModuleHandle(NULL),NULL);
-   SendMessage(hBtn,WM_SETFONT,(WPARAM)hFont,TRUE);
+   /* OK / Cancel — positioned from actual client rect */
+   { RECT rcCl; int cW, cH, bY;
+     GetClientRect(hDlg, &rcCl);
+     cW = rcCl.right; cH = rcCl.bottom;
+     bY = cH - 10 - 28;
+     hBtn = CreateWindowExA(0,"BUTTON","OK",WS_CHILD|WS_VISIBLE|BS_DEFPUSHBUTTON,
+        cW/2-100, bY, 90, 28, hDlg,(HMENU)IDOK,GetModuleHandle(NULL),NULL);
+     SendMessage(hBtn,WM_SETFONT,(WPARAM)hFont,TRUE);
+     hBtn = CreateWindowExA(0,"BUTTON","Cancel",WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,
+        cW/2+10, bY, 90, 28, hDlg,(HMENU)IDCANCEL,GetModuleHandle(NULL),NULL);
+     SendMessage(hBtn,WM_SETFONT,(WPARAM)hFont,TRUE);
+   }
 
    /* Modal loop */
    EnableWindow(hOwner, FALSE);
@@ -6668,10 +6721,40 @@ static void PO_ShowTab( PROJOPTDATA * d, int nTab )
    }
 }
 
+static HBRUSH s_hPODlgBrush  = NULL;
+static HBRUSH s_hPOEditBrush = NULL;
+
 static LRESULT CALLBACK ProjOptProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 {
    PROJOPTDATA * d = (PROJOPTDATA*) GetWindowLongPtr(hWnd, GWLP_USERDATA);
    switch(msg) {
+      case WM_ERASEBKGND:
+         if( g_bDarkIDE ) {
+            RECT rc; GetClientRect(hWnd, &rc);
+            if(!s_hPODlgBrush) s_hPODlgBrush = CreateSolidBrush(RGB(30,30,30));
+            FillRect((HDC)wParam, &rc, s_hPODlgBrush);
+            return 1;
+         }
+         break;
+      case WM_CTLCOLORSTATIC:
+         if( g_bDarkIDE ) {
+            HDC hdc = (HDC)wParam;
+            SetTextColor(hdc, RGB(212,212,212));
+            SetBkColor(hdc, RGB(30,30,30));
+            if(!s_hPODlgBrush) s_hPODlgBrush = CreateSolidBrush(RGB(30,30,30));
+            return (LRESULT)s_hPODlgBrush;
+         }
+         break;
+      case WM_CTLCOLOREDIT:
+         if( g_bDarkIDE ) {
+            HDC hdc = (HDC)wParam;
+            SetTextColor(hdc, RGB(212,212,212));
+            SetBkColor(hdc, RGB(45,45,45));
+            if(s_hPOEditBrush) DeleteObject(s_hPOEditBrush);
+            s_hPOEditBrush = CreateSolidBrush(RGB(45,45,45));
+            return (LRESULT)s_hPOEditBrush;
+         }
+         break;
       case WM_NOTIFY: {
          NMHDR * pnm = (NMHDR*)lParam;
          if(d && pnm->hwndFrom == d->hTab && pnm->code == TCN_SELCHANGE)
@@ -6709,7 +6792,7 @@ HB_FUNC( W32_PROJECTOPTIONSDIALOG )
    if(!bReg) {
       wc.lpfnWndProc=ProjOptProc; wc.hInstance=GetModuleHandle(NULL);
       wc.hCursor=LoadCursor(NULL,IDC_ARROW);
-      wc.hbrBackground=(HBRUSH)(COLOR_BTNFACE+1);
+      wc.hbrBackground=NULL;   /* painted in WM_ERASEBKGND */
       wc.lpszClassName="HbProjOpt"; RegisterClassA(&wc); bReg=TRUE;
    }
 
@@ -6722,6 +6805,10 @@ HB_FUNC( W32_PROJECTOPTIONSDIALOG )
       WS_POPUP|WS_CAPTION|WS_SYSMENU|WS_VISIBLE,
       x,y,PO_DLG_W,PO_DLG_H,hOwner,NULL,GetModuleHandle(NULL),NULL);
    SetWindowLongPtr(d.hDlg,GWLP_USERDATA,(LONG_PTR)&d);
+   if( g_bDarkIDE ) {
+      BOOL bDark = TRUE;
+      DwmSetWindowAttribute(d.hDlg, DWMWA_USE_IMMERSIVE_DARK_MODE, &bDark, sizeof(bDark));
+   }
 
    hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
 
