@@ -2380,6 +2380,8 @@ static function TBRun()
       cLog += "[6] Compiling GTK3 backend..." + Chr(10)
       cCmd := "gcc -c -O2 -I" + cHbInc + ;
               " $(pkg-config --cflags gtk+-3.0)" + ;
+              " $(pkg-config --exists webkit2gtk-4.1 2>/dev/null && echo '-DHAVE_WEBKIT2GTK '$(pkg-config --cflags webkit2gtk-4.1) || " + ;
+              "  (pkg-config --exists webkit2gtk-4.0 2>/dev/null && echo '-DHAVE_WEBKIT2GTK '$(pkg-config --cflags webkit2gtk-4.0) || echo ''))" + ;
               " " + cProjDir + "/source/backends/gtk3/gtk3_core.c" + ;
               " -o " + cBuildDir + "/gtk3_core.o 2>&1"
       GTK_ShellExec( cCmd )
@@ -2405,6 +2407,8 @@ static function TBRun()
               " -lgttrm -lhbpcre" + ;
               " -Wl,--end-group" + ;
               " $(pkg-config --libs gtk+-3.0)" + ;
+              " $(pkg-config --exists webkit2gtk-4.1 2>/dev/null && pkg-config --libs webkit2gtk-4.1 || " + ;
+              "  (pkg-config --exists webkit2gtk-4.0 2>/dev/null && pkg-config --libs webkit2gtk-4.0 || echo ''))" + ;
               " -lm -lpthread -ldl -lrt -lsqlite3 -lncurses 2>&1"
       cOutput := GTK_ShellExec( cCmd )
       if "error" $ Lower( cOutput )
