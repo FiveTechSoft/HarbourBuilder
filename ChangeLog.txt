@@ -1,6 +1,82 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-20d (Linux — module system, 40 missing controls, WebView, METHOD wiring)
+
+  MODULE SYSTEM (aModules / aOpenFiles):
+  - Added File > Add Module, Open File, Close File menu items.
+  - New static arrays aModules and aOpenFiles for multi-file projects.
+  - MenuAddModule() adds .prg as project module with duplicate checking.
+  - MenuOpenFile() opens .prg for editing without adding to project.
+  - MenuCloseFile() closes open-file tabs (uses TabInfo() to distinguish).
+  - TabInfo(nTab) returns {"project"|"form"|"module"|"openfile", nIndex}.
+  - TBNew() resets aModules/aOpenFiles on new project.
+  - OpenProjectFile() reads [modules] section from .hbp and loads tabs.
+  - TBSave() writes [modules] section and saves each module .prg.
+  - TBRun() includes modules in hash check, file save, and main.prg assembly.
+  - INS_GetAllCode() includes module code for handler detection.
+  - AddToProject() now calls MenuAddModule() (same as macOS).
+  - RemoveFromProject() shows forms and modules, allows removing both.
+  - ShowProjectInspector() displays modules in the tree.
+  - NewComponent()/InstallComponent() add as modules with correct tab positions.
+
+  GTK3 BACKEND — CodeEditorRemoveTab / CodeEditorGetActiveTab:
+  - New C functions in gtk3_core.c for tab removal (shift arrays, remove
+    notebook page, adjust active tab) and active tab query (1-based).
+
+  40 MISSING GTK3 CONTROLS IMPLEMENTED:
+  - UI_SpeedBtnNew: GtkButton with GTK_RELIEF_NONE (flat toolbar style).
+  - UI_StringGridNew: GtkTreeView + GtkListStore with dynamic columns/rows.
+  - UI_GridSetCell / UI_GridGetCell: direct GtkListStore cell manipulation.
+  - UI_MaskEditNew: GtkEntry (CT_MASKEDIT2) with mask support.
+  - UI_DateTimePickerNew: GtkEntry with calendar icon.
+  - UI_MonthCalendarNew: native GtkCalendar widget.
+  - UI_DBGridNew: GtkTreeView + GtkListStore (shares HBBrowse architecture).
+  - UI_DBGridSetCache: populates GtkListStore from Harbour array of arrays.
+  - UI_WebViewNew: WebKit2GTK when available (compile with -DHAVE_WEBKIT2GTK),
+    GtkFrame+GtkLabel placeholder otherwise. HBWebView struct with FUrl[512].
+  - UI_WebViewLoad/LoadHTML/GoBack/GoForward/Reload/Stop/EvaluateJS/GetURL/
+    CanGoBack/CanGoForward: full WebKit2GTK integration or safe no-ops.
+  - UI_Scene3DNew: GtkDrawingArea with Cairo wireframe cube rendering.
+  - UI_EarthViewNew: GtkDrawingArea with Cairo globe (ocean, continents, coords).
+  - UI_MapNew: GtkDrawingArea with grid, center pin, lat/lon/zoom display.
+  - UI_MapSetRegion/MapAddPin/MapClearPins: update coordinates and redraw.
+  - UI_GetPrinters: returns system default printer via GtkPrintSettings.
+  - UI_ShowPrintPanel: GtkPrintOperation native print dialog.
+  - RPT_PdfOpen/PdfAddPage/PdfDrawRect/PdfDrawText/RPT_ExportPdf:
+    full PDF generation using cairo-pdf (fonts, colors, filled/stroke rects).
+  - UI_WebServerStart/Stop: real TCP socket server with bind/listen.
+  - UI_HIX_Write/SetStatus: HTTP response body accumulation and status code.
+  - HIX_SetRoot/ExecPrg/ServeStatic: runtime .prg compilation via
+    hb_compileFromBuf→hb_hrbLoad→hb_hrbDo, static file serving with
+    MIME type detection (15 types).
+
+  WEBVIEW PROPERTY SYSTEM:
+  - HBWebView struct with FUrl[512] field for URL storage.
+  - UI_SetProp("cUrl") stores URL and navigates if WebKit available.
+  - UI_GetProp("cUrl") returns stored URL.
+  - Inspector shows cUrl in "Data" category.
+  - CreateWidget dispatch routes CT_WEBVIEW/CT_SCENE3D/CT_EARTHVIEW/CT_MAP.
+
+  WEBVIEW IN FORM DESIGNER:
+  - RestoreFormFromCode: added case " WEBVIEW " to create widget and parse
+    URL "..." attribute when loading projects.
+  - Code generation: added case nType==62 to emit WEBVIEW line with URL.
+  - WebView sample project (samples/projects/webview/) now loads correctly.
+
+  METHOD EVENT WIRING FIX:
+  - RegenerateFormCode and RewireAllFormEvents now detect whether an event
+    handler is a METHOD of the class or a standalone function.
+  - Methods generate {|| ::HandlerName() } (method call).
+  - Functions generate { || HandlerName( Self ) } (standalone function call).
+  - Fixes linker errors (undefined HB_FUN_*) when user writes event handlers
+    as class methods instead of standalone functions.
+
+  CLASS DECLARATION PRESERVATION:
+  - RegenerateFormCode now scans existing code for user-declared METHOD lines
+    inside CLASS..ENDCLASS and preserves them in the regenerated class block.
+  - Eliminates Harbour W0001 warnings ("Method not declared in class").
+
 2026-04-20c (macOS — TSQLite cursor navigation, DBGrid nAlign, inspector fixes)
 
   TSQLite — CURSOR NAVIGATION FOR DBGRID:

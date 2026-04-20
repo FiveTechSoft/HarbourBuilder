@@ -29,6 +29,8 @@ static cCurrentFile  // Current file path (empty = untitled)
 // Each entry: { cName, oForm, cCode, nFormX, nFormY }
 static aForms        // Array of form entries
 static nActiveForm   // Index of active form (1-based)
+static aModules      // Array of project modules: { { cName, cCode, cFilePath }, ... }
+static aOpenFiles    // Array of open files (not in project): { { cName, cCode, cFilePath }, ... }
 static oTB2          // Debug toolbar (for highlighting Debug button)
 static aDbgOffsets   // line offset tracking for debug_main.prg sections
 static lSyncingFromCode := .f.  // Guard: prevents re-entrant loop when syncing code→form
@@ -45,6 +47,8 @@ function Main()
    cCurrentFile := ""
    aForms := {}
    nActiveForm := 0
+   aModules := {}
+   aOpenFiles := {}
 
    // C++Builder classic proportions scaled to current screen
    nBarH    := 72                            // toolbar(36) + tabs(24) + margins(12)
@@ -78,9 +82,12 @@ function Main()
    DEFINE POPUP oFile PROMPT "File" OF oIDE
    MENUITEM "New Application" OF oFile ACTION TBNew()               ACCEL "n"
    MENUITEM "New Form"        OF oFile ACTION MenuNewForm()
+   MENUITEM "Add Module..."   OF oFile ACTION MenuAddModule()
    MENUSEPARATOR OF oFile
-   MENUITEM "Open..."    OF oFile ACTION TBOpen()                   ACCEL "o"
+   MENUITEM "Open Project..." OF oFile ACTION TBOpen()              ACCEL "o"
    MENUITEM "Reopen Last Project" OF oFile ACTION ReopenLastProject()
+   MENUITEM "Open File..."    OF oFile ACTION MenuOpenFile()
+   MENUITEM "Close File"      OF oFile ACTION MenuCloseFile()
    MENUITEM "Save"       OF oFile ACTION TBSave()                   ACCEL "s"
    MENUITEM "Save As..." OF oFile ACTION TBSaveAs()
    MENUSEPARATOR OF oFile
@@ -171,11 +178,13 @@ function Main()
 
    UI_MenuSetBitmapByPos( oFile:hPopup, 0, cIcoDir + "menu_new.png" )
    UI_MenuSetBitmapByPos( oFile:hPopup, 1, cIcoDir + "menu_new_form.png" )
-   UI_MenuSetBitmapByPos( oFile:hPopup, 3, cIcoDir + "menu_open.png" )
-   UI_MenuSetBitmapByPos( oFile:hPopup, 4, cIcoDir + "menu_open.png" )   // Reopen Last
-   UI_MenuSetBitmapByPos( oFile:hPopup, 5, cIcoDir + "menu_save.png" )
-   UI_MenuSetBitmapByPos( oFile:hPopup, 6, cIcoDir + "menu_saveas.png" )
-   UI_MenuSetBitmapByPos( oFile:hPopup, 8, cIcoDir + "menu_exit.png" )
+   UI_MenuSetBitmapByPos( oFile:hPopup, 2, cIcoDir + "menu_project_add.png" )  // Add Module
+   UI_MenuSetBitmapByPos( oFile:hPopup, 4, cIcoDir + "menu_open.png" )         // Open Project
+   UI_MenuSetBitmapByPos( oFile:hPopup, 5, cIcoDir + "menu_open.png" )         // Reopen Last
+   UI_MenuSetBitmapByPos( oFile:hPopup, 6, cIcoDir + "menu_open.png" )         // Open File
+   UI_MenuSetBitmapByPos( oFile:hPopup, 8, cIcoDir + "menu_save.png" )
+   UI_MenuSetBitmapByPos( oFile:hPopup, 9, cIcoDir + "menu_saveas.png" )
+   UI_MenuSetBitmapByPos( oFile:hPopup, 11, cIcoDir + "menu_exit.png" )
 
    UI_MenuSetBitmapByPos( oEdit:hPopup, 0, cIcoDir + "menu_undo.png" )
    UI_MenuSetBitmapByPos( oEdit:hPopup, 1, cIcoDir + "menu_redo.png" )
@@ -615,6 +624,7 @@ static function RegenerateFormCode( cName, hForm )
    local cExistingCode, aEvents, j, cEvName, cEvSuffix, cHandlerName
    local cVal, aHdrs, kk, nColCount, aColProps, nColW, nCtrlClr, nInterval
    local aCtrlMap := {}, cOf, hOwner, nPg, kk2, nLen0, cSlice
+   local aExLines, lInClass, cExLine
 
    // Read existing code to find declared event handlers
    cExistingCode := ""
@@ -772,6 +782,15 @@ static function RegenerateFormCode( cName, hForm )
                if ! Empty( cVal )
                   cCreate += '   ::o' + cCtrlName + ':cDataSource := "' + cVal + '"' + e
                endif
+            case nType == 62  // WebView
+               cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
+                  ' WEBVIEW ::o' + cCtrlName + ' OF Self SIZE ' + ;
+                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH))
+               cVal := UI_GetProp( hCtrl, "cUrl" )
+               if ! Empty( cVal )
+                  cCreate += ' URL "' + cVal + '"'
+               endif
+               cCreate += e
             otherwise
                if nType >= CT_TIMER  // Non-visual component
                   cCreate += '   COMPONENT ::o' + cCtrlName + ' TYPE CT_' + ;
@@ -839,8 +858,14 @@ static function RegenerateFormCode( cName, hForm )
             cEvSuffix := SubStr( cEvName, 3 )  // "Click", "Change"...
             cHandlerName := cCtrlName + cEvSuffix
             if cHandlerName $ cExistingCode
-               cEvents += "   ::o" + cCtrlName + ":" + cEvName + ;
-                  " := { || " + cHandlerName + "( Self ) }" + e
+               // Check if handler is a METHOD of the class or a standalone function
+               if ( "METHOD " + cHandlerName ) $ cExistingCode
+                  cEvents += "   ::o" + cCtrlName + ":" + cEvName + ;
+                     " := {|| ::" + cHandlerName + "() }" + e
+               else
+                  cEvents += "   ::o" + cCtrlName + ":" + cEvName + ;
+                     " := { || " + cHandlerName + "( Self ) }" + e
+               endif
             endif
          next
       next
@@ -875,6 +900,29 @@ static function RegenerateFormCode( cName, hForm )
    cCode += "   // Event handlers" + e
    cCode += e
    cCode += "   METHOD CreateForm()" + e
+
+   // Preserve user-declared METHOD lines from existing code
+   if ! Empty( cExistingCode )
+      aExLines := HB_ATokens( cExistingCode, Chr(10) )
+      lInClass := .F.
+      for j := 1 to Len( aExLines )
+         cExLine := AllTrim( StrTran( aExLines[j], Chr(13), "" ) )
+         if Upper( Left( cExLine, 6 ) ) == "CLASS " .and. Upper( cClass ) $ Upper( cExLine )
+            lInClass := .T.
+            loop
+         endif
+         if lInClass
+            if Upper( Left( cExLine, 8 ) ) == "ENDCLASS"
+               exit
+            endif
+            if Upper( Left( cExLine, 7 ) ) == "METHOD " .and. ;
+               ! ( "CREATEFORM" $ Upper( cExLine ) )
+               cCode += "   " + cExLine + e
+            endif
+         endif
+      next
+   endif
+
    cCode += e
    cCode += "ENDCLASS" + e
    cCode += cSep
@@ -1006,8 +1054,27 @@ function INS_GetAllCode()
       cAll += aForms[i][3]  // Form code from memory
       cAll += CodeEditorGetTabText( hCodeEditor, i + 1 )  // Editor tab
    next
+   for i := 1 to Len( aModules )
+      cAll += CodeEditorGetTabText( hCodeEditor, 1 + Len(aForms) + i )
+   next
 
 return cAll
+
+// Determine what kind of tab is at position nTab
+static function TabInfo( nTab )
+
+   local nF := Len( aForms )
+   local nM := Len( aModules )
+
+   if nTab == 1
+      return { "project", 0 }
+   elseif nTab <= nF + 1
+      return { "form", nTab - 1 }
+   elseif nTab <= nF + nM + 1
+      return { "module", nTab - nF - 1 }
+   endif
+
+return { "openfile", nTab - nF - nM - 1 }
 
 static function OnEventDblClick( hCtrl, cEvent )
 
@@ -1258,8 +1325,13 @@ static function RewireAllFormEvents()
             cEvSuffix := SubStr( cEvName, 3 )
             cHandlerName := cCtrlName + cEvSuffix
             if cHandlerName $ cCode
-               cEvents += "   ::o" + cCtrlName + ":" + cEvName + ;
-                  " := { || " + cHandlerName + "( Self ) }" + e
+               if ( "METHOD " + cHandlerName ) $ cCode
+                  cEvents += "   ::o" + cCtrlName + ":" + cEvName + ;
+                     " := {|| ::" + cHandlerName + "() }" + e
+               else
+                  cEvents += "   ::o" + cCtrlName + ":" + cEvName + ;
+                     " := { || " + cHandlerName + "( Self ) }" + e
+               endif
             endif
          next
       next
@@ -1457,6 +1529,108 @@ static function MenuViewForms()
 
 return nil
 
+// Add a standalone .prg module to the project
+static function MenuAddModule()
+
+   local cFile, cName, cCode, i, nTabPos
+
+   cFile := GTK_OpenFileDialog( "Add Module to Project", "prg" )
+   if Empty( cFile ); return nil; endif
+
+   cName := SubStr( cFile, RAt( "/", cFile ) + 1 )
+   if "." $ cName
+      cName := Left( cName, At( ".", cName ) - 1 )
+   endif
+
+   // Check duplicates in forms and modules
+   for i := 1 to Len( aForms )
+      if Lower( aForms[i][1] ) == Lower( cName )
+         MsgInfo( cName + " is already in the project (as a form)" )
+         return nil
+      endif
+   next
+   for i := 1 to Len( aModules )
+      if Lower( aModules[i][1] ) == Lower( cName )
+         MsgInfo( cName + " is already in the project (as a module)" )
+         return nil
+      endif
+   next
+
+   cCode := hb_MemoRead( cFile )
+   if Empty( cCode )
+      cCode := "// " + cName + ".prg" + Chr(10)
+   endif
+
+   AAdd( aModules, { cName, cCode, cFile } )
+
+   nTabPos := 1 + Len( aForms ) + Len( aModules )
+   CodeEditorAddTab( hCodeEditor, cName + ".prg" )
+   CodeEditorSetTabText( hCodeEditor, nTabPos, cCode )
+   CodeEditorSelectTab( hCodeEditor, nTabPos )
+
+return nil
+
+// Open a .prg file for viewing/editing (not added to project)
+static function MenuOpenFile()
+
+   local cFile, cName, cCode, i, nTabPos
+
+   cFile := GTK_OpenFileDialog( "Open File", "prg" )
+   if Empty( cFile ); return nil; endif
+
+   cName := SubStr( cFile, RAt( "/", cFile ) + 1 )
+   if "." $ cName
+      cName := Left( cName, At( ".", cName ) - 1 )
+   endif
+
+   // Check if already open
+   for i := 1 to Len( aOpenFiles )
+      if Lower( aOpenFiles[i][3] ) == Lower( cFile )
+         CodeEditorSelectTab( hCodeEditor, 1 + Len(aForms) + Len(aModules) + i )
+         return nil
+      endif
+   next
+
+   cCode := hb_MemoRead( cFile )
+   if Empty( cCode )
+      MsgInfo( "Could not read file: " + cFile )
+      return nil
+   endif
+
+   AAdd( aOpenFiles, { cName, cCode, cFile } )
+
+   nTabPos := 1 + Len( aForms ) + Len( aModules ) + Len( aOpenFiles )
+   CodeEditorAddTab( hCodeEditor, cName + ".prg" )
+   CodeEditorSetTabText( hCodeEditor, nTabPos, cCode )
+   CodeEditorSelectTab( hCodeEditor, nTabPos )
+
+return nil
+
+// Close the current open-file tab (only for open files, not forms/modules)
+static function MenuCloseFile()
+
+   local nTab, aInfo, nIdx
+
+   nTab := CodeEditorGetActiveTab( hCodeEditor )
+   aInfo := TabInfo( nTab )
+
+   if aInfo[1] != "openfile"
+      MsgInfo( "Only open files can be closed. Use 'Remove from Project' for forms and modules." )
+      return nil
+   endif
+
+   nIdx := aInfo[2]
+   if nIdx < 1 .or. nIdx > Len( aOpenFiles )
+      return nil
+   endif
+
+   CodeEditorRemoveTab( hCodeEditor, nTab )
+
+   ADel( aOpenFiles, nIdx )
+   ASize( aOpenFiles, Len(aOpenFiles) - 1 )
+
+return nil
+
 static function DestroyAllForms()
 
    local i
@@ -1479,6 +1653,8 @@ static function TBNew()
    next
    aForms := {}
    nActiveForm := 0
+   aModules := {}
+   aOpenFiles := {}
 
    nInsW := Int( nScreenW * 0.18 ) + 20
    nInsTop := GTK_GetWindowBottom( oIDE:hCpp )
@@ -1698,6 +1874,16 @@ static function RestoreFormFromCode( hForm, cCode )
             hCtrl := UI_RadioButtonNew( hForm, cText, nL, nT, nW, nH )
          case " MEMO " $ Upper( cTrim )
             hCtrl := UI_MemoNew( hForm, "", nL, nT, nW, nH )
+         case " WEBVIEW " $ Upper( cTrim )
+            hCtrl := UI_WebViewNew( hForm, nL, nT, nW, nH )
+            // Extract URL "..."
+            nPos := At( 'URL "', cTrim )
+            if nPos > 0 .and. hCtrl != 0
+               nPos2 := At( '"', SubStr( cTrim, nPos + 5 ) )
+               if nPos2 > 0
+                  UI_SetProp( hCtrl, "cUrl", SubStr( cTrim, nPos + 5, nPos2 - 1 ) )
+               endif
+            endif
          case " BROWSE " $ Upper( cTrim )
             hCtrl := UI_BrowseNew( hForm, nL, nT, nW, nH )
             // Extract HEADERS "col1", "col2", "col3"
@@ -1820,7 +2006,7 @@ return nil
 
 static function OpenProjectFile( cFile )
 
-   local cContent, cDir, aLines, i
+   local cContent, cDir, aLines, i, lInModules
    local cFormName, cFormCode, nFormX, nFormY
    local nInsW, nInsTop, nEditorTop, nEditorX, nEditorW, nEditorH
 
@@ -1837,6 +2023,8 @@ static function OpenProjectFile( cFile )
    next
    aForms := {}
    nActiveForm := 0
+   aModules := {}
+   aOpenFiles := {}
 
    CodeEditorClearTabs( hCodeEditor )
 
@@ -1862,6 +2050,7 @@ static function OpenProjectFile( cFile )
    for i := 2 to Len( aLines )
       cFormName := AllTrim( aLines[i] )
       if Empty( cFormName ); loop; endif
+      if Lower( cFormName ) == "[modules]"; exit; endif
 
       cFormCode := MemoRead( cDir + cFormName + ".prg" )
       if Empty( cFormCode ); loop; endif
@@ -1883,6 +2072,25 @@ static function OpenProjectFile( cFile )
          { |hCtrl| OnDesignSelChange( hCtrl ) } )
       UI_FormOnComponentDrop( oDesignForm:hCpp, ;
          { |hForm, nType, nL, nT, nW, nH| OnComponentDrop( hForm, nType, nL, nT, nW, nH ) } )
+   next
+
+   // Load modules
+   aModules := {}
+   lInModules := .F.
+   for i := 2 to Len( aLines )
+      cFormName := AllTrim( aLines[i] )
+      if Empty( cFormName ); loop; endif
+      if Lower( cFormName ) == "[modules]"
+         lInModules := .T.
+         loop
+      endif
+      if lInModules
+         cFormCode := MemoRead( cDir + cFormName + ".prg" )
+         if Empty( cFormCode ); loop; endif
+         AAdd( aModules, { cFormName, cFormCode, cDir + cFormName + ".prg" } )
+         CodeEditorAddTab( hCodeEditor, cFormName + ".prg" )
+         CodeEditorSetTabText( hCodeEditor, 1 + Len(aForms) + Len(aModules), cFormCode )
+      endif
    next
 
    lSyncingFromCode := .f.
@@ -1924,12 +2132,24 @@ static function TBSave()
    for i := 1 to Len( aForms )
       cHbp += aForms[i][1] + Chr(10)
    next
+   if Len( aModules ) > 0
+      cHbp += "[modules]" + Chr(10)
+      for i := 1 to Len( aModules )
+         cHbp += aModules[i][1] + Chr(10)
+      next
+   endif
    MemoWrit( cCurrentFile, cHbp )
 
    MemoWrit( cDir + "Project1.prg", CodeEditorGetTabText( hCodeEditor, 1 ) )
 
    for i := 1 to Len( aForms )
       MemoWrit( cDir + aForms[i][1] + ".prg", aForms[i][3] )
+   next
+
+   // Write each module .prg
+   for i := 1 to Len( aModules )
+      aModules[i][2] := CodeEditorGetTabText( hCodeEditor, 1 + Len(aForms) + i )
+      MemoWrit( cDir + aModules[i][1] + ".prg", aModules[i][2] )
    next
 
    AddRecentProject( cCurrentFile )
@@ -2038,6 +2258,9 @@ static function TBRun()
    for i := 1 to Len( aForms )
       cAllCode += aForms[i][3]
    next
+   for i := 1 to Len( aModules )
+      cAllCode += CodeEditorGetTabText( hCodeEditor, 1 + Len(aForms) + i )
+   next
    nHash := Len( cAllCode )
    for i := 1 to Min( Len( cAllCode ), 5000 )
       nHash := nHash + Asc( SubStr( cAllCode, i, 1 ) ) * i
@@ -2081,6 +2304,11 @@ static function TBRun()
       MemoWrit( cBuildDir + "/" + aForms[i][1] + ".prg", aForms[i][3] )
       cLog += "    " + aForms[i][1] + ".prg" + Chr(10)
    next
+   for i := 1 to Len( aModules )
+      aModules[i][2] := CodeEditorGetTabText( hCodeEditor, 1 + Len(aForms) + i )
+      MemoWrit( cBuildDir + "/" + aModules[i][1] + ".prg", aModules[i][2] )
+      cLog += "    " + aModules[i][1] + ".prg (module)" + Chr(10)
+   next
    GTK_ShellExec( "cp " + cProjDir + "/source/core/classes.prg " + cBuildDir + "/" )
    GTK_ShellExec( "cp " + cProjDir + "/include/hbbuilder.ch " + cBuildDir + "/" )
    GTK_ShellExec( "cp " + cProjDir + "/include/hbide.ch " + cBuildDir + "/" )
@@ -2093,6 +2321,11 @@ static function TBRun()
                        '#include "hbbuilder.ch"', "" ) + Chr(10)
    for i := 1 to Len( aForms )
       cAllPrg += MemoRead( cBuildDir + "/" + aForms[i][1] + ".prg" ) + Chr(10)
+   next
+   for i := 1 to Len( aModules )
+      cAllPrg += StrTran( StrTran( MemoRead( cBuildDir + "/" + aModules[i][1] + ".prg" ), ;
+                          '#include "classes.prg"', "" ), ;
+                          '#include "hbbuilder.ch"', "" ) + Chr(10)
    next
    MemoWrit( cBuildDir + "/main.prg", cAllPrg )
    MemoWrit( "/tmp/hbbuilder_debug_main.prg", cAllPrg )
@@ -2612,13 +2845,7 @@ return nil
 // === Components ===
 
 static function InstallComponent()
-   local cFile := GTK_OpenFileDialog( "Install Component (.prg)", "prg" )
-   local cName
-   if Empty( cFile ); return nil; endif
-   cName := SubStr( cFile, RAt( "/", cFile ) + 1 )
-   MsgInfo( "Component installed: " + cName + Chr(10) + Chr(10) + ;
-            "The component will be available in the palette" + Chr(10) + ;
-            "after restarting HbBuilder." )
+   MenuAddModule()
 return nil
 
 static function NewComponent()
@@ -2637,10 +2864,11 @@ static function NewComponent()
       "method Paint() class TMyComponent" + Chr(10) + ;
       "   ::Super:Paint()" + Chr(10) + ;
       "return nil" + Chr(10)
-   // Add as new tab in editor
+   // Add as module
+   AAdd( aModules, { "MyComponent", cCode, "" } )
    CodeEditorAddTab( hCodeEditor, "MyComponent.prg" )
-   CodeEditorSetTabText( hCodeEditor, Len(aForms) + 2, cCode )
-   CodeEditorSelectTab( hCodeEditor, Len(aForms) + 2 )
+   CodeEditorSetTabText( hCodeEditor, 1 + Len(aForms) + Len(aModules), cCode )
+   CodeEditorSelectTab( hCodeEditor, 1 + Len(aForms) + Len(aModules) )
 return nil
 
 // === AI Assistant ===
@@ -2656,7 +2884,10 @@ static function ShowProjectInspector()
    local i
    AAdd( aItems, "Project1" )
    for i := 1 to Len( aForms )
-      AAdd( aItems, "  " + aForms[i][1] + ".prg" )
+      AAdd( aItems, "  " + aForms[i][1] + ".prg (Form)" )
+   next
+   for i := 1 to Len( aModules )
+      AAdd( aItems, "  " + aModules[i][1] + ".prg (Module)" )
    next
    AAdd( aItems, "  classes.prg" )
    AAdd( aItems, "  hbbuilder.ch" )
@@ -2666,59 +2897,54 @@ return nil
 // === Add/Remove from Project ===
 
 static function AddToProject()
-   local cFile := GTK_OpenFileDialog( "Add File to Project", "prg" )
-   local cName, cCode, i
-   if Empty( cFile ); return nil; endif
-   cName := SubStr( cFile, RAt( "/", cFile ) + 1 )
-   // Remove extension
-   if "." $ cName
-      cName := Left( cName, At( ".", cName ) - 1 )
-   endif
-   // Check if already in project
-   for i := 1 to Len( aForms )
-      if Lower( aForms[i][1] ) == Lower( cName )
-         MsgInfo( cName + " is already in the project" )
-         return nil
-      endif
-   next
-   // Read file and add as new form tab
-   cCode := MemoRead( cFile )
-   if Empty( cCode )
-      cCode := "// " + cName + ".prg" + Chr(10)
-   endif
-   // Add to project (as code-only unit, no visual form)
-   CodeEditorAddTab( hCodeEditor, cName + ".prg" )
-   CodeEditorSetTabText( hCodeEditor, Len(aForms) + 2, cCode )
-   CodeEditorSelectTab( hCodeEditor, Len(aForms) + 2 )
-   CodeEditorSetTabText( hCodeEditor, 1, GenerateProjectCode() )
+   MenuAddModule()
 return nil
 
 static function RemoveFromProject()
+
    local aNames := {}, i, nSel
-   if Len( aForms ) <= 1
-      MsgInfo( "Cannot remove the last form" )
+
+   for i := 1 to Len( aForms )
+      AAdd( aNames, aForms[i][1] + ".prg (Form)" )
+   next
+   for i := 1 to Len( aModules )
+      AAdd( aNames, aModules[i][1] + ".prg (Module)" )
+   next
+
+   if Len( aNames ) == 0
+      MsgInfo( "No items to remove" )
       return nil
    endif
-   for i := 1 to Len( aForms )
-      AAdd( aNames, aForms[i][1] + ".prg" )
-   next
+
    nSel := GTK_SelectFromList( "Remove from Project", aNames )
-   if nSel > 0 .and. nSel <= Len( aForms )
+   if nSel < 1; return nil; endif
+
+   if nSel <= Len( aForms )
+      // Removing a form
+      if Len( aForms ) <= 1 .and. Len( aModules ) == 0
+         MsgInfo( "Cannot remove the last item from the project" )
+         return nil
+      endif
       aForms[nSel][2]:Destroy()
+      CodeEditorRemoveTab( hCodeEditor, nSel + 1 )
       ADel( aForms, nSel )
       ASize( aForms, Len(aForms) - 1 )
       if nActiveForm > Len( aForms )
-         nActiveForm := Len( aForms )
+         nActiveForm := Max( Len( aForms ), 1 )
       endif
-      // Rebuild editor tabs
-      CodeEditorClearTabs( hCodeEditor )
-      CodeEditorSetTabText( hCodeEditor, 1, GenerateProjectCode() )
-      for i := 1 to Len( aForms )
-         CodeEditorAddTab( hCodeEditor, aForms[i][1] + ".prg" )
-         CodeEditorSetTabText( hCodeEditor, i + 1, aForms[i][3] )
-      next
-      SwitchToForm( nActiveForm )
+      if nActiveForm > 0 .and. Len( aForms ) > 0
+         SwitchToForm( nActiveForm )
+      endif
+   else
+      // Removing a module
+      i := nSel - Len( aForms )
+      CodeEditorRemoveTab( hCodeEditor, 1 + Len(aForms) + i )
+      ADel( aModules, i )
+      ASize( aModules, Len(aModules) - 1 )
    endif
+
+   CodeEditorSetTabText( hCodeEditor, 1, GenerateProjectCode() )
+
 return nil
 
 // === Environment Options ===

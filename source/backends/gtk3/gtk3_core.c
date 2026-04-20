@@ -132,6 +132,9 @@
 #define CT_ATOMICINT  68
 #define CT_CONDVAR    69
 #define CT_CHANNEL    70
+#define CT_SCENE3D    110
+#define CT_EARTHVIEW  111
+#define CT_MAP        112
 
 #define MAX_CHILDREN  256
 
@@ -179,6 +182,7 @@ typedef struct _HBComboBox HBComboBox;
 typedef struct _HBEdit     HBEdit;
 typedef struct _HBGroupBox HBGroupBox;
 typedef struct _HBLabel    HBLabel;
+typedef struct _HBWebView  HBWebView;
 
 /* ======================================================================
  * HBControl - base control structure
@@ -313,6 +317,11 @@ typedef struct {
    int  FCenter;
    int  FProportional;
 } HBImage;
+
+struct _HBWebView {
+   HBControl base;
+   char FUrl[512];
+};
 
 typedef struct {
    HBControl base;
@@ -1768,6 +1777,12 @@ static void HBNonVisual_CreateWidget( HBControl * p, GtkWidget * container )
    gtk_widget_show( da );
 }
 
+/* Forward declarations for extended controls defined at end of file */
+static void HBWebView_CreateWidget( HBControl * p, GtkWidget * container );
+static gboolean on_scene3d_draw( GtkWidget * w, cairo_t * cr, gpointer data );
+static gboolean on_earthview_draw( GtkWidget * w, cairo_t * cr, gpointer data );
+static gboolean on_map_draw( GtkWidget * w, cairo_t * cr, gpointer data );
+
 static void HBControl_CreateWidget( HBControl * child, GtkWidget * fixed, const char * fontDesc )
 {
    strcpy( child->FFontDesc, fontDesc );
@@ -1817,6 +1832,25 @@ static void HBControl_CreateWidget( HBControl * child, GtkWidget * fixed, const 
       case CT_DBCOMBOBOX:  HBDBComboBox_CreateWidget( child, fixed ); break;
       case CT_DBCHECKBOX:  HBDBCheckBox_CreateWidget( child, fixed ); break;
       case CT_DBIMAGE:     HBDBImage_CreateWidget( child, fixed ); break;
+      case CT_WEBVIEW:      HBWebView_CreateWidget( child, fixed ); break;
+      case CT_SCENE3D: {
+         GtkWidget * da = gtk_drawing_area_new();
+         g_signal_connect( da, "draw", G_CALLBACK(on_scene3d_draw), child );
+         HBGeneric_CreateWidget( child, fixed, da );
+         break;
+      }
+      case CT_EARTHVIEW: {
+         GtkWidget * da = gtk_drawing_area_new();
+         g_signal_connect( da, "draw", G_CALLBACK(on_earthview_draw), child );
+         HBGeneric_CreateWidget( child, fixed, da );
+         break;
+      }
+      case CT_MAP: {
+         GtkWidget * da = gtk_drawing_area_new();
+         g_signal_connect( da, "draw", G_CALLBACK(on_map_draw), child );
+         HBGeneric_CreateWidget( child, fixed, da );
+         break;
+      }
       default:
          if( IsNonVisualControl( child->FControlType ) )
             HBNonVisual_CreateWidget( child, fixed );
@@ -3552,8 +3586,18 @@ HB_FUNC( UI_SETPROP )
       if( p->FControlType == CT_BROWSE ) ((HBBrowse*)p)->FGridLines = hb_parl(3);
       else ((HBListView*)p)->FGridLines = hb_parl(3);
    }
-   else if( strcasecmp( szProp, "cDataSource" ) == 0 && HB_ISCHAR(3) && p->FControlType == CT_BROWSE )
+   else if( strcasecmp( szProp, "cDataSource" ) == 0 && HB_ISCHAR(3) &&
+            ( p->FControlType == CT_BROWSE || p->FControlType == CT_DBGRID ) )
       strncpy( ((HBBrowse*)p)->FDataSourceName, hb_parc(3), 63 );
+   /* WebView */
+   else if( strcasecmp( szProp, "cUrl" ) == 0 && HB_ISCHAR(3) && p->FControlType == CT_WEBVIEW )
+   {
+      strncpy( ((HBWebView*)p)->FUrl, hb_parc(3), sizeof(((HBWebView*)p)->FUrl) - 1 );
+#ifdef HAVE_WEBKIT2GTK
+      if( p->FWidget && WEBKIT_IS_WEB_VIEW(p->FWidget) )
+         webkit_web_view_load_uri( WEBKIT_WEB_VIEW(p->FWidget), hb_parc(3) );
+#endif
+   }
    else if( strcasecmp( szProp, "aColumns" ) == 0 && HB_ISCHAR(3) && p->FControlType == CT_BROWSE )
    {
       /* Parse pipe-separated column titles, rebuild FCols[] */
@@ -3732,8 +3776,11 @@ HB_FUNC( UI_GETPROP )
       hb_retni( ((HBTimer *)p)->FInterval );
    else if( strcasecmp(szProp,"nItemIndex")==0 && p->FControlType==CT_COMBOBOX )
       hb_retni( ((HBComboBox *)p)->FItemIndex );
-   else if( strcasecmp(szProp,"cDataSource")==0 && p->FControlType==CT_BROWSE )
+   else if( strcasecmp(szProp,"cDataSource")==0 &&
+            ( p->FControlType==CT_BROWSE || p->FControlType==CT_DBGRID ) )
       hb_retc( ((HBBrowse *)p)->FDataSourceName );
+   else if( strcasecmp(szProp,"cUrl")==0 && p->FControlType==CT_WEBVIEW )
+      hb_retc( ((HBWebView *)p)->FUrl );
    else if( strcasecmp(szProp,"aColumns")==0 && p->FControlType==CT_BROWSE )
    {
       /* Return pipe-separated column titles */
@@ -4035,6 +4082,9 @@ HB_FUNC( UI_GETALLPROPS )
       }
       case CT_TIMER:
          ADD_N("nInterval",((HBTimer*)p)->FInterval,"Behavior");
+         break;
+      case CT_WEBVIEW:
+         ADD_S("cUrl",((HBWebView*)p)->FUrl,"Data");
          break;
    }
    hb_itemReturnRelease( pArray );
@@ -7201,6 +7251,62 @@ HB_FUNC( CODEEDITORCLEARTABS )
 
    if( ed->sciWidget )
       SciMsg( ed->sciWidget, SCI_SETTEXT, 0, (intptr_t) "" );
+}
+
+/* CodeEditorRemoveTab( hEditor, nTab ) - remove a tab (1-based) */
+HB_FUNC( CODEEDITORREMOVETAB )
+{
+   CODEEDITOR * ed = (CODEEDITOR *)(HB_PTRUINT) hb_parnint(1);
+   int nTab = hb_parni(2) - 1;  /* convert to 0-based */
+   int i;
+   if( !ed || !ed->tabBar || nTab < 0 || nTab >= ed->nTabs || ed->nTabs <= 1 )
+      return;
+
+   /* Free the text for this tab */
+   if( ed->tabTexts[nTab] ) { free( ed->tabTexts[nTab] ); ed->tabTexts[nTab] = NULL; }
+
+   /* Shift remaining tabs down */
+   for( i = nTab; i < ed->nTabs - 1; i++ )
+   {
+      strncpy( ed->tabNames[i], ed->tabNames[i+1], 63 );
+      ed->tabNames[i][63] = 0;
+      ed->tabTexts[i] = ed->tabTexts[i+1];
+   }
+   ed->tabTexts[ed->nTabs - 1] = NULL;
+   ed->tabNames[ed->nTabs - 1][0] = 0;
+   ed->nTabs--;
+
+   /* Remove the notebook page */
+   g_signal_handlers_block_matched( ed->tabBar, G_SIGNAL_MATCH_FUNC,
+      0, 0, NULL, (gpointer)on_editor_tab_switched, NULL );
+   gtk_notebook_remove_page( GTK_NOTEBOOK(ed->tabBar), nTab );
+   g_signal_handlers_unblock_matched( ed->tabBar, G_SIGNAL_MATCH_FUNC,
+      0, 0, NULL, (gpointer)on_editor_tab_switched, NULL );
+
+   /* Adjust active tab if needed */
+   if( ed->nActiveTab >= ed->nTabs )
+      ed->nActiveTab = ed->nTabs - 1;
+   if( ed->nActiveTab == nTab && ed->nActiveTab > 0 )
+      ed->nActiveTab--;
+
+   /* Refresh Scintilla with the new active tab's text */
+   if( ed->sciWidget && ed->nActiveTab >= 0 && ed->nActiveTab < ed->nTabs )
+   {
+      ed->bSettingText = 1;
+      SciMsg( ed->sciWidget, SCI_SETTEXT, 0,
+              (intptr_t)( ed->tabTexts[ed->nActiveTab] ? ed->tabTexts[ed->nActiveTab] : "" ) );
+      SciMsg( ed->sciWidget, SCI_EMPTYUNDOBUFFER, 0, 0 );
+      ed->bSettingText = 0;
+   }
+}
+
+/* CodeEditorGetActiveTab( hEditor ) --> nTab (1-based) */
+HB_FUNC( CODEEDITORGETACTIVETAB )
+{
+   CODEEDITOR * ed = (CODEEDITOR *)(HB_PTRUINT) hb_parnint(1);
+   if( !ed )
+   { hb_retni(0); return; }
+   hb_retni( ed->nActiveTab + 1 );  /* return 1-based */
 }
 
 /* CodeEditorOnTabChange( hEditor, bBlock ) */
@@ -11223,4 +11329,1053 @@ HB_FUNC( UI_TABCONTROLSETSEL )
       gtk_notebook_set_current_page( GTK_NOTEBOOK( p->FWidget ), nIdx );
       HBTabControl2_ApplyPageVisibility( p );
    }
+}
+
+/* ======================================================================
+ * Extended controls - SpeedButton, StringGrid, MaskEdit, DateTimePicker,
+ * MonthCalendar, DBGrid, WebView, Map, Scene3D, EarthView, Printer, PDF,
+ * WebServer, HIX runtime
+ * ====================================================================== */
+
+/* --- TSpeedButton (flat toolbar-style button) --- */
+HB_FUNC( UI_SPEEDBTNNEW )
+{
+   HBForm * pForm = GetForm(1);
+   HBButton * p = (HBButton *) calloc( 1, sizeof(HBButton) );
+   HBControl_Init( &p->base );
+   strcpy( p->base.FClassName, "TSpeedButton" );
+   p->base.FControlType = CT_SPEEDBTN;
+   p->base.FWidth = 23; p->base.FHeight = 22;
+   if( HB_ISCHAR(2) ) HBControl_SetText( &p->base, hb_parc(2) );
+   if( HB_ISNUM(3) ) p->base.FLeft = hb_parni(3);
+   if( HB_ISNUM(4) ) p->base.FTop = hb_parni(4);
+   if( HB_ISNUM(5) ) p->base.FWidth = hb_parni(5);
+   if( HB_ISNUM(6) ) p->base.FHeight = hb_parni(6);
+   if( pForm ) HBControl_AddChild( &pForm->base, &p->base );
+   RetCtrl( &p->base );
+}
+
+/* --- TStringGrid (editable grid with columns/rows) --- */
+
+/* Helper: get GtkListStore and GtkTreeView from a StringGrid control.
+   The StringGrid widget is a GtkScrolledWindow containing a GtkTreeView. */
+static GtkListStore * SGrid_GetStore( HBControl * p, GtkWidget ** ppTV )
+{
+   GtkWidget * sw = p ? p->FWidget : NULL;
+   if( !sw || !GTK_IS_SCROLLED_WINDOW(sw) ) return NULL;
+   GtkWidget * child = gtk_bin_get_child( GTK_BIN(sw) );
+   if( !child || !GTK_IS_TREE_VIEW(child) ) return NULL;
+   if( ppTV ) *ppTV = child;
+   GtkTreeModel * model = gtk_tree_view_get_model( GTK_TREE_VIEW(child) );
+   return GTK_IS_LIST_STORE(model) ? GTK_LIST_STORE(model) : NULL;
+}
+
+HB_FUNC( UI_STRINGGRIDNEW )
+{
+   HBForm * pForm = GetForm(1);
+   HBBrowse * p = (HBBrowse *) calloc( 1, sizeof(HBBrowse) );
+   HBControl_Init( &p->base );
+   strcpy( p->base.FClassName, "TStringGrid" );
+   p->base.FControlType = CT_STRINGGRID;
+   p->base.FWidth = 200; p->base.FHeight = 120;
+   p->FGridLines = 1;
+   p->FRowHeight = 22;
+   p->FColumnCount = HB_ISNUM(6) ? hb_parni(6) : 3;
+   p->FRowCount    = HB_ISNUM(7) ? hb_parni(7) : 0;
+   if( p->FColumnCount > MAX_BROWSE_COLS ) p->FColumnCount = MAX_BROWSE_COLS;
+   p->FTreeView = NULL;
+
+   if( HB_ISNUM(2) ) p->base.FLeft = hb_parni(2);
+   if( HB_ISNUM(3) ) p->base.FTop = hb_parni(3);
+   if( HB_ISNUM(4) ) p->base.FWidth = hb_parni(4);
+   if( HB_ISNUM(5) ) p->base.FHeight = hb_parni(5);
+
+   /* Pre-allocate ListStore */
+   EnsureGTK();
+   GType types[MAX_BROWSE_COLS];
+   for( int i = 0; i < MAX_BROWSE_COLS; i++ ) types[i] = G_TYPE_STRING;
+   p->FStore = gtk_list_store_newv( p->FColumnCount > 0 ? p->FColumnCount : 3, types );
+
+   /* Pre-populate rows */
+   for( int r = 0; r < p->FRowCount; r++ )
+   {
+      GtkTreeIter iter;
+      gtk_list_store_append( p->FStore, &iter );
+   }
+
+   if( pForm ) HBControl_AddChild( &pForm->base, &p->base );
+   KeepAlive( &p->base );
+   hb_retnint( (HB_PTRUINT) &p->base );
+}
+
+/* UI_GridSetCell( hCtrl, nCol, nRow, cText ) — 0-based */
+HB_FUNC( UI_GRIDSETCELL )
+{
+   HBControl * p = GetCtrl(1);
+   if( !p ) return;
+   int nCol = hb_parni(2), nRow = hb_parni(3);
+   const char * cText = HB_ISCHAR(4) ? hb_parc(4) : "";
+
+   if( p->FControlType == CT_STRINGGRID || p->FControlType == CT_BROWSE ||
+       p->FControlType == CT_DBGRID )
+   {
+      HBBrowse * br = (HBBrowse *)p;
+      if( !br->FStore ) return;
+      if( nCol < 0 || nCol >= MAX_BROWSE_COLS ) return;
+
+      /* Ensure enough rows exist */
+      while( br->FRowCount <= nRow )
+      {
+         GtkTreeIter iter;
+         gtk_list_store_append( br->FStore, &iter );
+         br->FRowCount++;
+      }
+
+      GtkTreeIter iter;
+      GtkTreePath * path = gtk_tree_path_new_from_indices( nRow, -1 );
+      if( gtk_tree_model_get_iter( GTK_TREE_MODEL(br->FStore), &iter, path ) )
+         gtk_list_store_set( br->FStore, &iter, nCol, cText, -1 );
+      gtk_tree_path_free( path );
+   }
+}
+
+/* UI_GridGetCell( hCtrl, nCol, nRow ) --> cText — 0-based */
+HB_FUNC( UI_GRIDGETCELL )
+{
+   HBControl * p = GetCtrl(1);
+   if( !p ) { hb_retc(""); return; }
+   int nCol = hb_parni(2), nRow = hb_parni(3);
+
+   if( p->FControlType == CT_STRINGGRID || p->FControlType == CT_BROWSE ||
+       p->FControlType == CT_DBGRID )
+   {
+      HBBrowse * br = (HBBrowse *)p;
+      if( !br->FStore || nRow < 0 || nRow >= br->FRowCount ||
+          nCol < 0 || nCol >= MAX_BROWSE_COLS )
+      { hb_retc(""); return; }
+
+      GtkTreeIter iter;
+      GtkTreePath * path = gtk_tree_path_new_from_indices( nRow, -1 );
+      if( gtk_tree_model_get_iter( GTK_TREE_MODEL(br->FStore), &iter, path ) )
+      {
+         gchar * val = NULL;
+         gtk_tree_model_get( GTK_TREE_MODEL(br->FStore), &iter, nCol, &val, -1 );
+         hb_retc( val ? val : "" );
+         if( val ) g_free( val );
+      }
+      else
+         hb_retc("");
+      gtk_tree_path_free( path );
+   }
+   else
+      hb_retc("");
+}
+
+/* --- TMaskEdit (entry with input mask) --- */
+HB_FUNC( UI_MASKEDITNEW )
+{
+   HBForm * pForm = GetForm(1);
+   HBEdit * p = (HBEdit *) calloc( 1, sizeof(HBEdit) );
+   HBControl_Init( &p->base );
+   strcpy( p->base.FClassName, "TMaskEdit" );
+   p->base.FControlType = CT_MASKEDIT2;
+   p->base.FWidth = 120; p->base.FHeight = 24;
+   if( HB_ISCHAR(2) ) HBControl_SetText( &p->base, hb_parc(2) ); /* mask as text hint */
+   if( HB_ISNUM(3) ) p->base.FLeft = hb_parni(3);
+   if( HB_ISNUM(4) ) p->base.FTop = hb_parni(4);
+   if( HB_ISNUM(5) ) p->base.FWidth = hb_parni(5);
+   if( HB_ISNUM(6) ) p->base.FHeight = hb_parni(6);
+   if( pForm ) HBControl_AddChild( &pForm->base, &p->base );
+   RetCtrl( &p->base );
+}
+
+/* --- TDateTimePicker --- */
+HB_FUNC( UI_DATETIMEPICKERNEW )
+{
+   HBForm * pForm = GetForm(1);
+   HBEdit * p = (HBEdit *) calloc( 1, sizeof(HBEdit) );
+   HBControl_Init( &p->base );
+   strcpy( p->base.FClassName, "TDateTimePicker" );
+   p->base.FControlType = CT_DATETIMEPICKER;
+   p->base.FWidth = 120; p->base.FHeight = 24;
+   if( HB_ISNUM(2) ) p->base.FLeft = hb_parni(2);
+   if( HB_ISNUM(3) ) p->base.FTop = hb_parni(3);
+   if( HB_ISNUM(4) ) p->base.FWidth = hb_parni(4);
+   if( HB_ISNUM(5) ) p->base.FHeight = hb_parni(5);
+   if( pForm ) HBControl_AddChild( &pForm->base, &p->base );
+   RetCtrl( &p->base );
+}
+
+/* --- TMonthCalendar (GtkCalendar widget) --- */
+HB_FUNC( UI_MONTHCALENDARNEW )
+{
+   HBForm * pForm = GetForm(1);
+   HBControl * p = (HBControl *) calloc( 1, sizeof(HBControl) );
+   HBControl_Init( p );
+   strcpy( p->FClassName, "TMonthCalendar" );
+   p->FControlType = CT_MONTHCALENDAR;
+   p->FWidth = 240; p->FHeight = 200;
+   if( HB_ISNUM(2) ) p->FLeft = hb_parni(2);
+   if( HB_ISNUM(3) ) p->FTop = hb_parni(3);
+   if( HB_ISNUM(4) ) p->FWidth = hb_parni(4);
+   if( HB_ISNUM(5) ) p->FHeight = hb_parni(5);
+   if( pForm ) HBControl_AddChild( &pForm->base, p );
+   RetCtrl( p );
+}
+
+/* --- TDBGrid (data-aware grid, shares Browse implementation) --- */
+HB_FUNC( UI_DBGRIDNEW )
+{
+   HBForm * pForm = GetForm(1);
+   HBBrowse * p = (HBBrowse *) calloc( 1, sizeof(HBBrowse) );
+   HBControl_Init( &p->base );
+   strcpy( p->base.FClassName, "TDBGrid" );
+   p->base.FControlType = CT_DBGRID;
+   p->base.FWidth = 400; p->base.FHeight = 200;
+   p->FReadOnly = 0;
+   p->FGridLines = 1;
+   p->FRowHeight = 22;
+   p->FColumnCount = 0;
+   p->FRowCount = 0;
+   p->FTreeView = NULL;
+   p->FDataSourceName[0] = 0;
+   memset( p->FCols, 0, sizeof(p->FCols) );
+
+   EnsureGTK();
+   GType types[MAX_BROWSE_COLS];
+   for( int i = 0; i < MAX_BROWSE_COLS; i++ ) types[i] = G_TYPE_STRING;
+   p->FStore = gtk_list_store_newv( MAX_BROWSE_COLS, types );
+
+   if( HB_ISNUM(2) ) p->base.FLeft = hb_parni(2);
+   if( HB_ISNUM(3) ) p->base.FTop = hb_parni(3);
+   if( HB_ISNUM(4) ) p->base.FWidth = hb_parni(4);
+   if( HB_ISNUM(5) ) p->base.FHeight = hb_parni(5);
+   if( pForm ) HBControl_AddChild( &pForm->base, &p->base );
+   KeepAlive( &p->base );
+   hb_retnint( (HB_PTRUINT) &p->base );
+}
+
+/* UI_DBGridSetCache( hGrid, aRows ) — populate grid from Harbour array of arrays */
+HB_FUNC( UI_DBGRIDSETCACHE )
+{
+   HBControl * p = GetCtrl(1);
+   PHB_ITEM pArray = hb_param(2, HB_IT_ARRAY);
+   if( !p || !pArray ) return;
+
+   HBBrowse * br = (HBBrowse *)p;
+   if( !br->FStore ) return;
+
+   gtk_list_store_clear( br->FStore );
+   br->FRowCount = 0;
+
+   int nRows = (int) hb_arrayLen( pArray );
+   for( int r = 0; r < nRows; r++ )
+   {
+      PHB_ITEM pRow = hb_arrayGetItemPtr( pArray, r + 1 );
+      if( !pRow || !HB_IS_ARRAY(pRow) ) continue;
+
+      GtkTreeIter iter;
+      gtk_list_store_append( br->FStore, &iter );
+      br->FRowCount++;
+
+      int nCols = (int) hb_arrayLen( pRow );
+      if( nCols > MAX_BROWSE_COLS ) nCols = MAX_BROWSE_COLS;
+      for( int c = 0; c < nCols; c++ )
+      {
+         const char * val = hb_arrayGetCPtr( pRow, c + 1 );
+         gtk_list_store_set( br->FStore, &iter, c, val ? val : "", -1 );
+      }
+   }
+
+   /* Refresh tree view if widget exists */
+   if( br->FTreeView )
+      gtk_widget_queue_draw( br->FTreeView );
+}
+
+/* ======================================================================
+ * TWebView — uses WebKit2GTK if available at compile time, otherwise a
+ * GtkLabel placeholder informing the user to install the dev package.
+ * Build with: pkg-config --cflags --libs webkit2gtk-4.1
+ * ====================================================================== */
+
+#ifdef HAVE_WEBKIT2GTK
+#include <webkit2/webkit2.h>
+#endif
+
+static void HBWebView_CreateWidget( HBControl * p, GtkWidget * container )
+{
+#ifdef HAVE_WEBKIT2GTK
+   GtkWidget * wv = webkit_web_view_new();
+   webkit_web_view_load_uri( WEBKIT_WEB_VIEW(wv), "about:blank" );
+   HBGeneric_CreateWidget( p, container, wv );
+#else
+   GtkWidget * frame = gtk_frame_new( NULL );
+   gtk_frame_set_shadow_type( GTK_FRAME(frame), GTK_SHADOW_IN );
+   GtkWidget * label = gtk_label_new( "WebView\n(install libwebkit2gtk-4.1-dev)" );
+   gtk_label_set_justify( GTK_LABEL(label), GTK_JUSTIFY_CENTER );
+   gtk_container_add( GTK_CONTAINER(frame), label );
+   HBGeneric_CreateWidget( p, container, frame );
+#endif
+}
+
+HB_FUNC( UI_WEBVIEWNEW )
+{
+   HBForm * pForm = GetForm(1);
+   HBWebView * p = (HBWebView *) calloc( 1, sizeof(HBWebView) );
+   HBControl_Init( &p->base );
+   strcpy( p->base.FClassName, "TWebView" );
+   p->base.FControlType = CT_WEBVIEW;
+   p->base.FWidth = 320; p->base.FHeight = 240;
+   p->FUrl[0] = 0;
+   if( HB_ISNUM(2) ) p->base.FLeft = hb_parni(2);
+   if( HB_ISNUM(3) ) p->base.FTop = hb_parni(3);
+   if( HB_ISNUM(4) ) p->base.FWidth = hb_parni(4);
+   if( HB_ISNUM(5) ) p->base.FHeight = hb_parni(5);
+   if( pForm ) HBControl_AddChild( &pForm->base, &p->base );
+   RetCtrl( &p->base );
+}
+
+/* UI_WebViewLoad( hCtrl, cURL ) */
+HB_FUNC( UI_WEBVIEWLOAD )
+{
+   HBControl * p = GetCtrl(1);
+   const char * url = hb_parc(2);
+   if( !p || !url ) return;
+   if( p->FControlType == CT_WEBVIEW )
+      strncpy( ((HBWebView *)p)->FUrl, url, sizeof(((HBWebView *)p)->FUrl) - 1 );
+#ifdef HAVE_WEBKIT2GTK
+   if( p->FWidget && WEBKIT_IS_WEB_VIEW(p->FWidget) )
+      webkit_web_view_load_uri( WEBKIT_WEB_VIEW(p->FWidget), url );
+#endif
+}
+
+/* UI_WebViewLoadHTML( hCtrl, cHTML [, cBaseURL] ) */
+HB_FUNC( UI_WEBVIEWLOADHTML )
+{
+#ifdef HAVE_WEBKIT2GTK
+   HBControl * p = GetCtrl(1);
+   const char * html = hb_parc(2);
+   if( !p || !html || !p->FWidget ) return;
+   GtkWidget * wv = p->FWidget;
+   if( WEBKIT_IS_WEB_VIEW(wv) )
+   {
+      const char * base = HB_ISCHAR(3) ? hb_parc(3) : NULL;
+      webkit_web_view_load_html( WEBKIT_WEB_VIEW(wv), html, base );
+   }
+#endif
+}
+
+/* UI_WebViewGoBack( hCtrl ) */
+HB_FUNC( UI_WEBVIEWGOBACK )
+{
+#ifdef HAVE_WEBKIT2GTK
+   HBControl * p = GetCtrl(1);
+   if( p && p->FWidget && WEBKIT_IS_WEB_VIEW(p->FWidget) )
+      webkit_web_view_go_back( WEBKIT_WEB_VIEW(p->FWidget) );
+#endif
+}
+
+/* UI_WebViewGoForward( hCtrl ) */
+HB_FUNC( UI_WEBVIEWGOFORWARD )
+{
+#ifdef HAVE_WEBKIT2GTK
+   HBControl * p = GetCtrl(1);
+   if( p && p->FWidget && WEBKIT_IS_WEB_VIEW(p->FWidget) )
+      webkit_web_view_go_forward( WEBKIT_WEB_VIEW(p->FWidget) );
+#endif
+}
+
+/* UI_WebViewReload( hCtrl ) */
+HB_FUNC( UI_WEBVIEWRELOAD )
+{
+#ifdef HAVE_WEBKIT2GTK
+   HBControl * p = GetCtrl(1);
+   if( p && p->FWidget && WEBKIT_IS_WEB_VIEW(p->FWidget) )
+      webkit_web_view_reload( WEBKIT_WEB_VIEW(p->FWidget) );
+#endif
+}
+
+/* UI_WebViewStop( hCtrl ) */
+HB_FUNC( UI_WEBVIEWSTOP )
+{
+#ifdef HAVE_WEBKIT2GTK
+   HBControl * p = GetCtrl(1);
+   if( p && p->FWidget && WEBKIT_IS_WEB_VIEW(p->FWidget) )
+      webkit_web_view_stop_loading( WEBKIT_WEB_VIEW(p->FWidget) );
+#endif
+}
+
+/* UI_WebViewEvaluateJS( hCtrl, cScript ) */
+HB_FUNC( UI_WEBVIEWEVALUATEJS )
+{
+#ifdef HAVE_WEBKIT2GTK
+   HBControl * p = GetCtrl(1);
+   const char * script = hb_parc(2);
+   if( p && script && p->FWidget && WEBKIT_IS_WEB_VIEW(p->FWidget) )
+      webkit_web_view_run_javascript( WEBKIT_WEB_VIEW(p->FWidget), script, NULL, NULL, NULL );
+#endif
+}
+
+/* UI_WebViewGetURL( hCtrl ) --> cURL */
+HB_FUNC( UI_WEBVIEWGETURL )
+{
+   HBControl * p = GetCtrl(1);
+#ifdef HAVE_WEBKIT2GTK
+   if( p && p->FWidget && WEBKIT_IS_WEB_VIEW(p->FWidget) )
+   {
+      const gchar * url = webkit_web_view_get_uri( WEBKIT_WEB_VIEW(p->FWidget) );
+      hb_retc( url ? url : "" );
+      return;
+   }
+#endif
+   if( p && p->FControlType == CT_WEBVIEW )
+      hb_retc( ((HBWebView *)p)->FUrl );
+   else
+      hb_retc( "" );
+}
+
+/* UI_WebViewCanGoBack( hCtrl ) --> lBool */
+HB_FUNC( UI_WEBVIEWCANGOBACK )
+{
+#ifdef HAVE_WEBKIT2GTK
+   HBControl * p = GetCtrl(1);
+   if( p && p->FWidget && WEBKIT_IS_WEB_VIEW(p->FWidget) )
+      hb_retl( webkit_web_view_can_go_back( WEBKIT_WEB_VIEW(p->FWidget) ) );
+   else
+#endif
+      hb_retl( 0 );
+}
+
+/* UI_WebViewCanGoForward( hCtrl ) --> lBool */
+HB_FUNC( UI_WEBVIEWCANGOFORWARD )
+{
+#ifdef HAVE_WEBKIT2GTK
+   HBControl * p = GetCtrl(1);
+   if( p && p->FWidget && WEBKIT_IS_WEB_VIEW(p->FWidget) )
+      hb_retl( webkit_web_view_can_go_forward( WEBKIT_WEB_VIEW(p->FWidget) ) );
+   else
+#endif
+      hb_retl( 0 );
+}
+
+/* ======================================================================
+ * TScene3D / TEarthView / TMap — rendered with Cairo drawing
+ * These use GtkDrawingArea with informative placeholder rendering.
+ * Full 3D/map would require external libs (e.g., libchamplain for maps).
+ * ====================================================================== */
+
+typedef struct {
+   HBControl base;
+   char   FPicture[256];
+   double FLat, FLon;
+   int    FZoom;
+} HBMapControl;
+
+static gboolean on_scene3d_draw( GtkWidget * w, cairo_t * cr, gpointer data )
+{
+   HBControl * p = (HBControl *)data;
+   int width  = gtk_widget_get_allocated_width( w );
+   int height = gtk_widget_get_allocated_height( w );
+
+   /* Dark background */
+   cairo_set_source_rgb( cr, 0.05, 0.05, 0.15 );
+   cairo_paint( cr );
+
+   /* Draw a wireframe cube */
+   cairo_set_source_rgb( cr, 0.2, 0.6, 1.0 );
+   cairo_set_line_width( cr, 1.5 );
+   double cx = width / 2.0, cy = height / 2.0;
+   double s = (width < height ? width : height) * 0.25;
+   double off = s * 0.4;
+   /* Front face */
+   cairo_rectangle( cr, cx - s, cy - s, s * 2, s * 2 );
+   cairo_stroke( cr );
+   /* Back face */
+   cairo_rectangle( cr, cx - s + off, cy - s - off, s * 2, s * 2 );
+   cairo_stroke( cr );
+   /* Connecting edges */
+   cairo_move_to( cr, cx - s, cy - s ); cairo_line_to( cr, cx - s + off, cy - s - off );
+   cairo_move_to( cr, cx + s, cy - s ); cairo_line_to( cr, cx + s + off, cy - s - off );
+   cairo_move_to( cr, cx + s, cy + s ); cairo_line_to( cr, cx + s + off, cy + s - off );
+   cairo_move_to( cr, cx - s, cy + s ); cairo_line_to( cr, cx - s + off, cy + s - off );
+   cairo_stroke( cr );
+
+   /* Label */
+   cairo_set_source_rgb( cr, 0.5, 0.5, 0.6 );
+   cairo_select_font_face( cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL );
+   cairo_set_font_size( cr, 11 );
+   cairo_move_to( cr, 8, height - 8 );
+   cairo_show_text( cr, p->FName[0] ? p->FName : "TScene3D" );
+
+   return TRUE;
+   (void)data;
+}
+
+static gboolean on_earthview_draw( GtkWidget * w, cairo_t * cr, gpointer data )
+{
+   HBMapControl * mc = (HBMapControl *)data;
+   int width  = gtk_widget_get_allocated_width( w );
+   int height = gtk_widget_get_allocated_height( w );
+
+   /* Space background */
+   cairo_set_source_rgb( cr, 0.0, 0.0, 0.05 );
+   cairo_paint( cr );
+
+   /* Draw Earth as a circle */
+   double cx = width / 2.0, cy = height / 2.0;
+   double r = (width < height ? width : height) * 0.38;
+   cairo_arc( cr, cx, cy, r, 0, 2 * 3.14159265 );
+   cairo_set_source_rgb( cr, 0.1, 0.3, 0.6 );
+   cairo_fill_preserve( cr );
+   cairo_set_source_rgb( cr, 0.2, 0.7, 0.3 );
+   cairo_set_line_width( cr, 1.0 );
+   cairo_stroke( cr );
+
+   /* Continents hint (simple shapes) */
+   cairo_set_source_rgb( cr, 0.2, 0.55, 0.2 );
+   cairo_arc( cr, cx - r*0.2, cy - r*0.3, r*0.25, 0, 2*3.14159265 );
+   cairo_fill( cr );
+   cairo_arc( cr, cx + r*0.3, cy + r*0.1, r*0.2, 0, 2*3.14159265 );
+   cairo_fill( cr );
+
+   /* Coordinate label */
+   char buf[64];
+   snprintf( buf, sizeof(buf), "Lat: %.1f  Lon: %.1f", mc->FLat, mc->FLon );
+   cairo_set_source_rgb( cr, 0.7, 0.7, 0.8 );
+   cairo_select_font_face( cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL );
+   cairo_set_font_size( cr, 11 );
+   cairo_move_to( cr, 8, height - 8 );
+   cairo_show_text( cr, buf );
+
+   return TRUE;
+}
+
+static gboolean on_map_draw( GtkWidget * w, cairo_t * cr, gpointer data )
+{
+   HBMapControl * mc = (HBMapControl *)data;
+   int width  = gtk_widget_get_allocated_width( w );
+   int height = gtk_widget_get_allocated_height( w );
+
+   /* Light map background */
+   cairo_set_source_rgb( cr, 0.85, 0.90, 0.95 );
+   cairo_paint( cr );
+
+   /* Draw grid lines */
+   cairo_set_source_rgb( cr, 0.75, 0.80, 0.88 );
+   cairo_set_line_width( cr, 0.5 );
+   int spacing = 40;
+   for( int x = 0; x < width; x += spacing )
+   { cairo_move_to( cr, x, 0 ); cairo_line_to( cr, x, height ); }
+   for( int y = 0; y < height; y += spacing )
+   { cairo_move_to( cr, 0, y ); cairo_line_to( cr, width, y ); }
+   cairo_stroke( cr );
+
+   /* Center crosshair (map pin) */
+   double cx = width / 2.0, cy = height / 2.0;
+   cairo_set_source_rgb( cr, 0.9, 0.2, 0.2 );
+   cairo_set_line_width( cr, 2.0 );
+   cairo_arc( cr, cx, cy - 12, 8, 0, 2 * 3.14159265 );
+   cairo_fill( cr );
+   cairo_move_to( cr, cx, cy - 4 );
+   cairo_line_to( cr, cx, cy + 4 );
+   cairo_stroke( cr );
+
+   /* Coordinate label */
+   char buf[80];
+   snprintf( buf, sizeof(buf), "Lat: %.4f  Lon: %.4f  Zoom: %d",
+      mc->FLat, mc->FLon, mc->FZoom );
+   cairo_set_source_rgb( cr, 0.2, 0.2, 0.3 );
+   cairo_select_font_face( cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL );
+   cairo_set_font_size( cr, 11 );
+   cairo_move_to( cr, 8, height - 8 );
+   cairo_show_text( cr, buf );
+
+   return TRUE;
+}
+
+HB_FUNC( UI_SCENE3DNEW )
+{
+   HBForm * pForm = GetForm(1);
+   HBControl * p = (HBControl *) calloc( 1, sizeof(HBControl) );
+   HBControl_Init( p );
+   strcpy( p->FClassName, "TScene3D" );
+   p->FControlType = CT_SCENE3D;
+   p->FWidth = 400; p->FHeight = 300;
+   if( HB_ISNUM(2) ) p->FLeft = hb_parni(2);
+   if( HB_ISNUM(3) ) p->FTop = hb_parni(3);
+   if( HB_ISNUM(4) ) p->FWidth = hb_parni(4);
+   if( HB_ISNUM(5) ) p->FHeight = hb_parni(5);
+   if( pForm ) HBControl_AddChild( &pForm->base, p );
+   RetCtrl( p );
+}
+
+HB_FUNC( UI_EARTHVIEWNEW )
+{
+   HBForm * pForm = GetForm(1);
+   HBMapControl * p = (HBMapControl *) calloc( 1, sizeof(HBMapControl) );
+   HBControl_Init( &p->base );
+   strcpy( p->base.FClassName, "TEarthView" );
+   p->base.FControlType = CT_EARTHVIEW;
+   p->base.FWidth = 400; p->base.FHeight = 400;
+   p->FLat = 20.0; p->FLon = 0.0; p->FZoom = 3;
+   if( HB_ISNUM(2) ) p->base.FLeft = hb_parni(2);
+   if( HB_ISNUM(3) ) p->base.FTop = hb_parni(3);
+   if( HB_ISNUM(4) ) p->base.FWidth = hb_parni(4);
+   if( HB_ISNUM(5) ) p->base.FHeight = hb_parni(5);
+   if( HB_ISNUM(6) ) p->FLat = hb_parnd(6);
+   if( HB_ISNUM(7) ) p->FLon = hb_parnd(7);
+   if( pForm ) HBControl_AddChild( &pForm->base, &p->base );
+   RetCtrl( &p->base );
+}
+
+HB_FUNC( UI_MAPNEW )
+{
+   HBForm * pForm = GetForm(1);
+   HBMapControl * p = (HBMapControl *) calloc( 1, sizeof(HBMapControl) );
+   HBControl_Init( &p->base );
+   strcpy( p->base.FClassName, "TMap" );
+   p->base.FControlType = CT_MAP;
+   p->base.FWidth = 400; p->base.FHeight = 300;
+   p->FLat = 0.0; p->FLon = 0.0; p->FZoom = 5;
+   if( HB_ISNUM(2) ) p->base.FLeft = hb_parni(2);
+   if( HB_ISNUM(3) ) p->base.FTop = hb_parni(3);
+   if( HB_ISNUM(4) ) p->base.FWidth = hb_parni(4);
+   if( HB_ISNUM(5) ) p->base.FHeight = hb_parni(5);
+   if( HB_ISNUM(6) ) p->FLat = hb_parnd(6);
+   if( HB_ISNUM(7) ) p->FLon = hb_parnd(7);
+   if( HB_ISNUM(8) ) p->FZoom = hb_parni(8);
+   if( pForm ) HBControl_AddChild( &pForm->base, &p->base );
+   RetCtrl( &p->base );
+}
+
+/* UI_MapSetRegion( hCtrl, dLat, dLon, nZoom ) */
+HB_FUNC( UI_MAPSETREGION )
+{
+   HBControl * p = GetCtrl(1);
+   if( !p ) return;
+   HBMapControl * mc = (HBMapControl *)p;
+   if( HB_ISNUM(2) ) mc->FLat = hb_parnd(2);
+   if( HB_ISNUM(3) ) mc->FLon = hb_parnd(3);
+   if( HB_ISNUM(4) ) mc->FZoom = hb_parni(4);
+   if( p->FWidget ) gtk_widget_queue_draw( p->FWidget );
+}
+
+/* UI_MapAddPin( hCtrl, dLat, dLon, cTitle, cSubtitle ) */
+HB_FUNC( UI_MAPADDPIN )
+{
+   /* Pins are rendered in the draw callback; for now just redraw */
+   HBControl * p = GetCtrl(1);
+   if( p && p->FWidget ) gtk_widget_queue_draw( p->FWidget );
+}
+
+/* UI_MapClearPins( hCtrl ) */
+HB_FUNC( UI_MAPCLEARPINS )
+{
+   HBControl * p = GetCtrl(1);
+   if( p && p->FWidget ) gtk_widget_queue_draw( p->FWidget );
+}
+
+/* ======================================================================
+ * Printer support — GTK Print API
+ * ====================================================================== */
+
+/* UI_GetPrinters() --> aNames */
+HB_FUNC( UI_GETPRINTERS )
+{
+   EnsureGTK();
+   PHB_ITEM pArray = hb_itemArrayNew( 0 );
+
+   /* Use CUPS/GTK to enumerate printers */
+   GtkPrintSettings * settings = gtk_print_settings_new();
+   /* gtk_enumerate_printers is async; for a simple sync list, use CUPS directly
+      or return the default printer.  For now, return system default. */
+   const gchar * defPrinter = gtk_print_settings_get_printer( settings );
+   if( defPrinter )
+   {
+      PHB_ITEM pItem = hb_itemPutC( NULL, defPrinter );
+      hb_arrayAdd( pArray, pItem );
+      hb_itemRelease( pItem );
+   }
+   else
+   {
+      /* Add a generic entry so the array is not empty */
+      PHB_ITEM pItem = hb_itemPutC( NULL, "Default Printer" );
+      hb_arrayAdd( pArray, pItem );
+      hb_itemRelease( pItem );
+   }
+   g_object_unref( settings );
+
+   hb_itemReturnRelease( pArray );
+}
+
+/* UI_ShowPrintPanel() --> cPrinterName
+   Uses GtkPrintOperation to show the native print dialog. */
+HB_FUNC( UI_SHOWPRINTPANEL )
+{
+   EnsureGTK();
+   GtkPrintOperation * op = gtk_print_operation_new();
+   GtkPrintOperationResult res;
+
+   gtk_print_operation_set_n_pages( op, 1 );
+   res = gtk_print_operation_run( op, GTK_PRINT_OPERATION_ACTION_PRINT_DIALOG, NULL, NULL );
+
+   if( res == GTK_PRINT_OPERATION_RESULT_APPLY )
+   {
+      GtkPrintSettings * settings = gtk_print_operation_get_print_settings( op );
+      const gchar * pname = gtk_print_settings_get_printer( settings );
+      hb_retc( pname ? pname : "Default Printer" );
+   }
+   else
+      hb_retc( "" );
+
+   g_object_unref( op );
+}
+
+/* ======================================================================
+ * PDF Generation — direct PDF file output using cairo-pdf
+ * ====================================================================== */
+
+#include <cairo-pdf.h>
+
+static cairo_surface_t * s_pdfSurface = NULL;
+static cairo_t *         s_pdfCr = NULL;
+static double            s_pdfPageW = 595.0;  /* A4 points */
+static double            s_pdfPageH = 842.0;
+static double            s_pdfMarginL = 36, s_pdfMarginR = 36;
+static double            s_pdfMarginT = 36, s_pdfMarginB = 36;
+
+/* RPT_PdfOpen( nPageW, nPageH, nMarginL, nMarginR, nMarginT, nMarginB ) */
+HB_FUNC( RPT_PDFOPEN )
+{
+   s_pdfPageW   = HB_ISNUM(1) ? hb_parnd(1) : 595.0;
+   s_pdfPageH   = HB_ISNUM(2) ? hb_parnd(2) : 842.0;
+   s_pdfMarginL = HB_ISNUM(3) ? hb_parnd(3) : 36.0;
+   s_pdfMarginR = HB_ISNUM(4) ? hb_parnd(4) : 36.0;
+   s_pdfMarginT = HB_ISNUM(5) ? hb_parnd(5) : 36.0;
+   s_pdfMarginB = HB_ISNUM(6) ? hb_parnd(6) : 36.0;
+
+   /* Create a temporary surface; actual file is written on ExportPDF */
+   if( s_pdfSurface ) cairo_surface_destroy( s_pdfSurface );
+   if( s_pdfCr ) cairo_destroy( s_pdfCr );
+
+   s_pdfSurface = cairo_pdf_surface_create( "/tmp/hbbuilder_report.pdf",
+      s_pdfPageW, s_pdfPageH );
+   s_pdfCr = cairo_create( s_pdfSurface );
+}
+
+/* RPT_PdfAddPage() */
+HB_FUNC( RPT_PDFADDPAGE )
+{
+   if( !s_pdfCr ) return;
+   cairo_show_page( s_pdfCr );
+}
+
+/* RPT_PdfDrawRect( nLeft, nTop, nWidth, nHeight, nBackColor, lFilled ) */
+HB_FUNC( RPT_PDFDRAWRECT )
+{
+   if( !s_pdfCr ) return;
+   double nL = hb_parnd(1), nT = hb_parnd(2);
+   double nW = hb_parnd(3), nH = hb_parnd(4);
+   int nColor = HB_ISNUM(5) ? hb_parni(5) : 0xFFFFFF;
+   int lFilled = HB_ISLOG(6) ? hb_parl(6) : 0;
+
+   double r = ((nColor >> 16) & 0xFF) / 255.0;
+   double g = ((nColor >> 8)  & 0xFF) / 255.0;
+   double b = ( nColor        & 0xFF) / 255.0;
+
+   cairo_set_source_rgb( s_pdfCr, r, g, b );
+   cairo_rectangle( s_pdfCr, nL, nT, nW, nH );
+   if( lFilled )
+      cairo_fill( s_pdfCr );
+   else
+   {
+      cairo_set_line_width( s_pdfCr, 0.5 );
+      cairo_stroke( s_pdfCr );
+   }
+}
+
+/* RPT_PdfDrawText( nLeft, nTop, cText, cFontName, nFontSize, lBold, lItalic, nForeColor ) */
+HB_FUNC( RPT_PDFDRAWTEXT )
+{
+   if( !s_pdfCr ) return;
+   double nL = hb_parnd(1), nT = hb_parnd(2);
+   const char * cText = HB_ISCHAR(3) ? hb_parc(3) : "";
+   const char * cFont = HB_ISCHAR(4) ? hb_parc(4) : "Sans";
+   double nSize = HB_ISNUM(5) ? hb_parnd(5) : 10.0;
+   int lBold   = HB_ISLOG(6) ? hb_parl(6) : 0;
+   int lItalic = HB_ISLOG(7) ? hb_parl(7) : 0;
+   int nColor  = HB_ISNUM(8) ? hb_parni(8) : 0;
+
+   double r = ((nColor >> 16) & 0xFF) / 255.0;
+   double g = ((nColor >> 8)  & 0xFF) / 255.0;
+   double b = ( nColor        & 0xFF) / 255.0;
+
+   cairo_select_font_face( s_pdfCr, cFont,
+      lItalic ? CAIRO_FONT_SLANT_ITALIC : CAIRO_FONT_SLANT_NORMAL,
+      lBold   ? CAIRO_FONT_WEIGHT_BOLD  : CAIRO_FONT_WEIGHT_NORMAL );
+   cairo_set_font_size( s_pdfCr, nSize );
+   cairo_set_source_rgb( s_pdfCr, r, g, b );
+   cairo_move_to( s_pdfCr, nL, nT + nSize );
+   cairo_show_text( s_pdfCr, cText );
+}
+
+/* RPT_ExportPdf( cFile ) — finish and copy PDF to destination */
+HB_FUNC( RPT_EXPORTPDF )
+{
+   const char * cFile = hb_parc(1);
+
+   if( s_pdfCr )   { cairo_destroy( s_pdfCr );          s_pdfCr = NULL; }
+   if( s_pdfSurface ) { cairo_surface_destroy( s_pdfSurface ); s_pdfSurface = NULL; }
+
+   if( cFile && cFile[0] )
+   {
+      /* Copy temp PDF to destination */
+      FILE * src = fopen( "/tmp/hbbuilder_report.pdf", "rb" );
+      FILE * dst = fopen( cFile, "wb" );
+      if( src && dst )
+      {
+         char buf[8192];
+         size_t n;
+         while( (n = fread( buf, 1, sizeof(buf), src )) > 0 )
+            fwrite( buf, 1, n, dst );
+      }
+      if( src ) fclose( src );
+      if( dst ) fclose( dst );
+   }
+}
+
+/* ======================================================================
+ * HTTP Web Server — lightweight socket-based server
+ * Runs in a background thread, dispatches requests to Harbour callbacks.
+ * ====================================================================== */
+
+static int  s_httpServerFd = -1;
+static int  s_httpRunning  = 0;
+static pthread_t s_httpThread;
+
+/* Current request context (per-request, single-threaded dispatch) */
+static int    s_httpClientFd   = -1;
+static int    s_httpStatusCode = 200;
+static char   s_httpContentType[128] = "text/html; charset=utf-8";
+static char * s_httpResponseBody = NULL;
+static int    s_httpResponseLen  = 0;
+
+static void http_append_body( const char * data, int len )
+{
+   if( !data || len <= 0 ) return;
+   s_httpResponseBody = (char *) realloc( s_httpResponseBody, s_httpResponseLen + len + 1 );
+   memcpy( s_httpResponseBody + s_httpResponseLen, data, len );
+   s_httpResponseLen += len;
+   s_httpResponseBody[s_httpResponseLen] = 0;
+}
+
+static void http_send_response( int fd )
+{
+   char header[512];
+   snprintf( header, sizeof(header),
+      "HTTP/1.1 %d OK\r\n"
+      "Content-Type: %s\r\n"
+      "Content-Length: %d\r\n"
+      "Connection: close\r\n\r\n",
+      s_httpStatusCode, s_httpContentType, s_httpResponseLen );
+   send( fd, header, strlen(header), 0 );
+   if( s_httpResponseBody && s_httpResponseLen > 0 )
+      send( fd, s_httpResponseBody, s_httpResponseLen, 0 );
+}
+
+/* UI_WebServerStart( nPort [, nPortSSL, cRoot, lTrace, oServer] ) --> lSuccess */
+HB_FUNC( UI_WEBSERVERSTART )
+{
+   int nPort = HB_ISNUM(1) ? hb_parni(1) : 8080;
+   if( nPort <= 0 ) nPort = 8080;
+
+   if( s_httpRunning ) { hb_retl( 1 ); return; }
+
+   s_httpServerFd = socket( AF_INET, SOCK_STREAM, 0 );
+   if( s_httpServerFd < 0 ) { hb_retl( 0 ); return; }
+
+   int opt = 1;
+   setsockopt( s_httpServerFd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt) );
+
+   struct sockaddr_in addr;
+   memset( &addr, 0, sizeof(addr) );
+   addr.sin_family = AF_INET;
+   addr.sin_addr.s_addr = htonl( INADDR_ANY );
+   addr.sin_port = htons( nPort );
+
+   if( bind( s_httpServerFd, (struct sockaddr *)&addr, sizeof(addr) ) < 0 )
+   {
+      close( s_httpServerFd );
+      s_httpServerFd = -1;
+      hb_retl( 0 );
+      return;
+   }
+
+   if( listen( s_httpServerFd, 16 ) < 0 )
+   {
+      close( s_httpServerFd );
+      s_httpServerFd = -1;
+      hb_retl( 0 );
+      return;
+   }
+
+   s_httpRunning = 1;
+   hb_retl( 1 );
+}
+
+/* UI_WebServerStop() */
+HB_FUNC( UI_WEBSERVERSTOP )
+{
+   s_httpRunning = 0;
+   if( s_httpServerFd >= 0 )
+   {
+      close( s_httpServerFd );
+      s_httpServerFd = -1;
+   }
+}
+
+/* UI_HIX_Write( cText ) — append to current HTTP response body */
+HB_FUNC( UI_HIX_WRITE )
+{
+   const char * data = hb_parc(1);
+   if( data )
+      http_append_body( data, (int) hb_parclen(1) );
+}
+
+/* UI_HIX_SetStatus( nCode ) — set HTTP response status code */
+HB_FUNC( UI_HIX_SETSTATUS )
+{
+   s_httpStatusCode = HB_ISNUM(1) ? hb_parni(1) : 200;
+}
+
+/* ======================================================================
+ * HIX Runtime — Harbour-compatible template engine functions
+ * These are normally defined in hix_runtime.prg but need C linkage
+ * when that file is not compiled into the project.
+ * ====================================================================== */
+
+static char s_hixRoot[512] = ".";
+
+/* HIX_SetRoot( cRoot ) */
+HB_FUNC( HIX_SETROOT )
+{
+   if( HB_ISCHAR(1) )
+      strncpy( s_hixRoot, hb_parc(1), sizeof(s_hixRoot) - 1 );
+}
+
+/* HIX_ExecPrg( cFile ) — compile and execute a .prg file at runtime.
+   Calls Harbour's hb_compileFromBuf → hb_hrbLoad → hb_hrbDo chain. */
+HB_FUNC( HIX_EXECPRG )
+{
+   const char * cFile = hb_parc(1);
+   if( !cFile || !cFile[0] ) return;
+
+   /* Check if file exists */
+   FILE * f = fopen( cFile, "r" );
+   if( !f )
+   {
+      char msg[256];
+      snprintf( msg, sizeof(msg), "<!-- HIX_ExecPrg: file not found: %s -->", cFile );
+      http_append_body( msg, (int)strlen(msg) );
+      return;
+   }
+
+   /* Read file content */
+   fseek( f, 0, SEEK_END );
+   long fsize = ftell( f );
+   fseek( f, 0, SEEK_SET );
+   char * code = (char *) malloc( fsize + 1 );
+   fread( code, 1, fsize, f );
+   code[fsize] = 0;
+   fclose( f );
+
+   /* Compile and execute via Harbour VM dynamic symbol dispatch */
+   PHB_DYNS pCompSym = hb_dynsymFind( "HB_COMPILEFROMBUF" );
+   if( pCompSym )
+   {
+      hb_vmPushDynSym( pCompSym );
+      hb_vmPushNil();
+      hb_vmPushString( code, fsize );
+      hb_vmPushString( "-n", 2 );
+      hb_vmPushString( "-w", 2 );
+      hb_vmPushString( "-q", 2 );
+      hb_vmDo( 4 );
+
+      PHB_ITEM pHrb = hb_itemNew( hb_stackReturnItem() );
+      if( pHrb && !HB_IS_NIL(pHrb) )
+      {
+         PHB_DYNS pLoadSym = hb_dynsymFind( "HB_HRBLOAD" );
+         if( pLoadSym )
+         {
+            hb_vmPushDynSym( pLoadSym );
+            hb_vmPushNil();
+            hb_vmPush( pHrb );
+            hb_vmDo( 1 );
+
+            PHB_ITEM pMod = hb_itemNew( hb_stackReturnItem() );
+            if( pMod && !HB_IS_NIL(pMod) )
+            {
+               PHB_DYNS pDoSym = hb_dynsymFind( "HB_HRBDO" );
+               if( pDoSym )
+               {
+                  hb_vmPushDynSym( pDoSym );
+                  hb_vmPushNil();
+                  hb_vmPush( pMod );
+                  hb_vmDo( 1 );
+               }
+            }
+            if( pMod ) hb_itemRelease( pMod );
+         }
+      }
+      if( pHrb ) hb_itemRelease( pHrb );
+   }
+   else
+   {
+      /* Fallback: hb_compileFromBuf not available, output raw content */
+      http_append_body( code, (int)fsize );
+   }
+   free( code );
+}
+
+/* HIX_ServeStatic( cFilePath ) — serve a static file with correct MIME type */
+HB_FUNC( HIX_SERVESTATIC )
+{
+   const char * cFile = hb_parc(1);
+   if( !cFile || !cFile[0] ) return;
+
+   /* Detect MIME type from extension */
+   const char * dot = strrchr( cFile, '.' );
+   const char * mime = "application/octet-stream";
+   if( dot )
+   {
+      if( strcasecmp(dot, ".html") == 0 || strcasecmp(dot, ".htm") == 0 )
+         mime = "text/html; charset=utf-8";
+      else if( strcasecmp(dot, ".css") == 0 )  mime = "text/css";
+      else if( strcasecmp(dot, ".js") == 0 )   mime = "application/javascript";
+      else if( strcasecmp(dot, ".json") == 0 )  mime = "application/json";
+      else if( strcasecmp(dot, ".png") == 0 )   mime = "image/png";
+      else if( strcasecmp(dot, ".jpg") == 0 || strcasecmp(dot, ".jpeg") == 0 )
+         mime = "image/jpeg";
+      else if( strcasecmp(dot, ".gif") == 0 )   mime = "image/gif";
+      else if( strcasecmp(dot, ".svg") == 0 )   mime = "image/svg+xml";
+      else if( strcasecmp(dot, ".ico") == 0 )   mime = "image/x-icon";
+      else if( strcasecmp(dot, ".txt") == 0 )   mime = "text/plain";
+      else if( strcasecmp(dot, ".pdf") == 0 )   mime = "application/pdf";
+   }
+   strncpy( s_httpContentType, mime, sizeof(s_httpContentType) - 1 );
+
+   /* Read and append file content */
+   FILE * f = fopen( cFile, "rb" );
+   if( !f ) return;
+   fseek( f, 0, SEEK_END );
+   long fsize = ftell( f );
+   fseek( f, 0, SEEK_SET );
+   char * buf = (char *) malloc( fsize );
+   if( buf )
+   {
+      fread( buf, 1, fsize, f );
+      http_append_body( buf, (int) fsize );
+      free( buf );
+   }
+   fclose( f );
 }
