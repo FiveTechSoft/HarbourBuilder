@@ -4159,6 +4159,54 @@ HB_FUNC( IDE_DEBUGSTART2 )
    hb_retl( HB_TRUE );
 }
 
+/* IDE_DEBUGRUNTOBREAK( cHrbFile, bOnPause ) — execute .hrb and run to first breakpoint */
+HB_FUNC( IDE_DEBUGRUNTOBREAK )
+{
+   const char * cHrbFile = hb_parc(1);
+   PHB_ITEM pOnPause = hb_param(2, HB_IT_BLOCK);
+
+   if( !cHrbFile || s_dbgState != DBG_IDLE ) { hb_retl( HB_FALSE ); return; }
+
+   if( s_dbgOnPause ) { hb_itemRelease( s_dbgOnPause ); s_dbgOnPause = NULL; }
+   if( pOnPause ) s_dbgOnPause = hb_itemNew( pOnPause );
+
+   /* Install debug hook */
+   hb_dbg_SetEntry( IDE_DebugHook );
+
+   s_dbgState = DBG_RUNNING;  /* DIFFERENT FROM IDE_DEBUGSTART: RUNNING instead of STEPPING */
+   s_nBreakpoints = 0;
+
+   fprintf( stderr, "DBG: run-to-breakpoint session start, file=%s\n", cHrbFile );
+   DbgOutput( "=== Debug session started (run to breakpoint) ===\n" );
+
+   /* Execute user .hrb file in IDE VM */
+   {
+      PHB_DYNS pDyn = hb_dynsymFind( "HB_HRBRUN" );
+      fprintf( stderr, "DBG: HB_HRBRUN sym=%p\n", (void*)pDyn );
+      if( !pDyn )
+      {
+         DbgOutput( "ERROR: HB_HRBRUN symbol not found (hbrun not linked)\n" );
+         if( s_dbgStatusLbl )
+            [s_dbgStatusLbl setStringValue:@"Error: HB_HRBRUN not available"];
+         hb_dbg_SetEntry( NULL );
+         s_dbgState = DBG_IDLE;
+         hb_retl( HB_FALSE );
+         return;
+      }
+
+      PHB_ITEM pFile = hb_itemPutC( NULL, cHrbFile );
+      hb_vmPushSymbol( hb_dynsymSymbol(pDyn) );
+      hb_vmPush( pFile );
+      hb_vmSend( 1 );
+      hb_itemRelease( pFile );
+
+      if( s_dbgStatusLbl )
+         [s_dbgStatusLbl setStringValue:@"Running to breakpoint..."];
+   }
+
+   hb_retl( HB_TRUE );
+}
+
 /* IDE_DebugGo() */
 HB_FUNC( IDE_DEBUGGO )
 { if( s_dbgState == DBG_PAUSED ) s_dbgState = DBG_RUNNING; }
