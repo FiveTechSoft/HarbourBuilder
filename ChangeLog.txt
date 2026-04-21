@@ -1,6 +1,31 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-21b (Windows — drop stubs_win.cpp, real printer APIs)
+
+  CONSOLIDATION — stubs_win.cpp eliminated:
+  - All Windows-specific HB_FUNCs previously in source/cpp/stubs_win.cpp
+    (PDF writer, printer functions, HIX stubs) moved to hbbridge.cpp.
+    One fewer translation unit on Windows; no separate "stubs" file.
+  - Removed references from build_win.bat (3 compiler sections) and
+    source/hbbuilder_win.prg (TBRun + TBDebug aCppFiles + OBJS lists).
+  - Deleted source/cpp/stubs_win.cpp.
+
+  REAL PRINTER IMPLEMENTATIONS (was stubs):
+  - UI_GetPrinters() now returns the actual list of installed printers
+    via EnumPrinters(PRINTER_ENUM_LOCAL | PRINTER_ENUM_CONNECTIONS, 2).
+  - UI_ShowPrintPanel() now opens the native Windows Print dialog via
+    PrintDlgA and returns the chosen printer name (or "" on cancel).
+  - Added winspool.lib to BCC/MSVC link lines in build_win.bat and to
+    all three user-project link paths (TBRun + TBDebug) in
+    hbbuilder_win.prg. MinGW already had -lwinspool.
+
+  HIX WEB SERVER SHIMS:
+  - HIX_SetRoot / UI_HIX_SetStatus / UI_HIX_Write / HIX_ExecPrg /
+    HIX_ServeStatic remain as link-time shims inside hbbridge.cpp,
+    clearly documented as "pending Winsock port." TWebServer on Windows
+    is effectively a no-op until the port lands.
+
 2026-04-21 (Windows — Report PDF writer, build-assembly Chr(26) fix)
 
   NATIVE WINDOWS PDF WRITER:

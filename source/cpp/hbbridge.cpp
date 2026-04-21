@@ -7383,3 +7383,349 @@ HB_FUNC( UI_TABCONTROLSETSEL )
       ((TTabControl2*)pCtrl)->ApplyPageVisibility();
    }
 }
+
+/* =====================================================================
+ * Windows platform HB_FUNCs previously in stubs_win.cpp.
+ * Consolidated here so Windows has a single C++ translation unit.
+ * ===================================================================== */
+
+#include <winspool.h>
+#include <commdlg.h>
+#include <vector>
+#include <string>
+#include <cstdio>
+#include <cstdarg>
+
+/* ---- Printer enumeration / selection --------------------------------- */
+
+/* UI_GetPrinters() --> aNames  — installed printer names via EnumPrinters. */
+HB_FUNC( UI_GETPRINTERS )
+{
+   DWORD needed = 0, returned = 0;
+   EnumPrintersA( PRINTER_ENUM_LOCAL | PRINTER_ENUM_CONNECTIONS,
+      NULL, 2, NULL, 0, &needed, &returned );
+   if( needed == 0 ) { hb_reta( 0 ); return; }
+
+   BYTE * buf = (BYTE *) hb_xgrab( needed );
+   if( !EnumPrintersA( PRINTER_ENUM_LOCAL | PRINTER_ENUM_CONNECTIONS,
+         NULL, 2, buf, needed, &needed, &returned ) )
+   {
+      hb_xfree( buf );
+      hb_reta( 0 );
+      return;
+   }
+
+   PRINTER_INFO_2A * info = (PRINTER_INFO_2A *) buf;
+   PHB_ITEM pArr = hb_itemArrayNew( returned );
+   for( DWORD i = 0; i < returned; i++ )
+      hb_arraySetC( pArr, (HB_SIZE) ( i + 1 ),
+         info[i].pPrinterName ? info[i].pPrinterName : "" );
+   hb_xfree( buf );
+   hb_itemReturnRelease( pArr );
+}
+
+/* UI_ShowPrintPanel() --> cPrinterName  (empty string on cancel) */
+HB_FUNC( UI_SHOWPRINTPANEL )
+{
+   PRINTDLGA pd;
+   memset( &pd, 0, sizeof( pd ) );
+   pd.lStructSize = sizeof( pd );
+   pd.hwndOwner   = GetActiveWindow();
+   pd.Flags       = PD_RETURNDC | PD_NOSELECTION | PD_NOPAGENUMS;
+
+   if( !PrintDlgA( &pd ) ) { hb_retc( "" ); return; }
+
+   if( pd.hDevNames )
+   {
+      DEVNAMES * pdn = (DEVNAMES *) GlobalLock( pd.hDevNames );
+      hb_retc( pdn ? (const char *) pdn + pdn->wDeviceOffset : "" );
+      if( pdn ) GlobalUnlock( pd.hDevNames );
+      GlobalFree( pd.hDevNames );
+   }
+   else
+      hb_retc( "" );
+
+   if( pd.hDevMode ) GlobalFree( pd.hDevMode );
+   if( pd.hDC )      DeleteDC( pd.hDC );
+}
+
+/* ---- HIX web server link shims ---------------------------------------
+ * HIX uses a pthread+socket server on Linux (gtk3_core.c) and macOS
+ * (cocoa_webserver.m). Not ported to Windows yet — these let
+ * classes.prg:TWebServer methods resolve at link time so the framework
+ * builds. TWebServer on Windows is a no-op until the Winsock port.
+ * --------------------------------------------------------------------- */
+
+HB_FUNC( HIX_SETROOT )        { hb_retl( 0 ); }
+HB_FUNC( UI_HIX_SETSTATUS )   { hb_retl( 0 ); }
+HB_FUNC( UI_HIX_WRITE )       { hb_retl( 0 ); }
+HB_FUNC( HIX_EXECPRG )        { hb_retl( 0 ); }
+HB_FUNC( HIX_SERVESTATIC )    { hb_retl( 0 ); }
+
+/* ---- Report PDF export — native PDF 1.4 writer (no external deps) ----
+ * Coordinate contract (matches Linux/gtk3 backend):
+ *   - Units are PDF points as passed by caller
+ *   - Origin top-left, Y grows down; flipped at emit time
+ * Fonts: the 12 core scalable fonts from the PDF standard 14, WinAnsi
+ * encoded. Guaranteed available in every PDF reader — no embedding.
+ * --------------------------------------------------------------------- */
+
+static double                   s_pdfPageW = 595.0;
+static double                   s_pdfPageH = 842.0;
+static std::vector<std::string> s_pdfPages;
+static std::string              s_pdfCur;
+static bool                     s_pdfHasPage = false;
+static bool                     s_pdfIsOpen  = false;
+
+static const char * const k_pdfFontNames[12] = {
+   "Helvetica",     "Helvetica-Bold",  "Helvetica-Oblique", "Helvetica-BoldOblique",
+   "Times-Roman",   "Times-Bold",      "Times-Italic",      "Times-BoldItalic",
+   "Courier",       "Courier-Bold",    "Courier-Oblique",   "Courier-BoldOblique"
+};
+
+static int pdf_family_base( const char * family )
+{
+   /* Map incoming family name to one of: 0 (Helvetica), 4 (Times), 8 (Courier). */
+   if( !family || !*family ) return 0;
+   const char * f = family;
+   char lo[64]; int i = 0;
+   for( ; f[i] && i < 63; i++ )
+      lo[i] = (char)( (f[i] >= 'A' && f[i] <= 'Z') ? f[i] + 32 : f[i] );
+   lo[i] = 0;
+   if( strstr( lo, "times" ) || strstr( lo, "serif" ) || strstr( lo, "roman" ) )
+      return 4;
+   if( strstr( lo, "courier" ) || strstr( lo, "mono" ) || strstr( lo, "consolas" )
+       || strstr( lo, "fixed" ) )
+      return 8;
+   return 0;
+}
+
+static int pdf_font_index( const char * family, int bold, int italic )
+{
+   int base = pdf_family_base( family );
+   int offset = (bold ? 1 : 0) | (italic ? 2 : 0);
+   return base + offset;
+}
+
+static void pdf_appendf( std::string & out, const char * fmt, ... )
+{
+   char buf[512];
+   va_list ap;
+   va_start( ap, fmt );
+   int n = vsnprintf( buf, sizeof(buf), fmt, ap );
+   va_end( ap );
+   if( n > 0 ) out.append( buf, (size_t) ( n < (int)sizeof(buf) ? n : (int)sizeof(buf) - 1 ) );
+}
+
+static void pdf_append_escaped( std::string & out, const char * s )
+{
+   if( !s ) return;
+   for( ; *s; s++ )
+   {
+      unsigned char c = (unsigned char) *s;
+      if( c == '\\' || c == '(' || c == ')' ) { out.push_back( '\\' ); out.push_back( (char) c ); }
+      else if( c >= 0x20 || c == '\t' )       { out.push_back( (char) c ); }
+      /* control chars dropped */
+   }
+}
+
+static void pdf_reset()
+{
+   s_pdfPages.clear();
+   s_pdfCur.clear();
+   s_pdfHasPage = false;
+   s_pdfIsOpen  = false;
+}
+
+/* RPT_PDFOPEN( nPageW, nPageH, nMarginL, nMarginR, nMarginT, nMarginB ) */
+HB_FUNC( RPT_PDFOPEN )
+{
+   pdf_reset();
+   s_pdfPageW = HB_ISNUM(1) && hb_parnd(1) > 0 ? hb_parnd(1) : 595.0;
+   s_pdfPageH = HB_ISNUM(2) && hb_parnd(2) > 0 ? hb_parnd(2) : 842.0;
+   /* margins accepted for API parity; classes.prg positions everything itself */
+   s_pdfIsOpen = true;
+   hb_retl( 1 );
+}
+
+/* RPT_PDFADDPAGE() — start a new page; flushes the in-progress one */
+HB_FUNC( RPT_PDFADDPAGE )
+{
+   if( !s_pdfIsOpen ) { hb_retl( 0 ); return; }
+   if( s_pdfHasPage )
+   {
+      s_pdfPages.push_back( s_pdfCur );
+      s_pdfCur.clear();
+   }
+   s_pdfHasPage = true;
+   hb_retl( 1 );
+}
+
+/* RPT_PDFDRAWRECT( nLeft, nTop, nWidth, nHeight, nColor, lFilled ) */
+HB_FUNC( RPT_PDFDRAWRECT )
+{
+   if( !s_pdfIsOpen || !s_pdfHasPage ) { hb_retl( 0 ); return; }
+
+   double x = hb_parnd(1);
+   double y = hb_parnd(2);
+   double w = hb_parnd(3);
+   double h = hb_parnd(4);
+   int    c = HB_ISNUM(5) ? hb_parni(5) : 0xFFFFFF;
+   int    filled = HB_ISLOG(6) ? hb_parl(6) : 1;
+
+   if( w <= 0 || h <= 0 ) { hb_retl( 0 ); return; }
+
+   double r = ( (c >> 16) & 0xFF ) / 255.0;
+   double g = ( (c >>  8) & 0xFF ) / 255.0;
+   double b = (  c        & 0xFF ) / 255.0;
+
+   double pdfY = s_pdfPageH - y - h;   /* flip Y axis */
+
+   if( filled )
+      pdf_appendf( s_pdfCur,
+         "%.3f %.3f %.3f rg\n"
+         "%.2f %.2f %.2f %.2f re\n"
+         "f\n",
+         r, g, b, x, pdfY, w, h );
+   else
+      pdf_appendf( s_pdfCur,
+         "%.3f %.3f %.3f RG\n"
+         "0.5 w\n"
+         "%.2f %.2f %.2f %.2f re\n"
+         "S\n",
+         r, g, b, x, pdfY, w, h );
+
+   hb_retl( 1 );
+}
+
+/* RPT_PDFDRAWTEXT( nLeft, nTop, cText, cFont, nSize, lBold, lItalic, nColor ) */
+HB_FUNC( RPT_PDFDRAWTEXT )
+{
+   if( !s_pdfIsOpen || !s_pdfHasPage ) { hb_retl( 0 ); return; }
+
+   double       x     = hb_parnd(1);
+   double       y     = hb_parnd(2);
+   const char * text  = HB_ISCHAR(3) ? hb_parc(3) : "";
+   const char * font  = HB_ISCHAR(4) ? hb_parc(4) : "Helvetica";
+   double       size  = HB_ISNUM(5) && hb_parnd(5) > 0 ? hb_parnd(5) : 10.0;
+   int          bold  = HB_ISLOG(6) ? hb_parl(6) : 0;
+   int          ital  = HB_ISLOG(7) ? hb_parl(7) : 0;
+   int          color = HB_ISNUM(8) ? hb_parni(8) : 0;
+
+   if( !text || !*text ) { hb_retl( 1 ); return; }
+
+   int fi = pdf_font_index( font, bold, ital );     /* 0..11 */
+   double r = ( (color >> 16) & 0xFF ) / 255.0;
+   double g = ( (color >>  8) & 0xFF ) / 255.0;
+   double b = (  color        & 0xFF ) / 255.0;
+
+   double baseline = s_pdfPageH - y - size;         /* top-left → baseline */
+
+   pdf_appendf( s_pdfCur,
+      "BT\n"
+      "/F%d %.2f Tf\n"
+      "%.3f %.3f %.3f rg\n"
+      "1 0 0 1 %.2f %.2f Tm\n"
+      "(",
+      fi + 1, size, r, g, b, x, baseline );
+   pdf_append_escaped( s_pdfCur, text );
+   s_pdfCur.append( ") Tj\nET\n" );
+
+   hb_retl( 1 );
+}
+
+/* RPT_EXPORTPDF( cDestFile ) — assemble and write PDF to disk */
+HB_FUNC( RPT_EXPORTPDF )
+{
+   const char * cFile = hb_parc(1);
+   if( !s_pdfIsOpen || !cFile || !*cFile ) { pdf_reset(); hb_retl( 0 ); return; }
+
+   /* Finalize last page */
+   if( s_pdfHasPage )
+   {
+      s_pdfPages.push_back( s_pdfCur );
+      s_pdfCur.clear();
+      s_pdfHasPage = false;
+   }
+   if( s_pdfPages.empty() ) s_pdfPages.push_back( std::string() );  /* at least one page */
+
+   FILE * fp = fopen( cFile, "wb" );
+   if( !fp ) { pdf_reset(); hb_retl( 0 ); return; }
+
+   const int nPages         = (int) s_pdfPages.size();
+   const int firstPageObj   = 3;
+   const int firstContObj   = firstPageObj + nPages;
+   const int firstFontObj   = firstContObj + nPages;
+   const int nObjs          = firstFontObj + 12 - 1;
+
+   std::vector<long> offsets;
+   offsets.reserve( (size_t) nObjs );
+
+   /* Build the whole PDF in memory, then write it once.
+      Tracking offsets by buf.size() avoids lambdas (BCC32 compatibility). */
+   std::string out;
+
+   /* Header */
+   out.append( "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n" );
+
+   /* 1: Catalog */
+   offsets.push_back( (long) out.size() );
+   out.append( "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n" );
+
+   /* 2: Pages */
+   offsets.push_back( (long) out.size() );
+   pdf_appendf( out, "2 0 obj\n<< /Type /Pages /Kids [" );
+   for( int i = 0; i < nPages; i++ )
+      pdf_appendf( out, "%d 0 R ", firstPageObj + i );
+   pdf_appendf( out, "] /Count %d >>\nendobj\n", nPages );
+
+   /* Page objects */
+   for( int i = 0; i < nPages; i++ )
+   {
+      offsets.push_back( (long) out.size() );
+      pdf_appendf( out,
+         "%d 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %.2f %.2f] "
+         "/Resources << /Font <<",
+         firstPageObj + i, s_pdfPageW, s_pdfPageH );
+      for( int f = 0; f < 12; f++ )
+         pdf_appendf( out, " /F%d %d 0 R", f + 1, firstFontObj + f );
+      pdf_appendf( out, " >> >> /Contents %d 0 R >>\nendobj\n", firstContObj + i );
+   }
+
+   /* Content streams */
+   for( int i = 0; i < nPages; i++ )
+   {
+      offsets.push_back( (long) out.size() );
+      const std::string & cs = s_pdfPages[ (size_t) i ];
+      pdf_appendf( out, "%d 0 obj\n<< /Length %lu >>\nstream\n",
+         firstContObj + i, (unsigned long) cs.size() );
+      out.append( cs );
+      out.append( "\nendstream\nendobj\n" );
+   }
+
+   /* Font objects */
+   for( int f = 0; f < 12; f++ )
+   {
+      offsets.push_back( (long) out.size() );
+      pdf_appendf( out,
+         "%d 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /%s "
+         "/Encoding /WinAnsiEncoding >>\nendobj\n",
+         firstFontObj + f, k_pdfFontNames[f] );
+   }
+
+   /* xref */
+   long xrefPos = (long) out.size();
+   pdf_appendf( out, "xref\n0 %d\n0000000000 65535 f \n", nObjs + 1 );
+   for( size_t i = 0; i < offsets.size(); i++ )
+      pdf_appendf( out, "%010ld 00000 n \n", offsets[i] );
+
+   /* Trailer */
+   pdf_appendf( out,
+      "trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%ld\n%%%%EOF\n",
+      nObjs + 1, xrefPos );
+
+   fwrite( out.data(), 1, out.size(), fp );
+   fclose( fp );
+   pdf_reset();
+   hb_retl( 1 );
+}

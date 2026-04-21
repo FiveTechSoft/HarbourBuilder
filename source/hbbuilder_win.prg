@@ -3421,7 +3421,7 @@ static function TBRun()
    if ! lError
       W32_ProgressStep( "Compiling C++ core..." )
       cLog += "[6] Compiling C++ core..." + Chr(10)
-      aCppFiles := { "tcontrol", "tform", "tcontrols", "hbbridge", "stubs_win" }
+      aCppFiles := { "tcontrol", "tform", "tcontrols", "hbbridge" }
       if cCompiler == "msvc"
          cCppBase := "/c /O2 /W0 /EHsc" + Chr(10) + ;
                  '/I"' + cHbInc + '"' + Chr(10) + ;
@@ -3473,8 +3473,7 @@ static function TBRun()
                   cBuildDir + "\tcontrol.o " + ;
                   cBuildDir + "\tform.o " + ;
                   cBuildDir + "\tcontrols.o " + ;
-                  cBuildDir + "\hbbridge.o " + ;
-                  cBuildDir + "\stubs_win.o"
+                  cBuildDir + "\hbbridge.o"
          if File( cBuildDir + "\stddlgs.o" )
             cObjs += " " + cBuildDir + "\stddlgs.o"
          endif
@@ -3484,8 +3483,7 @@ static function TBRun()
                   cBuildDir + "\tcontrol.obj " + ;
                   cBuildDir + "\tform.obj " + ;
                   cBuildDir + "\tcontrols.obj " + ;
-                  cBuildDir + "\hbbridge.obj " + ;
-                  cBuildDir + "\stubs_win.obj"
+                  cBuildDir + "\hbbridge.obj"
          if File( cBuildDir + "\stddlgs.obj" )
             cObjs += " " + cBuildDir + "\stddlgs.obj"
          endif
@@ -3510,7 +3508,7 @@ static function TBRun()
          cRspContent += "gtwin.lib gtwvt.lib gtgui.lib" + Chr(10)
          cRspContent += "user32.lib gdi32.lib comctl32.lib comdlg32.lib shell32.lib" + Chr(10)
          cRspContent += "ole32.lib oleaut32.lib advapi32.lib ws2_32.lib winmm.lib" + Chr(10)
-         cRspContent += "msimg32.lib gdiplus.lib iphlpapi.lib ucrt.lib vcruntime.lib msvcrt.lib" + Chr(10)
+         cRspContent += "msimg32.lib gdiplus.lib winspool.lib iphlpapi.lib ucrt.lib vcruntime.lib msvcrt.lib" + Chr(10)
          MemoWrit( cRsp, cRspContent )
          cCmd := 'cmd /S /c ""' + cLinker + '" @"' + cRsp + '" 2>&1"'
       elseif cCompiler == "mingw"
@@ -3547,7 +3545,7 @@ static function TBRun()
                  " cw32mt.lib import32.lib ws2_32.lib winmm.lib iphlpapi.lib" + ;
                  " user32.lib gdi32.lib comctl32.lib comdlg32.lib shell32.lib" + ;
                  " ole32.lib oleaut32.lib uuid.lib advapi32.lib" + ;
-                 " msimg32.lib gdiplus.lib,,"
+                 " msimg32.lib gdiplus.lib winspool.lib,,"
       endif
       cOutput := W32_ShellExec( cCmd )
       // Also check if exe was actually created
@@ -4490,7 +4488,7 @@ static function TBDebugRun()
    // Step 6: Compile C++ core (same as TBRun)
    if ! lError
       cLog += "[6] Compiling C++ core..." + Chr(10)
-      aCppFiles := { "tcontrol", "tform", "tcontrols", "hbbridge", "stubs_win" }
+      aCppFiles := { "tcontrol", "tform", "tcontrols", "hbbridge" }
       if cCompiler == "msvc"
          cCppBase := "/c /Od /Zi /W0 /EHsc" + Chr(10) + ;
                  '/I"' + cHbInc + '"' + Chr(10) + ;
@@ -4541,16 +4539,14 @@ static function TBDebugRun()
                   cBuildDir + "\tcontrol.o " + ;
                   cBuildDir + "\tform.o " + ;
                   cBuildDir + "\tcontrols.o " + ;
-                  cBuildDir + "\hbbridge.o " + ;
-                  cBuildDir + "\stubs_win.o"
+                  cBuildDir + "\hbbridge.o"
       else
          cObjs := cBuildDir + "\debug_main.obj " + ;
                   cBuildDir + "\dbghook.obj " + ;
                   cBuildDir + "\tcontrol.obj " + ;
                   cBuildDir + "\tform.obj " + ;
                   cBuildDir + "\tcontrols.obj " + ;
-                  cBuildDir + "\hbbridge.obj " + ;
-                  cBuildDir + "\stubs_win.obj"
+                  cBuildDir + "\hbbridge.obj"
       endif
       if cCompiler == "msvc"
          cRsp := cBuildDir + "\link_dbg.rsp"
@@ -4571,7 +4567,7 @@ static function TBDebugRun()
          cRspContent += "gtwin.lib gtwvt.lib gtgui.lib" + Chr(10)
          cRspContent += "user32.lib gdi32.lib comctl32.lib comdlg32.lib shell32.lib" + Chr(10)
          cRspContent += "ole32.lib oleaut32.lib advapi32.lib ws2_32.lib winmm.lib" + Chr(10)
-         cRspContent += "msimg32.lib gdiplus.lib iphlpapi.lib ucrt.lib vcruntime.lib msvcrt.lib" + Chr(10)
+         cRspContent += "msimg32.lib gdiplus.lib winspool.lib iphlpapi.lib ucrt.lib vcruntime.lib msvcrt.lib" + Chr(10)
          MemoWrit( cRsp, cRspContent )
          cCmd := 'cmd /S /c ""' + cLinker + '" @"' + cRsp + '" 2>&1"'
       elseif cCompiler == "mingw"
@@ -4608,7 +4604,7 @@ static function TBDebugRun()
                  " cw32mt.lib import32.lib ws2_32.lib winmm.lib iphlpapi.lib" + ;
                  " user32.lib gdi32.lib comctl32.lib comdlg32.lib shell32.lib" + ;
                  " ole32.lib oleaut32.lib uuid.lib advapi32.lib" + ;
-                 " msimg32.lib gdiplus.lib,,"
+                 " msimg32.lib gdiplus.lib winspool.lib,,"
       endif
       cOutput := W32_ShellExec( cCmd )
       if ! File( cBuildDir + "\DebugApp.exe" )
