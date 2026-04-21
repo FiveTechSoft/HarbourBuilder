@@ -7,7 +7,11 @@
 
 #include "hbbuilder.ch"
 
-STATIC s_cHixRoot := "."
+//─── Static storage ──────────────────────────────────────────────────────────
+
+STATIC FUNCTION HIX_StaticStorage()
+   STATIC s_hStorage := { "root" => "." }
+RETURN s_hStorage
 
 //─── Query string parser ─────────────────────────────────────────────────────
 
@@ -198,11 +202,11 @@ return "<pre>" + UHtmlEncode( hb_CStr(uVal) ) + "</pre>"
 //─── Internal helpers ────────────────────────────────────────────────────────
 
 FUNCTION HIX_SetRoot( cRoot )
-   s_cHixRoot := cRoot
+   HIX_StaticStorage()["root"] := cRoot
 return nil
 
 FUNCTION HIX_GetRoot()
-return s_cHixRoot
+return HIX_StaticStorage()["root"]
 
 FUNCTION HIX_ServeStatic( cFilePath )
    local cExt := Lower( hb_FNameExt( cFilePath ) )

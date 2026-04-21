@@ -5262,3 +5262,9 @@ BUILD SYSTEM:
   * OOP Harbour wrappers (classes.prg) over C++ core
   * xBase-style command syntax (commands.ch)
   * Build system for BCC77C + Harbour
+
+- Fixed Harbour compilation error "STATIC declaration follows executable statement"
+  * Issue: When assembling debug_main.prg, hix_runtime.prg was placed after executable code
+  * Fix: Changed STATIC s_cHixRoot to be wrapped in HIX_StaticStorage() function
+  * This allows the static variable to be declared inside a function scope
+  * Fixes Harbour error E0004 during debug session compilation
