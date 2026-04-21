@@ -1,6 +1,38 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-21c (Windows — IDE no longer hangs on exit while project runs)
+
+  BUG FIX — exit-while-running:
+  - Closing the IDE while a Run project (UserApp.exe) was still running
+    caused the IDE window to appear DPI-deformed on screen and the
+    process to hang. Closing the project first avoided it.
+  - Root cause: TBRun() launched the user executable via
+    W32_ShellExec('cmd /c start "" "UserApp.exe"'). W32_ShellExec
+    creates an inheritable stdout/stderr pipe (bInheritHandle = TRUE on
+    the SECURITY_ATTRIBUTES, only the read end explicitly stripped via
+    SetHandleInformation). The intermediate cmd inherited the write
+    end and — depending on how cmd's internal `start` forwarded
+    bInheritHandles to CreateProcess — the grandchild UserApp could
+    also inherit it. That leaked a pipe reference into the running
+    user app and left the IDE with a handle tied to a process it no
+    longer tracked; closing the IDE then stalled during cleanup and
+    Windows DWM painted a DPI-scaled ghost bitmap of the frozen
+    window (hence the "deformation").
+
+  FIX:
+  - Added HB_FUNC( W32_RUNEXE ) in source/hbbuilder_win.prg (inside
+    the main BEGINDUMP block, next to W32_ShellExec). It launches the
+    user exe directly via CreateProcessA with bInheritHandles = FALSE
+    and DETACHED_PROCESS, so no IDE handle crosses the boundary.
+    AllowSetForegroundWindow is still called so the user app can take
+    focus.
+  - TBRun() now calls W32_RunExe( cExePath ) on both the fast-path
+    (cache-hit, no rebuild needed) and the post-build run paths —
+    replacing the two `cmd /c start "" "..."` invocations.
+  - W32_ShellExec remains unchanged; it is still used for all build
+    commands where capturing stdout is required.
+
 2026-04-21b (Windows — drop stubs_win.cpp, real printer APIs)
 
   CONSOLIDATION — stubs_win.cpp eliminated:

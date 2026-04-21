@@ -3094,7 +3094,7 @@ static function TBRun()
       nHash := nHash + Asc( SubStr( cAllCode, i, 1 ) ) * i
    next
    if nHash == nLastHash .and. nLastHash != 0 .and. File( cExePath )
-      W32_ShellExec( 'cmd /c start "" "' + cExePath + '"' )
+      W32_RunExe( cExePath )
       RefreshIDEToolbars()
       return nil
    endif
@@ -3571,7 +3571,7 @@ static function TBRun()
       W32_BuildErrorDialog( "Build Failed", cLog )
    else
       nLastHash := nHash  // remember successful build hash
-      W32_ShellExec( 'cmd /c start "" "' + cExePath + '"' )
+      W32_RunExe( cExePath )
       RefreshIDEToolbars()
    endif
 
@@ -6392,6 +6392,43 @@ HB_FUNC( W32_SELECTFROMLIST )
 
    s_formsListBox = NULL;
    hb_retni( s_formsSel );
+}
+
+/* W32_RunExe( cExePath ) --> lOk
+ * Launches the user's compiled .exe detached, without inheriting any
+ * handle from the IDE. Using cmd /c start via W32_ShellExec leaked the
+ * pipe's write end into the child (GUI subsystem or not, depending on
+ * how cmd's internal start forwarded bInheritHandles), which kept a
+ * pipe reference alive inside the running UserApp and caused the IDE
+ * to hang on exit (Windows DWM then painted a DPI-scaled ghost window
+ * while it waited for the frozen process to finish). Launching with
+ * CreateProcess + bInheritHandles=FALSE keeps IDE and UserApp fully
+ * independent: closing the IDE while the project runs must never hang. */
+HB_FUNC( W32_RUNEXE )
+{
+   STARTUPINFOA si;
+   PROCESS_INFORMATION pi;
+   char cmd[1024];
+
+   snprintf( cmd, sizeof(cmd), "\"%s\"", hb_parc(1) );
+
+   memset( &si, 0, sizeof(si) );
+   si.cb = sizeof(si);
+   si.dwFlags = STARTF_USESHOWWINDOW;
+   si.wShowWindow = SW_SHOWNORMAL;
+   memset( &pi, 0, sizeof(pi) );
+
+   if( CreateProcessA( NULL, cmd, NULL, NULL,
+       FALSE,                        /* bInheritHandles = FALSE */
+       DETACHED_PROCESS, NULL, NULL, &si, &pi ) )
+   {
+      AllowSetForegroundWindow( pi.dwProcessId );
+      CloseHandle( pi.hProcess );
+      CloseHandle( pi.hThread );
+      hb_retl( HB_TRUE );
+   }
+   else
+      hb_retl( HB_FALSE );
 }
 
 /* W32_ShellExec( cCommand ) --> cOutput */
