@@ -130,7 +130,8 @@ function Main()
 
    DEFINE POPUP oRun PROMPT "Run" OF oIDE
    MENUITEM "Run"             OF oRun ACTION TBRun()                 ACCEL "r"
-   MENUITEM "Debug"           OF oRun ACTION TBDebugRun()
+   MENUITEM "Debug"           OF oRun ACTION TBDebugRun(.F.)
+   MENUITEM "Debug to Breakpoint" OF oRun ACTION TBDebugRunToBreak() ACCEL "b"
    MENUSEPARATOR OF oRun
    MENUITEM "Continue"        OF oRun ACTION IDE_DebugGo()
    MENUITEM "Step Into"       OF oRun ACTION DebugStepInto()
@@ -268,7 +269,8 @@ function Main()
 
    // Row 2: Run & Debug speedbar
    DEFINE TOOLBAR oTB2 OF oIDE
-   BUTTON "Debug" OF oTB2 TOOLTIP "Debug (F8)"              ACTION TBDebugRun()
+   BUTTON "Debug" OF oTB2 TOOLTIP "Debug (F8)"              ACTION TBDebugRun(.F.)
+   BUTTON "Debug→BP" OF oTB2 TOOLTIP "Debug to Breakpoint (B)" ACTION TBDebugRunToBreak()
    SEPARATOR OF oTB2
    BUTTON "Step"  OF oTB2 TOOLTIP "Step Into (F7)"          ACTION DebugStepInto()
    BUTTON "Over"  OF oTB2 TOOLTIP "Step Over (F8)"          ACTION DebugStepOver()
@@ -3815,13 +3817,18 @@ return nil
 
 // === Debug Run (in-process: compile to .hrb, execute in IDE VM) ===
 
-static function TBDebugRun()
+static function TBDebugRun( lRunToBreakpoint )
 
    local cBuildDir, cOutput, cLog, i, lError
    local cHbDir, cHbBin, cHbInc, cHbLib, cProjDir
    local cAllPrg, cCmd, cMainPrg
    local cBackends, cSciInc, cSciCocoa, cLexInc, cSciLib, cResDir
    local nCurLine, cSection
+
+   // Default parameter
+   if lRunToBreakpoint == NIL
+      lRunToBreakpoint := .F.
+   endif
 
    SaveActiveFormCode()
 
@@ -4061,8 +4068,13 @@ static function TBDebugRun()
    INS_SetDebugMode( _InsGetData(), .t. )
    CodeEditorSelectTab( hCodeEditor, 1 )  // switch to Project1.prg
 
-   IDE_DebugStart2( cBuildDir + "/DebugApp", ;
-      { |cFunc, nLine, cLocals, cStack| OnDebugPause( cFunc, nLine, cLocals, cStack ) } )
+   if lRunToBreakpoint == .T.
+      IDE_DEBUGRUNTOBREAK2( cBuildDir + "/DebugApp", ;
+         { |cFunc, nLine, cLocals, cStack| OnDebugPause( cFunc, nLine, cLocals, cStack ) } )
+   else
+      IDE_DebugStart2( cBuildDir + "/DebugApp", ;
+         { |cFunc, nLine, cLocals, cStack| OnDebugPause( cFunc, nLine, cLocals, cStack ) } )
+   endif
 
    // Restore: unhighlight, show design form, switch inspector back
    if oTB2 != nil
@@ -4074,6 +4086,12 @@ static function TBDebugRun()
    endif
 
 return nil
+
+// === Debug Run to Breakpoint (same as TBDebugRun but uses IDE_DEBUGRUNTOBREAK2) ===
+
+static function TBDebugRunToBreak()
+   // Simple wrapper that calls TBDebugRun with run-to-breakpoint flag
+   return TBDebugRun(.T.)
 
 // Convert stack line numbers from debug_main.prg to editor tab line numbers
 static function DbgFixStackLines( cStack )

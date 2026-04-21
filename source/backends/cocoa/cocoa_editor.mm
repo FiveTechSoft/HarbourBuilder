@@ -523,24 +523,46 @@ static HBDebounceTarget * s_debounceTarget = nil;
 
       case SCN_MARGINCLICK:
       {
+         fprintf(stderr, "DBG: SCN_MARGINCLICK margin=%d position=%lld\n",
+                 scn->margin, (long long)scn->position);
          sptr_t line = SciMsg( ed->sciView, SCI_LINEFROMPOSITION,
                                (uptr_t)scn->position, 0 );
+         fprintf(stderr, "DBG: Click on line %lld\n", (long long)line);
 
          /* Breakpoint toggle on margin 1 */
          if( scn->margin == 1 )
          {
+            fprintf(stderr, "DBG: Margin 1 click, checking markers\n");
             sptr_t markers = SciMsg( ed->sciView, SCI_MARKERGET, (uptr_t)line, 0 );
+            fprintf(stderr, "DBG: Current markers on line %lld: 0x%llx\n",
+                    (long long)line, (long long)markers);
             if( markers & (1 << 12) )  /* Breakpoint marker (12) */
             {
+               fprintf(stderr, "DBG: Removing breakpoint marker 12\n");
                /* Remove breakpoint */
                SciMsg( ed->sciView, SCI_MARKERDELETE, (uptr_t)line, 12 );
-               /* TODO: call Harbour to remove from debugger list */
+               /* Call Harbour to remove from debugger list */
+               if( ed->nActiveTab >= 0 && ed->nActiveTab < ed->nTabs && ed->tabNames[ed->nActiveTab][0] )
+               {
+                  hb_vmPushSymbol( hb_dynsymSymbol( hb_dynsymFind( "IDE_DEBUGREMOVEBREAKPOINT" ) ) );
+                  hb_vmPushString( ed->tabNames[ed->nActiveTab], strlen( ed->tabNames[ed->nActiveTab] ) );
+                  hb_vmPushLong( (long)line + 1 );  // Convert 0-based to 1-based
+                  hb_vmSend( 2 );
+               }
             }
             else
             {
+               fprintf(stderr, "DBG: Adding breakpoint marker 12\n");
                /* Add breakpoint */
                SciMsg( ed->sciView, SCI_MARKERADD, (uptr_t)line, 12 );
-               /* TODO: call Harbour to add to debugger list */
+               /* Call Harbour to add to debugger list */
+               if( ed->nActiveTab >= 0 && ed->nActiveTab < ed->nTabs && ed->tabNames[ed->nActiveTab][0] )
+               {
+                  hb_vmPushSymbol( hb_dynsymSymbol( hb_dynsymFind( "IDE_DEBUGADDBREAKPOINT" ) ) );
+                  hb_vmPushString( ed->tabNames[ed->nActiveTab], strlen( ed->tabNames[ed->nActiveTab] ) );
+                  hb_vmPushLong( (long)line + 1 );  // Convert 0-based to 1-based
+                  hb_vmSend( 2 );
+               }
             }
          }
          /* Fold/unfold on margin 2 */
@@ -3918,7 +3940,7 @@ HB_FUNC( IDE_DEBUGSTART )
    hb_dbg_SetEntry( IDE_DebugHook );
 
    s_dbgState = DBG_STEPPING;
-   s_nBreakpoints = 0;
+   // s_nBreakpoints = 0;  // Keep existing breakpoints
 
    fprintf( stderr, "DBG: session start, file=%s\n", cHrbFile );
    DbgOutput( "=== Debug session started ===\n" );
@@ -3982,7 +4004,7 @@ HB_FUNC( IDE_DEBUGSTART2 )
    }
 
    s_dbgState = DBG_STEPPING;
-   s_nBreakpoints = 0;
+   // s_nBreakpoints = 0;  // Keep existing breakpoints
    fprintf(stderr, "IDE-DBG: server started on 19800\n");
    DbgOutput( "=== Debug session started (socket) ===\n" );
    DbgOutput( "Listening on port 19800...\n" );
@@ -4174,7 +4196,7 @@ HB_FUNC( IDE_DEBUGRUNTOBREAK )
    hb_dbg_SetEntry( IDE_DebugHook );
 
    s_dbgState = DBG_RUNNING;  /* DIFFERENT FROM IDE_DEBUGSTART: RUNNING instead of STEPPING */
-   s_nBreakpoints = 0;
+   // s_nBreakpoints = 0;  // Keep existing breakpoints
 
    fprintf( stderr, "DBG: run-to-breakpoint session start, file=%s\n", cHrbFile );
    DbgOutput( "=== Debug session started (run to breakpoint) ===\n" );
@@ -4229,7 +4251,7 @@ HB_FUNC( IDE_DEBUGRUNTOBREAK2 )
    }
 
    s_dbgState = DBG_RUNNING;  /* DIFFERENT FROM IDE_DEBUGSTART2: RUNNING instead of STEPPING */
-   s_nBreakpoints = 0;
+   // s_nBreakpoints = 0;  // Keep existing breakpoints
    fprintf(stderr, "IDE-DBG: server started on 19800 (run to breakpoint)\n");
    DbgOutput( "=== Debug session started (socket, run to breakpoint) ===\n" );
    DbgOutput( "Listening on port 19800...\n" );
