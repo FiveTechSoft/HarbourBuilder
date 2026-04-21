@@ -3295,6 +3295,12 @@ static function TBRun()
    cAllPrg += '  ExitProcess(1);' + Chr(10)
    cAllPrg += '}' + Chr(10)
    cAllPrg += '#pragma ENDDUMP' + Chr(10)
+   // Form files saved via MemoWrit carry a trailing Chr(26) EOF marker.
+   // When concatenated, those embedded ^Z bytes truncate Harbour's view of
+   // main.prg and silently drop everything after the first occurrence —
+   // including the #pragma BEGINDUMP block, causing link errors for the
+   // platform-stub HB_FUNCs.
+   cAllPrg := StrTran( cAllPrg, Chr(26), "" )
    MemoWrit( cBuildDir + "\main.prg", cAllPrg )
 
    // Step 3: Compile user code with Harbour
@@ -4400,6 +4406,9 @@ static function TBDebugRun()
    cAllPrg += '}' + Chr(10)
    cAllPrg += '#pragma ENDDUMP' + Chr(10)
 
+   // Strip embedded Chr(26) EOF markers left by MemoWrit when forms were saved —
+   // without this, Harbour truncates at the first ^Z and drops BEGINDUMP.
+   cAllPrg := StrTran( cAllPrg, Chr(26), "" )
    MemoWrit( cBuildDir + "\debug_main.prg", cAllPrg )
 
    // Step 3: Harbour compile → C

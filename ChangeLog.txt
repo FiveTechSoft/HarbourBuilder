@@ -1,6 +1,41 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-21 (Windows — Report PDF writer, build-assembly Chr(26) fix)
+
+  NATIVE WINDOWS PDF WRITER:
+  - Replaced the RPT_PDF* stub functions in source/cpp/stubs_win.cpp with
+    a real PDF 1.4 writer. No external dependencies — emits PDF bytes
+    directly (catalog, pages tree, content streams, xref, trailer).
+  - RPT_PDFOPEN / RPT_PDFADDPAGE / RPT_PDFDRAWRECT / RPT_PDFDRAWTEXT /
+    RPT_EXPORTPDF now render filled/stroked rectangles and text with
+    font/size/bold/italic/color, matching the Linux (Cairo) and macOS
+    (Core Graphics) backends.
+  - Maps incoming font family names (Arial/Helvetica/Times/Courier/Mono/
+    Consolas/etc.) to one of the PDF standard 14 core fonts with
+    bold/italic variants. WinAnsi encoding is compatible with Harbour's
+    default CP_ACP on Windows.
+  - Screen coordinates (Y-down) are flipped to PDF's bottom-left origin.
+  - Fixes linker error: Unresolved external '_HB_FUN_RPT_PDFDRAWRECT'
+    referenced from HBBUILDER_WIN.OBJ. Calling classes.prg:2736 inside
+    TReport:ExportPDF() no longer fails to link.
+
+  USER-PROJECT BUILD: STRIP EMBEDDED Chr(26) FROM main.prg:
+  - Form files saved via MemoWrit carry a trailing Chr(26) (DOS EOF).
+    When the IDE concatenated Project1.prg + Form*.prg into the assembled
+    main.prg, those embedded ^Z bytes silently truncated Harbour's view
+    of the file at the first occurrence — dropping the entire
+    #pragma BEGINDUMP/ENDDUMP block that defines the platform-stub
+    HB_FUN_* symbols.
+  - Symptom: link failed with 14 unresolved externals on UserApp.exe
+    (UI_MEMONEW, UI_MSGBOX, UI_MSGYESNO, UI_SCENE3DNEW, UI_EARTHVIEWNEW,
+    UI_MAPNEW, UI_MAPSETREGION, UI_MAPADDPIN, UI_MAPCLEARPINS,
+    UI_MASKEDITNEW, UI_STRINGGRIDNEW, UI_GRIDSETCELL, UI_GRIDGETCELL,
+    W32_ERRORDIALOG).
+  - Fix: TBRun and TBDebug now strip Chr(26) from cAllPrg right before
+    writing main.prg / debug_main.prg, so Harbour sees the full text
+    including the BEGINDUMP block.
+
 2026-04-20e (Linux — WebView runtime fix, WebKit2GTK auto-detection)
 
   WEBKIT2GTK AUTO-DETECTION IN BUILD:
