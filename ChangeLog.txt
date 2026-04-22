@@ -1,6 +1,38 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-22b (macOS — Debugger form close fix, IDE exit fix, toolbar tooltips)
+
+  EXECUTED FORM CLOSE FIX:
+  - Fixed hang when closing the executed project form during a debug session
+  - Added s_dbgInPauseLoop flag to track when the debug pause event pump is active
+  - Added s_pendingAppStop deferred mechanism: [NSApp stop:nil] was targeting the
+    wrong run loop level when called from within sendEvent: — now deferred to after
+    sendEvent returns via CE_RequestAppStop()
+  - Added NSModalPanelRunLoopMode detection: pause loop now uses the correct run loop
+    mode when a modal window is active
+  - Added extern "C" helper functions: CE_IsInDebugPauseLoop(), CE_DebugForceStop(),
+    CE_RequestAppStop() — exported from cocoa_editor.mm for use by cocoa_core.m
+
+  IDE EXIT BUTTON FIX:
+  - Fixed IDE not closing from the Exit button after a debug session
+  - windowWillClose: now checks CE_IsInDebugPauseLoop() before calling Harbour VM
+    (prevents re-entrant hb_vmSend hang)
+  - windowWillClose: calls CE_DebugForceStop() to abort debug state when form closes
+    during a pause loop, then defers [NSApp stop:nil] via CE_RequestAppStop()
+  - windowShouldClose: returns YES immediately when in debug pause loop
+
+  DEBUG TOOLBAR TOOLTIPS FIX:
+  - Corrected tooltip assignments for all debug toolbar buttons
+  - toolbar_debug.bmp has exactly 6 icons (192×32px); separator does not consume a slot
+  - Removed misplaced "Go/Continue" button (no icon in bitmap for it)
+  - Correct button order: Debug | Debug→BP | --- | Step | Over | Stop Debugging | Exit IDE
+  - Last button (Exit IDE) calls oIDE:Close(); second-to-last (Stop Debugging) calls IDE_DebugStop()
+
+  SYMBOL REGISTRATION:
+  - Added IDE_ISBREAKPOINT, IDE_DBGISSTEPPING, IDE_DEBUGPAUSEATSTEP to cocoa_editor_reg.c
+    (were missing from HB_INIT_SYMBOLS table, causing symbol-not-found at runtime)
+
 2026-04-22 (macOS — Debugger step mode, correct breakpoint matching, UI fixes)
 
   STEP MODE DEBUGGER:

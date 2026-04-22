@@ -64,9 +64,9 @@ function DbgClientStart( nPort )
 return .t.
 
 static function DbgLog( cMsg )
-   local nH := FOpen( "c:\hbbuilder_debug\dbgclient_trace.log", 1 + 16 )  // FO_WRITE + FO_SHARED
+   local nH := FOpen( "/tmp/hbbuilder_debug/dbgclient_trace.log", 1 + 16 )  // FO_WRITE + FO_SHARED
    if nH == -1
-      nH := FCreate( "c:\hbbuilder_debug\dbgclient_trace.log" )
+      nH := FCreate( "/tmp/hbbuilder_debug/dbgclient_trace.log" )
    else
       FSeek( nH, 0, 2 )  // seek to end
    endif
@@ -106,6 +106,7 @@ static function DbgHook( nLine, cModule, cProcName )
    endif
 
    // Build full PAUSE message with locals and stack inline
+   // cModule already includes function name (format: "module:FUNCNAME")
    cMsg := "PAUSE " + cModule + ":" + LTrim( Str( nLine ) )
    cMsg += "|" + BuildLocals( cProcName )
    cMsg += "|" + BuildStack()

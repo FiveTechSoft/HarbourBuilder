@@ -3515,6 +3515,8 @@ HB_FUNC( MAC_PROJECTOPTIONSDIALOG )
 
 static int    s_dbgState = DBG_IDLE;
 static int    s_prevDbgState = DBG_IDLE;
+static int    s_dbgInPauseLoop = 0;   /* 1 while pause loop is processing events */
+static int    s_pendingAppStop = 0;   /* deferred [NSApp stop:nil] request */
 static int    s_dbgLine = 0;
 static int    s_dbgStepDepth = 0;
 static char   s_dbgModule[256] = "";
@@ -3775,17 +3777,31 @@ static void IDE_DebugHook( int nMode, int nLine, const char * szName,
       hb_itemRelease( pLine );
    }
 
-   /* Keep UI responsive while paused — process Cocoa events */
+   /* Keep UI responsive while paused — process Cocoa events.
+      s_dbgInPauseLoop guards against re-entrant hb_vmSend from event handlers. */
+   s_dbgInPauseLoop = 1;
    while( s_dbgState == DBG_PAUSED )
    {
       @autoreleasepool {
+         NSString * runMode = ([NSApp modalWindow] != nil)
+            ? NSModalPanelRunLoopMode : NSDefaultRunLoopMode;
          NSEvent * event = [NSApp nextEventMatchingMask:NSEventMaskAny
             untilDate:[NSDate dateWithTimeIntervalSinceNow:0.05]
-            inMode:NSDefaultRunLoopMode dequeue:YES];
+            inMode:runMode dequeue:YES];
          if( event )
             [NSApp sendEvent:event];
+         /* Apply deferred [NSApp stop:nil] AFTER sendEvent returns so it
+            targets the form's [NSApp run], not the innermost nextEventMatchingMask level */
+         if( s_pendingAppStop ) {
+            s_pendingAppStop = 0;
+            [NSApp stop:nil];
+            [NSApp postEvent:[NSEvent otherEventWithType:NSEventTypeApplicationDefined
+               location:NSZeroPoint modifierFlags:0 timestamp:0
+               windowNumber:0 context:nil subtype:0 data1:0 data2:0] atStart:YES];
+         }
       }
    }
+   s_dbgInPauseLoop = 0;
 
    if( s_dbgState == DBG_STOPPED )
       DbgOutput( "Debug session stopped.\n" );
@@ -4225,9 +4241,11 @@ HB_FUNC( IDE_DEBUGSTART2 )
          while( s_dbgState == DBG_PAUSED )
          {
             @autoreleasepool {
+               NSString * runMode = ([NSApp modalWindow] != nil)
+                  ? NSModalPanelRunLoopMode : NSDefaultRunLoopMode;
                NSEvent * ev = [NSApp nextEventMatchingMask:NSEventMaskAny
                   untilDate:[NSDate dateWithTimeIntervalSinceNow:0.05]
-                  inMode:NSDefaultRunLoopMode dequeue:YES];
+                  inMode:runMode dequeue:YES];
                if( ev ) [NSApp sendEvent:ev];
             }
          }
@@ -4552,6 +4570,11 @@ HB_FUNC( IDE_DEBUGSTEPOVER )
 /* IDE_DebugStop() */
 HB_FUNC( IDE_DEBUGSTOP )
 { if( s_dbgState != DBG_IDLE ) s_dbgState = DBG_STOPPED; }
+
+/* C-level helpers — extern "C" so cocoa_core.m (plain C) links without name mangling */
+extern "C" int  CE_IsInDebugPauseLoop(void) { return s_dbgInPauseLoop; }
+extern "C" void CE_DebugForceStop(void)     { if( s_dbgState != DBG_IDLE ) s_dbgState = DBG_STOPPED; }
+extern "C" void CE_RequestAppStop(void)     { s_pendingAppStop = 1; }
 
 /* IDE_DebugPauseAtStep() — called from OnDebugPause when user code reached in step mode */
 HB_FUNC( IDE_DEBUGPAUSEATSTEP )

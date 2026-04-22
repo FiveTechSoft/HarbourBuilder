@@ -25,6 +25,11 @@
 #include <stdio.h>
 #include <pthread.h>
 
+/* Debug helpers from cocoa_editor.mm — avoid re-entrant VM calls */
+extern int  CE_IsInDebugPauseLoop(void);
+extern void CE_DebugForceStop(void);
+extern void CE_RequestAppStop(void);
+
 /* Suppress macOS "Wait cursor is invalid" / "Reverse arrow cursor is invalid" warnings */
 __attribute__((constructor))
 static void SuppressCursorWarnings(void)
@@ -3912,7 +3917,9 @@ static HBPaletteTarget * s_palTarget = nil;
       [NSApp activateIgnoringOtherApps:YES];
       FRunning = YES;
       if( enterLoop ) {
+         fprintf(stderr, "RUNLOOP: [NSApp run] START pathA title='%s'\n", FWindow ? [[FWindow title] UTF8String] : "?");
          [NSApp run];
+         fprintf(stderr, "RUNLOOP: [NSApp run] END pathA title='%s'\n", FWindow ? [[FWindow title] UTF8String] : "?");
          FRunning = NO;
       }
       return;
@@ -4300,32 +4307,56 @@ static void FlushPendingDBGrids( HBControl * node )
 
 - (void)windowWillClose:(NSNotification *)notification
 {
-   if( FOnClose ) [self fireEvent:FOnClose];
-   if( FOnHide ) [self fireEvent:FOnHide];
+   BOOL inPauseLoop = CE_IsInDebugPauseLoop();
+   fprintf(stderr, "CLOSE: windowWillClose title='%s' inPauseLoop=%d FRunning=%d FWasRunning=%d modalWindow=%s\n",
+      FWindow ? [[FWindow title] UTF8String] : "?",
+      (int)inPauseLoop, (int)FRunning, (int)FWasRunning,
+      [NSApp modalWindow] ? "yes" : "no");
+
+   /* While the debug pause loop is spinning, hb_vmSend would be re-entrant — skip */
+   if( !inPauseLoop ) {
+      if( FOnClose ) [self fireEvent:FOnClose];
+      if( FOnHide )  [self fireEvent:FOnHide];
+   } else {
+      CE_DebugForceStop();  /* unblock the pause loop */
+   }
 
    /* If this window is running a modal session, end it */
    if( [NSApp modalWindow] == FWindow ) {
       [NSApp stopModal];
       FRunning = NO;
       FWasRunning = NO;
+      fprintf(stderr, "CLOSE: stopModal called\n");
       return;
    }
 
-   /* Only stop the run loop if this form had its own modal loop (Activate/Run) */
+   /* Stop the form's [NSApp run] event loop if it owns one */
    BOOL wasModal = FRunning || FWasRunning;
    FRunning = NO;
    FWasRunning = NO;
 
    if( wasModal ) {
-      [NSApp stop:nil];
-      [NSApp postEvent:[NSEvent otherEventWithType:NSEventTypeApplicationDefined
-         location:NSZeroPoint modifierFlags:0 timestamp:0
-         windowNumber:0 context:nil subtype:0 data1:0 data2:0] atStart:YES];
+      if( inPauseLoop ) {
+         fprintf(stderr, "CLOSE: CE_RequestAppStop (deferred)\n");
+         CE_RequestAppStop();
+      } else {
+         fprintf(stderr, "CLOSE: [NSApp stop:nil] direct\n");
+         [NSApp stop:nil];
+         [NSApp postEvent:[NSEvent otherEventWithType:NSEventTypeApplicationDefined
+            location:NSZeroPoint modifierFlags:0 timestamp:0
+            windowNumber:0 context:nil subtype:0 data1:0 data2:0] atStart:YES];
+      }
+   } else {
+      fprintf(stderr, "CLOSE: wasModal=NO, no stop\n");
    }
 }
 
 - (BOOL)windowShouldClose:(NSWindow *)sender
 {
+   fprintf(stderr, "CLOSE: windowShouldClose title='%s' inPauseLoop=%d\n",
+      FWindow ? [[FWindow title] UTF8String] : "?", CE_IsInDebugPauseLoop());
+   /* Skip OnCloseQuery Harbour callback when re-entrant (debug pause loop) */
+   if( CE_IsInDebugPauseLoop() ) return YES;
    if( FOnCloseQuery && HB_IS_BLOCK( FOnCloseQuery ) ) {
       hb_vmPushEvalSym();
       hb_vmPush( FOnCloseQuery );
