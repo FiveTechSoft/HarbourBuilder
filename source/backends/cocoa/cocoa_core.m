@@ -29,6 +29,7 @@
 extern int  CE_IsInDebugPauseLoop(void);
 extern void CE_DebugForceStop(void);
 extern void CE_RequestAppStop(void);
+extern void CE_NotifyRunLoopEnded(void);
 
 /* Suppress macOS "Wait cursor is invalid" / "Reverse arrow cursor is invalid" warnings */
 __attribute__((constructor))
@@ -4058,11 +4059,18 @@ static HBPaletteTarget * s_palTarget = nil;
    if( enterLoop ) {
       if( s_nRunLoopDepth > 0 ) {
          /* Already inside [NSApp run] — don't nest, just show */
+         fprintf(stderr, "RUNLOOP: pathB depth>0, NOT calling [NSApp run] title='%s'\n",
+            FWindow ? [[FWindow title] UTF8String] : "?");
       } else {
          FRunning = YES;
          s_nRunLoopDepth++;
+         fprintf(stderr, "RUNLOOP: pathB [NSApp run] START title='%s'\n",
+            FWindow ? [[FWindow title] UTF8String] : "?");
          [NSApp run];
+         fprintf(stderr, "RUNLOOP: pathB [NSApp run] END title='%s'\n",
+            FWindow ? [[FWindow title] UTF8String] : "?");
          s_nRunLoopDepth--;
+         if( s_nRunLoopDepth == 0 ) CE_NotifyRunLoopEnded();
          FRunning = NO;
       }
    }
@@ -4345,6 +4353,7 @@ static void FlushPendingDBGrids( HBControl * node )
          [NSApp postEvent:[NSEvent otherEventWithType:NSEventTypeApplicationDefined
             location:NSZeroPoint modifierFlags:0 timestamp:0
             windowNumber:0 context:nil subtype:0 data1:0 data2:0] atStart:YES];
+         fprintf(stderr, "CLOSE: [NSApp stop:nil] + postEvent done\n");
       }
    } else {
       fprintf(stderr, "CLOSE: wasModal=NO, no stop\n");

@@ -46,6 +46,7 @@ EXTERNAL INS_SETDEBUGSTACK
 EXTERNAL IDE_DEBUGPAUSEATSTEP
 EXTERNAL IDE_ISBREAKPOINT
 EXTERNAL IDE_DBGISSTEPPING
+EXTERNAL IDE_DBGRUNLOOPENDED
 
 static oIDE          // Main IDE bar (top strip)
 static oDesignForm   // Design form (active, floats on top of editor)
@@ -4031,6 +4032,10 @@ static function TBDebugRun( lRunToBreakpoint )
               " -o " + cBuildDir + "/cocoa_editor.o 2>&1"
       MAC_ShellExec( cCmd )
       cCmd := "clang -c -O2 -I" + cHbInc + ;
+              " " + cBackends + "/cocoa_editor_reg.c" + ;
+              " -o " + cBuildDir + "/cocoa_editor_reg.o 2>&1"
+      MAC_ShellExec( cCmd )
+      cCmd := "clang -c -O2 -I" + cHbInc + ;
               " " + cBackends + "/gt_dummy.c" + ;
               " -o " + cBuildDir + "/gt_dummy.o 2>&1"
       MAC_ShellExec( cCmd )
@@ -4052,6 +4057,7 @@ static function TBDebugRun( lRunToBreakpoint )
               " " + cBuildDir + "/cocoa_core.o" + ;
               " " + cBuildDir + "/cocoa_webserver.o" + ;
               " " + cBuildDir + "/cocoa_editor.o" + ;
+              " " + cBuildDir + "/cocoa_editor_reg.o" + ;
               " " + cBuildDir + "/gt_dummy.o" + ;
               If( File( cBuildDir + "/stddlgs_mac.o" ), " " + cBuildDir + "/stddlgs_mac.o", "" ) + ;
               " " + cSciLib + "/libscintilla.a" + ;

@@ -1,6 +1,25 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-22c (macOS — Debugger: clean exit after form closes during step mode)
+
+  DEBUGGER CLEAN EXIT AFTER FORM CLOSE:
+  - Fixed hang (spinning cursor) after closing the executed form while in step mode
+  - Root cause: after form closes, debug hook fired at MAIN's final `return`; with
+    s_dbgState=DBG_STEPPING the IDE paused there, blocking the subprocess indefinitely
+  - Fix: subprocess now signals IDE when its [NSApp run] loop ends (form closed):
+    * cocoa_core.m: calls CE_NotifyRunLoopEnded() after s_nRunLoopDepth drops to 0
+    * cocoa_editor.mm: CE_NotifyRunLoopEnded() sets s_dbgRunLoopEnded flag;
+      new IDE_DBGRUNLOOPENDED() HB_FUNC exposes flag to Harbour in the subprocess
+    * dbgclient.prg: DbgHook() checks IDE_DbgRunLoopEnded() before sending PAUSE —
+      if run loop ended, sends "DONE" and disconnects instead of blocking
+    * cocoa_editor.mm (IDE side): handles "DONE" in IDE_DEBUGRUNTOBREAK2 command
+      loop by breaking cleanly; resets s_dbgRunLoopEnded at session start
+  - cocoa_editor_reg.c: registered IDE_DBGRUNLOOPENDED symbol for DebugApp subprocess
+  - hbbuilder_macos.prg: added EXTERNAL IDE_DBGRUNLOOPENDED declaration
+  - DbgRecv() already pumps Cocoa events (50ms loop with IDE_DbgPumpEvents) so the
+    form remains responsive and closes cleanly while waiting for STEP/GO from IDE
+
 2026-04-22b (macOS — Debugger form close fix, IDE exit fix, toolbar tooltips)
 
   EXECUTED FORM CLOSE FIX:

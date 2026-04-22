@@ -3522,6 +3522,7 @@ static int    s_dbgStepDepth = 0;
 static char   s_dbgModule[256] = "";
 static PHB_ITEM s_dbgOnPause = NULL;
 static int    s_dbgPauseAtStep = 0; /* set by IDE_DebugPauseAtStep() from Harbour */
+static int    s_dbgRunLoopEnded = 0; /* set by CE_NotifyRunLoopEnded when subprocess form closes */
 
 /* Debugger UI widgets */
 static NSWindow *    s_dbgWindow = nil;
@@ -3705,6 +3706,27 @@ HB_FUNC( IDE_ISBREAKPOINT )
 /* IDE_DbgIsStepping() → .T. when debugger is in step/stepover mode */
 HB_FUNC( IDE_DBGISSTEPPING )
 { hb_retl( s_dbgState == DBG_STEPPING || s_dbgState == DBG_STEPOVER ); }
+
+/* IDE_DbgPumpEvents() — pump Cocoa events for up to 20ms, called from debug client
+ * subprocess wait loop so the executed form remains responsive while paused */
+HB_FUNC( IDE_DBGPUMPEVENTS )
+{
+   @autoreleasepool {
+      NSDate * deadline = [NSDate dateWithTimeIntervalSinceNow:0.02];
+      NSEvent * evt;
+      while( (evt = [NSApp nextEventMatchingMask:NSEventMaskAny
+                                      untilDate:deadline
+                                         inMode:NSDefaultRunLoopMode
+                                        dequeue:YES]) != nil )
+      {
+         [NSApp sendEvent:evt];
+      }
+   }
+}
+
+/* IDE_DbgRunLoopEnded() — .T. after subprocess's [NSApp run] ends (form closed) */
+HB_FUNC( IDE_DBGRUNLOOPENDED )
+{ hb_retl( s_dbgRunLoopEnded != 0 ); }
 
 static int DbgIsBreakpoint( const char * module, int line )
 {
@@ -4361,6 +4383,7 @@ HB_FUNC( IDE_DEBUGRUNTOBREAK2 )
 
    s_dbgState = DBG_RUNNING;  /* DIFFERENT FROM IDE_DEBUGSTART2: RUNNING instead of STEPPING */
    s_prevDbgState = DBG_RUNNING;
+   s_dbgRunLoopEnded = 0;
    // s_nBreakpoints = 0;  // Keep existing breakpoints
    fprintf(stderr, "IDE-DBG: server started on 19800 (run to breakpoint)\n");
    DbgOutput( "=== Debug session started (socket, run to breakpoint) ===\n" );
@@ -4441,6 +4464,13 @@ HB_FUNC( IDE_DEBUGRUNTOBREAK2 )
       }
       recvBuf[n] = 0;
       s_prevDbgState = s_dbgState;
+
+      if( strncmp( recvBuf, "DONE", 4 ) == 0 )
+      {
+         fprintf(stderr, "IDE-DBG: subprocess sent DONE (run loop ended, exiting cleanly)\n");
+         DbgOutput( "Subprocess completed.\n" );
+         break;
+      }
 
       if( strncmp( recvBuf, "HELLO", 5 ) == 0 )
       {
@@ -4572,9 +4602,10 @@ HB_FUNC( IDE_DEBUGSTOP )
 { if( s_dbgState != DBG_IDLE ) s_dbgState = DBG_STOPPED; }
 
 /* C-level helpers — extern "C" so cocoa_core.m (plain C) links without name mangling */
-extern "C" int  CE_IsInDebugPauseLoop(void) { return s_dbgInPauseLoop; }
-extern "C" void CE_DebugForceStop(void)     { if( s_dbgState != DBG_IDLE ) s_dbgState = DBG_STOPPED; }
-extern "C" void CE_RequestAppStop(void)     { s_pendingAppStop = 1; }
+extern "C" int  CE_IsInDebugPauseLoop(void)  { return s_dbgInPauseLoop; }
+extern "C" void CE_DebugForceStop(void)      { if( s_dbgState != DBG_IDLE ) s_dbgState = DBG_STOPPED; }
+extern "C" void CE_RequestAppStop(void)      { s_pendingAppStop = 1; }
+extern "C" void CE_NotifyRunLoopEnded(void)  { s_dbgRunLoopEnded = 1; }
 
 /* IDE_DebugPauseAtStep() — called from OnDebugPause when user code reached in step mode */
 HB_FUNC( IDE_DEBUGPAUSEATSTEP )

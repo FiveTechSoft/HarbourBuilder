@@ -105,6 +105,14 @@ static function DbgHook( nLine, cModule, cProcName )
       endif
    endif
 
+   // If form's run loop ended (form closed), signal IDE and exit cleanly
+   if IDE_DbgRunLoopEnded()
+      DbgSend( "DONE" )
+      aS[ DBG_CONNECTED ] := .f.
+      hb_socketClose( aS[ DBG_SOCKET ] )
+      return nil
+   endif
+
    // Build full PAUSE message with locals and stack inline
    // cModule already includes function name (format: "module:FUNCNAME")
    cMsg := "PAUSE " + cModule + ":" + LTrim( Str( nLine ) )
@@ -316,8 +324,28 @@ return nil
 static function DbgRecv()
 
    local cBuf := Space( 4096 ), nLen, aS := DbgState()
+   local lReady
 
    if ! aS[ DBG_CONNECTED ] .or. aS[ DBG_SOCKET ] == nil
+      return nil
+   endif
+
+   // Non-blocking select loop: pump Cocoa events every 50ms so the
+   // executed form (running in this subprocess) can process UI events
+   // (e.g. close button) while waiting for a STEP/GO command from IDE
+   do while aS[ DBG_CONNECTED ]
+      lReady := hb_socketSelect( { aS[ DBG_SOCKET ] }, ,, 50 )
+      if lReady > 0
+         exit
+      endif
+      if lReady < 0
+         aS[ DBG_CONNECTED ] := .f.
+         return nil
+      endif
+      IDE_DbgPumpEvents()
+   enddo
+
+   if ! aS[ DBG_CONNECTED ]
       return nil
    endif
 
