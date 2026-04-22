@@ -130,6 +130,7 @@ function Main()
    DEFINE POPUP oRun PROMPT "Run" OF oIDE
    MENUITEM "Run"            OF oRun ACTION TBRun()                ACCEL "r"
    MENUITEM "Debug"          OF oRun ACTION TBDebugRun()
+   MENUITEM "Debug to BP"    OF oRun ACTION TBDebugRunToBreak()
    MENUSEPARATOR OF oRun
    MENUITEM "Step Over"      OF oRun ACTION DebugStepOver()
    MENUITEM "Step Into"      OF oRun ACTION DebugStepInto()
@@ -254,6 +255,7 @@ function Main()
    // Row 2: Debug speedbar
    DEFINE TOOLBAR oTB2 OF oIDE
    BUTTON "Debug" OF oTB2 TOOLTIP "Debug (F8)"             ACTION TBDebugRun()
+   BUTTON "DebBP" OF oTB2 TOOLTIP "Debug to Breakpoint"   ACTION TBDebugRunToBreak()
    SEPARATOR OF oTB2
    BUTTON "Step"  OF oTB2 TOOLTIP "Step Into (F7)"         ACTION DebugStepInto()
    BUTTON "Over"  OF oTB2 TOOLTIP "Step Over (F8)"         ACTION DebugStepOver()
@@ -2448,12 +2450,18 @@ return nil
 
 // === Debug Run (socket-based, compiles native exe with dbgclient.prg) ===
 
-static function TBDebugRun()
+static function TBDebugRunToBreak()
+   TBDebugRun( .T. )
+return nil
+
+static function TBDebugRun( lRunToBreak )
 
    local cBuildDir, cOutput, cLog, i, lError
    local cHbDir, cHbBin, cHbInc, cHbLib, cProjDir
    local cAllPrg, cCmd, cMainPrg, cSection
    local nCurLine
+
+   if lRunToBreak == nil; lRunToBreak := .F.; endif
 
    SaveActiveFormCode()
 
@@ -2638,7 +2646,8 @@ static function TBDebugRun()
    GTK_ProcessEvents()
 
    IDE_DebugStart2( cBuildDir + "/DebugApp", ;
-      { |cFunc, nLine, cLocals, cStack| OnDebugPause( cFunc, nLine, cLocals, cStack ) } )
+      { |cFunc, nLine, cLocals, cStack| OnDebugPause( cFunc, nLine, cLocals, cStack, lRunToBreak ) }, ;
+      lRunToBreak )
 
    // Restore: clear debug marker, unhighlight, restore inspector, show design form
    CodeEditorShowDebugLine( hCodeEditor, 0 )  // clear yellow marker
@@ -2783,19 +2792,20 @@ return n
 
 // === Debug Pause Callback (called from socket command loop) ===
 
-static function OnDebugPause( cFunc, nLine, cLocals, cStack )
+static function OnDebugPause( cFunc, nLine, cLocals, cStack, lRunToBreak )
 
-   local i, nTab, nTabLine, hIns
-
+   local i, nTab, nTabLine, hIns, cFile
 
    // Map debug_main.prg line number to the correct editor tab and line
    nTab := 0
    nTabLine := 0
+   cFile := ""
    if aDbgOffsets != nil
       for i := Len( aDbgOffsets ) to 1 step -1
          if nLine >= aDbgOffsets[i][1]
-            nTab := aDbgOffsets[i][3]
+            nTab    := aDbgOffsets[i][3]
             nTabLine := nLine - aDbgOffsets[i][1] + aDbgOffsets[i][4]
+            cFile   := aDbgOffsets[i][2]
             exit
          endif
       next
@@ -2804,6 +2814,13 @@ static function OnDebugPause( cFunc, nLine, cLocals, cStack )
    // Framework code (nTab == 0) — skip, don't pause, don't update
    if nTab == 0
       return .f.
+   endif
+
+   // In "run to BP" mode: only pause at actual breakpoints or when stepping line-by-line
+   if lRunToBreak
+      if ! IDE_IsBreakpoint( cFile, nTabLine ) .and. ! IDE_DbgIsStepping()
+         return .f.
+      endif
    endif
 
    // Select the tab and highlight the line

@@ -8862,6 +8862,48 @@ HB_FUNC( IDE_DEBUGADDBREAKPOINT )
 
 HB_FUNC( IDE_DEBUGCLEARBREAKPOINTS ) { s_nBreakpoints = 0; }
 
+/* IDE_IsBreakpoint( cFile, nLine ) — exact source filename + line matching */
+HB_FUNC( IDE_ISBREAKPOINT )
+{
+   const char * cFile = HB_ISCHAR(1) ? hb_parc(1) : "";
+   int nLine = hb_parni(2);
+   int i;
+   for( i = 0; i < s_nBreakpoints; i++ )
+      if( s_breakpoints[i].line == nLine &&
+          ( s_breakpoints[i].module[0] == 0 ||
+            strcasestr( cFile, s_breakpoints[i].module ) != NULL ||
+            strcasestr( s_breakpoints[i].module, cFile ) != NULL ) )
+      {
+         hb_retl( HB_TRUE );
+         return;
+      }
+   hb_retl( HB_FALSE );
+}
+
+HB_FUNC( IDE_DBGISSTEPPING )
+{
+   hb_retl( s_dbgState == DBG_STEPPING || s_dbgState == DBG_STEPOVER );
+}
+
+/* Always .F. on Linux — no NSApp-style run loop to detect */
+HB_FUNC( IDE_DBGRUNLOOPENDED )
+{
+   hb_retl( HB_FALSE );
+}
+
+/* Pump GTK events for ~20ms — keeps executed form responsive during step */
+HB_FUNC( IDE_DBGPUMPEVENTS )
+{
+   int i;
+   for( i = 0; i < 4; i++ ) {
+      while( gtk_events_pending() )
+         gtk_main_iteration_do( FALSE );
+      g_usleep( 5000 );
+   }
+}
+
+HB_FUNC( IDE_DEBUGPAUSEATSTEP ) {}
+
 /* State queries */
 HB_FUNC( IDE_DEBUGGETSTATE )  { hb_retni( s_dbgState ); }
 HB_FUNC( IDE_DEBUGGETLINE )   { hb_retni( s_dbgLine ); }
@@ -9046,11 +9088,12 @@ static void DbgServerStop(void)
    s_dbgRecvLen = 0;
 }
 
-/* IDE_DebugStart2( cExePath, bOnPause ) — socket-based debug session */
+/* IDE_DebugStart2( cExePath, bOnPause [, lRunToBreak] ) — socket-based debug session */
 HB_FUNC( IDE_DEBUGSTART2 )
 {
    const char * cExePath = hb_parc(1);
    PHB_ITEM pOnPause = hb_param(2, HB_IT_BLOCK);
+   int lRunToBreak = HB_ISLOG(3) ? hb_parl(3) : HB_FALSE;
 
    setbuf(stderr, NULL);
    fprintf(stderr, "IDE-DBG: IDE_DebugStart2 called exe='%s'\n", cExePath ? cExePath : "(null)");
@@ -9079,7 +9122,6 @@ HB_FUNC( IDE_DEBUGSTART2 )
    }
 
    s_dbgState = DBG_STEPPING;
-   s_nBreakpoints = 0;
    DbgOutput( "=== Debug session started (socket) ===\n" );
    DbgOutput( "Listening on port 19800...\n" );
 
@@ -9131,6 +9173,12 @@ HB_FUNC( IDE_DEBUGSTART2 )
          continue;
       }
 
+      if( strncmp( recvBuf, "DONE", 4 ) == 0 )
+      {
+         DbgOutput( "Debug client finished (form closed).\n" );
+         break;
+      }
+
       if( strncmp( recvBuf, "PAUSE ", 6 ) == 0 )
       {
          /* Format: PAUSE filepath:FUNCNAME:line|VARS ...|STACK ... */
@@ -9164,10 +9212,15 @@ HB_FUNC( IDE_DEBUGSTART2 )
 
          s_dbgLine = line;
 
-         /* In RUNNING mode, skip pause */
+         /* In RUNNING mode: GO for normal debug, STEP for run-to-BP (keeps breakpoint checks active) */
          if( s_dbgState == DBG_RUNNING )
          {
-            DbgServerSend( "GO" );
+            if( lRunToBreak ) {
+               DbgServerSend( "STEP" );
+               s_dbgState = DBG_PAUSED;
+            } else {
+               DbgServerSend( "GO" );
+            }
             continue;
          }
 
