@@ -1,6 +1,45 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-22d (Linux — Step Into fix, breakpoints, debugger toolbar, WebKit build)
+
+  STEP INTO FIX:
+  - Step Into now correctly pauses at each user-code line
+  - Root cause: s_dbgWasStepping flag was overwritten on every PAUSE arrival with a
+    state check that always evaluated to false (s_dbgState is already DBG_PAUSED by
+    then); flag is now exclusively managed by IDE_DEBUGSTEP (sets it) / IDE_DEBUGGO
+    (clears it) and never recomputed inside the PAUSE handler
+
+  BREAKPOINT MOUSE CLICK:
+  - Clicking in margin 1 (left of line numbers) now toggles breakpoints
+  - Margin 1 configured as symbol margin showing marker 12 (red circle) — width 14px,
+    sensitive to clicks
+  - SCN_MARGINCLICK handler toggles marker 12 and updates s_breakpoints[] in pure C
+  - Added SC_MARK_CIRCLE and SCI_MARKERGET constants (missing from GTK3 build)
+  - Moved DBGBP struct and s_breakpoints[] definitions before on_sci_notify to fix
+    forward-reference compiler errors
+
+  DEBUGGER STATE MACHINE (ported from macOS):
+  - Added s_dbgWasStepping flag alongside s_dbgState for decoupled step tracking
+  - Added IDE_ISBREAKPOINT, IDE_DBGISSTEPPING, IDE_DBGRUNLOOPENDED, IDE_DBGPUMPEVENTS,
+    IDE_DEBUGPAUSEATSTEP HB_FUNCs to GTK3 backend
+  - IDE_DEBUGSTART2: RUNNING state always sends STEP (never GO) so subprocess pauses
+    on every line; breakpoint/step filtering done in the Harbour callback
+  - IDE_DEBUGSTART2: handles DONE message from subprocess for clean exit
+  - OnDebugPause: skips framework lines (nTab==0), then checks IDE_IsBreakpoint OR
+    IDE_DbgIsStepping — matches macOS logic exactly
+
+  DEBUG TOOLBAR FIX:
+  - Removed duplicate Exit button and separator from debug toolbar (oTB2)
+  - Corrected button actions: Stop Debugging → IDE_DebugStop, Exit → oIDE:Close()
+  - Added "Run to Breakpoint" (DebBP) toolbar button calling TBDebugRunToBreak()
+
+  BUILD FIXES:
+  - Fixed .o copy path: source/gtk3_core.o (was incorrectly samples/gtk3_core.o)
+  - WebKit2GTK auto-detection: pkg-config checks for webkit2gtk-4.1 then 4.0 before
+    linking DebugApp, preventing undefined-reference errors on WebKit-enabled builds
+  - Moved cWebKitLibs LOCAL declaration to function top (Harbour LOCAL scope rule)
+
 2026-04-22c (macOS — Debugger: clean exit after form closes during step mode)
 
   DEBUGGER CLEAN EXIT AFTER FORM CLOSE:
