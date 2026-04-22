@@ -2457,7 +2457,7 @@ static function TBDebugRun( lRunToBreak )
    local cBuildDir, cOutput, cLog, i, lError
    local cHbDir, cHbBin, cHbInc, cHbLib, cProjDir
    local cAllPrg, cCmd, cMainPrg, cSection
-   local nCurLine
+   local nCurLine, cWebKitLibs
 
    if lRunToBreak == nil; lRunToBreak := .F.; endif
 
@@ -2585,6 +2585,14 @@ static function TBDebugRun( lRunToBreak )
       cLog += "    OK" + Chr(10)
    endif
 
+   // Detect WebKit2GTK for linker flags (same logic as build_linux.sh)
+   cWebKitLibs := ""
+   if GTK_ShellExec( "pkg-config --exists webkit2gtk-4.1 2>/dev/null; echo $?" ) == "0" + Chr(10)
+      cWebKitLibs := "$(pkg-config --libs webkit2gtk-4.1)"
+   elseif GTK_ShellExec( "pkg-config --exists webkit2gtk-4.0 2>/dev/null; echo $?" ) == "0" + Chr(10)
+      cWebKitLibs := "$(pkg-config --libs webkit2gtk-4.0)"
+   endif
+
    // Step 6: Link native executable
    if ! lError
       cLog += "[6] Linking..." + Chr(10)
@@ -2605,6 +2613,7 @@ static function TBDebugRun( lRunToBreak )
               " -lgttrm -lhbpcre" + ;
               " -Wl,--end-group" + ;
               " $(pkg-config --libs gtk+-3.0)" + ;
+              " " + cWebKitLibs + ;
               " -lm -lpthread -ldl -lrt -lsqlite3 -lncurses 2>&1"
       cOutput := GTK_ShellExec( cCmd )
       if "error" $ Lower( cOutput )
