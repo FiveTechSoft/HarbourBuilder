@@ -14,6 +14,7 @@
 #include <ws2tcpip.h>
 #include "hbide.h"
 #include <string.h>
+#include <tlhelp32.h>
 
 /* Forward declaration — defined in tform.cpp */
 void ApplyDockAlign( TForm * form );
@@ -4233,6 +4234,28 @@ static int DbgServerStart( int port )
    return 0;
 }
 
+/* Kill any running DebugApp.exe without blocking the caller's message pump.
+ * Replaces system("taskkill ...") which freezes the IDE long enough for DWM
+ * to flag the window "Not Responding" (and show a stretched ghost bitmap). */
+static void KillDebugApp( void )
+{
+   HANDLE hSnap = CreateToolhelp32Snapshot( TH32CS_SNAPPROCESS, 0 );
+   PROCESSENTRY32 pe;
+   if( hSnap == INVALID_HANDLE_VALUE ) return;
+   pe.dwSize = sizeof(pe);
+   if( Process32First( hSnap, &pe ) )
+   {
+      do {
+         if( _stricmp( pe.szExeFile, "DebugApp.exe" ) == 0 )
+         {
+            HANDLE h = OpenProcess( PROCESS_TERMINATE, FALSE, pe.th32ProcessID );
+            if( h ) { TerminateProcess( h, 1 ); CloseHandle( h ); }
+         }
+      } while( Process32Next( hSnap, &pe ) );
+   }
+   CloseHandle( hSnap );
+}
+
 static int DbgServerAccept( double timeoutSec )
 {
    fd_set fds;
@@ -4747,10 +4770,14 @@ static void BringDebugAppToFront(void)
 /* IDE_DebugStart2( cExePath, bOnPause ) — socket-based debug session
  * Mirrors the macOS/Linux implementation: starts TCP server on port 19800,
  * launches user exe as separate process, communicates via socket protocol. */
+/* IDE_DebugStart2( cExePath, bOnPause, [lRunToBreak] )
+ *   lRunToBreak defaults to .F. — Debug button pauses at first user line;
+ *   .T. → Debug-to-BP button runs through until a breakpoint is hit. */
 HB_FUNC( IDE_DEBUGSTART2 )
 {
    const char * cExePath = hb_parc(1);
    PHB_ITEM pOnPause = hb_param(2, HB_IT_BLOCK);
+   HB_BOOL lRunToBreak = hb_parl(3);
 
    /* Clear trace log */
    { FILE * f = fopen("c:\\hbbuilder_debug\\dbg_trace_c.log","w"); if(f) fclose(f); }
@@ -4766,7 +4793,7 @@ HB_FUNC( IDE_DEBUGSTART2 )
    /* Clean up any previous debug session */
    DbgServerStop();
    /* Kill any leftover DebugApp */
-   system( "taskkill /F /IM DebugApp.exe >nul 2>&1" );
+   KillDebugApp();  /* Direct Win32 API — doesn't block the IDE message pump */
 
    if( s_dbgOnPause ) { hb_itemRelease( s_dbgOnPause ); s_dbgOnPause = NULL; }
    if( pOnPause ) s_dbgOnPause = hb_itemNew( pOnPause );
@@ -4783,9 +4810,13 @@ HB_FUNC( IDE_DEBUGSTART2 )
    DbgTrace("TCP server started OK");
 
    s_dbgState = DBG_STEPPING;
-   s_dbgWasStepping = 0;
-   /* Preserve breakpoints across debug sessions (matches macOS/Linux) */
-   DbgOutput( "=== Debug session started (socket) ===\r\n" );
+   /* Debug button → stepping=TRUE pauses at the first user line (classic
+    * step-through). Debug-to-BP button → stepping=FALSE runs until a BP
+    * is hit. Breakpoints persist across sessions (match macOS/Linux). */
+   s_dbgWasStepping = lRunToBreak ? 0 : 1;
+   DbgOutput( lRunToBreak
+      ? "=== Debug session started (run to breakpoint) ===\r\n"
+      : "=== Debug session started (step) ===\r\n" );
    DbgOutput( "Listening on port 19800...\r\n" );
 
    /* Launch user executable as separate process */
@@ -5016,7 +5047,9 @@ HB_FUNC( IDE_DEBUGSTART2 )
                   if( nTicks >= 10 && nTicks <= 200 && (nTicks % 20) == 0 )
                      BringDebugAppToFront();
 
-                  /* Check if client disconnected */
+                  /* Check if client disconnected OR sent data (e.g. "DONE"
+                   * when the user closed the form during free-run). Break
+                   * out so the outer command loop reads and handles it. */
                   {
                      fd_set fds; struct timeval tv;
                      FD_ZERO(&fds); FD_SET(s_dbgClientSock, &fds);
@@ -5025,6 +5058,21 @@ HB_FUNC( IDE_DEBUGSTART2 )
                         char peek[1];
                         int n = recv(s_dbgClientSock, peek, 1, MSG_PEEK);
                         if( n <= 0 ) { s_dbgState = DBG_STOPPED; break; }
+                        /* Data available — let the outer loop read it. */
+                        break;
+                     }
+                  }
+
+                  /* Watchdog: subprocess died (form closed + process exited
+                   * before we saw DONE on the socket). Bail out cleanly. */
+                  if( s_dbgChildPID )
+                  {
+                     HANDLE hProc = OpenProcess( SYNCHRONIZE, FALSE, s_dbgChildPID );
+                     if( hProc )
+                     {
+                        DWORD w = WaitForSingleObject( hProc, 0 );
+                        CloseHandle( hProc );
+                        if( w == WAIT_OBJECT_0 ) { s_dbgState = DBG_STOPPED; break; }
                      }
                   }
                }
@@ -5049,7 +5097,7 @@ HB_FUNC( IDE_DEBUGSTART2 )
    DbgServerStop();
 
    /* Kill any remaining DebugApp process */
-   system( "taskkill /F /IM DebugApp.exe >nul 2>&1" );
+   KillDebugApp();  /* Direct Win32 API — doesn't block the IDE message pump */
 
    s_dbgState = DBG_IDLE;
    s_dbgRecvLen = 0;

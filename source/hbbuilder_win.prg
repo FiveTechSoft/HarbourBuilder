@@ -4696,7 +4696,8 @@ static function TBDebugRun( lRunToBreak )
    W32_ProcessEvents()
 
    IDE_DebugStart2( cBuildDir + "\DebugApp.exe", ;
-      { |cFunc, nLine, cLocals, cStack| OnDebugPause( cFunc, nLine, cLocals, cStack ) } )
+      { |cFunc, nLine, cLocals, cStack| OnDebugPause( cFunc, nLine, cLocals, cStack ) }, ;
+      lRunToBreak )
 
    // Restore: clear debug marker, restore inspector with properties
    CodeEditorShowDebugLine( hCodeEditor, 0 )
@@ -6523,9 +6524,58 @@ HB_FUNC( W32_SHELLEXEC )
    if( CreateProcessA( NULL, cmd, NULL, NULL, TRUE,
        CREATE_NO_WINDOW, NULL, NULL, &si, &pi ) )
    {
+      MSG winMsg;
+      int bDone = 0;
+      HWND hTopWnd;
+
       CloseHandle( hWritePipe );
       hWritePipe = NULL;
 
+      /* Locate the IDE's top-level window (parent of current thread windows). */
+      hTopWnd = GetActiveWindow();
+      if( !hTopWnd ) hTopWnd = GetForegroundWindow();
+
+      /* Poll loop: keeps IDE's message pump alive so the window doesn't go
+       * "Not Responding" (and DWM doesn't show a stretched ghost bitmap). */
+      while( !bDone )
+      {
+         DWORD avail = 0;
+
+         /* Drain any data sitting in the pipe without blocking. */
+         while( PeekNamedPipe( hReadPipe, NULL, 0, NULL, &avail, NULL ) && avail > 0 )
+         {
+            DWORD toRead = bufSize - dwTotal - 1;
+            if( toRead > avail ) toRead = avail;
+            if( !ReadFile( hReadPipe, buf + dwTotal, toRead, &dwRead, NULL ) || dwRead == 0 )
+               break;
+            dwTotal += dwRead;
+            if( dwTotal >= (DWORD)(bufSize - 256) )
+            {
+               bufSize *= 2;
+               buf = (char *) realloc( buf, bufSize );
+            }
+         }
+
+         /* MsgWaitForMultipleObjects wakes up on BOTH a process-exit AND a
+          * new message in the queue — lets the thread sleep efficiently while
+          * still staying responsive to Win32 messages (the critical bit that
+          * stops DWM flagging the window as "Not Responding" and ghosting a
+          * stretched bitmap). */
+         {
+            DWORD r = MsgWaitForMultipleObjects( 1, &pi.hProcess, FALSE, 50, QS_ALLINPUT );
+            if( r == WAIT_OBJECT_0 ) bDone = 1;
+         }
+
+         /* Pump ALL pending messages. */
+         while( PeekMessage( &winMsg, NULL, 0, 0, PM_REMOVE ) )
+         {
+            TranslateMessage( &winMsg );
+            DispatchMessage( &winMsg );
+         }
+      }
+
+      /* Drain any data that arrived between the last PeekNamedPipe and the
+       * process exit. Child has closed its end so ReadFile will return. */
       while( ReadFile( hReadPipe, buf + dwTotal, bufSize - dwTotal - 1, &dwRead, NULL ) && dwRead > 0 )
       {
          dwTotal += dwRead;
@@ -6537,7 +6587,6 @@ HB_FUNC( W32_SHELLEXEC )
       }
       buf[dwTotal] = 0;
 
-      WaitForSingleObject( pi.hProcess, 10000 );
       CloseHandle( pi.hProcess );
       CloseHandle( pi.hThread );
    }

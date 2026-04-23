@@ -86,6 +86,16 @@ static function DbgHook( nLine, cModule, cProcName )
       return nil
    endif
 
+   // Check BEFORE the RUNNING branch: if the main form was closed (user
+   // pressed X after Continue), the flag is set but otherwise we'd never
+   // notice until a STEP arrived — which it won't if IDE is idle.
+   if IDE_DbgRunLoopEnded()
+      DbgSend( "DONE" )
+      aS[ DBG_CONNECTED ] := .f.
+      hb_socketClose( aS[ DBG_SOCKET ] )
+      return nil
+   endif
+
    // In RUNNING mode: don't block — just check for STEP/QUIT non-blocking
    if aS[ DBG_RUNNING ]
       cCmd := DbgRecvNonBlock()
@@ -105,7 +115,7 @@ static function DbgHook( nLine, cModule, cProcName )
       endif
    endif
 
-   // If form's run loop ended (form closed), signal IDE and exit cleanly
+   // Second check (redundant with the early check above, kept for clarity)
    if IDE_DbgRunLoopEnded()
       DbgSend( "DONE" )
       aS[ DBG_CONNECTED ] := .f.

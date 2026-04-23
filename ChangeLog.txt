@@ -1,6 +1,49 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-23b (Windows — IDE responsiveness during Debug build, Debug vs Debug-to-BP split, form-close in RUNNING mode)
+
+  ROOT CAUSE OF THE "IDE DEFORMATION" AT 125% DPI:
+  - The IDE window was actually being flagged "(Not Responding)" by Windows
+    during a debug build, and DWM was showing its stretched ghost bitmap —
+    it was never a DPI issue at all. The cause was synchronous blocking in
+    two places that stopped the IDE's message pump for several seconds.
+
+  IDE MESSAGE PUMP STAYS ALIVE DURING DEBUG BUILD:
+  - W32_ShellExec (used by every step of TBDebugRun — harbour.exe, bcc32,
+    rc.exe, ilink32, copy, mkdir, etc.) no longer uses blocking ReadFile
+    and WaitForSingleObject; now polls the child with PeekNamedPipe +
+    MsgWaitForMultipleObjects(QS_ALLINPUT, 50 ms) so Win32 messages are
+    dispatched while waiting, preventing the "(Not Responding)" mark and
+    the stretched DWM ghost
+  - system("taskkill /F /IM DebugApp.exe") replaced by KillDebugApp(), a
+    direct Win32 API helper (CreateToolhelp32Snapshot + TerminateProcess)
+    that doesn't spawn cmd.exe + taskkill.exe and returns instantly
+
+  DEBUG vs DEBUG-TO-BP NOW BEHAVE DIFFERENTLY:
+  - Debug (oRun → Debug, F8 toolbar): starts with s_dbgWasStepping = 1, so
+    the session pauses at the first user-code line (classic step-through)
+  - DebBP (oRun → Debug to BP, toolbar button): starts with
+    s_dbgWasStepping = 0, so execution runs until the first breakpoint is
+    hit (or the program ends if no BP is set)
+  - IDE_DEBUGSTART2 accepts an optional third parameter lRunToBreak; the
+    Harbour-side TBDebugRun passes its lRunToBreak flag through so the two
+    toolbar buttons map onto the two flows
+
+  FORM CLOSE WHILE IN FREE-RUN (after user clicked Continue):
+  - dbgclient.prg: IDE_DbgRunLoopEnded() now checked at the TOP of DbgHook,
+    before the RUNNING non-blocking branch. Previously the RUNNING branch
+    returned early when no command was pending, so the run-loop-ended flag
+    that CE_NotifyRunLoopEnded sets on WM_CLOSE was never observed and the
+    debug session hung until the user clicked Stop in the IDE
+  - IDE command loop: the inner RUNNING spin loop now also breaks out when
+    ANY socket data arrives (not just on disconnect) so the outer loop can
+    read and handle the "DONE" message the subprocess sends on form close
+  - Added a process-liveness watchdog inside the RUNNING spin: uses
+    OpenProcess(SYNCHRONIZE) + WaitForSingleObject(0) to detect that the
+    DebugApp subprocess died (form closed + process exited before we saw
+    the DONE frame) and transitions to DBG_STOPPED cleanly
+
 2026-04-23 (Windows — Debugger ported from macOS/Linux, clickable breakpoints, form-close fix)
 
   DEBUGGER STATE MACHINE (ported from macOS/Linux to Windows backend):
