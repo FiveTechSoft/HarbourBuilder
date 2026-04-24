@@ -1,6 +1,27 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-24a (Linux — inspector: enum literals y dropdown para propiedades numéricas)
+
+  INSPECTOR GTK: LITERALES EN LUGAR DE NÚMEROS:
+  - Las propiedades numéricas con valores predefinidos (nBorderStyle,
+    nPosition, nWindowState, nFormStyle, nCursor, nControlAlign,
+    nBevelStyle, nScrollBars, nViewStyle, nAlign, nBorderIcons) ahora
+    muestran el nombre literal en lugar del número crudo (p.ej. "bsSingle"
+    en vez de "1", "alTop" en vez de "1")
+  - Se agrega tabla s_enums[] + función InsGetEnum() en gtk3_inspector.c,
+    espejo exacto de la tabla equivalente del inspector de Windows
+  - InsRebuildStore() consulta InsGetEnum() al renderizar filas de tipo 'N'
+    y sustituye szValue por el literal correspondiente cuando existe
+
+  INSPECTOR GTK: DROPDOWN PARA SELECCIÓN DE ENUM:
+  - Doble clic sobre una propiedad con enum abre un menú popup (GtkMenu)
+    con todas las opciones, marcando la actual con radio button
+  - Al seleccionar, escribe el índice numérico en szValue, aplica via
+    UI_SetProp y reconstruye el store
+  - Las propiedades enum quedan marcadas como no-editables inline para
+    evitar que el usuario escriba texto libre que rompería el parse
+
 2026-04-23c (Windows — form close during debug now pauses at Main's `return`)
 
   FORM CLOSE → PAUSE AT POST-RUN-LOOP USER LINE:

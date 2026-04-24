@@ -98,6 +98,51 @@ enum {
 };
 
 /* ======================================================================
+ * Enum lookup table: numeric property name -> literal value array
+ * Mirrors the s_enums[] table in the Windows inspector.
+ * ====================================================================== */
+
+typedef struct { const char * szPropName; const char ** aValues; int nCount; } ENUMDEF;
+
+static const char * s_borderStyle[]  = { "bsNone", "bsSingle", "bsSizeable", "bsDialog", "bsToolWindow", "bsSizeToolWin" };
+static const char * s_borderIcons[]  = { "biNone", "biSystemMenu", "biMinimize", "biSystemMenu+biMinimize",
+                                          "biMaximize", "biSystemMenu+biMaximize", "biMinimize+biMaximize", "biAll" };
+static const char * s_position[]     = { "poDesigned", "poCenter", "poCenterScreen" };
+static const char * s_windowState[]  = { "wsNormal", "wsMinimized", "wsMaximized" };
+static const char * s_formStyle[]    = { "fsNormal", "fsStayOnTop" };
+static const char * s_cursor[]       = { "crDefault", "crArrow", "crCross", "crIBeam", "crHand",
+                                          "crHelp", "crNo", "crWait", "crSizeAll" };
+static const char * s_controlAlign[] = { "alNone", "alTop", "alBottom", "alLeft", "alRight", "alClient" };
+static const char * s_bevelStyle[]   = { "bsLowered", "bsRaised" };
+static const char * s_scrollBars[]   = { "ssNone", "ssVertical", "ssHorizontal", "ssBoth" };
+static const char * s_viewStyle[]    = { "vsIcon", "vsList", "vsReport", "vsSmallIcon" };
+static const char * s_alignment[]    = { "taLeftJustify", "taCenter", "taRightJustify" };
+
+static ENUMDEF s_enums[] = {
+   { "nBorderStyle",  s_borderStyle,  6 },
+   { "nBorderIcons",  s_borderIcons,  8 },
+   { "nPosition",     s_position,     3 },
+   { "nWindowState",  s_windowState,  3 },
+   { "nFormStyle",    s_formStyle,    2 },
+   { "nCursor",       s_cursor,       9 },
+   { "nControlAlign", s_controlAlign, 6 },
+   { "nBevelStyle",   s_bevelStyle,   2 },
+   { "nScrollBars",   s_scrollBars,   4 },
+   { "nViewStyle",    s_viewStyle,    4 },
+   { "nAlign",        s_alignment,    3 },
+   { NULL, NULL, 0 }
+};
+
+static ENUMDEF * InsGetEnum( const char * szName )
+{
+   int i;
+   for( i = 0; s_enums[i].szPropName; i++ )
+      if( strcasecmp( szName, s_enums[i].szPropName ) == 0 )
+         return &s_enums[i];
+   return NULL;
+}
+
+/* ======================================================================
  * Build rows from Harbour property array
  * ====================================================================== */
 
@@ -238,15 +283,11 @@ static void InsRebuildStore( INSDATA * d )
             hasBg = TRUE;
          }
 
-         /* Events tab: not editable (double-click generates handler) */
-         /* Array/Color/Font: not inline-editable (use dialog via double-click) */
-         gboolean editable = (d->nTab == 0) &&
-            (d->rows[nReal].cType != 'C' && d->rows[nReal].cType != 'F' &&
-             d->rows[nReal].cType != 'A');
-
-         /* Array properties: display "(N items)" instead of raw pipe string */
+         /* Resolve display value: enum literal, array count, or raw string */
          const char * dispValue = d->rows[nReal].szValue;
          char arrayDisp[32];
+         char enumDisp[64];
+         ENUMDEF * pEnumRow = NULL;
          if( d->rows[nReal].cType == 'A' )
          {
             const char * raw = d->rows[nReal].szValue;
@@ -255,6 +296,26 @@ static void InsRebuildStore( INSDATA * d )
             snprintf( arrayDisp, sizeof(arrayDisp), "(%d items)  ...", nItems );
             dispValue = arrayDisp;
          }
+         else if( d->rows[nReal].cType == 'N' )
+         {
+            pEnumRow = InsGetEnum( d->rows[nReal].szName );
+            if( pEnumRow )
+            {
+               int idx = atoi( d->rows[nReal].szValue );
+               if( idx >= 0 && idx < pEnumRow->nCount )
+               {
+                  strncpy( enumDisp, pEnumRow->aValues[idx], sizeof(enumDisp) - 1 );
+                  enumDisp[sizeof(enumDisp) - 1] = 0;
+                  dispValue = enumDisp;
+               }
+            }
+         }
+
+         /* Enum 'N' properties are not inline-editable (no dropdown yet) */
+         gboolean editable = (d->nTab == 0) &&
+            (d->rows[nReal].cType != 'C' && d->rows[nReal].cType != 'F' &&
+             d->rows[nReal].cType != 'A' &&
+             !(d->rows[nReal].cType == 'N' && pEnumRow != NULL));
 
          gtk_list_store_set( d->store, &iter,
             COL_NAME, dispName,
@@ -427,6 +488,17 @@ static void on_inspector_tab_switched( GtkNotebook * nb, GtkWidget * page, guint
    InsActivateTab( d );
 }
 
+/* Context passed to each enum popup menu item */
+typedef struct { INSDATA * d; int nReal; int nIdx; } EnumMenuData;
+
+static void on_enum_menu_activate( GtkMenuItem * item, gpointer userData )
+{
+   EnumMenuData * emd = (EnumMenuData *)userData;
+   sprintf( emd->d->rows[emd->nReal].szValue, "%d", emd->nIdx );
+   InsApplyValue( emd->d, emd->nReal );
+   InsRebuildStore( emd->d );
+}
+
 /* Row activated (double-click) - toggle category, open picker, or fire event handler */
 static void on_row_activated( GtkTreeView * treeView, GtkTreePath * path,
    GtkTreeViewColumn * column, gpointer data )
@@ -449,6 +521,32 @@ static void on_row_activated( GtkTreeView * treeView, GtkTreePath * path,
          d->rows[k].bVisible = !d->rows[nReal].bCollapsed;
       InsRebuildStore( d );
       return;
+   }
+
+   /* Enum 'N' property: show popup menu with named options */
+   if( d->rows[nReal].cType == 'N' )
+   {
+      ENUMDEF * pE = InsGetEnum( d->rows[nReal].szName );
+      if( pE )
+      {
+         int curIdx = atoi( d->rows[nReal].szValue );
+         GtkWidget * menu = gtk_menu_new();
+         for( int i = 0; i < pE->nCount; i++ )
+         {
+            GtkWidget * item = gtk_check_menu_item_new_with_label( pE->aValues[i] );
+            gtk_check_menu_item_set_draw_as_radio( GTK_CHECK_MENU_ITEM(item), TRUE );
+            if( i == curIdx )
+               gtk_check_menu_item_set_active( GTK_CHECK_MENU_ITEM(item), TRUE );
+            EnumMenuData * emd = g_new( EnumMenuData, 1 );
+            emd->d = d; emd->nReal = nReal; emd->nIdx = i;
+            g_object_set_data_full( G_OBJECT(item), "emd", emd, g_free );
+            g_signal_connect( item, "activate", G_CALLBACK(on_enum_menu_activate), emd );
+            gtk_menu_shell_append( GTK_MENU_SHELL(menu), item );
+         }
+         gtk_widget_show_all( menu );
+         gtk_menu_popup_at_pointer( GTK_MENU(menu), NULL );
+         return;
+      }
    }
 
    /* Color property: open color chooser */
