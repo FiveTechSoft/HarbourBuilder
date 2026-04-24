@@ -33,7 +33,7 @@ extern void EnsureGTK( void );
 
 typedef struct {
    char szName[32];
-   char szValue[256];
+   char szValue[4096];
    char szCategory[32];
    char cType;       /* S=string, N=number, L=logical, C=color, F=font */
    int  bIsCat;      /* category header */
@@ -195,7 +195,7 @@ static void InsBuildRows( INSDATA * d, PHB_ITEM pArray )
          d->rows[d->nRows].bVisible = 1;
 
          if( d->rows[d->nRows].cType == 'S' )
-            strncpy( d->rows[d->nRows].szValue, hb_arrayGetCPtr(pRow,2), 255 );
+            strncpy( d->rows[d->nRows].szValue, hb_arrayGetCPtr(pRow,2), sizeof(d->rows[0].szValue)-1 );
          else if( d->rows[d->nRows].cType == 'N' )
             sprintf( d->rows[d->nRows].szValue, "%d", hb_arrayGetNI(pRow,2) );
          else if( d->rows[d->nRows].cType == 'L' )
@@ -203,15 +203,15 @@ static void InsBuildRows( INSDATA * d, PHB_ITEM pArray )
          else if( d->rows[d->nRows].cType == 'C' )
             sprintf( d->rows[d->nRows].szValue, "%u", (unsigned) hb_arrayGetNInt(pRow,2) );
          else if( d->rows[d->nRows].cType == 'F' )
-            strncpy( d->rows[d->nRows].szValue, hb_arrayGetCPtr(pRow,2), 255 );
+            strncpy( d->rows[d->nRows].szValue, hb_arrayGetCPtr(pRow,2), sizeof(d->rows[0].szValue)-1 );
          else if( d->rows[d->nRows].cType == 'A' )
          {
             /* Store raw pipe-separated value; InsRebuildStore shows "(N items)" */
-            strncpy( d->rows[d->nRows].szValue, hb_arrayGetCPtr(pRow,2), 255 );
+            strncpy( d->rows[d->nRows].szValue, hb_arrayGetCPtr(pRow,2), sizeof(d->rows[0].szValue)-1 );
          }
          else if( d->rows[d->nRows].cType == 'M' )
          {
-            strncpy( d->rows[d->nRows].szValue, hb_arrayGetCPtr(pRow,2), 255 );
+            strncpy( d->rows[d->nRows].szValue, hb_arrayGetCPtr(pRow,2), sizeof(d->rows[0].szValue)-1 );
          }
 
          d->nRows++;
@@ -633,7 +633,11 @@ static void on_mei_caption_changed( GtkEditable * e, gpointer data )
    MEIDATA * d = (MEIDATA *)data;
    if( d->bUpdating || d->nSel<0 ) return;
    strncpy( d->nodes[d->nSel].szCaption, gtk_entry_get_text(GTK_ENTRY(e)), 127 );
+   int saved = d->nSel;
+   d->bUpdating = 1;
    MEI_RebuildTree(d);
+   d->bUpdating = 0;
+   d->nSel = saved;
 }
 
 static void on_mei_shortcut_changed( GtkEditable * e, gpointer data )
@@ -641,7 +645,11 @@ static void on_mei_shortcut_changed( GtkEditable * e, gpointer data )
    MEIDATA * d = (MEIDATA *)data;
    if( d->bUpdating || d->nSel<0 ) return;
    strncpy( d->nodes[d->nSel].szShortcut, gtk_entry_get_text(GTK_ENTRY(e)), 31 );
+   int saved = d->nSel;
+   d->bUpdating = 1;
    MEI_RebuildTree(d);
+   d->bUpdating = 0;
+   d->nSel = saved;
 }
 
 static void on_mei_handler_changed( GtkEditable * e, gpointer data )
@@ -681,8 +689,14 @@ static void mei_add_node( MEIDATA * d, int nLevel, int bSeparator )
    d->nodes[insPos].nLevel     = nLevel;
    d->nodes[insPos].nParent    = nParent;
    d->nCount++;
+   /* Fix parent refs shifted past the insertion point */
+   for( int i = insPos+1; i < d->nCount; i++ )
+      if( d->nodes[i].nParent >= insPos )
+         d->nodes[i].nParent++;
    d->nSel = insPos;
+   d->bUpdating = 1;
    MEI_RebuildTree(d);
+   d->bUpdating = 0;
 }
 
 static void on_mei_add_popup ( GtkButton * b, gpointer d ) { (void)b; mei_add_node((MEIDATA*)d,0,0); }
@@ -703,7 +717,9 @@ static void on_mei_move_up( GtkButton * b, gpointer data )
    if( d->nSel <= 0 ) return;
    MEINode tmp = d->nodes[d->nSel]; d->nodes[d->nSel]=d->nodes[d->nSel-1]; d->nodes[d->nSel-1]=tmp;
    d->nSel--;
+   d->bUpdating = 1;
    MEI_RebuildTree(d);
+   d->bUpdating = 0;
 }
 
 static void on_mei_move_down( GtkButton * b, gpointer data )
@@ -713,7 +729,9 @@ static void on_mei_move_down( GtkButton * b, gpointer data )
    if( d->nSel<0 || d->nSel>=d->nCount-1 ) return;
    MEINode tmp = d->nodes[d->nSel]; d->nodes[d->nSel]=d->nodes[d->nSel+1]; d->nodes[d->nSel+1]=tmp;
    d->nSel++;
+   d->bUpdating = 1;
    MEI_RebuildTree(d);
+   d->bUpdating = 0;
 }
 
 static void on_mei_delete( GtkButton * b, gpointer data )
@@ -725,7 +743,9 @@ static void on_mei_delete( GtkButton * b, gpointer data )
    for( int i=del; i<d->nCount-1; i++ ) d->nodes[i]=d->nodes[i+1];
    d->nCount--;
    d->nSel = del < d->nCount ? del : d->nCount-1;
+   d->bUpdating = 1;
    MEI_RebuildTree(d);
+   d->bUpdating = 0;
 }
 
 static void OpenMenuEditor( INSDATA * ins, int nReal )
@@ -844,7 +864,7 @@ static void OpenMenuEditor( INSDATA * ins, int nReal )
    if( gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_OK ) {
       char result[4096] = "";
       MEI_Serialize( &d, result, sizeof(result) );
-      strncpy( ins->rows[nReal].szValue, result, 255 );
+      strncpy( ins->rows[nReal].szValue, result, sizeof(ins->rows[nReal].szValue)-1 );
       InsApplyValue( ins, nReal );
       InsRebuildStore( ins );
    }
@@ -1038,7 +1058,7 @@ static void on_row_activated( GtkTreeView * treeView, GtkTreePath * path,
             g_free( text );
          }
 
-         strncpy( d->rows[nReal].szValue, result, 255 );
+         strncpy( d->rows[nReal].szValue, result, sizeof(d->rows[nReal].szValue)-1 );
          InsApplyValue( d, nReal );
          InsRebuildStore( d );
 
@@ -1132,7 +1152,7 @@ static gboolean on_tree_button_press( GtkWidget * widget, GdkEventButton * event
 
    /* Build context menu */
    GtkWidget * menu = gtk_menu_new();
-   char title[320];
+   char title[4104];
    snprintf( title, sizeof(title), "Delete %s", d->rows[nReal].szValue );
    GtkWidget * item = gtk_menu_item_new_with_label( title );
    g_object_set_data_full( G_OBJECT(item), "handler",
@@ -1504,7 +1524,7 @@ HB_FUNC( INS_SETEVENTS )
       {
          IROW * r = &d->evRows[d->nEvRows++];
          strncpy( r->szName, name, 31 );
-         strncpy( r->szValue, handlerName, 255 );
+         strncpy( r->szValue, handlerName, sizeof(r->szValue)-1 );
          strncpy( r->szCategory, cat, 31 );
          r->cType = 'S';
          r->bIsCat = 0;
@@ -1802,7 +1822,7 @@ HB_FUNC( INS_ADDROW )
    IROW * r = &d->rows[d->nRows++];
    memset( r, 0, sizeof(IROW) );
    strncpy( r->szName,     HB_ISCHAR(2) ? hb_parc(2) : "", 31 );
-   strncpy( r->szValue,    HB_ISCHAR(3) ? hb_parc(3) : "", 255 );
+   strncpy( r->szValue,    HB_ISCHAR(3) ? hb_parc(3) : "", sizeof(r->szValue)-1 );
    strncpy( r->szCategory, HB_ISCHAR(4) ? hb_parc(4) : "General", 31 );
    r->cType = ( HB_ISCHAR(5) && hb_parc(5)[0] ) ? hb_parc(5)[0] : 'S';
    r->bIsCat = 0;
