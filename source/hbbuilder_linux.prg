@@ -847,7 +847,7 @@ static function RegenerateFormCode( cName, hForm )
                         cHndl := iif( Len(aMFields) >= 3, aMFields[3], "" )
                         if nMI > 1; cCreate += ", "; endif
                         if ! Empty( cHndl )
-                           cCreate += '{|| ' + cHndl + '( Self )}'
+                           cCreate += '{|| ' + cHndl + '( Self, nil )}'
                         else
                            cCreate += 'nil'
                         endif
@@ -892,7 +892,7 @@ static function RegenerateFormCode( cName, hForm )
                         else
                            cCreate += cInd + 'MENUITEM "' + cCap + '"'
                            if ! Empty( cHndl )
-                              cCreate += ' ACTION ' + cHndl + '()'
+                              cCreate += ' ACTION ' + cHndl + '( Self, oMenuItem )'
                               if AScan( aMenuHandlers, cHndl ) == 0
                                  AAdd( aMenuHandlers, cHndl )
                               endif
@@ -1079,7 +1079,7 @@ static function RegenerateFormCode( cName, hForm )
       cHndl := aMenuHandlers[nMI]
       if ! ( "function " + Lower(cHndl) ) $ Lower( cExistingCode )
          cCode += cSep
-         cCode += "static function " + cHndl + "( oForm )" + e
+         cCode += "static function " + cHndl + "( oForm, oMenuItem )" + e
          cCode += e
          cCode += "return nil" + e
       endif
