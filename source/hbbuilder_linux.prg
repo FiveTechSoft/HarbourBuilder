@@ -625,6 +625,8 @@ static function RegenerateFormCode( cName, hForm )
    local cVal, aHdrs, kk, nColCount, aColProps, nColW, nCtrlClr, nInterval, nVal
    local aCtrlMap := {}, cOf, hOwner, nPg, kk2, nLen0, cSlice
    local aExLines, lInClass, cExLine
+   local aMenuNodes, nMI, cMNode, aMFields, nLv, cCap, cScut, cHndl
+   local nPendingLevels, nPL, cInd, bIsPopup, aNextF
 
    // Read existing code to find declared event handlers
    cExistingCode := ""
@@ -821,6 +823,63 @@ static function RegenerateFormCode( cName, hForm )
                   cCreate += ' URL "' + cVal + '"'
                endif
                cCreate += e
+            case nType == 132  // CT_MAINMENU
+               cCreate += '   COMPONENT ::o' + cCtrlName + ' TYPE CT_MAINMENU OF Self  // TMainMenu' + e
+               cVal := UI_GetProp( hCtrl, "aMenuItems" )
+               if ValType( cVal ) == "C" .and. ! Empty( cVal )
+                  aMenuNodes := HB_ATokens( cVal, "|" )
+                  nPendingLevels := {}
+                  cCreate += '   DEFINE MENUBAR' + e
+                  for nMI := 1 to Len( aMenuNodes )
+                     cMNode := aMenuNodes[nMI]
+                     aMFields := HB_ATokens( cMNode, Chr(1) )
+                     if Len( aMFields ) < 5; loop; endif
+                     cCap  := aMFields[1]
+                     cScut := iif( Len( aMFields ) >= 2, aMFields[2], "" )
+                     cHndl := iif( Len( aMFields ) >= 3, aMFields[3], "" )
+                     nLv   := iif( Len( aMFields ) >= 5, Val( aMFields[5] ), 0 )
+                     // Close any pending END POPUP for levels >= current
+                     do while Len( nPendingLevels ) > 0 .and. ;
+                               ATail( nPendingLevels ) >= nLv
+                        nPL := ATail( nPendingLevels )
+                        cCreate += Replicate( "   ", nPL + 1 ) + 'END POPUP' + e
+                        ASize( nPendingLevels, Len( nPendingLevels ) - 1 )
+                     enddo
+                     cInd := Replicate( "   ", nLv + 2 )  // 2 base levels (DEFINE MENUBAR indent)
+                     if cCap == "---"
+                        cCreate += cInd + 'MENUSEPARATOR' + e
+                     else
+                        // Look ahead: is next node at a deeper level?
+                        bIsPopup := .F.
+                        if nMI < Len( aMenuNodes )
+                           aNextF := HB_ATokens( aMenuNodes[nMI+1], Chr(1) )
+                           if Len(aNextF) >= 5 .and. Val(aNextF[5]) > nLv
+                              bIsPopup := .T.
+                           endif
+                        endif
+                        if nLv == 0 .or. bIsPopup
+                           cCreate += cInd + 'DEFINE POPUP "' + cCap + '"' + e
+                           AAdd( nPendingLevels, nLv )
+                        else
+                           cCreate += cInd + 'MENUITEM "' + cCap + '"'
+                           if ! Empty( cHndl )
+                              cCreate += ' ACTION ' + cHndl + '()'
+                           endif
+                           if ! Empty( cScut )
+                              cCreate += ' ACCEL "' + cScut + '"'
+                           endif
+                           cCreate += e
+                        endif
+                     endif
+                  next
+                  // Close remaining open popups
+                  do while Len( nPendingLevels ) > 0
+                     nPL := ATail( nPendingLevels )
+                     cCreate += Replicate( "   ", nPL + 1 ) + 'END POPUP' + e
+                     ASize( nPendingLevels, Len( nPendingLevels ) - 1 )
+                  enddo
+                  cCreate += '   END MENUBAR' + e
+               endif
             otherwise
                if nType >= CT_TIMER  // Non-visual component
                   cCreate += '   COMPONENT ::o' + cCtrlName + ' TYPE CT_' + ;
