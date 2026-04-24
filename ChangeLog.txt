@@ -1,6 +1,15 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-24i
+
+  - fix: TMainMenu menu items not reloading when loading form from disk
+    - RegenerateFormCode generates CRLF line endings (e := Chr(13)+Chr(10))
+    - RestoreFormFromCode split by Chr(10) leaving trailing Chr(13) on each line
+    - Harbour AllTrim() strips only spaces, not Chr(13), so "DEFINE MENUBAR\r"
+      failed the exact-equality check and the block was never parsed
+    - Fix: StrTran(cCode, Chr(13), "") before HB_ATokens in RestoreFormFromCode
+
 2026-04-24h
 
   - fix: TMainMenu runtime and compilation fixes

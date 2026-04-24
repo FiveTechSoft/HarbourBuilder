@@ -1797,7 +1797,7 @@ static function RestoreFormFromCode( hForm, cCode )
       return nil
    endif
 
-   aLines := HB_ATokens( cCode, Chr(10) )
+   aLines := HB_ATokens( StrTran( cCode, Chr(13), "" ), Chr(10) )
 
    for i := 1 to Len( aLines )
       cLine := aLines[i]
