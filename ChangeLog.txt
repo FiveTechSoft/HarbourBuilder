@@ -1,6 +1,20 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-24h
+
+  - fix: TMainMenu runtime and compilation fixes
+    - Added CT_MAINMENU (132) to hbide.ch and DEFINE MENUBAR no-op #xcommand macros to
+      hbbuilder.ch so user project code compiles without errors
+    - Added UI_MainMenuNew() to gtk3_core.c to create the C-side HBMainMenu struct at runtime
+    - Added TMainMenu Harbour class with aMenuItems ASSIGN in classes.prg
+    - Added HB_CreateComponent case 132 to instantiate TMainMenu and call UI_MainMenuNew
+    - RegenerateFormCode now emits ::oCtrlName:aMenuItems := "..." after the COMPONENT line
+      to transfer menu data to the compiled binary (Chr(1) encoded as "+Chr(1)+")
+    - Extended aNames/aCnt array to index 132 so dropped TMainMenu gets name MainMenu1
+    - Set separator bEnabled=0 in mei_add_node() for consistency with serialization
+    - Added TMainMenu to Standard palette tab
+
 2026-04-24g
 
   - feat: TMainMenu non-visual component for Linux IDE
