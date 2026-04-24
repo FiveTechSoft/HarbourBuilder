@@ -622,7 +622,7 @@ static function RegenerateFormCode( cName, hForm )
    local nL, nT, nCW, nCH, cText
    local cDatas := "", cCreate := "", cEvents := ""
    local cExistingCode, aEvents, j, cEvName, cEvSuffix, cHandlerName
-   local cVal, aHdrs, kk, nColCount, aColProps, nColW, nCtrlClr, nInterval
+   local cVal, aHdrs, kk, nColCount, aColProps, nColW, nCtrlClr, nInterval, nVal
    local aCtrlMap := {}, cOf, hOwner, nPg, kk2, nLen0, cSlice
    local aExLines, lInClass, cExLine
 
@@ -726,10 +726,40 @@ static function RegenerateFormCode( cName, hForm )
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' CHECKBOX ::o' + cCtrlName + ' PROMPT "' + cText + '" OF Self SIZE ' + ;
                   LTrim(Str(nCW)) + e
-            case nType == 5
+            case nType == 5  // ComboBox
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' COMBOBOX ::o' + cCtrlName + ' OF Self SIZE ' + ;
-                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
+                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH))
+               cVal := UI_GetProp( hCtrl, "aItems" )
+               if ValType( cVal ) == "C" .and. ! Empty( cVal )
+                  cCreate += ' ITEMS '
+                  for kk := 1 to Len( hb_ATokens( cVal, "|" ) )
+                     if kk > 1; cCreate += ', '; endif
+                     cCreate += '"' + hb_ATokens( cVal, "|" )[ kk ] + '"'
+                  next
+               endif
+               cCreate += e
+               nVal := UI_GetProp( hCtrl, "nItemIndex" )
+               if ValType( nVal ) == "N" .and. nVal > 0
+                  cCreate += '   ::o' + cCtrlName + ':Value := ' + LTrim( Str( nVal ) ) + e
+               endif
+            case nType == 7  // ListBox
+               cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
+                  ' LISTBOX ::o' + cCtrlName + ' OF Self SIZE ' + ;
+                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH))
+               cVal := UI_GetProp( hCtrl, "aItems" )
+               if ValType( cVal ) == "C" .and. ! Empty( cVal )
+                  cCreate += ' ITEMS '
+                  for kk := 1 to Len( hb_ATokens( cVal, "|" ) )
+                     if kk > 1; cCreate += ', '; endif
+                     cCreate += '"' + hb_ATokens( cVal, "|" )[ kk ] + '"'
+                  next
+               endif
+               cCreate += e
+               nVal := UI_GetProp( hCtrl, "nItemIndex" )
+               if ValType( nVal ) == "N" .and. nVal > 0
+                  cCreate += '   ::o' + cCtrlName + ':Value := ' + LTrim( Str( nVal ) ) + e
+               endif
             case nType == 6
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' GROUPBOX ::o' + cCtrlName + ' PROMPT "' + cText + '" OF Self SIZE ' + ;
@@ -841,9 +871,10 @@ static function RegenerateFormCode( cName, hForm )
             cCreate += '   ::o' + cCtrlName + ':lTransparent := .F.' + e
          endif
 
-         // Emit oFont if non-default
+         // Emit oFont if non-default (skip Linux/Windows defaults)
          cVal := UI_GetProp( hCtrl, "oFont" )
-         if ! Empty( cVal ) .and. cVal != "System,12"
+         if ! Empty( cVal ) .and. cVal != "System,12" .and. ;
+            cVal != "Segoe UI,12" .and. cVal != "Segoe UI,9" .and. cVal != "Sans,12"
             cCreate += '   ::o' + cCtrlName + ':oFont := "' + cVal + '"' + e
          endif
 

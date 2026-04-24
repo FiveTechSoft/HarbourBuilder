@@ -1,6 +1,28 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-24c (Linux — crash "No exported variable" en oFont al run con ListBox/ComboBox)
+
+  ROOT CAUSE — CRASH AL EJECUTAR FORM CON LISTBOX O COMBOBOX:
+  - El generador de código Linux no tenía 'case nType == 7' para ListBox,
+    por lo que caía al 'otherwise' y emitía solo un comentario; el DATA
+    ::oListBox1 quedaba NIL. A continuación el generador emitía
+    ::oListBox1:oFont := "Segoe UI,12", que llamaba _OFONT(NIL, ...) y
+    lanzaba el error BASE/1005 "No exported variable"
+  - El check de default de oFont solo excluía "System,12"; no excluía
+    "Segoe UI,12" (Windows) ni "Sans,12" (Linux), emitiendo la asignación
+    para absolutamente todos los controles
+
+  FIXES EN hbbuilder_linux.prg:
+  - Agrega 'case nType == 7' (ListBox): emite '@ y,x LISTBOX ::oCtrl OF
+    Self SIZE w,h', con cláusula ITEMS (pipe→lista) y ':Value :=' si
+    nItemIndex > 0 — mismo patrón que hbbuilder_win.prg
+  - Actualiza 'case nType == 5' (ComboBox): agrega cláusula ITEMS y
+    ':Value :=' (estaban ausentes en Linux, presentes en Windows)
+  - oFont check: excluye "System,12", "Segoe UI,12", "Segoe UI,9" y
+    "Sans,12" como valores por defecto que no deben emitirse
+  - Agrega 'nVal' a las declaraciones local de RegenerateFormCode
+
 2026-04-24b (Linux — ListBox y ComboBox: propiedad aItems en inspector)
 
   LISTBOX / COMBOBOX — aItems FALTANTE EN INSPECTOR:
