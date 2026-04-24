@@ -2389,6 +2389,9 @@ static void on_window_destroy( GtkWidget * widget, gpointer data )
       gtk_main_quit();
 }
 
+/* Forward declaration: TMainMenu runtime attach (defined later near Menu bridge) */
+static void HBMainMenu_Attach( HBControl * p, HBForm * form );
+
 static void HBForm_CreateAllChildren( HBForm * form )
 {
    /* GroupBoxes first */
@@ -2413,7 +2416,11 @@ static void HBForm_CreateAllChildren( HBForm * form )
       HBControl * child = form->base.FChildren[i];
       if( child->FControlType == CT_GROUPBOX ) continue;
       if( child->FControlType == CT_TABCONTROL2 ) continue;
-      if( IsNonVisualControl( child->FControlType ) && !form->FDesignMode ) continue;
+      if( IsNonVisualControl( child->FControlType ) && !form->FDesignMode ) {
+         if( child->FControlType == CT_MAINMENU )
+            HBMainMenu_Attach( child, form );
+         continue;
+      }
       strcpy( child->FFontDesc, form->FFormFontDesc );
       GtkWidget * container = form->FFixed;
       int savedLeft = child->FLeft, savedTop = child->FTop;
@@ -2479,12 +2486,6 @@ static void HBForm_Run( HBForm * form )
    GtkWidget * vbox = gtk_box_new( GTK_ORIENTATION_VERTICAL, 0 );
    gtk_container_add( GTK_CONTAINER(form->FWindow), vbox );
    gtk_widget_show( vbox );
-
-   /* Menu bar if created */
-   if( form->FMenuBar ) {
-      gtk_box_pack_start( GTK_BOX(vbox), form->FMenuBar, FALSE, FALSE, 0 );
-      gtk_widget_show_all( form->FMenuBar );
-   }
 
    /* Toolbars - build all toolbar rows, stack vertically at left of palette */
    if( form->FToolBarCount > 0 ) {
@@ -2564,6 +2565,13 @@ static void HBForm_Run( HBForm * form )
    gtk_widget_show( form->FFixed );
 
    HBForm_CreateAllChildren( form );
+
+   /* Menu bar: built by HBMainMenu_Attach() during CreateAllChildren, or pre-existing */
+   if( form->FMenuBar ) {
+      gtk_box_pack_start( GTK_BOX(vbox), form->FMenuBar, FALSE, FALSE, 0 );
+      gtk_box_reorder_child( GTK_BOX(vbox), form->FMenuBar, 0 );
+      gtk_widget_show_all( form->FMenuBar );
+   }
 
    /* Design mode overlay */
    if( form->FDesignMode )
@@ -2677,6 +2685,13 @@ static void HBForm_Show( HBForm * form )
 
    HBForm_CreateAllChildren( form );
 
+   /* Menu bar: built by HBMainMenu_Attach() during CreateAllChildren, or pre-existing */
+   if( form->FMenuBar ) {
+      gtk_box_pack_start( GTK_BOX(vbox), form->FMenuBar, FALSE, FALSE, 0 );
+      gtk_box_reorder_child( GTK_BOX(vbox), form->FMenuBar, 0 );
+      gtk_widget_show_all( form->FMenuBar );
+   }
+
    if( form->FDesignMode )
    {
       GtkWidget * da = gtk_drawing_area_new();
@@ -2769,6 +2784,13 @@ static int HBForm_ShowModal( HBForm * form )
    gtk_widget_show( form->FFixed );
 
    HBForm_CreateAllChildren( form );
+
+   /* Menu bar: built by HBMainMenu_Attach() during CreateAllChildren, or pre-existing */
+   if( form->FMenuBar ) {
+      gtk_box_pack_start( GTK_BOX(vbox), form->FMenuBar, FALSE, FALSE, 0 );
+      gtk_box_reorder_child( GTK_BOX(vbox), form->FMenuBar, 0 );
+      gtk_widget_show_all( form->FMenuBar );
+   }
 
    /* Runtime: wire form-level click event */
    gtk_widget_add_events( form->FWindow, GDK_BUTTON_PRESS_MASK );
@@ -4414,6 +4436,133 @@ HB_FUNC( UI_TOOLBTNONCLICK )
    {
       if( p->FBtnOnClick[nIdx] ) hb_itemRelease( p->FBtnOnClick[nIdx] );
       p->FBtnOnClick[nIdx] = hb_itemNew( pBlock );
+   }
+}
+
+/* ======================================================================
+ * TMainMenu runtime attach
+ * ====================================================================== */
+
+/* Parse "Ctrl+N", "Alt+F4", "Shift+F5" → modifier + keyval */
+static void ParseShortcut( const char * sz, GdkModifierType * mod, guint * key )
+{
+   *mod = 0; *key = 0;
+   if( !sz || !sz[0] ) return;
+   char buf[64]; strncpy(buf,sz,63); buf[63]=0;
+   char * plus = strrchr(buf,'+');
+   const char * keyPart = plus ? plus+1 : buf;
+   if( plus ) *plus = 0;
+   if( strcasestr(buf,"Ctrl")  ) *mod |= GDK_CONTROL_MASK;
+   if( strcasestr(buf,"Alt")   ) *mod |= GDK_MOD1_MASK;
+   if( strcasestr(buf,"Shift") ) *mod |= GDK_SHIFT_MASK;
+   if( strlen(keyPart)==1 )
+      *key = gdk_unicode_to_keyval((guint32)(unsigned char)keyPart[0]);
+   else
+      *key = gdk_keyval_from_name(keyPart);
+}
+
+typedef struct {
+   char szHandler[128];
+} HBMenuCBData;
+
+static void on_mainmenu_item_activated( GtkMenuItem * item, gpointer data )
+{
+   (void)item;
+   HBMenuCBData * cbd = (HBMenuCBData *)data;
+   if( !cbd || !cbd->szHandler[0] ) return;
+   char sym[128]; int i;
+   for(i=0;cbd->szHandler[i]&&i<127;i++) sym[i]=(char)toupper((unsigned char)cbd->szHandler[i]);
+   sym[i]=0;
+   PHB_DYNS pDyn = hb_dynsymFindName(sym);
+   if(pDyn){ hb_vmPushDynSym(pDyn); hb_vmPushNil(); hb_vmDo(0); }
+}
+
+static void HBMainMenu_Attach( HBControl * p, HBForm * form )
+{
+   HBMainMenu * m = (HBMainMenu *)p;
+   if( m->FNodeCount == 0 ) return;
+
+   if( !form->FMenuBar )
+      form->FMenuBar = gtk_menu_bar_new();
+
+   /* Level stack: popupShells[0] = menubar shell, [1] = level-1 popup, etc. */
+   GtkWidget * popupShells[8] = {0};
+   popupShells[0] = form->FMenuBar;
+
+   if( !s_accelGroup ) {
+      s_accelGroup = gtk_accel_group_new();
+      if( form->FWindow )
+         gtk_window_add_accel_group( GTK_WINDOW(form->FWindow), s_accelGroup );
+   }
+
+   for( int i = 0; i < m->FNodeCount; i++ )
+   {
+      HBMenuNode * n = &m->FNodes[i];
+      int lv = n->nLevel;
+
+      if( n->bSeparator )
+      {
+         GtkWidget * parentShell = (lv >= 1 && lv <= 7 && popupShells[lv]) ? popupShells[lv] : popupShells[1];
+         if( parentShell ) {
+            GtkWidget * sep = gtk_separator_menu_item_new();
+            gtk_menu_shell_append( GTK_MENU_SHELL(parentShell), sep );
+         }
+      }
+      else if( lv == 0 )
+      {
+         /* Root popup: attaches to the menu bar */
+         GtkWidget * mi = gtk_menu_item_new_with_mnemonic( n->szCaption );
+         GtkWidget * sub = gtk_menu_new();
+         gtk_menu_item_set_submenu( GTK_MENU_ITEM(mi), sub );
+         gtk_menu_shell_append( GTK_MENU_SHELL(form->FMenuBar), mi );
+         popupShells[1] = sub;
+         for(int lv2=2;lv2<8;lv2++) popupShells[lv2]=NULL;
+      }
+      else
+      {
+         /* Determine if this node itself has children (lookahead) */
+         int hasChildren = ( i+1 < m->FNodeCount && m->FNodes[i+1].nLevel > lv );
+         GtkWidget * parentShell = (lv >= 1 && lv <= 7 && popupShells[lv]) ? popupShells[lv] : NULL;
+         if( !parentShell ) continue;
+
+         if( hasChildren )
+         {
+            /* Sub-popup */
+            GtkWidget * mi = gtk_menu_item_new_with_mnemonic( n->szCaption );
+            GtkWidget * sub = gtk_menu_new();
+            gtk_menu_item_set_submenu( GTK_MENU_ITEM(mi), sub );
+            gtk_menu_shell_append( GTK_MENU_SHELL(parentShell), mi );
+            if( lv+1 < 8 ) popupShells[lv+1] = sub;
+            for(int lv2=lv+2;lv2<8;lv2++) popupShells[lv2]=NULL;
+         }
+         else
+         {
+            /* Leaf item */
+            GtkWidget * mi = gtk_menu_item_new_with_mnemonic( n->szCaption );
+            if( !n->bEnabled )
+               gtk_widget_set_sensitive( mi, FALSE );
+
+            if( n->szHandler[0] ) {
+               HBMenuCBData * cbd = (HBMenuCBData *)malloc(sizeof(HBMenuCBData));
+               strncpy( cbd->szHandler, n->szHandler, 127 );
+               g_signal_connect_data( mi, "activate",
+                  G_CALLBACK(on_mainmenu_item_activated), cbd,
+                  (GClosureNotify)free, 0 );
+            }
+
+            if( n->szShortcut[0] ) {
+               GdkModifierType mod; guint key;
+               ParseShortcut( n->szShortcut, &mod, &key );
+               if( key ) {
+                  if(!s_accelGroup){ s_accelGroup=gtk_accel_group_new();
+                     if(form->FWindow) gtk_window_add_accel_group(GTK_WINDOW(form->FWindow),s_accelGroup); }
+                  gtk_widget_add_accelerator(mi,"activate",s_accelGroup,key,mod,GTK_ACCEL_VISIBLE);
+               }
+            }
+
+            gtk_menu_shell_append( GTK_MENU_SHELL(parentShell), mi );
+         }
+      }
    }
 }
 
