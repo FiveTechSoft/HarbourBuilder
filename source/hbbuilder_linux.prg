@@ -1897,10 +1897,46 @@ static function RestoreFormFromCode( hForm, cCode )
             hCtrl := UI_CheckBoxNew( hForm, cText, nL, nT, nW, nH )
          case " COMBOBOX " $ Upper( cTrim )
             hCtrl := UI_ComboBoxNew( hForm, nL, nT, nW, nH )
+            nPos := At( "ITEMS ", Upper( cTrim ) )
+            if nPos > 0 .and. hCtrl != 0
+               cText := SubStr( cTrim, nPos + 6 )
+               cVal := ""
+               do while ! Empty( cText )
+                  nPos2 := At( '"', cText )
+                  if nPos2 == 0; exit; endif
+                  cText := SubStr( cText, nPos2 + 1 )
+                  nPos2 := At( '"', cText )
+                  if nPos2 == 0; exit; endif
+                  if ! Empty( cVal ); cVal += "|"; endif
+                  cVal += Left( cText, nPos2 - 1 )
+                  cText := SubStr( cText, nPos2 + 1 )
+               enddo
+               if ! Empty( cVal )
+                  UI_SetProp( hCtrl, "aItems", cVal )
+               endif
+            endif
          case " GROUPBOX " $ Upper( cTrim )
             hCtrl := UI_GroupBoxNew( hForm, cText, nL, nT, nW, nH )
          case " LISTBOX " $ Upper( cTrim )
             hCtrl := UI_ListBoxNew( hForm, nL, nT, nW, nH )
+            nPos := At( "ITEMS ", Upper( cTrim ) )
+            if nPos > 0 .and. hCtrl != 0
+               cText := SubStr( cTrim, nPos + 6 )
+               cVal := ""
+               do while ! Empty( cText )
+                  nPos2 := At( '"', cText )
+                  if nPos2 == 0; exit; endif
+                  cText := SubStr( cText, nPos2 + 1 )
+                  nPos2 := At( '"', cText )
+                  if nPos2 == 0; exit; endif
+                  if ! Empty( cVal ); cVal += "|"; endif
+                  cVal += Left( cText, nPos2 - 1 )
+                  cText := SubStr( cText, nPos2 + 1 )
+               enddo
+               if ! Empty( cVal )
+                  UI_SetProp( hCtrl, "aItems", cVal )
+               endif
+            endif
          case " RADIOBUTTON " $ Upper( cTrim )
             hCtrl := UI_RadioButtonNew( hForm, cText, nL, nT, nW, nH )
          case " MEMO " $ Upper( cTrim )

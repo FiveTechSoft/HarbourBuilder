@@ -855,8 +855,13 @@ static void HBComboBox_CreateWidget( HBComboBox * p, GtkWidget * container )
    GtkWidget * combo = gtk_combo_box_text_new();
    for( int i = 0; i < p->FItemCount; i++ )
       gtk_combo_box_text_append_text( GTK_COMBO_BOX_TEXT(combo), p->FItems[i] );
-   if( p->FItemIndex >= 0 && p->FItemIndex < p->FItemCount )
-      gtk_combo_box_set_active( GTK_COMBO_BOX(combo), p->FItemIndex );
+   if( p->FItemCount > 0 )
+   {
+      int selRow = p->FItemIndex > 0 ? p->FItemIndex - 1 : 0;
+      if( selRow >= p->FItemCount ) selRow = 0;
+      gtk_combo_box_set_active( GTK_COMBO_BOX(combo), selRow );
+      p->FItemIndex = selRow + 1;
+   }
    g_signal_connect( combo, "changed", G_CALLBACK(on_combo_changed), p );
    gtk_fixed_put( GTK_FIXED(container), combo, p->base.FLeft, p->base.FTop );
    gtk_widget_set_size_request( combo, p->base.FWidth, p->base.FHeight );
@@ -1241,7 +1246,18 @@ static void HBListBox_CreateWidget( HBControl * p, GtkWidget * container )
       gtk_list_store_append( store, &iter );
       gtk_list_store_set( store, &iter, 0, cb->FItems[i], -1 );
    }
+   if( cb->FItemCount > 0 )
+   {
+      int selRow = (cb->FItemIndex > 0) ? cb->FItemIndex - 1 : 0;
+      if( selRow >= cb->FItemCount ) selRow = 0;
+      GtkTreeSelection * sel = gtk_tree_view_get_selection( GTK_TREE_VIEW(tv) );
+      GtkTreePath * path = gtk_tree_path_new_from_indices( selRow, -1 );
+      gtk_tree_selection_select_path( sel, path );
+      gtk_tree_path_free( path );
+      cb->FItemIndex = selRow + 1;
+   }
    gtk_container_add( GTK_CONTAINER(sw), tv );
+   gtk_widget_show( tv );
    gtk_scrolled_window_set_shadow_type( GTK_SCROLLED_WINDOW(sw), GTK_SHADOW_IN );
    g_object_unref( store );
    HBGeneric_CreateWidget( p, container, sw );
@@ -3688,6 +3704,9 @@ HB_FUNC( UI_SETPROP )
          if( !pipe ) break;
          raw = pipe + 1;
       }
+      /* Default selection to first item when items are set */
+      if( cb->FItemCount > 0 && cb->FItemIndex == 0 )
+         cb->FItemIndex = 1;
       /* Rebuild live widget */
       if( p->FControlType == CT_COMBOBOX && p->FWidget &&
           GTK_IS_COMBO_BOX_TEXT(p->FWidget) )
@@ -3712,6 +3731,15 @@ HB_FUNC( UI_SETPROP )
                   GtkTreeIter iter;
                   gtk_list_store_append( store, &iter );
                   gtk_list_store_set( store, &iter, 0, cb->FItems[i], -1 );
+               }
+               /* Update selection to reflect FItemIndex */
+               GtkTreeSelection * sel = gtk_tree_view_get_selection( GTK_TREE_VIEW(tv) );
+               int selRow = cb->FItemIndex > 0 ? cb->FItemIndex - 1 : 0;
+               if( selRow < cb->FItemCount )
+               {
+                  GtkTreePath * path = gtk_tree_path_new_from_indices( selRow, -1 );
+                  gtk_tree_selection_select_path( sel, path );
+                  gtk_tree_path_free( path );
                }
             }
          }

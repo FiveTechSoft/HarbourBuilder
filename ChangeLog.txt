@@ -1,6 +1,33 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-24f (Linux — nItemIndex por defecto a 1 en ListBox y ComboBox cuando hay items)
+
+  - UI_SetProp("aItems"): al setear items, si FItemIndex==0 se fija a 1
+    (primer item seleccionado) tanto para ListBox como para ComboBox
+  - HBComboBox_CreateWidget: convierte FItemIndex de 1-base Harbour a
+    0-base GTK (FItemIndex-1); fija FItemIndex=1 si FItemCount>0
+  - El inspector ahora muestra nItemIndex=1 en ambos controles cuando
+    hay items definidos
+
+2026-04-24e (Linux — items de ListBox/ComboBox no aparecen al ejecutar ni al recargar proyecto)
+
+  ROOT CAUSE — ITEMS NO VISIBLES EN RUNTIME NI EN PROYECTO RECARGADO:
+  - RestoreFormFromCode() no parseaba la cláusula ITEMS del source .prg
+    al cargar un proyecto; FItemCount quedaba en 0 y RegenerateFormCode()
+    no emitía ITEMS → UserApp compilado sin items
+  - HBListBox_CreateWidget(): el GtkTreeView interno no recibía
+    gtk_widget_show(), quedando invisible aunque el ScrolledWindow sí
+    se mostraba
+
+  FIX (hbbuilder_linux.prg — RestoreFormFromCode):
+  - Agrega parseo de cláusula ITEMS para COMBOBOX y LISTBOX igual que
+    hace Windows (bucle extrae strings entre comillas, llama UI_SetProp)
+
+  FIX (gtk3_core.c — HBListBox_CreateWidget):
+  - Llama gtk_widget_show(tv) explícitamente sobre el GtkTreeView
+  - Selecciona el item correcto según FItemIndex al crear el widget
+
 2026-04-24d (Linux — items del ListBox no aparecen en runtime)
 
   ROOT CAUSE — ITEMS DEL LISTBOX NO VISIBLES AL EJECUTAR FORM:
