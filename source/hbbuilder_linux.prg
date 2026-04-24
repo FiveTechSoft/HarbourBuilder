@@ -337,6 +337,7 @@ static function CreatePalette()
    oPal:AddComp( nTab, "Grp",  "GroupBox",    6 )
    oPal:AddComp( nTab, "Pnl",  "Panel",      25 )
    oPal:AddComp( nTab, "SB",   "ScrollBar",  26 )
+   oPal:AddComp( nTab, "Mnu", "MainMenu",  132 )
 
    // Additional tab (C++Builder)
    nTab := oPal:AddTab( "Additional" )
