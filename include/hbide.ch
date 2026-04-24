@@ -170,6 +170,7 @@
 #define CT_GITMERGE        130
 // Non-visual: Data containers
 #define CT_COMPARRAY       131
+#define CT_MAINMENU        132   // Linux non-visual menu bar (same value as CT_BAND, which is Windows-only)
 
 // Report designer
 #define CT_BAND            132

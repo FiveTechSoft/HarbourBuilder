@@ -409,6 +409,14 @@
 #xcommand DEFINE PALETTE <oPal> OF <oForm> => ;
    <oPal> := TComponentPalette():New( <oForm> )
 
+// TMainMenu DSL — design-time block; built at runtime by HBMainMenu_Attach() reading aMenuItems
+#xcommand DEFINE MENUBAR                                  =>
+#xcommand END MENUBAR                                     =>
+#xcommand END POPUP                                       =>
+#xcommand DEFINE POPUP <x>                                =>
+#xcommand MENUITEM <x> [ ACTION <a> ] [ ACCEL <k> ]      =>
+#xcommand MENUSEPARATOR                                   =>
+
 // Menu
 #xcommand DEFINE MENUBAR OF <oForm> => ;
    <oForm>:CreateMenu()
