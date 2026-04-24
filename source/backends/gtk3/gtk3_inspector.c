@@ -511,6 +511,346 @@ static void on_enum_menu_activate( GtkMenuItem * item, gpointer userData )
    InsRebuildStore( emd->d );
 }
 
+/* ===== Menu Items Editor ===== */
+#define MEI_MAX 128
+
+typedef struct {
+   char  szCaption[128];
+   char  szShortcut[32];
+   char  szHandler[128];
+   int   bSeparator;
+   int   bEnabled;
+   int   nLevel;
+   int   nParent;
+} MEINode;
+
+typedef struct {
+   MEINode     nodes[MEI_MAX];
+   int         nCount;
+   GtkWidget * tree;
+   GtkWidget * eCaption;
+   GtkWidget * eShortcut;
+   GtkWidget * eHandler;
+   GtkWidget * cbEnabled;
+   int         nSel;
+   int         bUpdating;
+} MEIDATA;
+
+static void MEI_Serialize( MEIDATA * d, char * out, int outLen )
+{
+   int pos = 0;
+   out[0] = 0;
+   for( int i = 0; i < d->nCount && pos < outLen - 64; i++ ) {
+      if( i > 0 ) out[pos++] = '|';
+      const char * cap = d->nodes[i].bSeparator ? "---" : d->nodes[i].szCaption;
+      int n = snprintf( out+pos, outLen-pos, "%s\x01%s\x01%s\x01%d\x01%d\x01%d",
+         cap, d->nodes[i].szShortcut, d->nodes[i].szHandler,
+         d->nodes[i].bEnabled, d->nodes[i].nLevel, d->nodes[i].nParent );
+      if( n > 0 ) pos += n;
+   }
+}
+
+static void MEI_Parse( MEIDATA * d, const char * raw )
+{
+   d->nCount = 0;
+   if( !raw || !raw[0] ) return;
+   while( *raw && d->nCount < MEI_MAX )
+   {
+      const char * pipe = strchr( raw, '|' );
+      int tl = pipe ? (int)(pipe-raw) : (int)strlen(raw);
+      if( tl > 511 ) tl = 511;
+      char tok[512]; memcpy(tok,raw,tl); tok[tl]=0;
+      int fi = d->nCount;
+      char*f0=tok;
+      char*f1=strchr(f0,'\x01'); if(f1){*f1++=0;}else f1=(char*)"";
+      char*f2=f1[0]?strchr(f1,'\x01'):NULL; if(f2){*f2++=0;}else f2=(char*)"";
+      char*f3=f2?strchr(f2,'\x01'):NULL; if(f3){*f3++=0;}else f3=(char*)"";
+      char*f4=f3?strchr(f3,'\x01'):NULL; if(f4){*f4++=0;}else f4=(char*)"";
+      char*f5=f4?strchr(f4,'\x01'):NULL; if(f5){*f5++=0;}else f5=(char*)"-1";
+      d->nodes[fi].bSeparator = strcmp(f0,"---")==0;
+      strncpy(d->nodes[fi].szCaption, d->nodes[fi].bSeparator?"":f0, 127);
+      strncpy(d->nodes[fi].szShortcut, f1, 31);
+      strncpy(d->nodes[fi].szHandler,  f2, 127);
+      d->nodes[fi].bEnabled = f3[0]?atoi(f3):1;
+      d->nodes[fi].nLevel   = f4[0]?atoi(f4):0;
+      d->nodes[fi].nParent  = f5[0]?atoi(f5):-1;
+      d->nCount++;
+      if(!pipe) break;
+      raw = pipe+1;
+   }
+}
+
+static void MEI_RebuildTree( MEIDATA * d )
+{
+   GtkTreeStore * store = GTK_TREE_STORE(
+      gtk_tree_view_get_model(GTK_TREE_VIEW(d->tree)) );
+   gtk_tree_store_clear( store );
+
+   GtkTreeIter iters[8];
+   int hasIter[8] = {0};
+
+   for( int i = 0; i < d->nCount; i++ ) {
+      MEINode * n = &d->nodes[i];
+      GtkTreeIter it;
+      GtkTreeIter * parent = (n->nLevel>0 && n->nLevel<=7 && hasIter[n->nLevel-1])
+                              ? &iters[n->nLevel-1] : NULL;
+      gtk_tree_store_append( store, &it, parent );
+      const char * cap = n->bSeparator ? "──────" : n->szCaption;
+      gtk_tree_store_set( store, &it, 0, cap, 1, n->szShortcut, 2, i, -1 );
+      if( !n->bSeparator ) {
+         iters[n->nLevel] = it;
+         hasIter[n->nLevel] = 1;
+         for(int lv=n->nLevel+1;lv<8;lv++) hasIter[lv]=0;
+      }
+   }
+   gtk_tree_view_expand_all( GTK_TREE_VIEW(d->tree) );
+}
+
+static void on_mei_selection_changed( GtkTreeSelection * sel, gpointer data )
+{
+   MEIDATA * d = (MEIDATA *)data;
+   if( d->bUpdating ) return;
+   GtkTreeIter it;
+   GtkTreeModel * model;
+   if( !gtk_tree_selection_get_selected(sel, &model, &it) ) { d->nSel=-1; return; }
+   int idx; gtk_tree_model_get( model, &it, 2, &idx, -1 );
+   if( idx<0 || idx>=d->nCount ) { d->nSel=-1; return; }
+   d->bUpdating = 1;
+   d->nSel = idx;
+   MEINode * n = &d->nodes[idx];
+   gtk_entry_set_text( GTK_ENTRY(d->eCaption),  n->bSeparator?"":n->szCaption );
+   gtk_entry_set_text( GTK_ENTRY(d->eShortcut), n->szShortcut );
+   gtk_entry_set_text( GTK_ENTRY(d->eHandler),  n->szHandler );
+   gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(d->cbEnabled), n->bEnabled );
+   gtk_widget_set_sensitive( d->eCaption,  !n->bSeparator );
+   gtk_widget_set_sensitive( d->eShortcut, !n->bSeparator );
+   gtk_widget_set_sensitive( d->eHandler,  !n->bSeparator );
+   d->bUpdating = 0;
+}
+
+static void on_mei_caption_changed( GtkEditable * e, gpointer data )
+{
+   MEIDATA * d = (MEIDATA *)data;
+   if( d->bUpdating || d->nSel<0 ) return;
+   strncpy( d->nodes[d->nSel].szCaption, gtk_entry_get_text(GTK_ENTRY(e)), 127 );
+   MEI_RebuildTree(d);
+}
+
+static void on_mei_shortcut_changed( GtkEditable * e, gpointer data )
+{
+   MEIDATA * d = (MEIDATA *)data;
+   if( d->bUpdating || d->nSel<0 ) return;
+   strncpy( d->nodes[d->nSel].szShortcut, gtk_entry_get_text(GTK_ENTRY(e)), 31 );
+   MEI_RebuildTree(d);
+}
+
+static void on_mei_handler_changed( GtkEditable * e, gpointer data )
+{
+   MEIDATA * d = (MEIDATA *)data;
+   if( d->bUpdating || d->nSel<0 ) return;
+   strncpy( d->nodes[d->nSel].szHandler, gtk_entry_get_text(GTK_ENTRY(e)), 127 );
+}
+
+static void on_mei_enabled_toggled( GtkToggleButton * tb, gpointer data )
+{
+   MEIDATA * d = (MEIDATA *)data;
+   if( d->bUpdating || d->nSel<0 ) return;
+   d->nodes[d->nSel].bEnabled = gtk_toggle_button_get_active(tb) ? 1 : 0;
+}
+
+static void mei_add_node( MEIDATA * d, int nLevel, int bSeparator )
+{
+   if( d->nCount >= MEI_MAX ) return;
+   int insPos = (d->nSel >= 0) ? d->nSel + 1 : d->nCount;
+   /* Shift nodes up */
+   for( int i = d->nCount; i > insPos; i-- )
+      d->nodes[i] = d->nodes[i-1];
+   /* Find parent index */
+   int nParent = -1;
+   if( nLevel > 0 ) {
+      for( int i = insPos-1; i >= 0; i-- ) {
+         if( d->nodes[i].nLevel == nLevel-1 && !d->nodes[i].bSeparator ) {
+            nParent = i; break;
+         }
+      }
+   }
+   memset( &d->nodes[insPos], 0, sizeof(MEINode) );
+   if( !bSeparator ) strcpy( d->nodes[insPos].szCaption, "NewItem" );
+   d->nodes[insPos].bSeparator = bSeparator;
+   d->nodes[insPos].bEnabled   = 1;
+   d->nodes[insPos].nLevel     = nLevel;
+   d->nodes[insPos].nParent    = nParent;
+   d->nCount++;
+   d->nSel = insPos;
+   MEI_RebuildTree(d);
+}
+
+static void on_mei_add_popup ( GtkButton * b, gpointer d ) { (void)b; mei_add_node((MEIDATA*)d,0,0); }
+static void on_mei_add_item  ( GtkButton * b, gpointer d ) { (void)b; mei_add_node((MEIDATA*)d,1,0); }
+static void on_mei_add_sub   ( GtkButton * b, gpointer d ) { (void)b; mei_add_node((MEIDATA*)d,2,0); }
+static void on_mei_add_sep   ( GtkButton * b, gpointer d )
+{
+   (void)b;
+   MEIDATA * dd = (MEIDATA*)d;
+   int lv = (dd->nSel>=0) ? dd->nodes[dd->nSel].nLevel : 1;
+   mei_add_node(dd, lv, 1);
+}
+
+static void on_mei_move_up( GtkButton * b, gpointer data )
+{
+   (void)b;
+   MEIDATA * d = (MEIDATA *)data;
+   if( d->nSel <= 0 ) return;
+   MEINode tmp = d->nodes[d->nSel]; d->nodes[d->nSel]=d->nodes[d->nSel-1]; d->nodes[d->nSel-1]=tmp;
+   d->nSel--;
+   MEI_RebuildTree(d);
+}
+
+static void on_mei_move_down( GtkButton * b, gpointer data )
+{
+   (void)b;
+   MEIDATA * d = (MEIDATA *)data;
+   if( d->nSel<0 || d->nSel>=d->nCount-1 ) return;
+   MEINode tmp = d->nodes[d->nSel]; d->nodes[d->nSel]=d->nodes[d->nSel+1]; d->nodes[d->nSel+1]=tmp;
+   d->nSel++;
+   MEI_RebuildTree(d);
+}
+
+static void on_mei_delete( GtkButton * b, gpointer data )
+{
+   (void)b;
+   MEIDATA * d = (MEIDATA *)data;
+   if( d->nSel<0 || d->nCount==0 ) return;
+   int del = d->nSel;
+   for( int i=del; i<d->nCount-1; i++ ) d->nodes[i]=d->nodes[i+1];
+   d->nCount--;
+   d->nSel = del < d->nCount ? del : d->nCount-1;
+   MEI_RebuildTree(d);
+}
+
+static void OpenMenuEditor( INSDATA * ins, int nReal )
+{
+   MEIDATA d;
+   memset( &d, 0, sizeof(d) );
+   d.nSel = -1;
+   MEI_Parse( &d, ins->rows[nReal].szValue );
+
+   GtkWidget * dialog = gtk_dialog_new_with_buttons( "Menu Items Editor",
+      GTK_WINDOW(ins->window),
+      GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+      "OK", GTK_RESPONSE_OK,
+      "Cancel", GTK_RESPONSE_CANCEL,
+      NULL );
+   gtk_window_set_default_size( GTK_WINDOW(dialog), 640, 400 );
+
+   GtkWidget * content = gtk_dialog_get_content_area( GTK_DIALOG(dialog) );
+
+   /* Toolbar */
+   GtkWidget * toolbar = gtk_box_new( GTK_ORIENTATION_HORIZONTAL, 4 );
+   gtk_widget_set_margin_start( toolbar, 4 );
+   gtk_widget_set_margin_top( toolbar, 4 );
+   gtk_box_pack_start( GTK_BOX(content), toolbar, FALSE, FALSE, 0 );
+
+   const char * btnLabels[] = { "+Popup", "+Item", "+SubItem", "+Sep", "↑", "↓", "✕" };
+   GCallback    btnCbs[]    = {
+      G_CALLBACK(on_mei_add_popup), G_CALLBACK(on_mei_add_item),
+      G_CALLBACK(on_mei_add_sub),   G_CALLBACK(on_mei_add_sep),
+      G_CALLBACK(on_mei_move_up),   G_CALLBACK(on_mei_move_down),
+      G_CALLBACK(on_mei_delete)
+   };
+   for( int i = 0; i < 7; i++ ) {
+      GtkWidget * btn = gtk_button_new_with_label( btnLabels[i] );
+      g_signal_connect( btn, "clicked", btnCbs[i], &d );
+      gtk_box_pack_start( GTK_BOX(toolbar), btn, FALSE, FALSE, 2 );
+   }
+
+   /* Paned: tree | props */
+   GtkWidget * paned = gtk_paned_new( GTK_ORIENTATION_HORIZONTAL );
+   gtk_paned_set_position( GTK_PANED(paned), 360 );
+   gtk_box_pack_start( GTK_BOX(content), paned, TRUE, TRUE, 4 );
+
+   /* Left: scrolled tree */
+   GtkWidget * sw = gtk_scrolled_window_new( NULL, NULL );
+   gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(sw),
+      GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC );
+   GtkTreeStore * store = gtk_tree_store_new( 3, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_INT );
+   d.tree = gtk_tree_view_new_with_model( GTK_TREE_MODEL(store) );
+   g_object_unref( store );
+   gtk_tree_view_set_headers_visible( GTK_TREE_VIEW(d.tree), TRUE );
+
+   GtkCellRenderer * r0 = gtk_cell_renderer_text_new();
+   GtkTreeViewColumn * c0 = gtk_tree_view_column_new_with_attributes( "Caption", r0, "text", 0, NULL );
+   gtk_tree_view_column_set_min_width( c0, 180 );
+   gtk_tree_view_column_set_resizable( c0, TRUE );
+   gtk_tree_view_append_column( GTK_TREE_VIEW(d.tree), c0 );
+
+   GtkCellRenderer * r1 = gtk_cell_renderer_text_new();
+   GtkTreeViewColumn * c1 = gtk_tree_view_column_new_with_attributes( "Shortcut", r1, "text", 1, NULL );
+   gtk_tree_view_column_set_min_width( c1, 100 );
+   gtk_tree_view_append_column( GTK_TREE_VIEW(d.tree), c1 );
+
+   gtk_container_add( GTK_CONTAINER(sw), d.tree );
+   gtk_widget_show( d.tree );
+   gtk_paned_add1( GTK_PANED(paned), sw );
+
+   GtkTreeSelection * treeSel = gtk_tree_view_get_selection( GTK_TREE_VIEW(d.tree) );
+   g_signal_connect( treeSel, "changed", G_CALLBACK(on_mei_selection_changed), &d );
+
+   /* Right: properties grid in a scrolled window */
+   GtkWidget * propSw = gtk_scrolled_window_new( NULL, NULL );
+   gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(propSw),
+      GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC );
+
+   GtkWidget * grid = gtk_grid_new();
+   gtk_grid_set_row_spacing( GTK_GRID(grid), 8 );
+   gtk_grid_set_column_spacing( GTK_GRID(grid), 8 );
+   gtk_widget_set_margin_start( grid, 8 );
+   gtk_widget_set_margin_top( grid, 8 );
+   gtk_widget_set_margin_end( grid, 8 );
+
+   d.eCaption  = gtk_entry_new();
+   d.eShortcut = gtk_entry_new();
+   d.eHandler  = gtk_entry_new();
+   d.cbEnabled = gtk_check_button_new_with_label( "Enabled" );
+
+   GtkWidget * lCaption  = gtk_label_new("Caption:");  gtk_widget_set_halign(lCaption, GTK_ALIGN_END);
+   GtkWidget * lShortcut = gtk_label_new("Shortcut:"); gtk_widget_set_halign(lShortcut, GTK_ALIGN_END);
+   GtkWidget * lOnClick  = gtk_label_new("OnClick:");  gtk_widget_set_halign(lOnClick, GTK_ALIGN_END);
+
+   gtk_grid_attach( GTK_GRID(grid), lCaption,    0, 0, 1, 1 );
+   gtk_grid_attach( GTK_GRID(grid), d.eCaption,  1, 0, 1, 1 );
+   gtk_grid_attach( GTK_GRID(grid), lShortcut,   0, 1, 1, 1 );
+   gtk_grid_attach( GTK_GRID(grid), d.eShortcut, 1, 1, 1, 1 );
+   gtk_grid_attach( GTK_GRID(grid), lOnClick,    0, 2, 1, 1 );
+   gtk_grid_attach( GTK_GRID(grid), d.eHandler,  1, 2, 1, 1 );
+   gtk_grid_attach( GTK_GRID(grid), d.cbEnabled, 1, 3, 1, 1 );
+
+   gtk_widget_set_hexpand( d.eCaption,  TRUE );
+   gtk_widget_set_hexpand( d.eShortcut, TRUE );
+   gtk_widget_set_hexpand( d.eHandler,  TRUE );
+
+   g_signal_connect( d.eCaption,  "changed", G_CALLBACK(on_mei_caption_changed),  &d );
+   g_signal_connect( d.eShortcut, "changed", G_CALLBACK(on_mei_shortcut_changed), &d );
+   g_signal_connect( d.eHandler,  "changed", G_CALLBACK(on_mei_handler_changed),  &d );
+   g_signal_connect( d.cbEnabled, "toggled", G_CALLBACK(on_mei_enabled_toggled),  &d );
+
+   gtk_container_add( GTK_CONTAINER(propSw), grid );
+   gtk_paned_add2( GTK_PANED(paned), propSw );
+
+   gtk_widget_show_all( content );
+
+   MEI_RebuildTree( &d );
+
+   if( gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_OK ) {
+      char result[4096] = "";
+      MEI_Serialize( &d, result, sizeof(result) );
+      strncpy( ins->rows[nReal].szValue, result, 255 );
+      InsApplyValue( ins, nReal );
+      InsRebuildStore( ins );
+   }
+   gtk_widget_destroy( dialog );
+}
+
 /* Row activated (double-click) - toggle category, open picker, or fire event handler */
 static void on_row_activated( GtkTreeView * treeView, GtkTreePath * path,
    GtkTreeViewColumn * column, gpointer data )
@@ -623,6 +963,13 @@ static void on_row_activated( GtkTreeView * treeView, GtkTreePath * path,
          InsRebuildStore( d );
       }
       gtk_widget_destroy( dialog );
+      return;
+   }
+
+   /* Menu property: open Menu Items Editor */
+   if( d->rows[nReal].cType == 'M' )
+   {
+      OpenMenuEditor( d, nReal );
       return;
    }
 
