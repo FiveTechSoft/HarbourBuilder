@@ -1,6 +1,20 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-25d
+
+  - fix(ide-codegen): TMainMenu codegen produced invalid Harbour when a
+    menu handler was a method call like Self:Close. Emit path wrapped
+    every cHndl with ( Self, oMenuItem ) and added a stub
+    "static function <cHndl>( oForm, oMenuItem )", which yielded
+    "static function Self:Close(...)" — Error E0030 syntax error at ':'.
+    Codegen now distinguishes expression handlers (contain ':' or '(')
+    from bareword identifiers: expressions emit verbatim with a trailing
+    "()" appended if missing and no stub is generated; barewords keep
+    the auto-wrap + stub behavior. Applied across Win32, macOS, Linux
+    backends in both CT_MAINMENU paths (codeblock array + DEFINE MENUBAR
+    DSL).
+
 2026-04-25c
 
   - sample(mainmenu): new IDE-loadable sample at samples/projects/mainmenu/

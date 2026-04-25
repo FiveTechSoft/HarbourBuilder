@@ -847,7 +847,13 @@ static function RegenerateFormCode( cName, hForm )
                         cHndl := iif( Len(aMFields) >= 3, aMFields[3], "" )
                         if nMI > 1; cCreate += ", "; endif
                         if ! Empty( cHndl )
-                           cCreate += '{|| ' + cHndl + '( Self, nil )}'
+                           if ":" $ cHndl .or. "(" $ cHndl
+                              cCreate += '{|| ' + cHndl
+                              if !( "(" $ cHndl ); cCreate += '()'; endif
+                              cCreate += '}'
+                           else
+                              cCreate += '{|| ' + cHndl + '( Self, nil )}'
+                           endif
                         else
                            cCreate += 'nil'
                         endif
@@ -892,9 +898,14 @@ static function RegenerateFormCode( cName, hForm )
                         else
                            cCreate += cInd + 'MENUITEM "' + cCap + '"'
                            if ! Empty( cHndl )
-                              cCreate += ' ACTION ' + cHndl + '( Self, oMenuItem )'
-                              if AScan( aMenuHandlers, cHndl ) == 0
-                                 AAdd( aMenuHandlers, cHndl )
+                              if ":" $ cHndl .or. "(" $ cHndl
+                                 cCreate += ' ACTION ' + cHndl
+                                 if !( "(" $ cHndl ); cCreate += '()'; endif
+                              else
+                                 cCreate += ' ACTION ' + cHndl + '( Self, oMenuItem )'
+                                 if AScan( aMenuHandlers, cHndl ) == 0
+                                    AAdd( aMenuHandlers, cHndl )
+                                 endif
                               endif
                            endif
                            if ! Empty( cScut )
