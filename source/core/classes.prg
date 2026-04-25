@@ -1356,13 +1356,13 @@ return Self
 
 STATIC FUNCTION _HBMenuCtx( nOp, xArg )
    STATIC oMenu  := nil
-   STATIC nLevel := 1
+   STATIC nLevel := 0
    do case
-   case nOp == 0; oMenu := xArg; nLevel := 1
+   case nOp == 0; oMenu := xArg; nLevel := 0
    case nOp == 1; return oMenu
    case nOp == 2; return nLevel
    case nOp == 3; nLevel++
-   case nOp == 4; if nLevel > 1; nLevel--; endif
+   case nOp == 4; if nLevel > 0; nLevel--; endif
    case nOp == 5; oMenu := nil
    endcase
 return nil
@@ -1391,7 +1391,7 @@ RETURN
 PROCEDURE _HBMenuPopup( cText )
    local oMenu := _HBMenuCtx( 1 )
    if oMenu != nil
-      AAdd( oMenu:_aBuilding, TMenuItem():New( cText, "", "", .T., _HBMenuCtx(2) - 1, -1 ) )
+      AAdd( oMenu:_aBuilding, TMenuItem():New( cText, "", "", .T., _HBMenuCtx(2), -1 ) )
       _HBMenuCtx( 3 )
    endif
 RETURN

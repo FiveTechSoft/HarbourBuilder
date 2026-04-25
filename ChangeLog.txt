@@ -1,6 +1,24 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-25e
+
+  - fix(dsl): TMainMenu DEFINE MENUBAR DSL emitted MENUITEM nodes one
+    level too deep, so popups appeared on the menubar but their child
+    items were never visible at runtime. _HBMenuCtx started nLevel at 1
+    and _HBMenuPopup emitted popup at nLevel-1 (=0) then incremented
+    nLevel to 2 — subsequent _HBMenuAdd calls stamped MENUITEMs at
+    level 2 instead of 1. BuildHMenu (hbbridge.cpp) resolved the parent
+    via hStack[nLevel], and hStack[2] was never set for top-level
+    popups, so AppendMenuA was called with a NULL HMENU and the items
+    silently disappeared.
+    Now: nLevel starts at 0, _HBMenuPopup emits at nLevel then ++,
+    _HBMenuAdd emits at nLevel, END POPUP decrements. Layout becomes
+    popup=0, item=1, sub-popup=1, sub-item=2 — matches the parent
+    stack walk in BuildHMenu and the inspector's reverse parser
+    (RestoreFormFromCode). Single fix in source/core/classes.prg
+    covers Win32, macOS and Linux (shared classes file).
+
 2026-04-25d
 
   - fix(ide-codegen): TMainMenu codegen produced invalid Harbour when a
