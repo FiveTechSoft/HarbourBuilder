@@ -409,6 +409,7 @@ static function CreatePalette()
    oPal:AddComp( nTab, "Grp",  "GroupBox",    6 )
    oPal:AddComp( nTab, "Pnl",  "Panel",      25 )
    oPal:AddComp( nTab, "SB",   "ScrollBar",  26 )
+   oPal:AddComp( nTab, "Mnu", "MainMenu",  200 )
 
    // Additional tab (C++Builder)
    nTab := oPal:AddTab( "Additional" )
@@ -720,6 +721,8 @@ static function RegenerateFormCode( cName, hForm )
    local cVal, aHdrs, kk, nColCount, aColProps, nColW, nInterval
    local aCtrlMap := {}, cOf, hOwner, nPg, kk2, nLen0, cSlice, lRealCreate, nVal
    local cBandFields, aBandField, cBandFldLine, aBandRec
+   local aMenuHandlers := {}, nMI, aMFields, lHasHandlers, cHndl, aMenuNodes
+   local nPendingLevels, cMNode, cCap, cScut, nLv, nPL, bIsPopup, aNextF, cInd
 
    // Read existing code to find declared event handlers
    cExistingCode := ""
@@ -954,48 +957,158 @@ static function RegenerateFormCode( cName, hForm )
                if ! Empty( cVal )
                   cCreate += '   ::o' + cCtrlName + ':cDataSource := "' + cVal + '"' + e
                endif
-            case nType == 132  // Band
-               cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
-                  ' BAND ::o' + cCtrlName + ' OF Self SIZE ' + ;
-                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH))
-               cVal := UI_GetProp( hCtrl, "cBandType" )
-               if ! Empty( cVal ) .and. cVal != "Detail"
-                  cCreate += ' TYPE "' + cVal + '"'
-               endif
-               cCreate += e
-               cBandFields := UI_GetProp( hCtrl, "aData" )
-               if ! Empty( cBandFields )
-                  aBandField := hb_ATokens( cBandFields, Chr(10) )
-                  for kk := 1 to Len( aBandField )
-                     cBandFldLine := AllTrim( aBandField[kk] )
-                     if Empty( cBandFldLine ); loop; endif
-                     aBandRec := hb_ATokens( cBandFldLine, "|" )
-                     if Len( aBandRec ) >= 14
-                        cCreate += '   REPORTFIELD ::o' + aBandRec[1] + ;
-                           ' TYPE "' + aBandRec[2] + '"'
-                        if ! Empty( aBandRec[3] )
-                           cCreate += ' PROMPT "' + aBandRec[3] + '"'
+            case nType == 200  // CT_MAINMENU (same as macOS — DEFINE MENUBAR DSL)
+               cVal := UI_GetProp( hCtrl, "aMenuItems" )
+               cCreate += '   COMPONENT ::o' + cCtrlName + ' TYPE CT_MAINMENU OF Self  // TMainMenu' + e
+               if ValType( cVal ) == "C" .and. ! Empty( cVal )
+                  aMenuNodes := HB_ATokens( cVal, "|" )
+                  lHasHandlers := .F.
+                  for nMI := 1 to Len( aMenuNodes )
+                     aMFields := HB_ATokens( aMenuNodes[nMI], Chr(1) )
+                     cHndl := iif( Len(aMFields) >= 3, aMFields[3], "" )
+                     if ! Empty( cHndl ); lHasHandlers := .T.; exit; endif
+                  next
+                  if lHasHandlers
+                     cCreate += '   ::o' + cCtrlName + ':aOnClick := { '
+                     for nMI := 1 to Len( aMenuNodes )
+                        aMFields := HB_ATokens( aMenuNodes[nMI], Chr(1) )
+                        cHndl := iif( Len(aMFields) >= 3, aMFields[3], "" )
+                        if nMI > 1; cCreate += ", "; endif
+                        if ! Empty( cHndl )
+                           cCreate += '{|| ' + cHndl + '( Self, nil )}'
+                        else
+                           cCreate += 'nil'
                         endif
-                        if ! Empty( aBandRec[4] )
-                           cCreate += ' FIELD "' + aBandRec[4] + '"'
+                     next
+                     cCreate += ' }' + e
+                  endif
+                  nPendingLevels := {}
+                  cCreate += '   DEFINE MENUBAR ::o' + cCtrlName + e
+                  for nMI := 1 to Len( aMenuNodes )
+                     cMNode := aMenuNodes[nMI]
+                     aMFields := HB_ATokens( cMNode, Chr(1) )
+                     if Len( aMFields ) < 5; loop; endif
+                     cCap  := aMFields[1]
+                     cScut := iif( Len(aMFields) >= 2, aMFields[2], "" )
+                     cHndl := iif( Len(aMFields) >= 3, aMFields[3], "" )
+                     nLv   := iif( Len(aMFields) >= 5, Val( aMFields[5] ), 0 )
+                     do while Len( nPendingLevels ) > 0 .and. ;
+                              ATail( nPendingLevels ) >= nLv
+                        nPL := ATail( nPendingLevels )
+                        cCreate += Replicate( "   ", nPL + 2 ) + 'END POPUP' + e
+                        ASize( nPendingLevels, Len( nPendingLevels ) - 1 )
+                     enddo
+                     cInd := Replicate( "   ", nLv + 2 )
+                     if cCap == "---"
+                        cCreate += cInd + 'MENUSEPARATOR' + e
+                     else
+                        bIsPopup := .F.
+                        if nMI < Len( aMenuNodes )
+                           aNextF := HB_ATokens( aMenuNodes[nMI+1], Chr(1) )
+                           if Len(aNextF) >= 5 .and. Val(aNextF[5]) > nLv
+                              bIsPopup := .T.
+                           endif
                         endif
-                        if ! Empty( aBandRec[5] )
-                           cCreate += ' FORMAT "' + aBandRec[5] + '"'
+                        if nLv == 0 .or. bIsPopup
+                           cCreate += cInd + 'DEFINE POPUP "' + cCap + '"' + e
+                           AAdd( nPendingLevels, nLv )
+                        else
+                           cCreate += cInd + 'MENUITEM "' + cCap + '"'
+                           if ! Empty( cHndl )
+                              cCreate += ' ACTION ' + cHndl + '( Self, oMenuItem )'
+                              if AScan( aMenuHandlers, cHndl ) == 0
+                                 AAdd( aMenuHandlers, cHndl )
+                              endif
+                           endif
+                           if ! Empty( cScut )
+                              cCreate += ' ACCEL "' + cScut + '"'
+                           endif
+                           cCreate += e
                         endif
-                        cCreate += ' OF ::o' + cCtrlName + ;
-                           ' AT ' + aBandRec[6] + ',' + aBandRec[7] + ;
-                           ' SIZE ' + aBandRec[8] + ',' + aBandRec[9]
-                        if aBandRec[10] != "Sans" .or. Val(aBandRec[11]) != 10
-                           cCreate += ' FONT "' + aBandRec[10] + '",' + aBandRec[11]
-                        endif
-                        if aBandRec[12] == "1"; cCreate += ' BOLD';   endif
-                        if aBandRec[13] == "1"; cCreate += ' ITALIC'; endif
-                        if Val(aBandRec[14]) != 0
-                           cCreate += ' ALIGN ' + aBandRec[14]
-                        endif
-                        cCreate += e
                      endif
                   next
+                  do while Len( nPendingLevels ) > 0
+                     nPL := ATail( nPendingLevels )
+                     cCreate += Replicate( "   ", nPL + 2 ) + 'END POPUP' + e
+                     ASize( nPendingLevels, Len( nPendingLevels ) - 1 )
+                  enddo
+                  cCreate += '   END MENUBAR' + e
+               endif
+            case nType == 132  // CT_MAINMENU (has aMenuItems) or CT_BAND (report designer)
+               cVal := UI_GetProp( hCtrl, "aMenuItems" )
+               if ValType( cVal ) == "C"  // TMainMenu — discriminate by aMenuItems property
+                  cCreate += '   COMPONENT ::o' + cCtrlName + ' TYPE CT_MAINMENU OF Self  // TMainMenu' + e
+                  if ! Empty( cVal )
+                     cCreate += '   ::o' + cCtrlName + ':aMenuItems := "' + ;
+                                StrTran( cVal, Chr(1), '"+Chr(1)+"' ) + '"' + e
+                     aMenuNodes := HB_ATokens( cVal, "|" )
+                     lHasHandlers := .F.
+                     for nMI := 1 to Len( aMenuNodes )
+                        aMFields := HB_ATokens( aMenuNodes[nMI], Chr(1) )
+                        cHndl := iif( Len(aMFields) >= 3, aMFields[3], "" )
+                        if ! Empty( cHndl ); lHasHandlers := .T.; exit; endif
+                     next
+                     if lHasHandlers
+                        cCreate += '   ::o' + cCtrlName + ':aOnClick := { '
+                        for nMI := 1 to Len( aMenuNodes )
+                           aMFields := HB_ATokens( aMenuNodes[nMI], Chr(1) )
+                           cHndl := iif( Len(aMFields) >= 3, aMFields[3], "" )
+                           if nMI > 1; cCreate += ", "; endif
+                           if ! Empty( cHndl )
+                              cCreate += '{|| ' + cHndl + '( Self, nil )}'
+                              if AScan( aMenuHandlers, cHndl ) == 0
+                                 AAdd( aMenuHandlers, cHndl )
+                              endif
+                           else
+                              cCreate += 'nil'
+                           endif
+                        next
+                        cCreate += ' }' + e
+                     endif
+                  endif
+               else  // CT_BAND (report designer)
+                  cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
+                     ' BAND ::o' + cCtrlName + ' OF Self SIZE ' + ;
+                     LTrim(Str(nCW)) + ", " + LTrim(Str(nCH))
+                  cVal := UI_GetProp( hCtrl, "cBandType" )
+                  if ! Empty( cVal ) .and. cVal != "Detail"
+                     cCreate += ' TYPE "' + cVal + '"'
+                  endif
+                  cCreate += e
+                  cBandFields := UI_GetProp( hCtrl, "aData" )
+                  if ! Empty( cBandFields )
+                     aBandField := hb_ATokens( cBandFields, Chr(10) )
+                     for kk := 1 to Len( aBandField )
+                        cBandFldLine := AllTrim( aBandField[kk] )
+                        if Empty( cBandFldLine ); loop; endif
+                        aBandRec := hb_ATokens( cBandFldLine, "|" )
+                        if Len( aBandRec ) >= 14
+                           cCreate += '   REPORTFIELD ::o' + aBandRec[1] + ;
+                              ' TYPE "' + aBandRec[2] + '"'
+                           if ! Empty( aBandRec[3] )
+                              cCreate += ' PROMPT "' + aBandRec[3] + '"'
+                           endif
+                           if ! Empty( aBandRec[4] )
+                              cCreate += ' FIELD "' + aBandRec[4] + '"'
+                           endif
+                           if ! Empty( aBandRec[5] )
+                              cCreate += ' FORMAT "' + aBandRec[5] + '"'
+                           endif
+                           cCreate += ' OF ::o' + cCtrlName + ;
+                              ' AT ' + aBandRec[6] + ',' + aBandRec[7] + ;
+                              ' SIZE ' + aBandRec[8] + ',' + aBandRec[9]
+                           if aBandRec[10] != "Sans" .or. Val(aBandRec[11]) != 10
+                              cCreate += ' FONT "' + aBandRec[10] + '",' + aBandRec[11]
+                           endif
+                           if aBandRec[12] == "1"; cCreate += ' BOLD';   endif
+                           if aBandRec[13] == "1"; cCreate += ' ITALIC'; endif
+                           if Val(aBandRec[14]) != 0
+                              cCreate += ' ALIGN ' + aBandRec[14]
+                           endif
+                           cCreate += e
+                        endif
+                     next
+                  endif
                endif
             otherwise
                if IsNonVisual( nType )
@@ -1174,6 +1287,18 @@ static function RegenerateFormCode( cName, hForm )
    cCode += e
    cCode += "return nil" + e
    cCode += cSep
+
+   // Generate stub functions for any new menu item handlers
+   for nMI := 1 to Len( aMenuHandlers )
+      cHndl := aMenuHandlers[ nMI ]
+      if ! ( "function " + Lower( cHndl ) ) $ Lower( cExistingCode )
+         cCode += e
+         cCode += "static function " + cHndl + "( oForm, oMenuItem )" + e
+         cCode += e
+         cCode += "return nil" + e
+         cCode += cSep
+      endif
+   next
 
 return cCode
 
@@ -1354,7 +1479,7 @@ static function OnComponentDrop( hForm, nType, nL, nT, nW, nH )
 
    // Initialize counters on first call (indexed by control type)
    if aCnt == nil
-      aCnt := Array( 136 )
+      aCnt := Array( 201 )
       AFill( aCnt, 0 )
    endif
 
@@ -1411,6 +1536,22 @@ static function OnComponentDrop( hForm, nType, nL, nT, nW, nH )
       InspectorPopulateCombo( hForm )
       INS_ComboSelect( _InsGetData(), UI_GetChildCount( hForm ) )
       InspectorRefresh( hLastCtrl )
+      return nil
+   endif
+
+   // MainMenu non-visual drop (type 200)
+   if nType == 200
+      aCnt[ 200 ]++
+      cName := "MainMenu" + LTrim(Str(aCnt[200]))
+      nCount := UI_GetChildCount( hForm )
+      hCtrl  := UI_GetChild( hForm, nCount )
+      if hCtrl != 0
+         UI_SetProp( hCtrl, "cName", cName )
+      endif
+      SyncDesignerToCode()
+      InspectorPopulateCombo( hForm )
+      INS_ComboSelect( _InsGetData(), nCount )
+      InspectorRefresh( hCtrl )
       return nil
    endif
 
@@ -5633,6 +5774,7 @@ static function ComponentTypeName( nType )
       case nType == 65;  return "CT_HTTPCLIENT"
       case nType == 131; return "CT_COMPARRAY"
       case nType == 132; return "CT_BAND"
+      case nType == 200; return "CT_MAINMENU"
    endcase
 return "CT_UNKNOWN_" + LTrim( Str( nType ) )
 
@@ -5681,7 +5823,8 @@ static function ComponentTypeFromName( cName )
       { "CT_GITSTASH", 127 }, { "CT_GITTAG", 128 }, ;
       { "CT_GITBLAME", 129 }, { "CT_GITMERGE", 130 }, ;
       { "CT_COMPARRAY", 131 }, ;
-      { "CT_BAND", 132 } }
+      { "CT_BAND", 132 }, ;
+      { "CT_MAINMENU", 200 } }
    for i := 1 to Len( aMap )
       if Upper( cName ) == aMap[i][1]
          return aMap[i][2]

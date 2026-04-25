@@ -38,6 +38,7 @@ METHOD Run( oForm ) CLASS Win32Backend
       ::hFont, 0 )
 
    oForm:hNative := ::hWnd
+   oForm:hCpp    := ::hWnd   // Win32: expose hWnd as hCpp so COMPONENT/UI_MainMenuNew works
 
    // Create all child controls
    ::CreateControls( oForm )
@@ -130,6 +131,190 @@ return nil
 
 static HBRUSH s_hBrush = NULL;
 
+/* ---- Win32 TMainMenu support -------------------------------------------- */
+
+#define MAX_MENU_NODES  128
+#define MENU_ID_BASE    2000
+
+typedef struct {
+   char szCaption[ 128 ];
+   char szShortcut[  32 ];
+   char szHandler [ 128 ];
+   int  bSeparator;
+   int  bEnabled;
+   int  nParent;
+   int  nLevel;
+   int  nCmdId;
+} W32MenuNode;
+
+typedef struct {
+   HWND        hWnd;
+   HMENU       hMenu;
+   HACCEL      hAccel;
+   W32MenuNode nodes[ MAX_MENU_NODES ];
+   int         nCount;
+   PHB_ITEM    pOnClick;
+} HBW32Menu;
+
+static HBW32Menu * s_pMenu  = NULL;
+static HACCEL      s_hAccel = NULL;
+
+static void ParseMenuSerial( HBW32Menu * pm, const char * pSer )
+{
+   char  buf[ 8192 ], * pNode, * pNext, * pField, * pFEnd;
+   int   n = 0, f;
+
+   strncpy( buf, pSer, sizeof( buf ) - 1 );
+   buf[ sizeof( buf ) - 1 ] = '\0';
+   pNode = buf;
+
+   while( *pNode && n < MAX_MENU_NODES )
+   {
+      W32MenuNode * pN = &pm->nodes[ n ];
+      memset( pN, 0, sizeof( *pN ) );
+      pN->bEnabled = 1;
+
+      pNext = strchr( pNode, '|' );
+      if( pNext ) *pNext = '\0';
+
+      pField = pNode;
+      for( f = 0; f < 6; f++ )
+      {
+         pFEnd = strchr( pField, '\x01' );
+         if( pFEnd ) *pFEnd = '\0';
+         switch( f )
+         {
+            case 0: strncpy( pN->szCaption,  pField, 127 ); break;
+            case 1: strncpy( pN->szShortcut, pField,  31 ); break;
+            case 2: strncpy( pN->szHandler,  pField, 127 ); break;
+            case 3: pN->bEnabled = atoi( pField );          break;
+            case 4: pN->nLevel   = atoi( pField );          break;
+            case 5: pN->nParent  = atoi( pField );          break;
+         }
+         if( !pFEnd ) break;
+         pField = pFEnd + 1;
+      }
+      pN->bSeparator = ( strcmp( pN->szCaption, "---" ) == 0 );
+      n++;
+      if( !pNext ) break;
+      pNode = pNext + 1;
+   }
+   pm->nCount = n;
+}
+
+static BOOL ParseShortcut( const char * psz, BYTE * pfVirt, WORD * pKey )
+{
+   char   buf[ 64 ], * p, * plus;
+   BYTE   fVirt = FVIRTKEY;
+   WORD   key   = 0;
+
+   if( !psz || !*psz ) return FALSE;
+   strncpy( buf, psz, 63 );
+   buf[ 63 ] = '\0';
+   p = buf;
+
+   while( ( plus = strchr( p, '+' ) ) != NULL )
+   {
+      *plus = '\0';
+      if(      _stricmp( p, "Ctrl"  ) == 0 ) fVirt |= FCONTROL;
+      else if( _stricmp( p, "Alt"   ) == 0 ) fVirt |= FALT;
+      else if( _stricmp( p, "Shift" ) == 0 ) fVirt |= FSHIFT;
+      p = plus + 1;
+   }
+
+   if(      strlen( p ) == 1 )               key = (WORD) toupper( (unsigned char) p[0] );
+   else if( _stricmp( p, "F1"  ) == 0 )      key = VK_F1;
+   else if( _stricmp( p, "F2"  ) == 0 )      key = VK_F2;
+   else if( _stricmp( p, "F3"  ) == 0 )      key = VK_F3;
+   else if( _stricmp( p, "F4"  ) == 0 )      key = VK_F4;
+   else if( _stricmp( p, "F5"  ) == 0 )      key = VK_F5;
+   else if( _stricmp( p, "F6"  ) == 0 )      key = VK_F6;
+   else if( _stricmp( p, "F7"  ) == 0 )      key = VK_F7;
+   else if( _stricmp( p, "F8"  ) == 0 )      key = VK_F8;
+   else if( _stricmp( p, "F9"  ) == 0 )      key = VK_F9;
+   else if( _stricmp( p, "F10" ) == 0 )      key = VK_F10;
+   else if( _stricmp( p, "F11" ) == 0 )      key = VK_F11;
+   else if( _stricmp( p, "F12" ) == 0 )      key = VK_F12;
+   else if( _stricmp( p, "Del"    ) == 0 ||
+            _stricmp( p, "Delete" ) == 0 )    key = VK_DELETE;
+   else if( _stricmp( p, "Ins"    ) == 0 ||
+            _stricmp( p, "Insert" ) == 0 )    key = VK_INSERT;
+   else if( _stricmp( p, "Home"   ) == 0 )   key = VK_HOME;
+   else if( _stricmp( p, "End"    ) == 0 )   key = VK_END;
+   else if( _stricmp( p, "PgUp"   ) == 0 )   key = VK_PRIOR;
+   else if( _stricmp( p, "PgDn"   ) == 0 )   key = VK_NEXT;
+   else if( _stricmp( p, "Esc"    ) == 0 ||
+            _stricmp( p, "Escape" ) == 0 )    key = VK_ESCAPE;
+   else if( _stricmp( p, "Tab"    ) == 0 )   key = VK_TAB;
+   else if( _stricmp( p, "Enter"  ) == 0 )   key = VK_RETURN;
+   else if( _stricmp( p, "Space"  ) == 0 )   key = VK_SPACE;
+   else if( _stricmp( p, "Left"   ) == 0 )   key = VK_LEFT;
+   else if( _stricmp( p, "Right"  ) == 0 )   key = VK_RIGHT;
+   else if( _stricmp( p, "Up"     ) == 0 )   key = VK_UP;
+   else if( _stricmp( p, "Down"   ) == 0 )   key = VK_DOWN;
+
+   if( !key ) return FALSE;
+   *pfVirt = fVirt;
+   *pKey   = key;
+   return TRUE;
+}
+
+static void BuildHMenu( HBW32Menu * pm )
+{
+   HMENU       hMenuBar = CreateMenu();
+   HMENU       hStack[ 8 ];
+   ACCEL       aAccel[ MAX_MENU_NODES ];
+   int         nAccels = 0, nNextId = MENU_ID_BASE, i;
+
+   memset( hStack, 0, sizeof( hStack ) );
+
+   for( i = 0; i < pm->nCount; i++ )
+   {
+      W32MenuNode * pN  = &pm->nodes[ i ];
+      int           nLv = pN->nLevel;
+      int           bSub = ( i + 1 < pm->nCount && pm->nodes[ i + 1 ].nLevel > nLv );
+      HMENU         hPar = ( nLv == 0 ) ? hMenuBar : hStack[ nLv ];
+
+      if( pN->bSeparator )
+      {
+         AppendMenuA( hPar, MF_SEPARATOR, 0, NULL );
+      }
+      else if( bSub )
+      {
+         HMENU hSub = CreatePopupMenu();
+         if( nLv + 1 < 8 ) hStack[ nLv + 1 ] = hSub;
+         AppendMenuA( hPar, MF_POPUP, (UINT_PTR) hSub, pN->szCaption );
+      }
+      else
+      {
+         DWORD dwF = MF_STRING | ( pN->bEnabled ? 0 : MF_GRAYED );
+         pN->nCmdId = nNextId++;
+         AppendMenuA( hPar, dwF, (UINT_PTR) pN->nCmdId, pN->szCaption );
+
+         if( pN->szShortcut[ 0 ] )
+         {
+            BYTE fVirt = 0; WORD key = 0;
+            if( ParseShortcut( pN->szShortcut, &fVirt, &key ) && nAccels < MAX_MENU_NODES )
+            {
+               aAccel[ nAccels ].fVirt = fVirt;
+               aAccel[ nAccels ].key   = key;
+               aAccel[ nAccels ].cmd   = (WORD) pN->nCmdId;
+               nAccels++;
+            }
+         }
+      }
+   }
+
+   pm->hMenu  = hMenuBar;
+   pm->hAccel = nAccels > 0 ? CreateAcceleratorTable( aAccel, nAccels ) : NULL;
+   s_hAccel   = pm->hAccel;
+
+   SetMenu( pm->hWnd, hMenuBar );
+   DrawMenuBar( pm->hWnd );
+}
+
+/* ---- end Win32 TMainMenu support ---------------------------------------- */
+
 // WndProc for main window
 static LRESULT CALLBACK MainWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 {
@@ -137,7 +322,53 @@ static LRESULT CALLBACK MainWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM 
    {
       case WM_COMMAND:
       {
-         WORD wId = LOWORD( wParam );
+         WORD wId   = LOWORD( wParam );
+         WORD wCode = HIWORD( wParam );
+
+         /* menu item (wCode==0) or accelerator (wCode==1): lParam is NULL */
+         if( ( wCode == 0 || wCode == 1 ) && lParam == 0 &&
+             wId >= MENU_ID_BASE && s_pMenu )
+         {
+            HBW32Menu * pm = s_pMenu;
+            int         ii;
+
+            /* try aOnClick block array first */
+            if( pm->pOnClick )
+            {
+               HB_SIZE nLen = hb_arrayLen( pm->pOnClick );
+               for( ii = 0; ii < pm->nCount; ii++ )
+               {
+                  if( pm->nodes[ ii ].nCmdId == (int) wId )
+                  {
+                     if( (HB_SIZE)( ii + 1 ) <= nLen )
+                     {
+                        PHB_ITEM pBlock = hb_arrayGetItemPtr( pm->pOnClick, (HB_SIZE)( ii + 1 ) );
+                        if( pBlock && HB_IS_BLOCK( pBlock ) )
+                           hb_vmEvalBlock( pBlock );
+                     }
+                     return 0;
+                  }
+               }
+            }
+
+            /* fallback: call handler function by name */
+            for( ii = 0; ii < pm->nCount; ii++ )
+            {
+               if( pm->nodes[ ii ].nCmdId == (int) wId && pm->nodes[ ii ].szHandler[ 0 ] )
+               {
+                  PHB_DYNS pSym = hb_dynsymFindName( pm->nodes[ ii ].szHandler );
+                  if( pSym )
+                  {
+                     hb_vmPushDynSym( pSym );
+                     hb_vmPushNil();
+                     hb_vmDo( 0 );
+                  }
+                  return 0;
+               }
+            }
+            return 0;
+         }
+
          if( wId == 2 || wId == 1 )
          {
             DestroyWindow( hWnd );
@@ -378,10 +609,14 @@ HB_FUNC( W32_CENTERWINDOW )
 // W32_MessageLoop()
 HB_FUNC( W32_MESSAGELOOP )
 {
-   MSG msg;
+   MSG  msg;
+   HWND hAct;
    while( GetMessage( &msg, NULL, 0, 0 ) > 0 )
    {
-      if( !IsDialogMessage( GetActiveWindow(), &msg ) )
+      hAct = GetActiveWindow();
+      if( s_hAccel && hAct && TranslateAccelerator( hAct, s_hAccel, &msg ) )
+         continue;
+      if( !IsDialogMessage( hAct, &msg ) )
       {
          TranslateMessage( &msg );
          DispatchMessage( &msg );
@@ -399,6 +634,44 @@ HB_FUNC( W32_GETSYSCOLOR )
 HB_FUNC( W32_CREATESOLIDBRUSH )
 {
    hb_retnint( ( HB_PTRUINT ) CreateSolidBrush( ( COLORREF ) hb_parnint( 1 ) ) );
+}
+
+// UI_MainMenuNew( hParentHwnd ) → opaque handle to HBW32Menu
+HB_FUNC( UI_MAINMENUNEW )
+{
+   HWND       hWnd = (HWND)(HB_PTRUINT) hb_parnint( 1 );
+   HBW32Menu * pm  = (HBW32Menu *) calloc( 1, sizeof( HBW32Menu ) );
+   pm->hWnd      = hWnd;
+   s_pMenu       = pm;
+   hb_retnint( (HB_PTRUINT) pm );
+}
+
+// UI_SetProp( hMenu, cProp, val ) — routes aMenuItems and aOnClick to Win32 menu
+HB_FUNC( UI_SETPROP )
+{
+   HBW32Menu *  pm    = (HBW32Menu *)(HB_PTRUINT) hb_parnint( 1 );
+   const char * pProp = hb_parc( 2 );
+
+   if( !pm || !pProp ) return;
+
+   if( strcmp( pProp, "aMenuItems" ) == 0 )
+   {
+      const char * pSer = hb_parc( 3 );
+      if( pSer && *pSer )
+      {
+         ParseMenuSerial( pm, pSer );
+         BuildHMenu( pm );
+      }
+   }
+   else if( strcmp( pProp, "aOnClick" ) == 0 )
+   {
+      PHB_ITEM pArr = hb_param( 3, HB_IT_ARRAY );
+      if( pArr )
+      {
+         if( pm->pOnClick ) hb_itemRelease( pm->pOnClick );
+         pm->pOnClick = hb_itemNew( pArr );
+      }
+   }
 }
 
 // W32_DeleteObject( hObj )

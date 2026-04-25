@@ -1462,13 +1462,60 @@ static LRESULT CALLBACK PaletteTabSubProc( HWND hWnd, UINT msg, WPARAM wParam, L
             FillRect( di->hDC, &di->rcItem, hbr );
             DeleteObject( hbr );
          }
-         /* Draw icon centered */
-         if( pal && pal->FPalImageList )
+         /* Draw icon centered — special-case CT_MAINMENU since palette.bmp
+            has no slot for it; render a vector menubar glyph instead. */
          {
             int iconW = 24, iconH = 24;
             int cx = di->rcItem.left + (di->rcItem.right - di->rcItem.left - iconW) / 2;
             int cy = di->rcItem.top + (di->rcItem.bottom - di->rcItem.top - iconH) / 2;
-            ImageList_Draw( pal->FPalImageList, imgIdx, di->hDC, cx, cy, ILD_TRANSPARENT );
+            int nCtrlType = -1;
+            if( pal )
+            {
+               int btnIdx = (int)( di->CtlID - 200 );
+               int nTabCur = pal->FCurrentTab;
+               if( nTabCur >= 0 && nTabCur < pal->FTabCount &&
+                   btnIdx >= 0 && btnIdx < pal->FTabs[nTabCur].nBtnCount )
+                  nCtrlType = pal->FTabs[nTabCur].btns[btnIdx].nControlType;
+            }
+            if( nCtrlType == 200 /* CT_MAINMENU */ )
+            {
+               /* Window outline */
+               COLORREF clrBorder = g_bDarkIDE ? RGB(180,180,180) : RGB(60,60,60);
+               COLORREF clrTitle  = RGB( 70,130,180);
+               COLORREF clrMenu   = g_bDarkIDE ? RGB(80,80,80) : RGB(225,225,225);
+               COLORREF clrItem   = g_bDarkIDE ? RGB(200,200,200) : RGB(60,60,60);
+               RECT rcW = { cx, cy + 2, cx + iconW, cy + iconH - 1 };
+               RECT rcT = { cx + 1, cy + 3, cx + iconW - 1, cy + 7 };
+               RECT rcM = { cx + 1, cy + 7, cx + iconW - 1, cy + 12 };
+               HBRUSH hbT = CreateSolidBrush( clrTitle );
+               HBRUSH hbM = CreateSolidBrush( clrMenu );
+               HPEN   hpB = CreatePen( PS_SOLID, 1, clrBorder );
+               HBRUSH hbX = (HBRUSH) GetStockObject( NULL_BRUSH );
+               HPEN   hpO = (HPEN)   SelectObject( di->hDC, hpB );
+               HBRUSH hbO = (HBRUSH) SelectObject( di->hDC, hbX );
+               Rectangle( di->hDC, rcW.left, rcW.top, rcW.right, rcW.bottom );
+               FillRect( di->hDC, &rcT, hbT );
+               FillRect( di->hDC, &rcM, hbM );
+               /* Menu item ticks: File Edit View Help */
+               { HBRUSH hbI = CreateSolidBrush( clrItem ); int k;
+                 int xs[4] = { cx + 3, cx + 9, cx + 14, cx + 19 };
+                 int ws[4] = { 4, 3, 4, 3 };
+                 for( k = 0; k < 4; k++ ) {
+                    RECT rcI = { xs[k], cy + 8, xs[k] + ws[k], cy + 11 };
+                    FillRect( di->hDC, &rcI, hbI );
+                 }
+                 DeleteObject( hbI );
+               }
+               SelectObject( di->hDC, hpO );
+               SelectObject( di->hDC, hbO );
+               DeleteObject( hbT );
+               DeleteObject( hbM );
+               DeleteObject( hpB );
+            }
+            else if( pal && pal->FPalImageList )
+            {
+               ImageList_Draw( pal->FPalImageList, imgIdx, di->hDC, cx, cy, ILD_TRANSPARENT );
+            }
          }
          /* Subtle border */
          {

@@ -291,6 +291,7 @@ static void InsFilePick( INSDATA * d, int nLVRow );
 static void InsPopulateEvents( INSDATA * d );
 static void InsUpdateCombo( INSDATA * d );  /* updates combo from current rows data */
 static void InsArrayEdit( INSDATA * d, int nLVRow );
+static void InsMenuEdit( INSDATA * d, int nLVRow );
 
 /* Sentinel message IDs for MLEdit dialog internal signaling */
 #define WM_MLEDIT_OK     (WM_USER + 501)
@@ -458,6 +459,8 @@ static LRESULT CALLBACK InsBtnProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
          InsFontPick( d, nLV );
       else if( cType == 'A' )
          InsArrayEdit( d, nLV );
+      else if( cType == 'M' )
+         InsMenuEdit( d, nLV );
       else if( cType == 'S' && lstrcmpiA( szName, "cFileName" ) == 0 )
          InsFilePick( d, nLV );
       else if( cType == 'S' && lstrcmpiA( szName, "cFileName" ) != 0 )
@@ -819,6 +822,549 @@ static void InsArrayEdit( INSDATA * d, int nLVRow )
          }
       }
    }
+}
+
+/* ===== Menu Items Editor (CT_MAINMENU) ===================================
+ * Tree on left, property panel on right, toolbar buttons across the top.
+ * Mirrors gtk3_inspector.c::OpenMenuEditor and cocoa_inspector.m.
+ * Serial format: items separated by '|', fields by '\x01':
+ *   caption \x01 shortcut \x01 handler \x01 enabled \x01 level \x01 parent
+ * Separator caption is "---". Up to 128 nodes.
+ * ====================================================================== */
+
+#define MEI_MAX     128
+#define MEI_IDC_TREE   2001
+#define MEI_IDC_CAP    2002
+#define MEI_IDC_SCUT   2003
+#define MEI_IDC_HNDL   2004
+#define MEI_IDC_ENAB   2005
+#define MEI_IDC_BPOP   2010
+#define MEI_IDC_BITM   2011
+#define MEI_IDC_BSUB   2012
+#define MEI_IDC_BSEP   2013
+#define MEI_IDC_BUP    2014
+#define MEI_IDC_BDN    2015
+#define MEI_IDC_BDEL   2016
+
+typedef struct {
+   char szCaption[128];
+   char szShortcut[32];
+   char szHandler[128];
+   int  bSeparator;
+   int  bEnabled;
+   int  nLevel;
+   int  nParent;
+} MEINode;
+
+typedef struct {
+   MEINode nodes[MEI_MAX];
+   int     nCount;
+   int     nSel;
+   int     bUpdating;
+   HWND    hDlg;
+   HWND    hTree;
+   HWND    hCap;
+   HWND    hScut;
+   HWND    hHndl;
+   HWND    hEnab;
+   HTREEITEM hItems[MEI_MAX];
+   BOOL    bOK;
+} MEIDATA;
+
+static void MEI_Serialize( MEIDATA * d, char * out, int outLen )
+{
+   int pos = 0, i, n;
+   const char * cap;
+   out[0] = 0;
+   for( i = 0; i < d->nCount && pos < outLen - 64; i++ ) {
+      if( i > 0 ) out[pos++] = '|';
+      cap = d->nodes[i].bSeparator ? "---" : d->nodes[i].szCaption;
+      n = _snprintf( out + pos, outLen - pos, "%s\x01%s\x01%s\x01%d\x01%d\x01%d",
+         cap, d->nodes[i].szShortcut, d->nodes[i].szHandler,
+         d->nodes[i].bEnabled, d->nodes[i].nLevel, d->nodes[i].nParent );
+      if( n > 0 ) pos += n;
+   }
+   if( pos < outLen ) out[pos] = 0;
+}
+
+static void MEI_Parse( MEIDATA * d, const char * raw )
+{
+   const char * pipe;
+   int tl, fi;
+   char tok[512];
+   char * f0; char * f1; char * f2; char * f3; char * f4; char * f5;
+   d->nCount = 0;
+   if( !raw || !raw[0] ) return;
+   while( *raw && d->nCount < MEI_MAX ) {
+      pipe = strchr( raw, '|' );
+      tl = pipe ? (int)(pipe - raw) : (int)strlen(raw);
+      if( tl > 511 ) tl = 511;
+      memcpy( tok, raw, tl ); tok[tl] = 0;
+      fi = d->nCount;
+      f0 = tok;
+      f1 = strchr( f0, '\x01' ); if( f1 ) { *f1++ = 0; } else f1 = (char*)"";
+      f2 = f1[0] ? strchr( f1, '\x01' ) : NULL; if( f2 ) { *f2++ = 0; } else f2 = (char*)"";
+      f3 = f2[0] ? strchr( f2, '\x01' ) : NULL; if( f3 ) { *f3++ = 0; } else f3 = (char*)"";
+      f4 = f3[0] ? strchr( f3, '\x01' ) : NULL; if( f4 ) { *f4++ = 0; } else f4 = (char*)"";
+      f5 = f4[0] ? strchr( f4, '\x01' ) : NULL; if( f5 ) { *f5++ = 0; } else f5 = (char*)"-1";
+      d->nodes[fi].bSeparator = strcmp( f0, "---" ) == 0;
+      lstrcpynA( d->nodes[fi].szCaption, d->nodes[fi].bSeparator ? "" : f0, 128 );
+      lstrcpynA( d->nodes[fi].szShortcut, f1, 32 );
+      lstrcpynA( d->nodes[fi].szHandler,  f2, 128 );
+      d->nodes[fi].bEnabled = f3[0] ? atoi( f3 ) : 1;
+      d->nodes[fi].nLevel   = f4[0] ? atoi( f4 ) : 0;
+      d->nodes[fi].nParent  = f5[0] ? atoi( f5 ) : -1;
+      d->nCount++;
+      if( !pipe ) break;
+      raw = pipe + 1;
+   }
+}
+
+static void MEI_RebuildTree( MEIDATA * d )
+{
+   HTREEITEM hParent;
+   TVINSERTSTRUCTA tvis;
+   int i, lv;
+   char szDisp[200];
+   SendMessage( d->hTree, WM_SETREDRAW, FALSE, 0 );
+   TreeView_DeleteAllItems( d->hTree );
+   for( i = 0; i < d->nCount; i++ ) {
+      hParent = TVI_ROOT;
+      lv = d->nodes[i].nLevel;
+      if( lv > 0 && lv <= 7 ) {
+         /* Find most recent node at level (lv-1) */
+         int j;
+         for( j = i - 1; j >= 0; j-- ) {
+            if( !d->nodes[j].bSeparator && d->nodes[j].nLevel == lv - 1 ) {
+               hParent = d->hItems[j];
+               break;
+            }
+         }
+      }
+      memset( &tvis, 0, sizeof(tvis) );
+      tvis.hParent = hParent;
+      tvis.hInsertAfter = TVI_LAST;
+      tvis.item.mask = TVIF_TEXT | TVIF_PARAM;
+      tvis.item.lParam = (LPARAM) i;
+      if( d->nodes[i].bSeparator )
+         lstrcpyA( szDisp, "----------" );
+      else if( d->nodes[i].szShortcut[0] )
+         _snprintf( szDisp, sizeof(szDisp), "%s\t%s",
+                    d->nodes[i].szCaption, d->nodes[i].szShortcut );
+      else
+         lstrcpynA( szDisp, d->nodes[i].szCaption, 199 );
+      tvis.item.pszText = szDisp;
+      d->hItems[i] = (HTREEITEM) SendMessageA( d->hTree, TVM_INSERTITEMA, 0, (LPARAM) &tvis );
+   }
+   /* Expand all */
+   for( i = 0; i < d->nCount; i++ )
+      TreeView_Expand( d->hTree, d->hItems[i], TVE_EXPAND );
+   SendMessage( d->hTree, WM_SETREDRAW, TRUE, 0 );
+   InvalidateRect( d->hTree, NULL, TRUE );
+}
+
+static void MEI_LoadSelected( MEIDATA * d )
+{
+   MEINode * n;
+   d->bUpdating = 1;
+   if( d->nSel < 0 || d->nSel >= d->nCount ) {
+      SetWindowTextA( d->hCap,  "" );
+      SetWindowTextA( d->hScut, "" );
+      SetWindowTextA( d->hHndl, "" );
+      SendMessage( d->hEnab, BM_SETCHECK, BST_UNCHECKED, 0 );
+      EnableWindow( d->hCap,  FALSE );
+      EnableWindow( d->hScut, FALSE );
+      EnableWindow( d->hHndl, FALSE );
+      EnableWindow( d->hEnab, FALSE );
+      d->bUpdating = 0;
+      return;
+   }
+   n = &d->nodes[d->nSel];
+   EnableWindow( d->hCap,  !n->bSeparator );
+   EnableWindow( d->hScut, !n->bSeparator );
+   EnableWindow( d->hHndl, !n->bSeparator );
+   EnableWindow( d->hEnab, !n->bSeparator );
+   SetWindowTextA( d->hCap,  n->bSeparator ? "" : n->szCaption );
+   SetWindowTextA( d->hScut, n->szShortcut );
+   SetWindowTextA( d->hHndl, n->szHandler );
+   SendMessage( d->hEnab, BM_SETCHECK, n->bEnabled ? BST_CHECKED : BST_UNCHECKED, 0 );
+   d->bUpdating = 0;
+}
+
+static void MEI_AddNode( MEIDATA * d, int nLevel, int bSeparator )
+{
+   int ins, parent;
+   if( d->nCount >= MEI_MAX ) return;
+   ins = ( d->nSel >= 0 && d->nSel < d->nCount ) ? d->nSel + 1 : d->nCount;
+   parent = -1;
+   if( nLevel > 0 ) {
+      int i;
+      for( i = ins - 1; i >= 0; i-- ) {
+         if( !d->nodes[i].bSeparator && d->nodes[i].nLevel == nLevel - 1 ) {
+            parent = i; break;
+         }
+      }
+   }
+   /* Shift down */
+   { int i;
+     for( i = d->nCount; i > ins; i-- )
+        d->nodes[i] = d->nodes[i-1];
+   }
+   memset( &d->nodes[ins], 0, sizeof(MEINode) );
+   d->nodes[ins].bSeparator = bSeparator;
+   d->nodes[ins].bEnabled   = 1;
+   d->nodes[ins].nLevel     = nLevel;
+   d->nodes[ins].nParent    = parent;
+   if( !bSeparator )
+      lstrcpyA( d->nodes[ins].szCaption,
+         nLevel == 0 ? "Menu" : nLevel == 1 ? "Item" : "SubItem" );
+   d->nCount++;
+   d->nSel = ins;
+   MEI_RebuildTree( d );
+   MEI_LoadSelected( d );
+}
+
+static void MEI_DeleteNode( MEIDATA * d )
+{
+   int i;
+   if( d->nSel < 0 || d->nSel >= d->nCount ) return;
+   for( i = d->nSel; i < d->nCount - 1; i++ )
+      d->nodes[i] = d->nodes[i+1];
+   d->nCount--;
+   if( d->nSel >= d->nCount ) d->nSel = d->nCount - 1;
+   MEI_RebuildTree( d );
+   MEI_LoadSelected( d );
+}
+
+static void MEI_MoveSel( MEIDATA * d, int nDir )
+{
+   int s, t;
+   MEINode tmp;
+   s = d->nSel;
+   if( s < 0 || s >= d->nCount ) return;
+   t = s + nDir;
+   if( t < 0 || t >= d->nCount ) return;
+   tmp = d->nodes[s]; d->nodes[s] = d->nodes[t]; d->nodes[t] = tmp;
+   d->nSel = t;
+   MEI_RebuildTree( d );
+   MEI_LoadSelected( d );
+}
+
+static MEIDATA * s_pMEI = NULL;
+
+static LRESULT CALLBACK MEIDlgProc( HWND hDlg, UINT msg, WPARAM wp, LPARAM lp )
+{
+   static HBRUSH s_hMEIBgBr = NULL;
+   static HBRUSH s_hMEIEdBr = NULL;
+   MEIDATA * d = s_pMEI;
+   if( msg == WM_COMMAND && d ) {
+      WORD id = LOWORD( wp );
+      WORD code = HIWORD( wp );
+      if( id == IDOK )     { d->bOK = TRUE;  DestroyWindow( hDlg ); return 0; }
+      if( id == IDCANCEL ) { d->bOK = FALSE; DestroyWindow( hDlg ); return 0; }
+      if( id == MEI_IDC_BPOP && code == BN_CLICKED ) { MEI_AddNode( d, 0, 0 ); return 0; }
+      if( id == MEI_IDC_BITM && code == BN_CLICKED ) { MEI_AddNode( d, 1, 0 ); return 0; }
+      if( id == MEI_IDC_BSUB && code == BN_CLICKED ) { MEI_AddNode( d, 2, 0 ); return 0; }
+      if( id == MEI_IDC_BSEP && code == BN_CLICKED ) {
+         int lv = ( d->nSel >= 0 ) ? d->nodes[d->nSel].nLevel : 1;
+         if( lv == 0 ) lv = 1;
+         MEI_AddNode( d, lv, 1 ); return 0;
+      }
+      if( id == MEI_IDC_BUP  && code == BN_CLICKED ) { MEI_MoveSel( d, -1 ); return 0; }
+      if( id == MEI_IDC_BDN  && code == BN_CLICKED ) { MEI_MoveSel( d, +1 ); return 0; }
+      if( id == MEI_IDC_BDEL && code == BN_CLICKED ) { MEI_DeleteNode( d );  return 0; }
+      if( !d->bUpdating && d->nSel >= 0 && d->nSel < d->nCount ) {
+         MEINode * n = &d->nodes[d->nSel];
+         if( id == MEI_IDC_CAP && code == EN_CHANGE ) {
+            GetWindowTextA( d->hCap, n->szCaption, 128 );
+            MEI_RebuildTree( d );
+            return 0;
+         }
+         if( id == MEI_IDC_SCUT && code == EN_CHANGE ) {
+            GetWindowTextA( d->hScut, n->szShortcut, 32 );
+            MEI_RebuildTree( d );
+            return 0;
+         }
+         if( id == MEI_IDC_HNDL && code == EN_CHANGE ) {
+            GetWindowTextA( d->hHndl, n->szHandler, 128 );
+            return 0;
+         }
+         if( id == MEI_IDC_ENAB && code == BN_CLICKED ) {
+            n->bEnabled = ( SendMessage( d->hEnab, BM_GETCHECK, 0, 0 ) == BST_CHECKED );
+            return 0;
+         }
+      }
+   }
+   if( msg == WM_NOTIFY && d ) {
+      LPNMHDR pnmh = (LPNMHDR) lp;
+      if( pnmh->idFrom == MEI_IDC_TREE && pnmh->code == TVN_SELCHANGED ) {
+         LPNMTREEVIEWA pnmtv = (LPNMTREEVIEWA) lp;
+         if( pnmtv->itemNew.lParam >= 0 && pnmtv->itemNew.lParam < d->nCount )
+            d->nSel = (int) pnmtv->itemNew.lParam;
+         else
+            d->nSel = -1;
+         MEI_LoadSelected( d );
+         return 0;
+      }
+   }
+   /* Dark theme paint */
+   if( msg == WM_ERASEBKGND && s_bDarkIDE ) {
+      HDC hdc = (HDC) wp;
+      RECT rc;
+      GetClientRect( hDlg, &rc );
+      if( !s_hMEIBgBr ) s_hMEIBgBr = CreateSolidBrush( CLR_WND_BG );
+      FillRect( hdc, &rc, s_hMEIBgBr );
+      return 1;
+   }
+   if( ( msg == WM_CTLCOLORSTATIC || msg == WM_CTLCOLORBTN || msg == WM_CTLCOLORDLG )
+       && s_bDarkIDE ) {
+      HDC hdc = (HDC) wp;
+      SetBkColor( hdc, CLR_WND_BG );
+      SetTextColor( hdc, CLR_TEXT );
+      if( !s_hMEIBgBr ) s_hMEIBgBr = CreateSolidBrush( CLR_WND_BG );
+      return (LRESULT) s_hMEIBgBr;
+   }
+   if( msg == WM_CTLCOLOREDIT && s_bDarkIDE ) {
+      HDC hdc = (HDC) wp;
+      SetBkColor( hdc, CLR_EDIT_BG );
+      SetTextColor( hdc, CLR_EDIT_TEXT );
+      if( !s_hMEIEdBr ) s_hMEIEdBr = CreateSolidBrush( CLR_EDIT_BG );
+      return (LRESULT) s_hMEIEdBr;
+   }
+   if( msg == WM_CLOSE && d ) { d->bOK = FALSE; DestroyWindow( hDlg ); return 0; }
+   return DefWindowProcA( hDlg, msg, wp, lp );
+}
+
+static void InsMenuEdit( INSDATA * d, int nLVRow )
+{
+   MEIDATA * mei;
+   int nReal;
+   char fullSerial[4096] = "";
+   HINSTANCE hInst = GetModuleHandle( NULL );
+   static BYTE tplBuf[1024];
+   DLGTEMPLATE * pDT;
+   WORD * pw;
+   int w = 480, h = 320;
+
+   if( nLVRow < 0 || nLVRow >= d->nVisible ) return;
+   nReal = d->map[nLVRow];
+
+   /* Fetch full serial via UI_GetProp (IROW.szValue is too small) */
+   {
+      PHB_DYNS pDyn = hb_dynsymFindName( "UI_GETPROP" );
+      if( pDyn ) {
+         hb_vmPushDynSym( pDyn ); hb_vmPushNil();
+         hb_vmPushNumInt( d->hCtrl );
+         hb_vmPushString( "aMenuItems", 10 );
+         hb_vmDo( 2 );
+         {  const char * res = hb_parc( -1 );
+            if( res ) lstrcpynA( fullSerial, res, sizeof(fullSerial) );
+         }
+      }
+   }
+
+   mei = (MEIDATA *) calloc( 1, sizeof(MEIDATA) );
+   mei->nSel = -1;
+   MEI_Parse( mei, fullSerial );
+
+   /* Minimal empty dialog template; controls are created in WM_INITDIALOG via subclass.
+      Easier path: build a manual modal window. We'll use DialogBoxIndirect with empty
+      template and create children when WM_INITDIALOG fires — but our proc uses s_pMEI.
+      Simpler: create modal window directly with CreateWindowEx, run own message loop. */
+
+   memset( tplBuf, 0, sizeof(tplBuf) );
+   pDT = (DLGTEMPLATE *) tplBuf;
+   pDT->style = DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU;
+   pDT->cdit = 0;
+   pDT->cx = (short) w; pDT->cy = (short) h;
+   pw = (WORD *)( pDT + 1 );
+   *pw++ = 0; *pw++ = 0;
+   { const char * t = "Menu Items Editor";
+     while( *t ) *pw++ = (WORD)(unsigned char)*t++;
+     *pw++ = 0; }
+
+   s_pMEI = mei;
+
+   /* Use modeless creation: DialogBoxIndirect w/ INITDIALOG handler that builds children */
+   /* Simpler: define WM_INITDIALOG branch that populates children */
+
+   /* Custom dialog proc that creates children on init */
+   {
+      DLGPROC oldProc = (DLGPROC) MEIDlgProc;
+      (void) oldProc;
+   }
+
+   /* We use a different approach: create a modal popup window manually */
+   {
+      WNDCLASSA wc = {0};
+      static BOOL bReg = FALSE;
+      HWND hDlg, hPar = d->hWnd;
+      int x, y, sw, sh;
+      MSG msg;
+      BOOL bDone = FALSE;
+      const int dlgW = 720, dlgH = 480;
+
+      if( !bReg ) {
+         wc.lpfnWndProc = (WNDPROC) DefWindowProcA;
+         wc.hInstance = hInst;
+         wc.hCursor = LoadCursor( NULL, IDC_ARROW );
+         wc.hbrBackground = (HBRUSH)( COLOR_BTNFACE + 1 );
+         wc.lpszClassName = "HBMEIDlg";
+         RegisterClassA( &wc );
+         bReg = TRUE;
+      }
+      /* Center on primary screen */
+      sw = GetSystemMetrics( SM_CXSCREEN );
+      sh = GetSystemMetrics( SM_CYSCREEN );
+      x = ( sw - dlgW ) / 2; if( x < 0 ) x = 50;
+      y = ( sh - dlgH ) / 2; if( y < 0 ) y = 50;
+      hDlg = CreateWindowExA( WS_EX_DLGMODALFRAME | WS_EX_APPWINDOW,
+         "HBMEIDlg", "Menu Items Editor",
+         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
+         x, y, dlgW, dlgH, NULL, NULL, hInst, NULL );
+      if( !hDlg ) { free( mei ); s_pMEI = NULL; return; }
+      mei->hDlg = hDlg;
+      SetWindowTextA( hDlg, "Menu Items Editor" );
+      SetWindowLongPtr( hDlg, GWLP_WNDPROC, (LONG_PTR) MEIDlgProc );
+      /* Dark frame */
+      if( s_bDarkIDE ) {
+         BOOL bDark = TRUE;
+         DwmSetWindowAttribute( hDlg, DWMWA_USE_IMMERSIVE_DARK_MODE,
+                                &bDark, sizeof(bDark) );
+      }
+
+      /* Toolbar buttons */
+      {
+         struct { const char * txt; int id; int x; int w; } btns[] = {
+            { "+ Popup",    MEI_IDC_BPOP, 8,    66 },
+            { "+ Item",     MEI_IDC_BITM, 78,   66 },
+            { "+ SubItem",  MEI_IDC_BSUB, 148,  74 },
+            { "+ Sep",      MEI_IDC_BSEP, 226,  56 },
+            { "Up",         MEI_IDC_BUP,  286,  40 },
+            { "Down",       MEI_IDC_BDN,  330,  44 },
+            { "Delete",     MEI_IDC_BDEL, 378,  56 }
+         };
+         int i;
+         for( i = 0; i < 7; i++ ) {
+            CreateWindowExA( 0, "BUTTON", btns[i].txt,
+               WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+               btns[i].x, 8, btns[i].w, 26,
+               hDlg, (HMENU)(LONG_PTR) btns[i].id, hInst, NULL );
+         }
+      }
+
+      /* Tree control */
+      mei->hTree = CreateWindowExA( WS_EX_CLIENTEDGE, "SysTreeView32", "",
+         WS_CHILD | WS_VISIBLE | WS_BORDER | TVS_HASLINES | TVS_LINESATROOT |
+         TVS_HASBUTTONS | TVS_SHOWSELALWAYS,
+         8, 44, 380, 380,
+         hDlg, (HMENU)(LONG_PTR) MEI_IDC_TREE, hInst, NULL );
+      if( s_bDarkIDE ) {
+         TreeView_SetBkColor( mei->hTree, CLR_EDIT_BG );
+         TreeView_SetTextColor( mei->hTree, CLR_EDIT_TEXT );
+      }
+
+      /* Right panel */
+      CreateWindowExA( 0, "STATIC", "Caption:", WS_CHILD | WS_VISIBLE,
+         400, 50, 70, 20, hDlg, NULL, hInst, NULL );
+      mei->hCap = CreateWindowExA( WS_EX_CLIENTEDGE, "EDIT", "",
+         WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+         400, 70, 280, 22, hDlg, (HMENU)(LONG_PTR) MEI_IDC_CAP, hInst, NULL );
+
+      CreateWindowExA( 0, "STATIC", "Shortcut:", WS_CHILD | WS_VISIBLE,
+         400, 100, 70, 20, hDlg, NULL, hInst, NULL );
+      mei->hScut = CreateWindowExA( WS_EX_CLIENTEDGE, "EDIT", "",
+         WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+         400, 120, 280, 22, hDlg, (HMENU)(LONG_PTR) MEI_IDC_SCUT, hInst, NULL );
+
+      CreateWindowExA( 0, "STATIC", "OnClick:", WS_CHILD | WS_VISIBLE,
+         400, 150, 70, 20, hDlg, NULL, hInst, NULL );
+      mei->hHndl = CreateWindowExA( WS_EX_CLIENTEDGE, "EDIT", "",
+         WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+         400, 170, 280, 22, hDlg, (HMENU)(LONG_PTR) MEI_IDC_HNDL, hInst, NULL );
+
+      mei->hEnab = CreateWindowExA( 0, "BUTTON", "Enabled",
+         WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+         400, 200, 100, 22, hDlg, (HMENU)(LONG_PTR) MEI_IDC_ENAB, hInst, NULL );
+
+      /* OK / Cancel */
+      CreateWindowExA( 0, "BUTTON", "OK",
+         WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
+         500, 410, 80, 28, hDlg, (HMENU)(LONG_PTR) IDOK, hInst, NULL );
+      CreateWindowExA( 0, "BUTTON", "Cancel",
+         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+         590, 410, 80, 28, hDlg, (HMENU)(LONG_PTR) IDCANCEL, hInst, NULL );
+
+      /* Apply font */
+      {
+         HFONT hF = (HFONT) SendMessage( hPar, WM_GETFONT, 0, 0 );
+         if( hF ) {
+            HWND hChild;
+            for( hChild = GetWindow( hDlg, GW_CHILD ); hChild;
+                 hChild = GetWindow( hChild, GW_HWNDNEXT ) )
+               SendMessage( hChild, WM_SETFONT, (WPARAM) hF, TRUE );
+         }
+      }
+
+      MEI_RebuildTree( mei );
+      if( mei->nCount > 0 ) {
+         mei->nSel = 0;
+         TreeView_SelectItem( mei->hTree, mei->hItems[0] );
+      }
+      MEI_LoadSelected( mei );
+
+      EnableWindow( hPar, FALSE );
+      ShowWindow( hDlg, SW_SHOW );
+      UpdateWindow( hDlg );
+      SetForegroundWindow( hDlg );
+      SetFocus( mei->hTree );
+
+      while( !bDone && GetMessage( &msg, NULL, 0, 0 ) ) {
+         if( !IsWindow( hDlg ) ) { bDone = TRUE; break; }
+         if( msg.message == WM_KEYDOWN && msg.wParam == VK_ESCAPE ) {
+            mei->bOK = FALSE;
+            DestroyWindow( hDlg );
+            bDone = TRUE;
+            break;
+         }
+         if( !IsDialogMessageA( hDlg, &msg ) ) {
+            TranslateMessage( &msg );
+            DispatchMessage( &msg );
+         }
+      }
+      EnableWindow( hPar, TRUE );
+      SetForegroundWindow( hPar );
+   }
+
+   if( mei->bOK ) {
+      char result[4096] = "";
+      MEI_Serialize( mei, result, sizeof(result) );
+      /* Apply via UI_SetProp directly */
+      {
+         PHB_DYNS pDyn = hb_dynsymFindName( "UI_SETPROP" );
+         if( pDyn ) {
+            hb_vmPushDynSym( pDyn ); hb_vmPushNil();
+            hb_vmPushNumInt( d->hCtrl );
+            hb_vmPushString( "aMenuItems", 10 );
+            hb_vmPushString( result, (HB_SIZE) strlen( result ) );
+            hb_vmDo( 3 );
+         }
+      }
+      /* Update display in IROW */
+      sprintf( d->rows[nReal].szValue, "(%d nodes)", mei->nCount );
+      /* Notify IDE: triggers SyncDesignerToCode -> InspectorRefresh */
+      if( d->pOnPropChanged && HB_IS_BLOCK( d->pOnPropChanged ) ) {
+         if( hb_vmRequestReenter() ) {
+            hb_vmPushEvalSym();
+            hb_vmPush( d->pOnPropChanged );
+            hb_vmSend( 0 );
+            hb_vmRequestRestore();
+         }
+      }
+      InsRebuild( d );
+   }
+   free( mei );
+   s_pMEI = NULL;
 }
 
 /* Subclass tab control to paint dark background */
@@ -1408,6 +1954,7 @@ static void InsStartEdit( INSDATA * d, int nLVRow )
    bNeedsBtn = ( d->rows[nReal].cType == 'C' ||
                  d->rows[nReal].cType == 'F' ||
                  d->rows[nReal].cType == 'A' ||
+                 d->rows[nReal].cType == 'M' ||
                  d->rows[nReal].cType == 'S' );
    nBtnW = bNeedsBtn ? 22 : 0;
    { FILE*f=fopen("c:\\HarbourBuilder\\inspector_trace.log","a");
@@ -1640,6 +2187,18 @@ static void InsPopulate( INSDATA * d )
             lstrcpynA( d->rows[d->nRows].szValue, hb_arrayGetCPtr(pRow,2), 256 );
          else if( d->rows[d->nRows].cType == 'A' )
             lstrcpynA( d->rows[d->nRows].szValue, hb_arrayGetCPtr(pRow,2), 256 );
+         else if( d->rows[d->nRows].cType == 'M' )
+         {
+            /* Menu serial may exceed 256; store "(N nodes)" summary.
+               Editor fetches full string via UI_GetProp directly. */
+            const char * raw = hb_arrayGetCPtr(pRow,2);
+            int cnt = 0;
+            if( raw && raw[0] ) {
+               const char * pp; cnt = 1;
+               for( pp = raw; *pp; pp++ ) if( *pp == '|' ) cnt++;
+            }
+            sprintf( d->rows[d->nRows].szValue, "(%d nodes)", cnt );
+         }
 
          d->nRows++;
       }
@@ -1794,7 +2353,8 @@ HB_FUNC( INS_CREATE )
       wc.lpszClassName = "HbIdeInspector"; RegisterClassA(&wc); bReg = TRUE;
    }
 
-   { INITCOMMONCONTROLSEX ic = { sizeof(ic), ICC_LISTVIEW_CLASSES | ICC_TAB_CLASSES };
+   { INITCOMMONCONTROLSEX ic = { sizeof(ic),
+        ICC_LISTVIEW_CLASSES | ICC_TAB_CLASSES | ICC_TREEVIEW_CLASSES };
      InitCommonControlsEx(&ic); }
 
    d->hWnd = CreateWindowExA( WS_EX_TOOLWINDOW, "HbIdeInspector", "Object Inspector",
@@ -1951,6 +2511,18 @@ HB_FUNC( INS_REFRESHWITHDATA )
             lstrcpynA( d->rows[d->nRows].szValue, hb_arrayGetCPtr(pRow,2), 256 );
          else if( d->rows[d->nRows].cType == 'A' )
             lstrcpynA( d->rows[d->nRows].szValue, hb_arrayGetCPtr(pRow,2), 256 );
+         else if( d->rows[d->nRows].cType == 'M' )
+         {
+            /* Menu serial may exceed 256; store "(N nodes)" summary.
+               Editor fetches full string via UI_GetProp directly. */
+            const char * raw = hb_arrayGetCPtr(pRow,2);
+            int cnt = 0;
+            if( raw && raw[0] ) {
+               const char * pp; cnt = 1;
+               for( pp = raw; *pp; pp++ ) if( *pp == '|' ) cnt++;
+            }
+            sprintf( d->rows[d->nRows].szValue, "(%d nodes)", cnt );
+         }
 
          d->nRows++;
       }

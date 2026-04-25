@@ -8,6 +8,9 @@
 /* Forward declaration: defined in hbbridge.cpp */
 void BandStackAll( HWND hParent );
 extern "C" void CE_NotifyRunLoopEnded( void );
+extern "C" BOOL HBMenu_DispatchCommand( WORD wId, WORD wCode, LPARAM lParam );
+extern "C" void HBMenu_AttachPending( TControl * pForm );
+extern "C" HACCEL g_hMenuAccel;
 
 /* Global dark mode flag for forms — set from Harbour via W32_SetIDEDarkMode */
 /* Defined here, declared extern in tcontrols.cpp / inspector / hbbuilder_win */
@@ -397,6 +400,10 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
       {
          WORD wId = LOWORD(wParam);
          WORD wNotify = HIWORD(wParam);
+
+         /* TMainMenu (CT_MAINMENU) dispatch — implemented in hbbridge.cpp */
+         if( HBMenu_DispatchCommand( wId, wNotify, lParam ) )
+            return 0;
 
          /* Toolbar button clicks */
          if( FToolBar && wId >= FToolBar->FIdBase &&
@@ -1658,6 +1665,7 @@ void TForm::Run()
    FMainWindow = TRUE;
 
    CreateHandle( NULL );
+   HBMenu_AttachPending( this );
    CreateAllChildren();
 
    if( FDesignMode )
@@ -1690,6 +1698,8 @@ void TForm::Run()
 
    while( GetMessage( &msg, NULL, 0, 0 ) > 0 )
    {
+      if( g_hMenuAccel && TranslateAccelerator( FHandle, g_hMenuAccel, &msg ) )
+         continue;
       if( !IsDialogMessage( FHandle, &msg ) )
       {
          TranslateMessage( &msg );
@@ -1706,6 +1716,7 @@ void TForm::Run()
 void TForm::Show()
 {
    CreateHandle( NULL );
+   HBMenu_AttachPending( this );
 
    /* Apply dark mode to every form window (title bar + menus) */
    if( FHandle )
@@ -1758,6 +1769,7 @@ int TForm::ShowModal()
    HWND hOwner = GetActiveWindow();
 
    CreateHandle( hOwner );
+   HBMenu_AttachPending( this );
    CreateAllChildren();
 
    if( FDesignMode )

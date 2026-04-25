@@ -1,6 +1,68 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-25b
+
+  - feat(win32): TMainMenu full implementation matching Mac/Linux
+    - palette: MainMenu component added to end of Standard tab (type 200,
+      same as macOS to avoid the CT_BAND=132 collision on Windows)
+    - hbbuilder_win.prg OnComponentDrop: type 200 auto-named MainMenu1..N,
+      placed as non-visual icon widget; aCnt array expanded to 201 entries;
+      range guard allows type 200 alongside 1..131
+    - hbbuilder_win.prg ComponentTypeName / ComponentTypeFromName: round-trip
+      mapping for CT_MAINMENU (200) added
+    - hbbuilder_win.prg RegenerateFormCode: case nType==200 emits Mac-style
+      DEFINE MENUBAR ::oMainMenuN ... END MENUBAR block with DEFINE POPUP /
+      MENUITEM ACTION fn(Self,oMenuItem) ACCEL "..." / MENUSEPARATOR / END POPUP;
+      aOnClick array generated when handlers present; raw aMenuItems := "..."
+      line removed (DSL is the single source of truth)
+    - hbbuilder_win.prg: handler stubs auto-generated as
+      static function fn( oForm, oMenuItem )
+    - include/hbide.h: #define CT_MAINMENU 200 added
+    - cpp/hbbridge.cpp: full Win32 menu runtime ported from backend.prg —
+      HBW32Menu struct with magic marker, ParseMenuSerial, ParseMenuShortcut,
+      BuildHMenu (HMENU + HACCEL + nested popups), CreateAcceleratorTable
+    - cpp/hbbridge.cpp UI_MAINMENUNEW: returns HBW32Menu* opaque handle and
+      stores parent TControl* so SetMenu can fire later when FHandle is set
+    - cpp/hbbridge.cpp UI_SETPROP: fast-path detects HBW32Menu* via global
+      identity + magic marker before TControl cast; routes aMenuItems and
+      aOnClick to ParseMenuSerial+BuildHMenu / hb_itemNew respectively
+    - cpp/hbbridge.cpp UI_GETPROP: reads aMenuItems from FData for CT_MAINMENU
+    - cpp/hbbridge.cpp UI_GETALLPROPS: case CT_MAINMENU emits aMenuItems with
+      type 'M' for the inspector's menu editor
+    - cpp/hbbridge.cpp HBMenu_DispatchCommand / HBMenu_AttachPending: extern "C"
+      hooks consumed by tform.cpp
+    - cpp/hbbridge.cpp BuildHMenu: resolves form HWND lazily from
+      pParentForm->FHandle since DEFINE MENUBAR runs before TForm::Run creates
+      the HWND
+    - cpp/tform.cpp WM_COMMAND: HBMenu_DispatchCommand called first so menu
+      command IDs (>=2000) and accelerator commands route to user codeblocks
+    - cpp/tform.cpp Run/Show/ShowModal: HBMenu_AttachPending(this) called
+      immediately after CreateHandle so menus built pre-HWND attach correctly
+    - cpp/tform.cpp Run loop: TranslateAccelerator(g_hMenuAccel) fires
+      keyboard accelerators before IsDialogMessage
+    - cpp/tcontrols.cpp WM_DRAWITEM: detects nControlType==200 and renders
+      vector menubar glyph (window outline + steel-blue title bar +
+      grey menu bar with 4 dark item ticks); dark-mode aware; replaces
+      missing palette.bmp slot
+    - inspector_win.prg: 'M' property type wired through InsPopulate (loads
+      "(N nodes)" summary), InsRebuild (display), bNeedsBtn (... button),
+      InsBtnProc (calls InsMenuEdit)
+    - inspector_win.prg InsMenuEdit: Win32 menu items editor — TreeView on
+      left with hierarchy + Caption/Shortcut columns, property panel on
+      right (Caption/Shortcut/OnClick edits + Enabled checkbox), toolbar
+      buttons (+Popup, +Item, +SubItem, +Sep, Up, Down, Delete), OK/Cancel;
+      MEI_Parse/Serialize/RebuildTree/AddNode/DeleteNode/MoveSel helpers;
+      DwmSetWindowAttribute DWMWA_USE_IMMERSIVE_DARK_MODE for dark frame;
+      WM_ERASEBKGND + WM_CTLCOLOR* for dark child controls;
+      TreeView_SetBkColor/SetTextColor for dark tree; centered on screen
+      via SM_CXSCREEN/SM_CYSCREEN; modal via manual GetMessage loop with
+      EnableWindow(parent,FALSE)
+    - inspector_win.prg: ICC_TREEVIEW_CLASSES added to InitCommonControlsEx
+    - hbbuilder_win.prg: removed obsolete UI_MAINMENUNEW IDE-only stub now
+      that real runtime impl lives in hbbridge.cpp (single definition for
+      both IDE and user app)
+
 2026-04-25a
 
   - feat(mac): TMenuItem class + DEFINE MENUBAR DSL as single source of truth

@@ -21,6 +21,246 @@ void ApplyDockAlign( TForm * form );
 
 extern "C" int g_bDarkIDE;
 
+/* ---- Win32 TMainMenu (CT_MAINMENU) runtime ----------------------------- */
+
+#define MAX_MENU_NODES  128
+#define MENU_ID_BASE    2000
+
+typedef struct {
+   char szCaption[ 128 ];
+   char szShortcut[  32 ];
+   char szHandler [ 128 ];
+   int  bSeparator;
+   int  bEnabled;
+   int  nParent;
+   int  nLevel;
+   int  nCmdId;
+} W32MenuNode;
+
+typedef struct {
+   DWORD       dwMagic;          /* 'MENU' marker — distinguishes from TControl* */
+   TControl *  pParentForm;       /* form TControl whose HWND owns the menu */
+   HWND        hWnd;             /* form HWND that owns the menu (resolved late) */
+   HMENU       hMenu;
+   HACCEL      hAccel;
+   W32MenuNode nodes[ MAX_MENU_NODES ];
+   int         nCount;
+   PHB_ITEM    pOnClick;          /* aOnClick: array of codeblocks indexed by node */
+} HBW32Menu;
+
+#define HBW32MENU_MAGIC  0x4D454E55  /* 'MENU' */
+
+static HBW32Menu * s_pMenu  = NULL;
+extern "C" HACCEL  g_hMenuAccel = NULL;   /* read by TForm::Run() loop */
+
+static void ParseMenuSerial( HBW32Menu * pm, const char * pSer )
+{
+   char  buf[ 8192 ];
+   char  * pNode, * pNext, * pField, * pFEnd;
+   int   n = 0, f;
+
+   strncpy( buf, pSer, sizeof( buf ) - 1 );
+   buf[ sizeof( buf ) - 1 ] = '\0';
+   pNode = buf;
+
+   while( *pNode && n < MAX_MENU_NODES )
+   {
+      W32MenuNode * pN = &pm->nodes[ n ];
+      memset( pN, 0, sizeof( *pN ) );
+      pN->bEnabled = 1;
+
+      pNext = strchr( pNode, '|' );
+      if( pNext ) *pNext = '\0';
+
+      pField = pNode;
+      for( f = 0; f < 6; f++ )
+      {
+         pFEnd = strchr( pField, '\x01' );
+         if( pFEnd ) *pFEnd = '\0';
+         switch( f )
+         {
+            case 0: strncpy( pN->szCaption,  pField, 127 ); break;
+            case 1: strncpy( pN->szShortcut, pField,  31 ); break;
+            case 2: strncpy( pN->szHandler,  pField, 127 ); break;
+            case 3: pN->bEnabled = atoi( pField );          break;
+            case 4: pN->nLevel   = atoi( pField );          break;
+            case 5: pN->nParent  = atoi( pField );          break;
+         }
+         if( !pFEnd ) break;
+         pField = pFEnd + 1;
+      }
+      pN->bSeparator = ( strcmp( pN->szCaption, "---" ) == 0 );
+      n++;
+      if( !pNext ) break;
+      pNode = pNext + 1;
+   }
+   pm->nCount = n;
+}
+
+static BOOL ParseMenuShortcut( const char * psz, BYTE * pfVirt, WORD * pKey )
+{
+   char buf[ 64 ];
+   char * p, * plus;
+   BYTE fVirt = FVIRTKEY;
+   WORD key = 0;
+
+   if( !psz || !*psz ) return FALSE;
+   strncpy( buf, psz, 63 ); buf[ 63 ] = '\0';
+   p = buf;
+
+   while( ( plus = strchr( p, '+' ) ) != NULL )
+   {
+      *plus = '\0';
+      if( _stricmp(p,"Ctrl")==0 ) fVirt |= FCONTROL;
+      else if( _stricmp(p,"Alt")==0 ) fVirt |= FALT;
+      else if( _stricmp(p,"Shift")==0 ) fVirt |= FSHIFT;
+      p = plus + 1;
+   }
+   if( strlen(p) == 1 ) key = (WORD) toupper( (unsigned char) p[0] );
+   else if( _stricmp(p,"F1")==0 )  key = VK_F1;
+   else if( _stricmp(p,"F2")==0 )  key = VK_F2;
+   else if( _stricmp(p,"F3")==0 )  key = VK_F3;
+   else if( _stricmp(p,"F4")==0 )  key = VK_F4;
+   else if( _stricmp(p,"F5")==0 )  key = VK_F5;
+   else if( _stricmp(p,"F6")==0 )  key = VK_F6;
+   else if( _stricmp(p,"F7")==0 )  key = VK_F7;
+   else if( _stricmp(p,"F8")==0 )  key = VK_F8;
+   else if( _stricmp(p,"F9")==0 )  key = VK_F9;
+   else if( _stricmp(p,"F10")==0 ) key = VK_F10;
+   else if( _stricmp(p,"F11")==0 ) key = VK_F11;
+   else if( _stricmp(p,"F12")==0 ) key = VK_F12;
+   else if( _stricmp(p,"Del")==0 || _stricmp(p,"Delete")==0 ) key = VK_DELETE;
+   else if( _stricmp(p,"Ins")==0 || _stricmp(p,"Insert")==0 ) key = VK_INSERT;
+   else if( _stricmp(p,"Home")==0 ) key = VK_HOME;
+   else if( _stricmp(p,"End")==0 )  key = VK_END;
+   else if( _stricmp(p,"PgUp")==0 ) key = VK_PRIOR;
+   else if( _stricmp(p,"PgDn")==0 ) key = VK_NEXT;
+   else if( _stricmp(p,"Esc")==0 || _stricmp(p,"Escape")==0 ) key = VK_ESCAPE;
+   else if( _stricmp(p,"Tab")==0 )    key = VK_TAB;
+   else if( _stricmp(p,"Enter")==0 )  key = VK_RETURN;
+   else if( _stricmp(p,"Space")==0 )  key = VK_SPACE;
+   else if( _stricmp(p,"Left")==0 )   key = VK_LEFT;
+   else if( _stricmp(p,"Right")==0 )  key = VK_RIGHT;
+   else if( _stricmp(p,"Up")==0 )     key = VK_UP;
+   else if( _stricmp(p,"Down")==0 )   key = VK_DOWN;
+
+   if( !key ) return FALSE;
+   *pfVirt = fVirt; *pKey = key;
+   return TRUE;
+}
+
+static void BuildHMenu( HBW32Menu * pm )
+{
+   HMENU hMenuBar = CreateMenu();
+   HMENU hStack[ 8 ];
+   ACCEL aAccel[ MAX_MENU_NODES ];
+   int   nAccels = 0, nNextId = MENU_ID_BASE, i;
+
+   memset( hStack, 0, sizeof( hStack ) );
+
+   for( i = 0; i < pm->nCount; i++ )
+   {
+      W32MenuNode * pN = &pm->nodes[ i ];
+      int nLv  = pN->nLevel;
+      int bSub = ( i + 1 < pm->nCount && pm->nodes[ i + 1 ].nLevel > nLv );
+      HMENU hPar = ( nLv == 0 ) ? hMenuBar : hStack[ nLv ];
+
+      if( pN->bSeparator ) {
+         AppendMenuA( hPar, MF_SEPARATOR, 0, NULL );
+      } else if( bSub ) {
+         HMENU hSub = CreatePopupMenu();
+         if( nLv + 1 < 8 ) hStack[ nLv + 1 ] = hSub;
+         AppendMenuA( hPar, MF_POPUP, (UINT_PTR) hSub, pN->szCaption );
+      } else {
+         DWORD dwF = MF_STRING | ( pN->bEnabled ? 0 : MF_GRAYED );
+         pN->nCmdId = nNextId++;
+         AppendMenuA( hPar, dwF, (UINT_PTR) pN->nCmdId, pN->szCaption );
+         if( pN->szShortcut[ 0 ] )
+         {
+            BYTE fVirt = 0; WORD key = 0;
+            if( ParseMenuShortcut( pN->szShortcut, &fVirt, &key )
+                && nAccels < MAX_MENU_NODES )
+            {
+               aAccel[ nAccels ].fVirt = fVirt;
+               aAccel[ nAccels ].key   = key;
+               aAccel[ nAccels ].cmd   = (WORD) pN->nCmdId;
+               nAccels++;
+            }
+         }
+      }
+   }
+
+   pm->hMenu  = hMenuBar;
+   pm->hAccel = nAccels > 0 ? CreateAcceleratorTable( aAccel, nAccels ) : NULL;
+   g_hMenuAccel = pm->hAccel;
+
+   /* Resolve form HWND lazily — it may not exist when DEFINE MENUBAR ran */
+   if( !pm->hWnd && pm->pParentForm )
+      pm->hWnd = pm->pParentForm->FHandle;
+
+   if( pm->hWnd ) {
+      SetMenu( pm->hWnd, hMenuBar );
+      DrawMenuBar( pm->hWnd );
+   }
+}
+
+/* UI_MainMenuNew( hParentForm ) → HBW32Menu * (returned as HB_PTRUINT) */
+HB_FUNC( UI_MAINMENUNEW )
+{
+   TControl * pf = (TControl *)(HB_PTRUINT) hb_parnint( 1 );
+   HBW32Menu * pm = (HBW32Menu *) calloc( 1, sizeof( HBW32Menu ) );
+   pm->dwMagic     = HBW32MENU_MAGIC;
+   pm->pParentForm = pf;
+   pm->hWnd        = pf ? pf->FHandle : NULL;
+   s_pMenu         = pm;
+   hb_retnint( (HB_PTRUINT) pm );
+}
+
+/* HBMenu_AttachPending — TForm::Run/Show calls this after CreateHandle so
+   menus built before HWND existed get attached. */
+extern "C" void HBMenu_AttachPending( TControl * pForm )
+{
+   if( s_pMenu && s_pMenu->dwMagic == HBW32MENU_MAGIC &&
+       s_pMenu->pParentForm == pForm && pForm && pForm->FHandle )
+   {
+      s_pMenu->hWnd = pForm->FHandle;
+      if( s_pMenu->hMenu ) {
+         SetMenu( pForm->FHandle, s_pMenu->hMenu );
+         DrawMenuBar( pForm->FHandle );
+      }
+   }
+}
+
+/* Menu WM_COMMAND dispatch — called from tform.cpp */
+extern "C" BOOL HBMenu_DispatchCommand( WORD wId, WORD wCode, LPARAM lParam )
+{
+   if( ( wCode == 0 || wCode == 1 ) && lParam == 0 &&
+       wId >= MENU_ID_BASE && s_pMenu &&
+       s_pMenu->dwMagic == HBW32MENU_MAGIC )
+   {
+      HBW32Menu * pm = s_pMenu;
+      int ii;
+      if( pm->pOnClick ) {
+         HB_SIZE nLen = hb_arrayLen( pm->pOnClick );
+         for( ii = 0; ii < pm->nCount; ii++ ) {
+            if( pm->nodes[ ii ].nCmdId == (int) wId
+                && (HB_SIZE)( ii + 1 ) <= nLen )
+            {
+               PHB_ITEM pBlk = hb_arrayGetItemPtr( pm->pOnClick, ii + 1 );
+               if( pBlk && HB_IS_BLOCK( pBlk ) ) {
+                  hb_vmPushEvalSym();
+                  hb_vmPush( pBlk );
+                  hb_vmSend( 0 );
+               }
+               return TRUE;
+            }
+         }
+      }
+      return TRUE;
+   }
+   return FALSE;
+}
+
 /* ---- CT_BAND helpers ---------------------------------------------------- */
 static COLORREF BandColor( const char * szType )
 {
@@ -1265,8 +1505,35 @@ HB_FUNC( UI_HASHANDLE )
 
 HB_FUNC( UI_SETPROP )
 {
-   TControl * p = GetCtrl(1);
    const char * szProp = hb_parc(2);
+
+   /* TMainMenu fast-path: detect HBW32Menu* by global identity check */
+   {
+      HBW32Menu * pm = (HBW32Menu *)(HB_PTRUINT) hb_parnint(1);
+      if( pm && pm == s_pMenu &&
+          pm->dwMagic == HBW32MENU_MAGIC && szProp )
+      {
+         if( strcmp( szProp, "aMenuItems" ) == 0 && HB_ISCHAR(3) ) {
+            const char * pSer = hb_parc(3);
+            if( pSer && *pSer ) {
+               ParseMenuSerial( pm, pSer );
+               BuildHMenu( pm );
+            }
+            return;
+         }
+         if( strcmp( szProp, "aOnClick" ) == 0 ) {
+            PHB_ITEM pArr = hb_param( 3, HB_IT_ARRAY );
+            if( pArr ) {
+               if( pm->pOnClick ) hb_itemRelease( pm->pOnClick );
+               pm->pOnClick = hb_itemNew( pArr );
+            }
+            return;
+         }
+      }
+   }
+
+   {
+   TControl * p = GetCtrl(1);
 
    if( !p || !szProp ) return;
 
@@ -1387,6 +1654,8 @@ HB_FUNC( UI_SETPROP )
       if( p->FHandle ) InvalidateRect( p->FHandle, NULL, TRUE );
    }
    else if( lstrcmpi( szProp, "aData" ) == 0 && p->FControlType == CT_BAND && HB_ISCHAR(3) )
+      lstrcpynA( p->FData, hb_parc(3), sizeof(p->FData) - 1 );
+   else if( lstrcmpi( szProp, "aMenuItems" ) == 0 && p->FControlType == CT_MAINMENU && HB_ISCHAR(3) )
       lstrcpynA( p->FData, hb_parc(3), sizeof(p->FData) - 1 );
    else if( lstrcmpi( szProp, "cFieldName" ) == 0 &&
             p->FControlType == CT_REPORTFIELD && HB_ISCHAR(3) )
@@ -1676,6 +1945,7 @@ HB_FUNC( UI_SETPROP )
    }
    else if( lstrcmpi( szProp, "cDataSource" ) == 0 && p->FControlType == CT_BROWSE && HB_ISCHAR(3) )
       lstrcpynA( ((TBrowse*)p)->FDataSourceName, hb_parc(3), 64 );
+   }
 }
 
 /* UI_GetProp( hCtrl, cProp ) --> xValue */
@@ -1807,6 +2077,8 @@ HB_FUNC( UI_GETPROP )
       }
       hb_retc( szAll );
    }
+   else if( lstrcmpi( szProp, "aMenuItems" ) == 0 && p->FControlType == CT_MAINMENU )
+      hb_retc( p->FData );
    else if( lstrcmpi( szProp, "aColumns" ) == 0 && p->FControlType == CT_BROWSE )
    {
       TBrowse * br = (TBrowse *) p;
@@ -2554,6 +2826,17 @@ HB_FUNC( UI_GETALLPROPS )
          hb_arrayAdd( pArray, pRow );
          hb_itemRelease( pRow );
          ADD_PROP_S( "aData", p->FData, "Band" );
+         break;
+      }
+      case CT_MAINMENU:
+      {
+         pRow = hb_itemArrayNew(4);
+         hb_arraySetC( pRow, 1, "aMenuItems" );
+         hb_arraySetC( pRow, 2, p->FData );
+         hb_arraySetC( pRow, 3, "Data" );
+         hb_arraySetC( pRow, 4, "M" );
+         hb_arrayAdd( pArray, pRow );
+         hb_itemRelease( pRow );
          break;
       }
       case CT_REPORTLABEL:
