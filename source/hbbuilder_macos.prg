@@ -1172,8 +1172,6 @@ static function RegenerateFormCode( cName, hForm )
                   elseif nType == 200  // CT_MAINMENU
                      cVal := UI_GetProp( hCtrl, "aMenuItems" )
                      if ValType( cVal ) == "C" .and. ! Empty( cVal )
-                        cCreate += '   ::o' + cCtrlName + ':aMenuItems := "' + ;
-                                   StrTran( cVal, Chr(1), '"+Chr(1)+"' ) + '"' + e
                         aMenuNodes := HB_ATokens( cVal, "|" )
                         lHasHandlers := .F.
                         for nMI := 1 to Len( aMenuNodes )
@@ -1196,7 +1194,7 @@ static function RegenerateFormCode( cName, hForm )
                            cCreate += ' }' + e
                         endif
                         nPendingLevels := {}
-                        cCreate += '   DEFINE MENUBAR' + e
+                        cCreate += '   DEFINE MENUBAR ::o' + cCtrlName + e
                         for nMI := 1 to Len( aMenuNodes )
                            cMNode := aMenuNodes[nMI]
                            aMFields := HB_ATokens( cMNode, Chr(1) )

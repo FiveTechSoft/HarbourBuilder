@@ -409,6 +409,14 @@
 #xcommand DEFINE PALETTE <oPal> OF <oForm> => ;
    <oPal> := TComponentPalette():New( <oForm> )
 
+// TMainMenu DSL — DEFINE MENUBAR <oMenu> builds aMenuItems via helper functions
+#xcommand DEFINE MENUBAR <oMenu>                          => _HBMenuStart( <oMenu> )
+#xcommand MENUITEM <x> [ ACTION <a> ] [ ACCEL <k> ]      => _HBMenuAdd( <x> [,<"a">] [,<"k">] )
+#xcommand MENUSEPARATOR                                   => _HBMenuSep()
+#xcommand DEFINE POPUP <x>                                => _HBMenuPopup( <x> )
+#xcommand END POPUP                                       => _HBMenuEndPopup()
+#xcommand END MENUBAR                                     => _HBMenuEnd()
+
 // Menu
 #xcommand DEFINE MENUBAR OF <oForm> => ;
    <oForm>:CreateMenu()

@@ -140,6 +140,7 @@ static void SuppressCursorWarnings(void)
 #define CT_REPORTFIELD    134   // Report field (data field inside band)
 #define CT_REPORTIMAGE    135   // Report image (picture inside band)
 #define CT_MAP            140
+#define CT_MAINMENU       200   // TMainMenu component (non-visual, attaches to NSApp mainMenu)
 #define CT_SCENE3D        141
 #define CT_EARTHVIEW      142
 #define CT_THREAD     63
@@ -156,6 +157,17 @@ static void SuppressCursorWarnings(void)
 #define TOOLBAR_BTN_ID_BASE 100
 #define MENU_ID_BASE        1000
 #define MAX_MENUITEMS       128
+#define MAX_MENU_NODES      128
+
+typedef struct {
+   char  szCaption[128];
+   char  szShortcut[32];
+   char  szHandler[128];
+   int   bSeparator;
+   int   bEnabled;
+   int   nParent;
+   int   nLevel;
+} HBMenuNode;
 
 /* --- TBrowse data grid structures --- */
 #define MAX_BROWSE_COLS  64
@@ -420,6 +432,9 @@ void EnsureNSApp( void )
    PHB_ITEM FOnStart;         /* TWebServer bOnStart */
    PHB_ITEM FOnStop;          /* TWebServer bOnStop */
    PHB_ITEM FOnError;         /* TWebServer bOnError */
+   /* TMainMenu */
+   char FMenuSerial[4096];    /* serialized aMenuItems (pipe+SOH format) */
+   PHB_ITEM FMenuOnClick;     /* Harbour array of codeblocks, one per node */
 }
 - (void)addChild:(HBControl *)child;
 - (void)setText:(const char *)text;
@@ -433,6 +448,8 @@ void EnsureNSApp( void )
 - (void)stopTimer;
 - (void)timerFired:(NSTimer *)timer;
 @end
+
+static void HBMainMenu_Attach( HBControl * p );  /* forward — defined near UI_MENUBARCREATE */
 
 /* Align constants (match C++Builder TAlign) */
 #define ALIGN_NONE   0
@@ -2978,6 +2995,7 @@ static NSImage * HBResolveBitBtnImage( int kind, const char * picture )
    if( ctrlType >= CT_PREPROCESSOR && ctrlType <= CT_SCHEDULER ) isNonVisual = 1;
    if( ctrlType >= CT_PRINTER && ctrlType <= CT_BARCODEPRINTER ) isNonVisual = 1;
    if( ctrlType >= 110 ) isNonVisual = 1; /* Whisper, Embeddings, Connectivity, Git */
+   if( ctrlType == CT_MAINMENU ) isNonVisual = 1;
    if( ctrlType == CT_MAP ) isNonVisual = 0; /* TMap is visual */
    if( ctrlType == CT_SCENE3D ) isNonVisual = 0; /* TScene3D is visual */
    if( ctrlType == CT_EARTHVIEW ) isNonVisual = 0; /* TEarthView is visual */
@@ -3453,6 +3471,7 @@ static HBPaletteTarget * s_palTarget = nil;
                   { CT_MONTHCALENDAR,"TMonthCalendar","",            227, 155 },
                   { CT_PAINTBOX,   "TPaintBox",       "",           105, 105 },
                   { CT_TIMER,      "TTimer",          "",            32,  32 },
+                  { CT_MAINMENU,   "TMainMenu",       "",            32,  32 },
                   { CT_OPENDIALOG, "TOpenDialog",     "",            32,  32 },
                   { CT_SAVEDIALOG, "TSaveDialog",     "",            32,  32 },
                   { CT_FONTDIALOG, "TFontDialog",     "",            32,  32 },
@@ -4228,6 +4247,13 @@ static void FlushPendingDBGrids( HBControl * node )
       if( !FChildren[i]->FFont ) FChildren[i]->FFont = FFormFont;
       FChildren[i]->FTop += FClientTop;
       [FChildren[i] createViewInParent:FContentView];
+   }
+   /* TMainMenu: attach to NSApp menu bar (runtime only) */
+   if( !FDesignMode )
+   {
+      for( int i = 0; i < FChildCount; i++ )
+         if( FChildren[i]->FControlType == CT_MAINMENU )
+            HBMainMenu_Attach( FChildren[i] );
    }
 }
 
@@ -5541,7 +5567,7 @@ HB_FUNC( UI_DROPNONVISUAL )
    /* Set FClassName based on component type */
    {
       static struct { int type; const char * cls; } s_typeMap[] = {
-         { CT_TIMER, "TTimer" }, { CT_PAINTBOX, "TPaintBox" },
+         { CT_TIMER, "TTimer" }, { CT_MAINMENU, "TMainMenu" }, { CT_PAINTBOX, "TPaintBox" },
          { CT_OPENDIALOG, "TOpenDialog" }, { CT_SAVEDIALOG, "TSaveDialog" },
          { CT_FONTDIALOG, "TFontDialog" }, { CT_COLORDIALOG, "TColorDialog" },
          { CT_FINDDIALOG, "TFindDialog" }, { CT_REPLACEDIALOG, "TReplaceDialog" },
@@ -5663,6 +5689,25 @@ HB_FUNC( UI_TIMERNEW )
    strncpy( ctrl->FClassName, "TTimer", sizeof(ctrl->FClassName) - 1 );
    strncpy( ctrl->FName, "Timer", sizeof(ctrl->FName) - 1 );
    [form addChild:ctrl];
+   RetCtrl( ctrl );
+}
+
+/* UI_MainMenuNew( hForm ) - create runtime TMainMenu (non-visual, no view) */
+HB_FUNC( UI_MAINMENUNEW )
+{
+   HBForm * form = GetForm(1);
+   NSLog( @"UI_MAINMENUNEW: form=%@", form );
+   if( !form ) return;
+   HBControl * ctrl = [[HBControl alloc] init];
+   ctrl->FControlType = CT_MAINMENU;
+   ctrl->FWidth = 0; ctrl->FHeight = 0;
+   ctrl->FView = nil;
+   strncpy( ctrl->FClassName, "TMainMenu", sizeof(ctrl->FClassName)-1 );
+   strncpy( ctrl->FName, "MainMenu", sizeof(ctrl->FName)-1 );
+   ctrl->FMenuSerial[0] = 0;
+   ctrl->FMenuOnClick = NULL;
+   [form addChild:ctrl];
+   NSLog( @"UI_MAINMENUNEW: created ctrl=%@, childCount=%d", ctrl, form->FChildCount );
    RetCtrl( ctrl );
 }
 
@@ -6430,6 +6475,16 @@ HB_FUNC( UI_SETPROP )
       p->FInterval = hb_parni(3);
       if( p->FEnabled && p->FOnTimer ) [p startTimer];
    }
+   else if( strcasecmp(szProp,"aMenuItems")==0 && p->FControlType==CT_MAINMENU && HB_ISCHAR(3) ) {
+      strncpy( p->FMenuSerial, hb_parc(3), sizeof(p->FMenuSerial)-1 );
+      NSLog( @"UI_SETPROP aMenuItems: len=%d first50='%.50s'", (int)strlen(p->FMenuSerial), p->FMenuSerial );
+   }
+   else if( strcasecmp(szProp,"aOnClick")==0 && p->FControlType==CT_MAINMENU )
+   {
+      PHB_ITEM pArr = hb_param(3, HB_IT_ARRAY);
+      if( p->FMenuOnClick ) { hb_itemRelease(p->FMenuOnClick); p->FMenuOnClick = NULL; }
+      if( pArr ) p->FMenuOnClick = hb_itemNew(pArr);
+   }
    else if( p->FControlType == CT_WEBSERVER ) {
       if( strcasecmp(szProp,"nPort")==0 )            p->FWSPort = hb_parni(3);
       else if( strcasecmp(szProp,"nPortSSL")==0 )    p->FWSPortSSL = hb_parni(3);
@@ -6776,6 +6831,8 @@ HB_FUNC( UI_GETPROP )
    else if( strcasecmp(szProp,"nAlign")==0 ) hb_retni( p->nAlign );
    else if( strcasecmp(szProp,"nInterval")==0 && p->FControlType==CT_TIMER )
       hb_retni( p->FInterval );
+   else if( strcasecmp(szProp,"aMenuItems")==0 && p->FControlType==CT_MAINMENU )
+      hb_retc( p->FMenuSerial );
    else if( p->FControlType == CT_WEBSERVER ) {
       if( strcasecmp(szProp,"nPort")==0 )            hb_retni( p->FWSPort );
       else if( strcasecmp(szProp,"nPortSSL")==0 )    hb_retni( p->FWSPortSSL );
@@ -7156,6 +7213,16 @@ HB_FUNC( UI_GETALLPROPS )
          ADD_L("lActive",  p->FActive,  "Behavior"); break;
       case CT_TIMER:
          ADD_N("nInterval",p->FInterval,"Behavior"); break;
+      case CT_MAINMENU: {
+         PHB_ITEM pRow = hb_itemArrayNew(4);
+         hb_arraySetC(pRow, 1, "aMenuItems");
+         hb_arraySetC(pRow, 2, p->FMenuSerial);
+         hb_arraySetC(pRow, 3, "Data");
+         hb_arraySetC(pRow, 4, "M");
+         hb_arrayAdd(pArray, pRow);
+         hb_itemRelease(pRow);
+         break;
+      }
       case CT_WEBSERVER:
          ADD_N("nPort",           p->FWSPort,           "Network");
          ADD_N("nPortSSL",        p->FWSPortSSL,        "Network");
@@ -7538,6 +7605,189 @@ HB_FUNC( UI_TOOLBARLOADIMAGES )
  * Menu bridge
  * ====================================================================== */
 
+/* Helper target for menu actions (used by both TMainMenu and legacy menu bridge) */
+@interface HBMenuTarget : NSObject
+{ @public PHB_ITEM pAction; NSString * pHandlerName; }
+- (void)menuAction:(id)sender;
+@end
+@implementation HBMenuTarget
+- (void)menuAction:(id)sender {
+   (void)sender;
+   if( pAction && HB_IS_BLOCK(pAction) ) {
+      hb_vmPushEvalSym(); hb_vmPush(pAction); hb_vmSend(0);
+      return;
+   }
+   if( pHandlerName ) {
+      const char * name = [pHandlerName UTF8String];
+      char sym[128]; int ii;
+      for(ii=0;name[ii]&&ii<127;ii++) sym[ii]=(char)toupper((unsigned char)name[ii]);
+      sym[ii]=0;
+      PHB_DYNS pDyn = hb_dynsymFindName(sym);
+      if(pDyn){ hb_vmPushDynSym(pDyn); hb_vmPushNil(); hb_vmDo(0); }
+   }
+}
+@end
+
+static NSMutableArray * s_menuTargets = nil;
+
+/* ======================================================================
+ * TMainMenu runtime attach — converts FMenuSerial into NSMenu hierarchy
+ * ====================================================================== */
+
+static void HBMainMenu_Attach( HBControl * p )
+{
+   NSLog( @"HBMainMenu_Attach: serial='%s'", p->FMenuSerial );
+   if( !p->FMenuSerial[0] ) {
+      NSLog( @"HBMainMenu_Attach: serial is empty, aborting" );
+      return;
+   }
+
+   /* Parse serialized string into local node array */
+   HBMenuNode nodes[MAX_MENU_NODES];
+   int nCount = 0;
+   const char * raw = p->FMenuSerial;
+   while( *raw && nCount < MAX_MENU_NODES )
+   {
+      const char * pipe = strchr(raw,'|');
+      int tl = pipe ? (int)(pipe-raw) : (int)strlen(raw);
+      if(tl>511) tl=511;
+      char tok[512]; memcpy(tok,raw,tl); tok[tl]=0;
+      char*f0=tok;
+      char*f1=strchr(f0,'\x01'); if(f1){*f1++=0;}else f1=(char*)"";
+      char*f2=f1[0]?strchr(f1,'\x01'):NULL; if(f2){*f2++=0;}else f2=(char*)"";
+      char*f3=f2?strchr(f2,'\x01'):NULL; if(f3){*f3++=0;}else f3=(char*)"";
+      char*f4=f3?strchr(f3,'\x01'):NULL; if(f4){*f4++=0;}else f4=(char*)"";
+      char*f5=f4?strchr(f4,'\x01'):NULL; if(f5){*f5++=0;}else f5=(char*)"-1";
+      nodes[nCount].bSeparator = (strcmp(f0,"---")==0);
+      strncpy(nodes[nCount].szCaption, nodes[nCount].bSeparator?"":f0, 127);
+      strncpy(nodes[nCount].szShortcut, f1, 31);
+      strncpy(nodes[nCount].szHandler, f2, 127);
+      nodes[nCount].bEnabled = f3[0]?atoi(f3):1;
+      nodes[nCount].nLevel   = f4[0]?atoi(f4):0;
+      nodes[nCount].nParent  = f5[0]?atoi(f5):-1;
+      NSLog( @"  node[%d]: cap='%s' lv=%d sep=%d", nCount, nodes[nCount].szCaption,
+             nodes[nCount].nLevel, nodes[nCount].bSeparator );
+      nCount++;
+      if(!pipe) break;
+      raw = pipe+1;
+   }
+   NSLog( @"HBMainMenu_Attach: parsed %d nodes", nCount );
+   if( nCount == 0 ) return;
+
+   NSMenu * menuBar = [NSApp mainMenu];
+   NSLog( @"HBMainMenu_Attach: [NSApp mainMenu]=%@, items=%ld",
+          menuBar, (long)(menuBar ? [menuBar numberOfItems] : -1) );
+
+   if( !menuBar ) {
+      /* Create menu bar with required app menu as first item */
+      menuBar = [[NSMenu alloc] init];
+      NSMenuItem * appMI = [[NSMenuItem alloc] init];
+      NSMenu * appMenu = [[NSMenu alloc] initWithTitle:@"App"];
+      [appMenu addItemWithTitle:@"Quit" action:@selector(terminate:) keyEquivalent:@"q"];
+      [appMI setSubmenu:appMenu];
+      [menuBar addItem:appMI];
+      [NSApp setMainMenu:menuBar];
+      NSLog( @"HBMainMenu_Attach: created fresh menu bar with app menu" );
+   }
+
+   if( !s_menuTargets ) s_menuTargets = [[NSMutableArray alloc] init];
+
+   /* Stack of open submenus indexed by level: popupStack[1] = first-level popup */
+   NSMenu * popupStack[8] = {nil};
+
+   for( int i = 0; i < nCount; i++ )
+   {
+      HBMenuNode * n = &nodes[i];
+      int lv = n->nLevel;
+
+      if( n->bSeparator )
+      {
+         NSMenu * pm = (lv>=1 && lv<=7 && popupStack[lv]) ? popupStack[lv] : popupStack[1];
+         if(pm) [pm addItem:[NSMenuItem separatorItem]];
+      }
+      else if( lv == 0 )
+      {
+         /* Root popup: add directly to the menu bar */
+         NSString * title = [NSString stringWithUTF8String:n->szCaption];
+         NSMenuItem * mi = [[NSMenuItem alloc] initWithTitle:title action:nil keyEquivalent:@""];
+         NSMenu * sub = [[NSMenu alloc] initWithTitle:title];
+         [mi setSubmenu:sub];
+         [menuBar addItem:mi];
+         popupStack[1] = sub;
+         for(int lv2=2;lv2<8;lv2++) popupStack[lv2]=nil;
+      }
+      else
+      {
+         int hasChildren = (i+1<nCount && nodes[i+1].nLevel > lv);
+         NSMenu * pm = (lv>=1 && lv<=7 && popupStack[lv]) ? popupStack[lv] : nil;
+         if(!pm) continue;
+
+         NSString * title = [NSString stringWithUTF8String:n->szCaption];
+
+         if( hasChildren )
+         {
+            /* Sub-popup */
+            NSMenuItem * mi = [[NSMenuItem alloc] initWithTitle:title action:nil keyEquivalent:@""];
+            NSMenu * sub = [[NSMenu alloc] initWithTitle:title];
+            [mi setSubmenu:sub];
+            [pm addItem:mi];
+            if(lv+1<8) popupStack[lv+1]=sub;
+            for(int lv2=lv+2;lv2<8;lv2++) popupStack[lv2]=nil;
+         }
+         else
+         {
+            /* Leaf item */
+            NSString * keyEq = @"";
+            NSEventModifierFlags modMask = NSEventModifierFlagCommand;
+            if( n->szShortcut[0] )
+            {
+               char buf[64]; strncpy(buf,n->szShortcut,63); buf[63]=0;
+               char * plus = strrchr(buf,'+');
+               const char * keyPart = plus ? plus+1 : buf;
+               if(plus) *plus=0;
+               modMask = 0;
+               if( strcasestr(buf,"Ctrl") || strcasestr(buf,"Cmd") )
+                  modMask |= NSEventModifierFlagCommand;
+               if( strcasestr(buf,"Alt") || strcasestr(buf,"Opt") )
+                  modMask |= NSEventModifierFlagOption;
+               if( strcasestr(buf,"Shift") )
+                  modMask |= NSEventModifierFlagShift;
+               if( modMask == 0 ) modMask = NSEventModifierFlagCommand;
+               if( strlen(keyPart)==1 )
+                  keyEq = [NSString stringWithFormat:@"%c",(char)tolower((unsigned char)keyPart[0])];
+            }
+
+            NSMenuItem * mi = [[NSMenuItem alloc] initWithTitle:title
+               action:nil keyEquivalent:keyEq];
+            if([keyEq length]>0)
+               [mi setKeyEquivalentModifierMask:modMask];
+            if(!n->bEnabled) [mi setEnabled:NO];
+
+            if( n->szHandler[0] || p->FMenuOnClick )
+            {
+               HBMenuTarget * target = [[HBMenuTarget alloc] init];
+               if( p->FMenuOnClick )
+               {
+                  HB_SIZE idx = (HB_SIZE)(i+1);
+                  if( idx>=1 && idx<=hb_arrayLen(p->FMenuOnClick) )
+                  {
+                     PHB_ITEM pBlock = hb_arrayGetItemPtr(p->FMenuOnClick, idx);
+                     if(pBlock && HB_IS_BLOCK(pBlock))
+                        target->pAction = hb_itemNew(pBlock);
+                  }
+               }
+               if(!target->pAction && n->szHandler[0])
+                  target->pHandlerName = [NSString stringWithUTF8String:n->szHandler];
+               [s_menuTargets addObject:target];
+               [mi setTarget:target];
+               [mi setAction:@selector(menuAction:)];
+            }
+            [pm addItem:mi];
+         }
+      }
+   }
+}
+
 /* Menu storage: use tag-based approach with NSMenu */
 static NSMenu * s_currentMenuBar = nil;
 
@@ -7548,17 +7798,9 @@ HB_FUNC( UI_MENUBARCREATE )
    EnsureNSApp();
 
    NSMenu * menuBar = [[NSMenu alloc] init];
-
-   // Add application menu (required for macOS)
-   NSMenuItem * appMenuItem = [[NSMenuItem alloc] init];
-   NSMenu * appMenu = [[NSMenu alloc] initWithTitle:@"HbBuilder"];
-   [appMenu addItemWithTitle:@"Quit HbBuilder" action:@selector(terminate:) keyEquivalent:@"q"];
-   [appMenuItem setSubmenu:appMenu];
-   [menuBar addItem:appMenuItem];
-
    [NSApp setMainMenu:menuBar];
    s_currentMenuBar = menuBar;
-   fprintf(stderr, "DEBUG: UI_MENUBARCREATE done (with app menu)\n");
+   fprintf(stderr, "DEBUG: UI_MENUBARCREATE done\n");
 }
 
 HB_FUNC( UI_MENUPOPUPADD )
@@ -7578,21 +7820,6 @@ HB_FUNC( UI_MENUPOPUPADD )
 }
 
 HB_FUNC( UI_MENUITEMADD ) { hb_retni( -1 ); }  /* Stub - use UI_MENUITEMADDEX */
-
-/* Helper target for menu actions */
-@interface HBMenuTarget : NSObject
-{ @public PHB_ITEM pAction; }
-- (void)menuAction:(id)sender;
-@end
-@implementation HBMenuTarget
-- (void)menuAction:(id)sender {
-   if( pAction && HB_IS_BLOCK(pAction) ) {
-      hb_vmPushEvalSym(); hb_vmPush(pAction); hb_vmSend(0);
-   }
-}
-@end
-
-static NSMutableArray * s_menuTargets = nil;
 
 HB_FUNC( UI_MENUITEMADDEX )
 {
@@ -7808,6 +8035,7 @@ HB_FUNC( UI_PALETTELOADIMAGES )
             else if( ct == CT_SCENE3D )        { sym = @"cube.transparent.fill";  clr = [NSColor systemPurpleColor]; }
             else if( ct == CT_EARTHVIEW )      { sym = @"globe.americas.fill";    clr = nil; /* multicolor */        }
             else if( ct == CT_TIMER )          { sym = @"timer";                  clr = [NSColor systemOrangeColor]; }
+            else if( ct == CT_MAINMENU )       { sym = @"menubar.rectangle";      clr = [NSColor systemBlueColor];   }
             else if( ct == CT_UPDOWN )         { sym = @"chevron.up.chevron.down"; clr = [NSColor systemIndigoColor];}
             else if( ct == CT_DATETIMEPICKER ) { sym = @"calendar.badge.clock";   clr = nil; /* multicolor */        }
             else if( ct == CT_MONTHCALENDAR )  { sym = @"calendar";               clr = [NSColor systemRedColor];    }

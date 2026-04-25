@@ -1302,7 +1302,114 @@ METHOD Refresh() CLASS TDBGrid
 return Self
 
 //----------------------------------------------------------------------------//
+// TMenuItem - menu item descriptor for TMainMenu:aMenuItems
+//----------------------------------------------------------------------------//
+
+CLASS TMenuItem
+   DATA cCaption  INIT "NewItem"
+   DATA cShortcut INIT ""
+   DATA cAction   INIT ""
+   DATA lEnabled  INIT .T.
+   DATA nLevel    INIT 1
+   DATA nParent   INIT -1
+   METHOD New( cCap, cScut, cAct, lEn, nLv, nPar ) CONSTRUCTOR
+ENDCLASS
+
+METHOD New( cCap, cScut, cAct, lEn, nLv, nPar ) CLASS TMenuItem
+   if cCap  != nil; ::cCaption  := cCap;  endif
+   if cScut != nil; ::cShortcut := cScut; endif
+   if cAct  != nil; ::cAction   := cAct;  endif
+   if lEn   != nil; ::lEnabled  := lEn;   endif
+   if nLv   != nil; ::nLevel    := nLv;   endif
+   if nPar  != nil; ::nParent   := nPar;  endif
+return Self
+
+FUNCTION TMainMenu_Serialize( aItems )
+   local cSerial := "", i, oItem, cSep := ""
+   for i := 1 to Len( aItems )
+      oItem := aItems[i]
+      cSerial += cSep + oItem:cCaption + Chr(1) + oItem:cShortcut + Chr(1) + ;
+                 oItem:cAction + Chr(1) + iif( oItem:lEnabled, "1", "0" ) + Chr(1) + ;
+                 LTrim( Str( oItem:nLevel ) ) + Chr(1) + LTrim( Str( oItem:nParent ) )
+      cSep := "|"
+   next
+return cSerial
+
+//----------------------------------------------------------------------------//
 // TCompArray - Non-visual array data container
+// TMainMenu - non-visual menu bar component
+//----------------------------------------------------------------------------//
+
+CLASS TMainMenu
+   DATA hCpp       INIT 0
+   DATA oParent    INIT nil
+   DATA _aBuilding INIT nil
+   ASSIGN aMenuItems( v ) INLINE iif( ::hCpp != 0, ;
+      UI_SetProp( ::hCpp, "aMenuItems", ;
+         iif( ValType(v) == "A", TMainMenu_Serialize(v), v ) ), nil )
+   ASSIGN aOnClick( a )   INLINE iif( ::hCpp != 0, UI_SetProp( ::hCpp, "aOnClick", a ), nil )
+   METHOD New() CONSTRUCTOR
+ENDCLASS
+
+METHOD New() CLASS TMainMenu
+return Self
+
+STATIC FUNCTION _HBMenuCtx( nOp, xArg )
+   STATIC oMenu  := nil
+   STATIC nLevel := 1
+   do case
+   case nOp == 0; oMenu := xArg; nLevel := 1
+   case nOp == 1; return oMenu
+   case nOp == 2; return nLevel
+   case nOp == 3; nLevel++
+   case nOp == 4; if nLevel > 1; nLevel--; endif
+   case nOp == 5; oMenu := nil
+   endcase
+return nil
+
+PROCEDURE _HBMenuStart( oMenu )
+   oMenu:_aBuilding := {}
+   _HBMenuCtx( 0, oMenu )
+RETURN
+
+PROCEDURE _HBMenuAdd( cText, cAction, cAccel )
+   local oMenu := _HBMenuCtx( 1 )
+   if oMenu != nil
+      AAdd( oMenu:_aBuilding, ;
+         TMenuItem():New( cText, iif(cAccel!=nil,cAccel,""), ;
+                          iif(cAction!=nil,cAction,""), .T., _HBMenuCtx(2), -1 ) )
+   endif
+RETURN
+
+PROCEDURE _HBMenuSep()
+   local oMenu := _HBMenuCtx( 1 )
+   if oMenu != nil
+      AAdd( oMenu:_aBuilding, TMenuItem():New( "---", "", "", .T., _HBMenuCtx(2), -1 ) )
+   endif
+RETURN
+
+PROCEDURE _HBMenuPopup( cText )
+   local oMenu := _HBMenuCtx( 1 )
+   if oMenu != nil
+      AAdd( oMenu:_aBuilding, TMenuItem():New( cText, "", "", .T., _HBMenuCtx(2) - 1, -1 ) )
+      _HBMenuCtx( 3 )
+   endif
+RETURN
+
+PROCEDURE _HBMenuEndPopup()
+   if _HBMenuCtx( 1 ) != nil; _HBMenuCtx( 4 ); endif
+RETURN
+
+PROCEDURE _HBMenuEnd()
+   local oMenu := _HBMenuCtx( 1 )
+   if oMenu != nil
+      oMenu:aMenuItems := oMenu:_aBuilding
+      oMenu:_aBuilding := nil
+      _HBMenuCtx( 5 )
+   endif
+RETURN
+
+//----------------------------------------------------------------------------//
 // TTimer - non-visual timer component
 //----------------------------------------------------------------------------//
 
@@ -3736,6 +3843,13 @@ function HB_CreateComponent( nType, oParent )
          oComp := TTimer():New()
          if oParent != nil .and. __objHasMsg( oParent, "HCPP" ) .and. oParent:hCpp != 0
             oComp:hCpp := UI_TimerNew( oParent:hCpp, 1000 )
+         endif
+         return oComp
+      case nType == 132 .or. nType == 200  // CT_MAINMENU (132=Linux, 200=macOS)
+         oComp := TMainMenu():New()
+         oComp:oParent := oParent
+         if oParent != nil .and. __objHasMsg( oParent, "HCPP" ) .and. oParent:hCpp != 0
+            oComp:hCpp := UI_MainMenuNew( oParent:hCpp )
          endif
          return oComp
       case nType == CT_WEBSERVER;  return TWebServer():New()

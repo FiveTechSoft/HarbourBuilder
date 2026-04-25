@@ -7798,17 +7798,9 @@ HB_FUNC( UI_MENUBARCREATE )
    EnsureNSApp();
 
    NSMenu * menuBar = [[NSMenu alloc] init];
-
-   // Add application menu (required for macOS)
-   NSMenuItem * appMenuItem = [[NSMenuItem alloc] init];
-   NSMenu * appMenu = [[NSMenu alloc] initWithTitle:@"HbBuilder"];
-   [appMenu addItemWithTitle:@"Quit HbBuilder" action:@selector(terminate:) keyEquivalent:@"q"];
-   [appMenuItem setSubmenu:appMenu];
-   [menuBar addItem:appMenuItem];
-
    [NSApp setMainMenu:menuBar];
    s_currentMenuBar = menuBar;
-   fprintf(stderr, "DEBUG: UI_MENUBARCREATE done (with app menu)\n");
+   fprintf(stderr, "DEBUG: UI_MENUBARCREATE done\n");
 }
 
 HB_FUNC( UI_MENUPOPUPADD )

@@ -1,6 +1,29 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-25a
+
+  - feat(mac): TMenuItem class + DEFINE MENUBAR DSL as single source of truth
+    - classes.prg: new TMenuItem class with fields cCaption, cShortcut, cAction,
+      lEnabled, nLevel, nParent; New() accepts 1..6 optional parameters with defaults
+    - classes.prg: TMainMenu_Serialize( aItems ) converts TMenuItem array to
+      pipe+Chr(1) serial string for the C backend
+    - classes.prg: TMainMenu ASSIGN aMenuItems now accepts either a string (legacy)
+      or an array of TMenuItem objects (auto-serialized before UI_SetProp)
+    - classes.prg: _HBMenuCtx() STATIC FUNCTION holds persistent oMenu/nLevel state
+    - classes.prg: _HBMenuStart/Add/Sep/Popup/EndPopup/End procedures implement
+      DEFINE MENUBAR DSL at runtime — builds TMenuItem array, assigns aMenuItems
+    - classes.prg: HB_CreateComponent handles CT_MAINMENU as nType==132 (Linux)
+      OR nType==200 (macOS) — fixes nil oMainMenu1 bug that prevented menu display
+    - hbbuilder.ch / include/hbbuilder.ch: DEFINE MENUBAR <oMenu> xcommands changed
+      from no-ops to _HBMenuStart/Add/Sep/Popup/EndPopup/End calls; DEFINE MENUBAR
+      without <oMenu> removed (was the no-op form)
+    - hbbuilder_macos.prg: codegen now emits only DEFINE MENUBAR ::oMainMenu1 block
+      (no separate ::oMainMenu1:aMenuItems := "..." string line); DEFINE MENUBAR
+      line includes the object reference so the xcommand wires it at compile time
+    - cocoa_core.m: UI_MENUBARCREATE no longer pre-creates "Quit HbBuilder" app menu
+      item; IDE's File popup is now the first visible menu item
+
 2026-04-24n
 
   - feat(mac): TMainMenu full implementation for Cocoa/AppKit backend
