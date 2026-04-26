@@ -985,6 +985,7 @@ public:
    int          FSplitPos;     /* X position of splitter */
    PHB_ITEM     FOnSelect;     /* callback when component selected */
    HIMAGELIST   FPalImageList; /* Image list for component buttons */
+   HBITMAP      FCompIconOverride[256]; /* Per-control-type 32x32 PNG (alpha) */
 
    TComponentPalette();
    virtual ~TComponentPalette();
@@ -996,6 +997,7 @@ public:
    int  GetBarHeight();
    void LoadImages( const char * szBmpPath );
    void AppendImages( const char * szBmpPath );
+   void SetCompIcon( int nCtrlType, const char * szPngPath );
    const PROPDESC * GetPropDescs( int * pnCount );
 };
 

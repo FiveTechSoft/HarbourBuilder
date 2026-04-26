@@ -7461,6 +7461,62 @@ HB_FUNC( UI_PALETTELOADIMAGES )
    free( icons );
 }
 
+/* UI_PaletteSetCompIcon( nControlType, cPngPath )
+ * Replace palette button icon for a given control type with a PNG file.
+ * Mirrors macOS implementation in cocoa_core.m. */
+HB_FUNC( UI_PALETTESETCOMPICON )
+{
+   PALDATA * pd = s_palData;
+   int nCtrlType = hb_parni(1);
+   const char * szPath = hb_parc(2);
+   if( !pd || !szPath ) return;
+
+   GError * err = NULL;
+   GdkPixbuf * pb = gdk_pixbuf_new_from_file( szPath, &err );
+   if( !pb ) { if( err ) g_error_free( err ); return; }
+
+   /* Scale to 28x28 to match palette button icon size */
+   GdkPixbuf * scaled = gdk_pixbuf_scale_simple( pb, 28, 28, GDK_INTERP_BILINEAR );
+   g_object_unref( pb );
+   if( !scaled ) return;
+
+   /* Walk every tab/button, replace image where nControlType matches */
+   for( int t = 0; t < pd->nTabCount; t++ )
+   {
+      GtkWidget * box = pd->tabBoxes[t];
+      PaletteTab * pt = &pd->tabs[t];
+      if( !box ) continue;
+
+      GList * children = gtk_container_get_children( GTK_CONTAINER(box) );
+      int btnIdx = 0;
+      for( GList * l = children; l != NULL; l = l->next )
+      {
+         GtkWidget * btn = GTK_WIDGET( l->data );
+         if( !GTK_IS_BUTTON(btn) ) continue;
+         if( btnIdx >= pt->nBtnCount ) break;
+         if( pt->btns[btnIdx].nControlType == nCtrlType )
+         {
+            GtkWidget * img = gtk_image_new_from_pixbuf( scaled );
+            gtk_button_set_label( GTK_BUTTON(btn), NULL );
+            gtk_button_set_image( GTK_BUTTON(btn), img );
+            gtk_button_set_always_show_image( GTK_BUTTON(btn), TRUE );
+         }
+         btnIdx++;
+      }
+      g_list_free( children );
+   }
+
+   /* Update non-visual marker icon cache */
+   if( nCtrlType > 0 && nCtrlType < MAX_ICON_CACHE )
+   {
+      if( s_paletteIcons[nCtrlType] )
+         g_object_unref( s_paletteIcons[nCtrlType] );
+      s_paletteIcons[nCtrlType] = g_object_ref( scaled );
+   }
+
+   g_object_unref( scaled );
+}
+
 /* ======================================================================
  * New HbBuilder functions (ported from macOS Cocoa backend)
  * ====================================================================== */

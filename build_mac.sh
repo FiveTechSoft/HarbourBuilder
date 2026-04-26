@@ -313,6 +313,26 @@ cp "$PROJDIR/resources/palette.bmp" "$APP/Contents/Resources/" 2>/dev/null
 cp "$PROJDIR/resources/harbour_logo.png" "$APP/Contents/Resources/" 2>/dev/null
 cp "$PROJDIR/resources/tmainmenu.png" "$APP/Contents/Resources/" 2>/dev/null
 cp "$PROJDIR/resources/tpopupmenu.png" "$APP/Contents/Resources/" 2>/dev/null
+cp "$PROJDIR/resources/topenai.png" "$APP/Contents/Resources/" 2>/dev/null
+cp "$PROJDIR/resources/tgemini.png" "$APP/Contents/Resources/" 2>/dev/null
+cp "$PROJDIR/resources/tclaude.png" "$APP/Contents/Resources/" 2>/dev/null
+cp "$PROJDIR/resources/tdeepseek.png" "$APP/Contents/Resources/" 2>/dev/null
+cp "$PROJDIR/resources/tgrok.png" "$APP/Contents/Resources/" 2>/dev/null
+cp "$PROJDIR/resources/tollama.png" "$APP/Contents/Resources/" 2>/dev/null
+for ico in tpython tswift tgo tnode trust tjava tdotnet tlua truby \
+           twebview twebserver twebsocket thttpclient tftpclient \
+           tsmtpclient ttcpserver ttcpclient tudpsocket \
+           tdbftable tmysql tmariadb tpostgresql tsqlite tfirebird \
+           tmssql toracle tmongodb tmap tscene3d tearthview ttextview \
+           tpreprocessor tscriptengine tbarcode tpdfgenerator texcelexport \
+           tauditlog tpermissions tcurrency ttaxengine tdashboard tscheduler \
+           tprinter treport tlabels tprintpreview tpagesetup tprintdialog \
+           treportviewer tbarcodeprinter tband treportlabel treportfield \
+           treportimage tthread tmutex tsemaphore tcriticalsection \
+           tthreadpool tatomicint tcondvar tchannel tembeddings \
+           ttransformer twhisper; do
+   cp "$PROJDIR/resources/${ico}.png" "$APP/Contents/Resources/" 2>/dev/null
+done
 cp -R "$PROJDIR/resources/menu_icons" "$APP/Contents/Resources/" 2>/dev/null
 # Copy Harbour source files needed for building user projects
 cp "$PROJDIR/source/core/classes.prg" "$APP/Contents/Resources/" 2>/dev/null

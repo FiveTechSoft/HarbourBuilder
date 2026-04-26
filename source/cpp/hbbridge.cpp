@@ -3987,6 +3987,15 @@ HB_FUNC( UI_PALETTEAPPENDIMAGES )
       p->AppendImages( hb_parc(2) );
 }
 
+/* UI_PaletteSetCompIcon( nControlType, cPngPath )
+ * Replace the palette icon for a given control type with a PNG.
+ * Operates on the global g_palette (set by UI_PaletteNew). */
+HB_FUNC( UI_PALETTESETCOMPICON )
+{
+   if( g_palette && HB_ISNUM(1) && HB_ISCHAR(2) )
+      g_palette->SetCompIcon( hb_parni(1), hb_parc(2) );
+}
+
 /* UI_PaletteOnSelect( hPalette, bBlock ) */
 HB_FUNC( UI_PALETTEONSELECT )
 {

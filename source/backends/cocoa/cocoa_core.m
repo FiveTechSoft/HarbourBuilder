@@ -8148,7 +8148,9 @@ static void PalShowTab( PALDATA * pd, int nTab )
       int thisBtnW = btnW;
 
       int imgIdx = imgBase + i;
-      BOOL hasImage = ( pd->palImages && imgIdx >= 0 && imgIdx < (int)[pd->palImages count] );
+      BOOL hasImage = ( pd->palImages && imgIdx >= 0 &&
+                        imgIdx < (int)[pd->palImages count] &&
+                        pd->palImages[imgIdx] != (id)[NSNull null] );
 
       if( !hasImage ) {
          NSDictionary * attrs = @{ NSFontAttributeName: btnFont };
@@ -8399,8 +8401,13 @@ HB_FUNC( UI_PALETTESETCOMPICON )
    int flat = 0;
    for( int t = 0; t < pd->nTabCount; t++ ) {
       for( int i = 0; i < pd->tabs[t].nBtnCount; i++ ) {
-         if( pd->tabs[t].btns[i].nControlType == nCtrlType &&
-             flat < (int)[pd->palImages count] ) {
+         if( pd->tabs[t].btns[i].nControlType == nCtrlType ) {
+            /* Extend palImages with NSNull placeholders if flat is past
+             * the BMP-derived range, so per-CT overrides work for tabs
+             * past slot 110 of palette.bmp. */
+            while( flat >= (int)[pd->palImages count] ) {
+               [pd->palImages addObject:(id)[NSNull null]];
+            }
             pd->palImages[flat] = composed;
          }
          flat++;

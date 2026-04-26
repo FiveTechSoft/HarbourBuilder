@@ -595,6 +595,77 @@ static function CreatePalette()
       {  84, "tdbcombobox.png"   }, ;  // DBComboBox
       {  85, "tdbcheckbox.png"   }, ;  // DBCheckBox
       {  86, "tdbimage.png"      }, ;  // DBImage
+      { 112, "tpython.png"       }, ;  // Python
+      { 113, "tswift.png"        }, ;  // Swift
+      { 114, "tgo.png"           }, ;  // Go
+      { 115, "tnode.png"         }, ;  // Node
+      { 116, "trust.png"         }, ;  // Rust
+      { 117, "tjava.png"         }, ;  // Java
+      { 118, "tdotnet.png"       }, ;  // DotNet
+      { 119, "tlua.png"          }, ;  // Lua
+      { 120, "truby.png"         }, ;  // Ruby
+      {  23, "ttextview.png"     }, ;  // TextView
+      {  53, "tdbftable.png"     }, ;  // DBFTable
+      {  54, "tmysql.png"        }, ;  // MySQL
+      {  55, "tmariadb.png"      }, ;  // MariaDB
+      {  56, "tpostgresql.png"   }, ;  // PostgreSQL
+      {  57, "tsqlite.png"       }, ;  // SQLite
+      {  58, "tfirebird.png"     }, ;  // Firebird
+      {  59, "tmssql.png"        }, ;  // SQLServer
+      {  60, "toracle.png"       }, ;  // Oracle
+      {  61, "tmongodb.png"      }, ;  // MongoDB
+      {  63, "tthread.png"       }, ;  // Thread
+      {  64, "tmutex.png"        }, ;  // Mutex
+      {  65, "tsemaphore.png"    }, ;  // Semaphore
+      {  66, "tcriticalsection.png" }, ;  // CriticalSection
+      {  67, "tthreadpool.png"   }, ;  // ThreadPool
+      {  68, "tatomicint.png"    }, ;  // AtomicInt
+      {  69, "tcondvar.png"      }, ;  // CondVar
+      {  70, "tchannel.png"      }, ;  // Channel
+      {  90, "tpreprocessor.png" }, ;  // Preprocessor
+      {  91, "tscriptengine.png" }, ;  // ScriptEngine
+      {  93, "tbarcode.png"      }, ;  // Barcode
+      {  94, "tpdfgenerator.png" }, ;  // PDFGenerator
+      {  95, "texcelexport.png"  }, ;  // ExcelExport
+      {  96, "tauditlog.png"     }, ;  // AuditLog
+      {  97, "tpermissions.png"  }, ;  // Permissions
+      {  98, "tcurrency.png"     }, ;  // Currency
+      {  99, "ttaxengine.png"    }, ;  // TaxEngine
+      { 100, "tdashboard.png"    }, ;  // Dashboard
+      { 101, "tscheduler.png"    }, ;  // Scheduler
+      { 102, "tprinter.png"      }, ;  // Printer
+      { 103, "treport.png"       }, ;  // Report
+      { 104, "tlabels.png"       }, ;  // Labels
+      { 105, "tprintpreview.png" }, ;  // PrintPreview
+      { 106, "tpagesetup.png"    }, ;  // PageSetup
+      { 107, "tprintdialog.png"  }, ;  // PrintDialog
+      { 108, "treportviewer.png" }, ;  // ReportViewer
+      { 109, "tbarcodeprinter.png" }, ;  // BarcodePrinter
+      { 111, "tembeddings.png"   }, ;  // Embeddings
+      {  52, "ttransformer.png"  }, ;  // Transformer
+      { 132, "tband.png"         }, ;  // Band
+      { 133, "treportlabel.png"  }, ;  // ReportLabel
+      { 134, "treportfield.png"  }, ;  // ReportField
+      { 135, "treportimage.png"  }, ;  // ReportImage
+      { 140, "tmap.png"          }, ;  // Map
+      { 141, "tscene3d.png"      }, ;  // Scene3D
+      { 142, "tearthview.png"    }, ;  // EarthView
+      {  62, "twebview.png"      }, ;  // WebView
+      {  71, "twebserver.png"    }, ;  // WebServer
+      {  72, "twebsocket.png"    }, ;  // WebSocket
+      {  73, "thttpclient.png"   }, ;  // HttpClient
+      {  74, "tftpclient.png"    }, ;  // FtpClient
+      {  75, "tsmtpclient.png"   }, ;  // SmtpClient
+      {  76, "ttcpserver.png"    }, ;  // TcpServer
+      {  77, "ttcpclient.png"    }, ;  // TcpClient
+      {  78, "tudpsocket.png"    }, ;  // UdpSocket
+      {  46, "topenai.png"       }, ;  // OpenAI
+      {  47, "tgemini.png"       }, ;  // Gemini
+      {  48, "tclaude.png"       }, ;  // Claude
+      {  49, "tdeepseek.png"     }, ;  // DeepSeek
+      {  50, "tgrok.png"         }, ;  // Grok
+      {  51, "tollama.png"       }, ;  // Ollama
+      { 110, "topenai.png"       }, ;  // Whisper (OpenAI)
       { 200, "tmainmenu.png"     }, ;  // MainMenu
       { 201, "tpopupmenu.png"    }  ;  // PopupMenu
    }, {| a | UI_PaletteSetCompIcon( a[ 1 ], ResPath( a[ 2 ] ) ) } )

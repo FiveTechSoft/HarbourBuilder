@@ -9,6 +9,15 @@ EXTERNAL UI_STORECLRPANE
 EXTERNAL UI_HASHANDLE
 #endif
 
+#ifdef __PLATFORM__DARWIN
+EXTERNAL HBMYSQL_OPEN, HBMYSQL_CLOSE, HBMYSQL_EXEC
+EXTERNAL HBMYSQL_QUERY, HBMYSQL_FIELDS, HBMYSQL_ERROR
+EXTERNAL HBMYSQL_LASTID, HBMYSQL_TABLES
+EXTERNAL HBPGSQL_OPEN, HBPGSQL_CLOSE, HBPGSQL_EXEC
+EXTERNAL HBPGSQL_QUERY, HBPGSQL_FIELDS, HBPGSQL_ERROR
+EXTERNAL HBPGSQL_LASTID, HBPGSQL_TABLES
+#endif
+
 //----------------------------------------------------------------------------//
 // TControl - Base class
 //----------------------------------------------------------------------------//
@@ -2527,41 +2536,179 @@ METHOD LastInsertId() CLASS TSQLite
 return 0
 
 //----------------------------------------------------------------------------//
-// TMySQL - MySQL/MariaDB connection (requires libmysqlclient)
+// TMySQL - MySQL/MariaDB connection via libmysqlclient (cocoa_mysql.c)
+//
+// Properties (inherited from TDatabase + own):
+//    cServer    - host name (default "127.0.0.1")
+//    nPort      - TCP port (default 3306)
+//    cDatabase  - schema/database name
+//    cUser      - login user
+//    cPassword  - login password
+//    cCharSet   - character set (sent via SET NAMES, default "utf8mb4")
+//    lAutoCommit- auto-commit mode (default .T.)
+//    cTable     - table for cursor navigation
+//    cSQL       - custom SELECT for cursor navigation
+//
+// Events (code blocks, fired when assigned):
+//    bOnConnect    - { || ... }       fires after successful Open()
+//    bOnDisconnect - { || ... }       fires after Close()
+//    bOnError      - { |cMsg| ... }   fires when any operation fails
 //----------------------------------------------------------------------------//
 
 CLASS TMySQL INHERIT TDatabase
+
+   DATA lAutoCommit  INIT .T.
+   DATA cTable       INIT ""
+   DATA cSQL         INIT ""
+   DATA aRows        INIT {}
+   DATA aFieldNames  INIT {}
+   DATA nRecord      INIT 0
+
+   DATA bOnConnect    INIT nil
+   DATA bOnDisconnect INIT nil
+   DATA bOnError      INIT nil
+
    METHOD New() CONSTRUCTOR
    METHOD Open()
    METHOD Close()
    METHOD Execute( cSQL )
    METHOD Query( cSQL )
+   METHOD TableExists( cTable )
    METHOD Tables()
+   METHOD LastInsertId()
+
+   // Cursor navigation (DBGrid compatible)
+   METHOD LoadCursor()
+   METHOD FieldCount()
+   METHOD FieldName( n )
+   METHOD GoTop()
+   METHOD Eof()
+   METHOD FieldGet( n )
+   METHOD Skip( n )
+
+   METHOD FireError( cMsg )
+
 ENDCLASS
 
 METHOD New() CLASS TMySQL
    ::cDriver := "MySQL"
+   ::cServer := "127.0.0.1"
    ::nPort   := 3306
+   ::cCharSet := "utf8mb4"
+return Self
+
+METHOD FireError( cMsg ) CLASS TMySQL
+   ::cLastError := cMsg
+   if ::bOnError != nil
+      Eval( ::bOnError, cMsg )
+   endif
 return Self
 
 METHOD Open() CLASS TMySQL
-   ::cLastError := "MySQL support requires libmysqlclient. Install with: apt install libmysqlclient-dev"
-return .F.
+   ::pHandle := HBMYSQL_OPEN( ::cServer, ::cUser, ::cPassword, ;
+                              ::cDatabase, ::nPort )
+   if ::pHandle == 0 .or. ::pHandle == nil
+      ::pHandle    := nil
+      ::lConnected := .F.
+      ::FireError( "Connection failed: " + HBMYSQL_ERROR( 0 ) )
+      return .F.
+   endif
+   ::lConnected := .T.
+   if ! Empty( ::cCharSet )
+      HBMYSQL_EXEC( ::pHandle, "SET NAMES '" + ::cCharSet + "'" )
+   endif
+   if ! ::lAutoCommit
+      HBMYSQL_EXEC( ::pHandle, "SET autocommit=0" )
+   endif
+   ::LoadCursor()
+   if ::bOnConnect != nil
+      Eval( ::bOnConnect )
+   endif
+return .T.
 
 METHOD Close() CLASS TMySQL
+   if ::pHandle != nil
+      HBMYSQL_CLOSE( ::pHandle )
+   endif
+   ::pHandle    := nil
    ::lConnected := .F.
+   if ::bOnDisconnect != nil
+      Eval( ::bOnDisconnect )
+   endif
 return nil
 
 METHOD Execute( cSQL ) CLASS TMySQL
-   HB_SYMBOL_UNUSED( cSQL )
-return .F.
+   local lOk
+   if ! ::lConnected; ::FireError( "Not connected" ); return .F.; endif
+   lOk := HBMYSQL_EXEC( ::pHandle, cSQL )
+   if ! lOk
+      ::FireError( HBMYSQL_ERROR( ::pHandle ) )
+   endif
+return lOk
 
 METHOD Query( cSQL ) CLASS TMySQL
-   HB_SYMBOL_UNUSED( cSQL )
-return {}
+   local aRet
+   if ! ::lConnected; ::FireError( "Not connected" ); return {}; endif
+   aRet := HBMYSQL_QUERY( ::pHandle, cSQL )
+   if Empty( aRet ) .and. ! Empty( HBMYSQL_ERROR( ::pHandle ) )
+      ::FireError( HBMYSQL_ERROR( ::pHandle ) )
+   endif
+return aRet
+
+METHOD LoadCursor() CLASS TMySQL
+   local cQuery
+   if ! ::lConnected; return Self; endif
+   cQuery := iif( ! Empty( ::cSQL ), ::cSQL, ;
+             iif( ! Empty( ::cTable ), "SELECT * FROM " + ::cTable, "" ) )
+   ::aRows       := {}
+   ::aFieldNames := {}
+   ::nRecord     := 0
+   if Empty( cQuery ); return Self; endif
+   ::aFieldNames := HBMYSQL_FIELDS( ::pHandle, cQuery )
+   ::aRows       := HBMYSQL_QUERY ( ::pHandle, cQuery )
+   ::nRecord     := iif( Len( ::aRows ) > 0, 1, 0 )
+return Self
+
+METHOD FieldCount() CLASS TMySQL
+return Len( ::aFieldNames )
+
+METHOD FieldName( n ) CLASS TMySQL
+   if n >= 1 .and. n <= Len( ::aFieldNames )
+      return ::aFieldNames[ n ]
+   endif
+return ""
+
+METHOD GoTop() CLASS TMySQL
+   ::nRecord := iif( Len( ::aRows ) > 0, 1, 0 )
+return Self
+
+METHOD Eof() CLASS TMySQL
+return ::nRecord == 0 .or. ::nRecord > Len( ::aRows )
+
+METHOD FieldGet( n ) CLASS TMySQL
+   if ! ::Eof() .and. n >= 1 .and. n <= Len( ::aRows[ ::nRecord ] )
+      return ::aRows[ ::nRecord ][ n ]
+   endif
+return nil
+
+METHOD Skip( n ) CLASS TMySQL
+   ::nRecord += n
+   if ::nRecord < 1; ::nRecord := 1; endif
+return Self
+
+METHOD TableExists( cTable ) CLASS TMySQL
+   local aResult
+   if ! ::lConnected; return .F.; endif
+   aResult := ::Query( "SHOW TABLES LIKE '" + cTable + "'" )
+return Len( aResult ) > 0
 
 METHOD Tables() CLASS TMySQL
-return {}
+   if ! ::lConnected; return {}; endif
+return HBMYSQL_TABLES( ::pHandle )
+
+METHOD LastInsertId() CLASS TMySQL
+   if ! ::lConnected; return 0; endif
+return HBMYSQL_LASTID( ::pHandle )
 
 //----------------------------------------------------------------------------//
 // TMariaDB - alias for TMySQL (wire-compatible)
@@ -2582,37 +2729,155 @@ return Self
 //----------------------------------------------------------------------------//
 
 CLASS TPostgreSQL INHERIT TDatabase
+
+   DATA cTable        INIT ""
+   DATA cSQL          INIT ""
+   DATA aRows         INIT {}
+   DATA aFieldNames   INIT {}
+   DATA nRecord       INIT 0
+   DATA cIdSequence   INIT ""           // sequence used by LastInsertId
+
+   DATA bOnConnect    INIT nil
+   DATA bOnDisconnect INIT nil
+   DATA bOnError      INIT nil
+
    METHOD New() CONSTRUCTOR
    METHOD Open()
    METHOD Close()
    METHOD Execute( cSQL )
    METHOD Query( cSQL )
+   METHOD TableExists( cTable )
    METHOD Tables()
+   METHOD LastInsertId( cSeq )
+
+   METHOD LoadCursor()
+   METHOD FieldCount()
+   METHOD FieldName( n )
+   METHOD GoTop()
+   METHOD Eof()
+   METHOD FieldGet( n )
+   METHOD Skip( n )
+
+   METHOD FireError( cMsg )
+
 ENDCLASS
 
 METHOD New() CLASS TPostgreSQL
    ::cDriver := "PostgreSQL"
+   ::cServer := "127.0.0.1"
    ::nPort   := 5432
+   ::cUser   := "postgres"
+   ::cDatabase := "postgres"
+return Self
+
+METHOD FireError( cMsg ) CLASS TPostgreSQL
+   ::cLastError := cMsg
+   if ::bOnError != nil
+      Eval( ::bOnError, cMsg )
+   endif
 return Self
 
 METHOD Open() CLASS TPostgreSQL
-   ::cLastError := "PostgreSQL support requires libpq-dev. Install with: apt install libpq-dev"
-return .F.
+   ::pHandle := HBPGSQL_OPEN( ::cServer, ::cUser, ::cPassword, ;
+                              ::cDatabase, ::nPort )
+   if ::pHandle == 0 .or. ::pHandle == nil
+      ::pHandle    := nil
+      ::lConnected := .F.
+      ::FireError( "Connection failed: " + HBPGSQL_ERROR( 0 ) )
+      return .F.
+   endif
+   ::lConnected := .T.
+   ::LoadCursor()
+   if ::bOnConnect != nil
+      Eval( ::bOnConnect )
+   endif
+return .T.
 
 METHOD Close() CLASS TPostgreSQL
+   if ::pHandle != nil
+      HBPGSQL_CLOSE( ::pHandle )
+   endif
+   ::pHandle    := nil
    ::lConnected := .F.
+   if ::bOnDisconnect != nil
+      Eval( ::bOnDisconnect )
+   endif
 return nil
 
 METHOD Execute( cSQL ) CLASS TPostgreSQL
-   HB_SYMBOL_UNUSED( cSQL )
-return .F.
+   local lOk
+   if ! ::lConnected; ::FireError( "Not connected" ); return .F.; endif
+   lOk := HBPGSQL_EXEC( ::pHandle, cSQL )
+   if ! lOk
+      ::FireError( HBPGSQL_ERROR( ::pHandle ) )
+   endif
+return lOk
 
 METHOD Query( cSQL ) CLASS TPostgreSQL
-   HB_SYMBOL_UNUSED( cSQL )
-return {}
+   local aRet
+   if ! ::lConnected; ::FireError( "Not connected" ); return {}; endif
+   aRet := HBPGSQL_QUERY( ::pHandle, cSQL )
+   if Empty( aRet ) .and. ! Empty( HBPGSQL_ERROR( ::pHandle ) )
+      ::FireError( HBPGSQL_ERROR( ::pHandle ) )
+   endif
+return aRet
+
+METHOD LoadCursor() CLASS TPostgreSQL
+   local cQuery
+   if ! ::lConnected; return Self; endif
+   cQuery := iif( ! Empty( ::cSQL ), ::cSQL, ;
+             iif( ! Empty( ::cTable ), "SELECT * FROM " + ::cTable, "" ) )
+   ::aRows       := {}
+   ::aFieldNames := {}
+   ::nRecord     := 0
+   if Empty( cQuery ); return Self; endif
+   ::aFieldNames := HBPGSQL_FIELDS( ::pHandle, cQuery )
+   ::aRows       := HBPGSQL_QUERY ( ::pHandle, cQuery )
+   ::nRecord     := iif( Len( ::aRows ) > 0, 1, 0 )
+return Self
+
+METHOD FieldCount() CLASS TPostgreSQL
+return Len( ::aFieldNames )
+
+METHOD FieldName( n ) CLASS TPostgreSQL
+   if n >= 1 .and. n <= Len( ::aFieldNames )
+      return ::aFieldNames[ n ]
+   endif
+return ""
+
+METHOD GoTop() CLASS TPostgreSQL
+   ::nRecord := iif( Len( ::aRows ) > 0, 1, 0 )
+return Self
+
+METHOD Eof() CLASS TPostgreSQL
+return ::nRecord == 0 .or. ::nRecord > Len( ::aRows )
+
+METHOD FieldGet( n ) CLASS TPostgreSQL
+   if ! ::Eof() .and. n >= 1 .and. n <= Len( ::aRows[ ::nRecord ] )
+      return ::aRows[ ::nRecord ][ n ]
+   endif
+return nil
+
+METHOD Skip( n ) CLASS TPostgreSQL
+   ::nRecord += n
+   if ::nRecord < 1; ::nRecord := 1; endif
+return Self
+
+METHOD TableExists( cTable ) CLASS TPostgreSQL
+   local aResult
+   if ! ::lConnected; return .F.; endif
+   aResult := ::Query( "SELECT 1 FROM information_schema.tables WHERE table_name='" + cTable + "'" )
+return Len( aResult ) > 0
 
 METHOD Tables() CLASS TPostgreSQL
-return {}
+   if ! ::lConnected; return {}; endif
+return HBPGSQL_TABLES( ::pHandle )
+
+METHOD LastInsertId( cSeq ) CLASS TPostgreSQL
+   if ! ::lConnected; return 0; endif
+   if cSeq == nil; cSeq := ::cIdSequence; endif
+   if Empty( cSeq ); return 0; endif
+return HBPGSQL_LASTID( ::pHandle, cSeq )
 
 //----------------------------------------------------------------------------//
 // TFirebird - Firebird connection (requires libfbclient)

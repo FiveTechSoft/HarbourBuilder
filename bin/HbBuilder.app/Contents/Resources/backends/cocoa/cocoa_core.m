@@ -8369,6 +8369,48 @@ HB_FUNC( UI_PALETTELOADIMAGES )
       PalShowTab( pd, pd->nCurrentTab );
 }
 
+/* UI_PaletteSetCompIcon( nControlType, cPngPath )
+ * Override the palette icon for a given control type with a PNG file.
+ * Call after UI_PaletteLoadImages. */
+HB_FUNC( UI_PALETTESETCOMPICON )
+{
+   PALDATA * pd = s_palData;
+   int nCtrlType = hb_parni(1);
+   const char * szPath = hb_parc(2);
+   if( !pd || !pd->palImages || !szPath ) return;
+
+   NSString * path = [NSString stringWithUTF8String:szPath];
+   NSImage * png = [[NSImage alloc] initWithContentsOfFile:path];
+   if( !png ) return;
+
+   /* Draw PNG centered on transparent 32x32 canvas — no tile background. */
+   NSImage * composed = [[NSImage alloc] initWithSize:NSMakeSize(32, 32)];
+   [composed lockFocus];
+   CGFloat pngW = [png size].width, pngH = [png size].height;
+   if( pngW > 24 ) pngW = 24;
+   if( pngH > 24 ) pngH = 24;
+   NSRect dst = NSMakeRect((32 - pngW) / 2.0, (32 - pngH) / 2.0, pngW, pngH);
+   NSRect srcRect = NSMakeRect(0, 0, [png size].width, [png size].height);
+   [png drawInRect:dst fromRect:srcRect
+      operation:NSCompositingOperationSourceOver fraction:1.0
+      respectFlipped:YES hints:nil];
+   [composed unlockFocus];
+
+   int flat = 0;
+   for( int t = 0; t < pd->nTabCount; t++ ) {
+      for( int i = 0; i < pd->tabs[t].nBtnCount; i++ ) {
+         if( pd->tabs[t].btns[i].nControlType == nCtrlType &&
+             flat < (int)[pd->palImages count] ) {
+            pd->palImages[flat] = composed;
+         }
+         flat++;
+      }
+   }
+
+   if( pd->nTabCount > 0 )
+      PalShowTab( pd, pd->nCurrentTab );
+}
+
 HB_FUNC( UI_TOOLBARGETWIDTH )
 {
    HBToolBar * p = (__bridge HBToolBar *)(void *)(HB_PTRUINT)hb_parnint(1);

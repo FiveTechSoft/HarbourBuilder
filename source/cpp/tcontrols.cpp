@@ -5,6 +5,8 @@
 
 #include "hbide.h"
 #include <string.h>
+#include <objidl.h>
+#include <gdiplus.h>
 
 extern "C" int g_bDarkIDE;
 
@@ -1477,7 +1479,19 @@ static LRESULT CALLBACK PaletteTabSubProc( HWND hWnd, UINT msg, WPARAM wParam, L
                    btnIdx >= 0 && btnIdx < pal->FTabs[nTabCur].nBtnCount )
                   nCtrlType = pal->FTabs[nTabCur].btns[btnIdx].nControlType;
             }
-            if( nCtrlType == 200 /* CT_MAINMENU */ )
+            /* Per-control-type PNG override takes priority */
+            if( pal && nCtrlType > 0 && nCtrlType < 256 &&
+                pal->FCompIconOverride[nCtrlType] )
+            {
+               HDC hMem = CreateCompatibleDC( di->hDC );
+               HBITMAP hOld = (HBITMAP) SelectObject( hMem, pal->FCompIconOverride[nCtrlType] );
+               BLENDFUNCTION bf = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
+               AlphaBlend( di->hDC, cx - 4, cy - 4, 32, 32,
+                           hMem, 0, 0, 32, 32, bf );
+               SelectObject( hMem, hOld );
+               DeleteDC( hMem );
+            }
+            else if( nCtrlType == 200 /* CT_MAINMENU */ )
             {
                /* Window outline */
                COLORREF clrBorder = g_bDarkIDE ? RGB(180,180,180) : RGB(60,60,60);
@@ -1558,11 +1572,14 @@ TComponentPalette::TComponentPalette()
    FTabStop = FALSE;
    memset( FTabs, 0, sizeof(FTabs) );
    memset( FBtns, 0, sizeof(FBtns) );
+   memset( FCompIconOverride, 0, sizeof(FCompIconOverride) );
 }
 
 TComponentPalette::~TComponentPalette()
 {
    if( FOnSelect ) hb_itemRelease( FOnSelect );
+   for( int i = 0; i < 256; i++ )
+      if( FCompIconOverride[i] ) DeleteObject( FCompIconOverride[i] );
 }
 
 void TComponentPalette::CreateHandle( HWND hParent )
@@ -1770,6 +1787,64 @@ void TComponentPalette::AppendImages( const char * szBmpPath )
    DeleteObject( hBmp );
 
    /* Refresh current tab */
+   if( FTabCtrl )
+      ShowTab( FCurrentTab );
+}
+
+/* Load a PNG file via GDI+ as a 32x32 32-bit BGRA HBITMAP. */
+static HBITMAP LoadPng32( const char * szPath )
+{
+   if( !szPath ) return NULL;
+
+   /* Convert UTF-8 path to wide string */
+   int wlen = MultiByteToWideChar( CP_UTF8, 0, szPath, -1, NULL, 0 );
+   if( wlen <= 0 ) return NULL;
+   WCHAR * wpath = (WCHAR *) malloc( wlen * sizeof(WCHAR) );
+   MultiByteToWideChar( CP_UTF8, 0, szPath, -1, wpath, wlen );
+
+   ULONG_PTR gpToken = 0;
+   Gdiplus::GdiplusStartupInput gpInput;
+   Gdiplus::GdiplusStartup( &gpToken, &gpInput, NULL );
+
+   HBITMAP hbm = NULL;
+   Gdiplus::Bitmap * src = Gdiplus::Bitmap::FromFile( wpath, FALSE );
+   if( src && src->GetLastStatus() == Gdiplus::Ok )
+   {
+      Gdiplus::Bitmap dst( 32, 32, PixelFormat32bppPARGB );
+      Gdiplus::Graphics g( &dst );
+      g.SetInterpolationMode( Gdiplus::InterpolationModeHighQualityBicubic );
+      g.SetSmoothingMode( Gdiplus::SmoothingModeHighQuality );
+      g.Clear( Gdiplus::Color( 0, 0, 0, 0 ) );
+
+      UINT sw = src->GetWidth(), sh = src->GetHeight();
+      UINT dw = sw, dh = sh;
+      if( dw > 24 ) dw = 24;
+      if( dh > 24 ) dh = 24;
+      int x = ( 32 - (int)dw ) / 2;
+      int y = ( 32 - (int)dh ) / 2;
+      g.DrawImage( src, Gdiplus::Rect( x, y, dw, dh ),
+                   0, 0, sw, sh, Gdiplus::UnitPixel );
+      dst.GetHBITMAP( Gdiplus::Color( 0, 0, 0, 0 ), &hbm );
+   }
+   if( src ) delete src;
+
+   Gdiplus::GdiplusShutdown( gpToken );
+   free( wpath );
+   return hbm;
+}
+
+void TComponentPalette::SetCompIcon( int nCtrlType, const char * szPngPath )
+{
+   if( nCtrlType <= 0 || nCtrlType >= 256 || !szPngPath ) return;
+
+   HBITMAP hbm = LoadPng32( szPngPath );
+   if( !hbm ) return;
+
+   if( FCompIconOverride[nCtrlType] )
+      DeleteObject( FCompIconOverride[nCtrlType] );
+   FCompIconOverride[nCtrlType] = hbm;
+
+   /* Repaint current tab to reflect new icon */
    if( FTabCtrl )
       ShowTab( FCurrentTab );
 }

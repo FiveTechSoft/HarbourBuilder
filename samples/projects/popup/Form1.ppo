@@ -1,0 +1,52 @@
+
+
+
+_HB_CLASS TForm1 ; function TForm1 ( ... ) ; STATIC s_oClass ; LOCAL nScope, oClass, oInstance ; IF s_oClass == NIL .AND. __clsLockDef( @s_oClass ) ; BEGIN SEQUENCE ; nScope := 1 ; HB_SYMBOL_UNUSED( nScope ) ; oClass := iif( .F.,, HBClass():new( "TForm1", iif( .T., { @TForm() }, { @HBObject() } ), @TForm1() ) ) ;;
+
+
+   _HB_MEMBER { oPopup1 } ; oClass:AddMultiData(,, nScope + iif( .F., 16, 0 ) + iif( .F., 256, 0 ) + iif( .F., 2048, 0 ), {"oPopup1"}, .F. )
+   _HB_MEMBER { oButton1 } ; oClass:AddMultiData(,, nScope + iif( .F., 16, 0 ) + iif( .F., 256, 0 ) + iif( .F., 2048, 0 ), {"oButton1"}, .F. )
+   _HB_MEMBER { oStatus1 } ; oClass:AddMultiData(,, nScope + iif( .F., 16, 0 ) + iif( .F., 256, 0 ) + iif( .F., 2048, 0 ), {"oStatus1"}, .F. )
+
+
+
+   _HB_MEMBER CreateForm(); oClass:AddMethod( "CreateForm", @TForm1_CreateForm(), nScope + iif( .F., 8, 0 ) + iif( .F., 256, 0 ) + iif( .F., 2048, 0 ) )
+
+oClass:Create() ; ; ALWAYS ; __clsUnlockDef( @s_oClass, oClass ) ; END SEQUENCE ; oInstance := oClass:Instance() ; IF __objHasMsg( oInstance, "InitClass" ) ; oInstance:InitClass( ... ) ; END ; RETURN oInstance ; END ; RETURN s_oClass:Instance() AS CLASS TForm1 ;
+
+
+static FUNCTION TForm1_CreateForm() ; local Self AS CLASS TForm1 := QSelf() AS CLASS TForm1
+
+   ::Title  := "TPopupMenu Sample"
+   ::Left   := 1042
+   ::Top    := 323
+   ::Width  := 480
+   ::Height := 280
+
+   ::oPopup1 := HB_CreateComponent( 136, Self )
+   _HBMenuStart( ::oPopup1 )
+      _HBMenuAdd( "Cu&t", 'PopAction( Self, "Cut" )', {|oMenuItem| PopAction( Self, "Cut" ) }, nil )
+      _HBMenuAdd( "&Copy", 'PopAction( Self, "Copy" )', {|oMenuItem| PopAction( Self, "Copy" ) }, nil )
+      _HBMenuAdd( "&Paste", 'PopAction( Self, "Paste" )', {|oMenuItem| PopAction( Self, "Paste" ) }, nil )
+      _HBMenuSep()
+      _HBMenuPopup( "&Format" )
+         _HBMenuAdd( "&Bold", 'PopAction( Self, "Format > Bold" )', {|oMenuItem| PopAction( Self, "Format > Bold" ) }, nil )
+         _HBMenuAdd( "&Italic", 'PopAction( Self, "Format > Italic" )', {|oMenuItem| PopAction( Self, "Format > Italic" ) }, nil )
+         _HBMenuAdd( "&Underline", 'PopAction( Self, "Format > Underline" )', {|oMenuItem| PopAction( Self, "Format > Underline" ) }, nil )
+      _HBMenuEndPopup()
+      _HBMenuSep()
+      _HBMenuAdd( "Select &All", 'PopAction( Self, "Select All" )', {|oMenuItem| PopAction( Self, "Select All" ) }, nil )
+   _HBMenuEnd()
+   ::oButton1 := TButton():New( Self, "Show Popup", 60, 96, 120, 32 ) ; ::oButton1:Default := .F. ; ::oButton1:Cancel := .F.
+   ::oStatus1 := TLabel():New( Self, "Click the button to open the context menu.", 16, 200, 329, )
+
+return nil
+
+
+
+
+static function PopAction( oForm, cWhat )
+   if oForm:oStatus1 <> nil
+      oForm:oStatus1:Text := "Picked: " + cWhat
+   endif
+return nil
