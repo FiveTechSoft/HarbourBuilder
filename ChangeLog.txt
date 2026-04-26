@@ -1,6 +1,35 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-26g
+
+  - fix(macos-menu): Keyboard accelerators on NSMenu items rendered as
+    blank for any shortcut that wasn't a single character separated by
+    "+", e.g. "Ctrl-T" (hyphen), "F1", "Esc", "Up". Replaced the inline
+    parser in HBMainMenu_Attach + HBPopupMenu_Build with a single
+    HB_ParseShortcut helper that:
+      * tokenizes on "+", "-", or whitespace as separators
+      * recognizes Ctrl/Control/Cmd/Command, Alt/Opt/Option, Shift,
+        Meta/Super as modifier names
+      * maps F1..F35 via NSF1FunctionKey
+      * maps Esc/Tab/Enter/Return/Space/Backspace, Delete/Del, Home/End,
+        PageUp/PageDown, and Up/Down/Left/Right arrows to their
+        corresponding Unicode/NSFunctionKey codepoints
+      * defaults the modifier mask to Cmd if none parsed
+    Both TMainMenu and TPopupMenu items now display their shortcuts
+    consistently in the right column of the menu.
+
+  - fix(macos-inspector): The Menu Items Editor's "+Item" / "+SubItem"
+    buttons always inserted at level 1 / level 2 — correct for TMainMenu
+    (where level 0 is the popup header) but wrong for TPopupMenu (where
+    level 0 is the top-level entry). Items added to a TPopupMenu via the
+    editor would end up orphaned at level 1 and disappear at runtime
+    until the form was saved (codegen + RestoreFromCode collapsed levels
+    on round-trip). The editor now queries UI_GetType on entry, and when
+    the control is CT_POPUPMENU=201 it shifts "+Item" to level 0,
+    "+SubItem" to level 1, and the separator default level accordingly.
+    "+Popup" stays at level 0 in both modes.
+
 2026-04-26f
 
   - feat(macos): TPopupMenu — port of the Linux non-visual context-menu

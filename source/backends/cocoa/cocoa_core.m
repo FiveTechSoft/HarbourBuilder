@@ -7675,6 +7675,84 @@ HB_FUNC( UI_TOOLBARLOADIMAGES )
 
 static NSMutableArray * s_menuTargets = nil;
 
+/* Parse "Ctrl+Shift+X", "Cmd-T", "F1", "x" etc. into NSMenu keyEquivalent +
+ * modifier mask. Accepts '+', '-', or whitespace as separators. The last
+ * token is the key; earlier tokens name modifiers. Returns empty string if
+ * the key portion is empty or unrecognized. */
+static NSString * HB_ParseShortcut( const char * src, NSEventModifierFlags * outMod )
+{
+   NSEventModifierFlags mod = 0;
+   *outMod = NSEventModifierFlagCommand;
+   if( !src || !src[0] ) return @"";
+
+   /* Tokenize on '+', '-', or whitespace into modifiers + key (last token). */
+   char buf[64]; strncpy(buf,src,63); buf[63]=0;
+   char * tokens[8] = {0};
+   int    nTok = 0;
+   char * p = buf;
+   while( *p && nTok < 8 ) {
+      while( *p == '+' || *p == '-' || *p == ' ' || *p == '\t' ) p++;
+      if( !*p ) break;
+      tokens[nTok++] = p;
+      while( *p && *p != '+' && *p != '-' && *p != ' ' && *p != '\t' ) p++;
+      if( *p ) { *p++ = 0; }
+   }
+   if( nTok == 0 ) return @"";
+
+   const char * keyPart = tokens[nTok-1];
+   for( int i = 0; i < nTok - 1; i++ ) {
+      const char * t = tokens[i];
+      if( !strcasecmp(t,"Ctrl") || !strcasecmp(t,"Control") || !strcasecmp(t,"Cmd") || !strcasecmp(t,"Command") )
+         mod |= NSEventModifierFlagCommand;
+      else if( !strcasecmp(t,"Alt") || !strcasecmp(t,"Opt") || !strcasecmp(t,"Option") )
+         mod |= NSEventModifierFlagOption;
+      else if( !strcasecmp(t,"Shift") )
+         mod |= NSEventModifierFlagShift;
+      else if( !strcasecmp(t,"Meta") || !strcasecmp(t,"Super") )
+         mod |= NSEventModifierFlagControl;
+   }
+   if( mod == 0 ) mod = NSEventModifierFlagCommand;
+   *outMod = mod;
+
+   /* Single character: lowercased. */
+   if( keyPart[0] && !keyPart[1] )
+      return [NSString stringWithFormat:@"%c",(char)tolower((unsigned char)keyPart[0])];
+
+   /* Function keys F1..F35. */
+   if( (keyPart[0] == 'F' || keyPart[0] == 'f') && isdigit((unsigned char)keyPart[1]) ) {
+      int n = atoi( keyPart + 1 );
+      if( n >= 1 && n <= 35 )
+         return [NSString stringWithFormat:@"%C", (unichar)(NSF1FunctionKey + n - 1)];
+   }
+
+   /* Named special keys. */
+   struct { const char * name; unichar ch; } specials[] = {
+      {"Esc",       0x1B},
+      {"Escape",    0x1B},
+      {"Tab",       0x09},
+      {"Enter",     0x0D},
+      {"Return",    0x0D},
+      {"Space",     ' ' },
+      {"Backspace", 0x08},
+      {"Delete",    NSDeleteFunctionKey},
+      {"Del",       NSDeleteFunctionKey},
+      {"Home",      NSHomeFunctionKey},
+      {"End",       NSEndFunctionKey},
+      {"PageUp",    NSPageUpFunctionKey},
+      {"PageDown",  NSPageDownFunctionKey},
+      {"Up",        NSUpArrowFunctionKey},
+      {"Down",      NSDownArrowFunctionKey},
+      {"Left",      NSLeftArrowFunctionKey},
+      {"Right",     NSRightArrowFunctionKey},
+      {NULL, 0}
+   };
+   for( int i = 0; specials[i].name; i++ )
+      if( !strcasecmp(keyPart, specials[i].name) )
+         return [NSString stringWithFormat:@"%C", specials[i].ch];
+
+   return @"";
+}
+
 /* Strip Win/GTK-style `&` mnemonics for Cocoa NSMenu titles.
  * Single `&` is removed; `&&` collapses to literal `&`. */
 static NSString * HB_StripMnemonic( const char * src )
@@ -7799,25 +7877,8 @@ static void HBMainMenu_Attach( HBControl * p )
          else
          {
             /* Leaf item */
-            NSString * keyEq = @"";
             NSEventModifierFlags modMask = NSEventModifierFlagCommand;
-            if( n->szShortcut[0] )
-            {
-               char buf[64]; strncpy(buf,n->szShortcut,63); buf[63]=0;
-               char * plus = strrchr(buf,'+');
-               const char * keyPart = plus ? plus+1 : buf;
-               if(plus) *plus=0;
-               modMask = 0;
-               if( strcasestr(buf,"Ctrl") || strcasestr(buf,"Cmd") )
-                  modMask |= NSEventModifierFlagCommand;
-               if( strcasestr(buf,"Alt") || strcasestr(buf,"Opt") )
-                  modMask |= NSEventModifierFlagOption;
-               if( strcasestr(buf,"Shift") )
-                  modMask |= NSEventModifierFlagShift;
-               if( modMask == 0 ) modMask = NSEventModifierFlagCommand;
-               if( strlen(keyPart)==1 )
-                  keyEq = [NSString stringWithFormat:@"%c",(char)tolower((unsigned char)keyPart[0])];
-            }
+            NSString * keyEq = HB_ParseShortcut(n->szShortcut, &modMask);
 
             NSMenuItem * mi = [[NSMenuItem alloc] initWithTitle:title
                action:nil keyEquivalent:keyEq];
@@ -7921,25 +7982,8 @@ static NSMenu * HBPopupMenu_Build( HBControl * p )
       }
       else
       {
-         NSString * keyEq = @"";
          NSEventModifierFlags modMask = NSEventModifierFlagCommand;
-         if( n->szShortcut[0] )
-         {
-            char buf[64]; strncpy(buf,n->szShortcut,63); buf[63]=0;
-            char * plus = strrchr(buf,'+');
-            const char * keyPart = plus ? plus+1 : buf;
-            if(plus) *plus=0;
-            modMask = 0;
-            if( strcasestr(buf,"Ctrl") || strcasestr(buf,"Cmd") )
-               modMask |= NSEventModifierFlagCommand;
-            if( strcasestr(buf,"Alt") || strcasestr(buf,"Opt") )
-               modMask |= NSEventModifierFlagOption;
-            if( strcasestr(buf,"Shift") )
-               modMask |= NSEventModifierFlagShift;
-            if( modMask == 0 ) modMask = NSEventModifierFlagCommand;
-            if( strlen(keyPart)==1 )
-               keyEq = [NSString stringWithFormat:@"%c",(char)tolower((unsigned char)keyPart[0])];
-         }
+         NSString * keyEq = HB_ParseShortcut(n->szShortcut, &modMask);
 
          NSMenuItem * mi = [[NSMenuItem alloc] initWithTitle:title
             action:nil keyEquivalent:keyEq];

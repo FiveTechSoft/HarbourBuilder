@@ -177,6 +177,8 @@ static void mei_add_node( MEIDATA * d, NSTableView * tv, int nLevel, int bSep )
    NSWindow *   win;
    BOOL         bUpdating;
    BOOL         bOK;
+   BOOL         bPopupMode;  /* CT_POPUPMENU: top-level items at level 0 (no
+                                outer popup wrapping like TMainMenu has). */
 }
 - (void)syncFieldsToNode;
 @end
@@ -240,10 +242,12 @@ static void mei_add_node( MEIDATA * d, NSTableView * tv, int nLevel, int bSep )
    mei->nodes[mei->nSel].bEnabled=([b state]==NSControlStateValueOn)?1:0; }
 
 - (void)addPopup:(id)s  { (void)s; mei_add_node(mei,tableView,0,0); [self syncFieldsToNode]; }
-- (void)addItem:(id)s   { (void)s; mei_add_node(mei,tableView,1,0); [self syncFieldsToNode]; }
-- (void)addSubItem:(id)s{ (void)s; mei_add_node(mei,tableView,2,0); [self syncFieldsToNode]; }
+- (void)addItem:(id)s   { (void)s;
+   mei_add_node(mei,tableView,bPopupMode?0:1,0); [self syncFieldsToNode]; }
+- (void)addSubItem:(id)s{ (void)s;
+   mei_add_node(mei,tableView,bPopupMode?1:2,0); [self syncFieldsToNode]; }
 - (void)addSep:(id)s    { (void)s;
-   int lv=(mei->nSel>=0)?mei->nodes[mei->nSel].nLevel:1;
+   int lv=(mei->nSel>=0)?mei->nodes[mei->nSel].nLevel:(bPopupMode?0:1);
    mei_add_node(mei,tableView,lv,1); [self syncFieldsToNode]; }
 
 - (void)moveUp:(id)s    { (void)s;
@@ -304,8 +308,22 @@ static void OpenMenuEditor( INSDATA * ins, int nReal )
    [win setTitle:@"Menu Items Editor"];
    NSView * cv=[win contentView];
 
+   /* Detect CT_POPUPMENU (201) so toolbar buttons add items at the levels
+    * the popup builder expects (top-level items at level 0). */
+   int nCtrlType = 0;
+   {
+      PHB_DYNS pDynT = hb_dynsymFindName("UI_GETTYPE");
+      if( pDynT ) {
+         hb_vmPushDynSym(pDynT); hb_vmPushNil();
+         hb_vmPushNumInt(ins->hCtrl);
+         hb_vmDo(1);
+         nCtrlType = hb_parni(-1);
+      }
+   }
+
    HBMenuEditorCtrl * ctrl=[[HBMenuEditorCtrl alloc] init];
    ctrl->mei=d; ctrl->win=win; ctrl->bOK=NO; ctrl->bUpdating=NO;
+   ctrl->bPopupMode = (nCtrlType == 201);  /* CT_POPUPMENU */
 
    /* Toolbar */
    NSArray * btnLabels=@[@"+Popup",@"+Item",@"+SubItem",@"+Sep",@"↑",@"↓",@"✕"];
