@@ -33,13 +33,13 @@ METHOD CreateForm() CLASS TForm1
          MENUITEM "E&xit" ACTION ::Close() ACCEL "Cmd+Q"
       END POPUP
       DEFINE POPUP "&Edit"
-         MENUITEM "&Undo" ACTION EditAction( Self, "Undo" )
-         MENUITEM "Cu&t" ACTION EditAction( Self, "Cut" )
-         MENUITEM "&Copy" ACTION EditAction( Self, "Copy" )
-         MENUITEM "&Paste" ACTION EditAction( Self, "Paste" )
+         MENUITEM "&Undo" ACTION EditAction( Self, "Undo" ) ACCEL "Cmd+Z"
+         MENUITEM "Cu&t" ACTION EditAction( Self, "Cut" ) ACCEL "Cmd+X"
+         MENUITEM "&Copy" ACTION EditAction( Self, "Copy" ) ACCEL "Cmd+C"
+         MENUITEM "&Paste" ACTION EditAction( Self, "Paste" ) ACCEL "Cmd+V"
       END POPUP
       DEFINE POPUP "&Help"
-         MENUITEM "&About" ACTION ShowAbout( Self, oMenuItem )
+         MENUITEM "&About" ACTION ShowAbout( Self, oMenuItem ) ACCEL "F1"
       END POPUP
    END MENUBAR
    @ 64, 32 GET ::oMemo1 VAR "Pick any menu item to see it dispatch..." OF Self SIZE 584, 40

@@ -1,6 +1,32 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-26c
+
+  - fix(gtk3): TMainMenu captions rendered "&File" literally instead of
+    showing the F as an Alt-mnemonic. GTK's gtk_menu_item_new_with_mnemonic
+    expects "_File" syntax; we were passing the Windows-style "&File"
+    captions straight through. Added a hb_amp_to_gtk_mnemonic helper that
+    converts "&" -> "_", collapses "&&" to literal "&", and escapes
+    existing "_" -> "__" so it renders literally. Applied at the three
+    menu builder call sites (root popup, sub-popup, leaf item) and the
+    legacy UI_MenuPopupAdd entry point.
+
+  - fix(palette): MainMenu palette button showed the BitBtn "✓Ok" icon
+    because palette.bmp was authored when Standard tab had 11 items
+    (Label..ScrollBar). Adding TMainMenu as the 12th Standard item
+    pushed every Additional-tab icon off by one (BitBtn got the
+    SpeedButton lightning, SpeedButton got the Image picture, etc).
+    Inserted a synthesized 32×32 menu-bar icon at position 11 in
+    resources/palette.bmp (and the macOS bundle copy), shifting icons
+    11..108 to 12..109. Realigns MainMenu plus every Additional-tab
+    component on Win/Mac/Linux simultaneously.
+
+  - sample(mainmenu): Added the standard keyboard accelerators that the
+    Edit and Help popups were missing: Cmd+Z/X/C/V on Undo/Cut/Copy/Paste
+    and F1 on About. Without an ACCEL clause MENUITEM does not register
+    a shortcut, so the right-aligned hint was blank.
+
 2026-04-26b
 
   - fix(ide-codegen/linux): TMainMenu generation produced two bugs in

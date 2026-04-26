@@ -4522,6 +4522,34 @@ static void on_mainmenu_item_activated( GtkMenuItem * item, gpointer data )
    if(pDyn){ hb_vmPushDynSym(pDyn); hb_vmPushNil(); hb_vmDo(0); }
 }
 
+/* Convert Windows-style "&File" mnemonics to GTK "_File" form.
+ * "&&" collapses to a literal "&"; existing "_" gets doubled so it renders
+ * as a literal underscore rather than a stray mnemonic marker.            */
+static void hb_amp_to_gtk_mnemonic( const char * src, char * dst, size_t dstSz )
+{
+   size_t j = 0;
+   if( !dst || dstSz == 0 ) return;
+   if( !src ) { dst[0] = 0; return; }
+   for( size_t i = 0; src[i] && j + 1 < dstSz; i++ )
+   {
+      if( src[i] == '&' )
+      {
+         if( src[i+1] == '&' ) { dst[j++] = '&'; i++; }
+         else                  { dst[j++] = '_'; }
+      }
+      else if( src[i] == '_' )
+      {
+         if( j + 2 >= dstSz ) break;
+         dst[j++] = '_'; dst[j++] = '_';
+      }
+      else
+      {
+         dst[j++] = src[i];
+      }
+   }
+   dst[j] = 0;
+}
+
 static void HBMainMenu_Attach( HBControl * p, HBForm * form )
 {
    HBMainMenu * m = (HBMainMenu *)p;
@@ -4556,7 +4584,8 @@ static void HBMainMenu_Attach( HBControl * p, HBForm * form )
       else if( lv == 0 )
       {
          /* Root popup: attaches to the menu bar */
-         GtkWidget * mi = gtk_menu_item_new_with_mnemonic( n->szCaption );
+         char gtkLabel[256]; hb_amp_to_gtk_mnemonic( n->szCaption, gtkLabel, sizeof gtkLabel );
+         GtkWidget * mi = gtk_menu_item_new_with_mnemonic( gtkLabel );
          GtkWidget * sub = gtk_menu_new();
          gtk_menu_item_set_submenu( GTK_MENU_ITEM(mi), sub );
          gtk_menu_shell_append( GTK_MENU_SHELL(form->FMenuBar), mi );
@@ -4573,7 +4602,8 @@ static void HBMainMenu_Attach( HBControl * p, HBForm * form )
          if( hasChildren )
          {
             /* Sub-popup */
-            GtkWidget * mi = gtk_menu_item_new_with_mnemonic( n->szCaption );
+            char gtkLabel[256]; hb_amp_to_gtk_mnemonic( n->szCaption, gtkLabel, sizeof gtkLabel );
+            GtkWidget * mi = gtk_menu_item_new_with_mnemonic( gtkLabel );
             GtkWidget * sub = gtk_menu_new();
             gtk_menu_item_set_submenu( GTK_MENU_ITEM(mi), sub );
             gtk_menu_shell_append( GTK_MENU_SHELL(parentShell), mi );
@@ -4583,7 +4613,8 @@ static void HBMainMenu_Attach( HBControl * p, HBForm * form )
          else
          {
             /* Leaf item */
-            GtkWidget * mi = gtk_menu_item_new_with_mnemonic( n->szCaption );
+            char gtkLabel[256]; hb_amp_to_gtk_mnemonic( n->szCaption, gtkLabel, sizeof gtkLabel );
+            GtkWidget * mi = gtk_menu_item_new_with_mnemonic( gtkLabel );
             if( !n->bEnabled )
                gtk_widget_set_sensitive( mi, FALSE );
 
@@ -4632,7 +4663,8 @@ HB_FUNC( UI_MENUPOPUPADD )
    if( !p || !HB_ISCHAR(2) ) { hb_retnint(0); return; }
    if( !p->FMenuBar ) p->FMenuBar = gtk_menu_bar_new();
 
-   GtkWidget * menuItem = gtk_menu_item_new_with_mnemonic( hb_parc(2) );
+   char gtkLabel[256]; hb_amp_to_gtk_mnemonic( hb_parc(2), gtkLabel, sizeof gtkLabel );
+   GtkWidget * menuItem = gtk_menu_item_new_with_mnemonic( gtkLabel );
    GtkWidget * subMenu = gtk_menu_new();
    gtk_menu_item_set_submenu( GTK_MENU_ITEM(menuItem), subMenu );
    gtk_menu_shell_append( GTK_MENU_SHELL(p->FMenuBar), menuItem );
