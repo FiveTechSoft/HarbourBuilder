@@ -86,7 +86,7 @@ function Main()
 
    // C++Builder classic proportions scaled to current screen
    // Reference: 1024x768 -> Inspector 250px (24.4%), Bar 140px
-   nBarH    := Max( 120, Int( 160 * nUIScale ) )   // title + menu + 2 toolbars + palette
+   nBarH    := Max( 110, Int( 160 * nUIScale ) ) - 10   // title + menu + 2 toolbars + palette
    // Inspector: wide enough for long property names ("nAlphaBlendValue" etc.)
    // at the scaled font size. Grows with screen and DPI.
    nInsW    := Max( Int( 320 * nUIScale ), Int( nScreenW * 0.20 ) )
@@ -425,6 +425,7 @@ static function CreatePalette()
    oPal:AddComp( nTab, "Pnl",  "Panel",      25 )
    oPal:AddComp( nTab, "SB",   "ScrollBar",  26 )
    oPal:AddComp( nTab, "Mnu", "MainMenu",  200 )
+   oPal:AddComp( nTab, "Pop", "PopupMenu", 201 )
 
    // Additional tab (C++Builder)
    nTab := oPal:AddTab( "Additional" )
@@ -708,7 +709,17 @@ return { ;
    { 119, "tlua.png"          }, ;
    { 120, "truby.png"         }, ;
    { 200, "tmainmenu.png"     }, ;
-   { 201, "tpopupmenu.png"    }  ;
+   { 201, "tpopupmenu.png"    }, ;
+   { 121, "menu_icons\menu_git_init.png"   }, ;
+   { 122, "menu_icons\menu_git_commit.png" }, ;
+   { 123, "menu_icons\menu_git_branch.png" }, ;
+   { 124, "menu_icons\menu_git_log.png"    }, ;
+   { 125, "menu_icons\menu_git_diff.png"   }, ;
+   { 126, "menu_icons\menu_git_clone.png"  }, ;
+   { 127, "menu_icons\menu_git_stash.png"  }, ;
+   { 128, "menu_icons\menu_git_status.png" }, ;
+   { 129, "menu_icons\menu_git_log.png"    }, ;
+   { 130, "menu_icons\menu_git_pull.png"   }  ;
 }
 
 static function CreateDesignForm( nX, nY )
@@ -1172,6 +1183,68 @@ static function RegenerateFormCode( cName, hForm )
                      ASize( nPendingLevels, Len( nPendingLevels ) - 1 )
                   enddo
                   cCreate += '   END MENUBAR' + e
+               endif
+            case nType == 201  // CT_POPUPMENU (TPopupMenu — non-visual context menu)
+               cCreate += '   COMPONENT ::o' + cCtrlName + ' TYPE CT_POPUPMENU OF Self  // TPopupMenu' + e
+               cVal := UI_GetProp( hCtrl, "aMenuItems" )
+               if ValType( cVal ) == "C" .and. ! Empty( cVal )
+                  aMenuNodes := HB_ATokens( cVal, "|" )
+                  nPendingLevels := {}
+                  cCreate += '   DEFINE POPUPMENU ::o' + cCtrlName + e
+                  for nMI := 1 to Len( aMenuNodes )
+                     cMNode := aMenuNodes[nMI]
+                     aMFields := HB_ATokens( cMNode, Chr(1) )
+                     if Len( aMFields ) < 5; loop; endif
+                     cCap  := aMFields[1]
+                     cScut := iif( Len(aMFields) >= 2, aMFields[2], "" )
+                     cHndl := iif( Len(aMFields) >= 3, aMFields[3], "" )
+                     nLv   := iif( Len(aMFields) >= 5, Val( aMFields[5] ), 0 )
+                     do while Len( nPendingLevels ) > 0 .and. ;
+                              ATail( nPendingLevels ) >= nLv
+                        nPL := ATail( nPendingLevels )
+                        cCreate += Replicate( "   ", nPL + 2 ) + 'END POPUP' + e
+                        ASize( nPendingLevels, Len( nPendingLevels ) - 1 )
+                     enddo
+                     cInd := Replicate( "   ", nLv + 2 )
+                     if cCap == "---"
+                        cCreate += cInd + 'MENUSEPARATOR' + e
+                     else
+                        bIsPopup := .F.
+                        if nMI < Len( aMenuNodes )
+                           aNextF := HB_ATokens( aMenuNodes[nMI+1], Chr(1) )
+                           if Len(aNextF) >= 5 .and. Val(aNextF[5]) > nLv
+                              bIsPopup := .T.
+                           endif
+                        endif
+                        if bIsPopup
+                           cCreate += cInd + 'DEFINE POPUP "' + cCap + '"' + e
+                           AAdd( nPendingLevels, nLv )
+                        else
+                           cCreate += cInd + 'MENUITEM "' + cCap + '"'
+                           if ! Empty( cHndl )
+                              if ":" $ cHndl .or. "(" $ cHndl
+                                 cCreate += ' ACTION ' + cHndl
+                                 if !( "(" $ cHndl ); cCreate += '()'; endif
+                              else
+                                 cCreate += ' ACTION ' + cHndl + '( Self, oMenuItem )'
+                                 if AScan( aMenuHandlers, cHndl ) == 0
+                                    AAdd( aMenuHandlers, cHndl )
+                                 endif
+                              endif
+                           endif
+                           if ! Empty( cScut )
+                              cCreate += ' ACCEL "' + cScut + '"'
+                           endif
+                           cCreate += e
+                        endif
+                     endif
+                  next
+                  do while Len( nPendingLevels ) > 0
+                     nPL := ATail( nPendingLevels )
+                     cCreate += Replicate( "   ", nPL + 2 ) + 'END POPUP' + e
+                     ASize( nPendingLevels, Len( nPendingLevels ) - 1 )
+                  enddo
+                  cCreate += '   END POPUPMENU' + e
                endif
             case nType == 132  // CT_MAINMENU (has aMenuItems) or CT_BAND (report designer)
                cVal := UI_GetProp( hCtrl, "aMenuItems" )
@@ -1660,6 +1733,22 @@ static function OnComponentDrop( hForm, nType, nL, nT, nW, nH )
    if nType == 200
       aCnt[ 200 ]++
       cName := "MainMenu" + LTrim(Str(aCnt[200]))
+      nCount := UI_GetChildCount( hForm )
+      hCtrl  := UI_GetChild( hForm, nCount )
+      if hCtrl != 0
+         UI_SetProp( hCtrl, "cName", cName )
+      endif
+      SyncDesignerToCode()
+      InspectorPopulateCombo( hForm )
+      INS_ComboSelect( _InsGetData(), nCount )
+      InspectorRefresh( hCtrl )
+      return nil
+   endif
+
+   // PopupMenu non-visual drop (type 201) — mirrors MainMenu logic
+   if nType == 201
+      aCnt[ 201 ]++
+      cName := "PopupMenu" + LTrim(Str(aCnt[201]))
       nCount := UI_GetChildCount( hForm )
       hCtrl  := UI_GetChild( hForm, nCount )
       if hCtrl != 0
@@ -2440,6 +2529,114 @@ static function RestoreFormFromCode( hForm, cCode )
             if hC == 0
                for jjC := nCC to 1 step -1
                   if UI_GetType( UI_GetChild( hForm, jjC ) ) == 200  // CT_MAINMENU
+                     hC := UI_GetChild( hForm, jjC )
+                     exit
+                  endif
+               next
+            endif
+            if hC != 0
+               UI_SetProp( hC, "aMenuItems", cMenuSerial )
+            endif
+         endif
+         loop
+      endif
+
+      // Parse DEFINE POPUPMENU ::oXxx ... END POPUPMENU block for TPopupMenu
+      if Left( Upper( cTrim ), 16 ) == "DEFINE POPUPMENU"
+         cMenuName := ""
+         nPos := At( "::o", cTrim )
+         if nPos > 0
+            cMenuName := SubStr( cTrim, nPos + 3 )
+            nPos2 := 1
+            do while nPos2 <= Len( cMenuName ) .and. ;
+               ( IsAlpha( SubStr( cMenuName, nPos2, 1 ) ) .or. ;
+                 IsDigit( SubStr( cMenuName, nPos2, 1 ) ) .or. ;
+                 SubStr( cMenuName, nPos2, 1 ) == "_" )
+               nPos2++
+            enddo
+            cMenuName := Left( cMenuName, nPos2 - 1 )
+         endif
+         cMenuSerial  := ""
+         nMenuLevel   := 0
+         aParentStack := {}
+         nFirstNode   := .T.
+         jj := i + 1
+         do while jj <= Len( aLines )
+            cML  := AllTrim( StrTran( aLines[jj], Chr(13), "" ) )
+            cMLU := Upper( cML )
+            if Left( cMLU, 13 ) == "END POPUPMENU"
+               exit
+            elseif Left( cMLU, 12 ) == "DEFINE POPUP"
+               nQ1 := At( '"', cML )
+               nQ2 := iif( nQ1 > 0, At( '"', SubStr( cML, nQ1 + 1 ) ), 0 )
+               cPopCap := iif( nQ1 > 0 .and. nQ2 > 0, ;
+                  SubStr( cML, nQ1 + 1, nQ2 - 1 ), "" )
+               nPar := iif( Len( aParentStack ) > 0, ATail( aParentStack ), -1 )
+               if ! nFirstNode; cMenuSerial += "|"; endif
+               cMenuSerial += cPopCap + Chr(1) + Chr(1) + Chr(1) + "1" + Chr(1) + ;
+                              LTrim( Str( nMenuLevel ) ) + Chr(1) + LTrim( Str( nPar ) )
+               AAdd( aParentStack, Len( HB_ATokens( cMenuSerial, "|" ) ) - 1 )
+               nMenuLevel++
+               nFirstNode := .F.
+            elseif Left( cMLU, 9 ) == "END POPUP"
+               nMenuLevel--
+               if Len( aParentStack ) > 0
+                  ASize( aParentStack, Len( aParentStack ) - 1 )
+               endif
+            elseif Left( cMLU, 13 ) == "MENUSEPARATOR"
+               nPar2 := iif( Len( aParentStack ) > 0, ATail( aParentStack ), -1 )
+               if ! nFirstNode; cMenuSerial += "|"; endif
+               cMenuSerial += "---" + Chr(1) + Chr(1) + Chr(1) + "1" + Chr(1) + ;
+                              LTrim( Str( nMenuLevel ) ) + Chr(1) + LTrim( Str( nPar2 ) )
+               nFirstNode := .F.
+            elseif Left( cMLU, 9 ) == "MENUITEM "
+               nQ3 := At( '"', cML )
+               nQ4 := iif( nQ3 > 0, At( '"', SubStr( cML, nQ3 + 1 ) ), 0 )
+               cItCap := iif( nQ3 > 0 .and. nQ4 > 0, ;
+                  SubStr( cML, nQ3 + 1, nQ4 - 1 ), "" )
+               cItHndl := ""
+               cItAccl := ""
+               nAct := At( " ACTION ", cMLU )
+               if nAct > 0
+                  cItHndl := AllTrim( SubStr( cML, nAct + 8 ) )
+                  nPos := At( "(", cItHndl )
+                  if nPos > 0
+                     cItHndl := AllTrim( Left( cItHndl, nPos - 1 ) )
+                  else
+                     nPos := At( " ", cItHndl )
+                     if nPos > 0; cItHndl := Left( cItHndl, nPos - 1 ); endif
+                  endif
+               endif
+               nAccl := At( 'ACCEL "', cML )
+               if nAccl > 0
+                  cItAccl := SubStr( cML, nAccl + 7 )
+                  nQ5 := At( '"', cItAccl )
+                  if nQ5 > 0; cItAccl := Left( cItAccl, nQ5 - 1 ); endif
+               endif
+               nPar3 := iif( Len( aParentStack ) > 0, ATail( aParentStack ), -1 )
+               if ! nFirstNode; cMenuSerial += "|"; endif
+               cMenuSerial += cItCap + Chr(1) + cItAccl + Chr(1) + cItHndl + Chr(1) + ;
+                              "1" + Chr(1) + LTrim( Str( nMenuLevel ) ) + Chr(1) + ;
+                              LTrim( Str( nPar3 ) )
+               nFirstNode := .F.
+            endif
+            jj++
+         enddo
+         i := jj
+         if ! Empty( cMenuSerial )
+            hC  := 0
+            nCC := UI_GetChildCount( hForm )
+            if ! Empty( cMenuName )
+               for jjC := 1 to nCC
+                  if AllTrim( UI_GetProp( UI_GetChild( hForm, jjC ), "cName" ) ) == cMenuName
+                     hC := UI_GetChild( hForm, jjC )
+                     exit
+                  endif
+               next
+            endif
+            if hC == 0
+               for jjC := nCC to 1 step -1
+                  if UI_GetType( UI_GetChild( hForm, jjC ) ) == 201  // CT_POPUPMENU
                      hC := UI_GetChild( hForm, jjC )
                      exit
                   endif
@@ -3394,6 +3591,7 @@ static function TBRun()
    local cRsp, cRspContent, aCI, cAppName, cAppTitle, cExePath
    local hRunForm, nRunCount, hRunCtrl, oRunReport, oRunBand, cRunType, nRunH
    local cFldData, aFldLines, cFldLine, aFldRec, oFld
+   local cDestDir, cAppExe, cSmart, cBin64, cMyDll
    static nLastHash := 0
 
    SaveActiveFormCode()
@@ -3812,7 +4010,7 @@ static function TBRun()
    if ! lError
       W32_ProgressStep( "Compiling C++ core..." )
       cLog += "[6] Compiling C++ core..." + Chr(10)
-      aCppFiles := { "tcontrol", "tform", "tcontrols", "hbbridge" }
+      aCppFiles := { "tcontrol", "tform", "tcontrols", "hbbridge", "hb_db_real" }
       if cCompiler == "msvc"
          cCppBase := "/c /O2 /W0 /EHsc" + Chr(10) + ;
                  '/I"' + cHbInc + '"' + Chr(10) + ;
@@ -3864,7 +4062,8 @@ static function TBRun()
                   cBuildDir + "\tcontrol.o " + ;
                   cBuildDir + "\tform.o " + ;
                   cBuildDir + "\tcontrols.o " + ;
-                  cBuildDir + "\hbbridge.o"
+                  cBuildDir + "\hbbridge.o " + ;
+                  cBuildDir + "\hb_db_real.o"
          if File( cBuildDir + "\stddlgs.o" )
             cObjs += " " + cBuildDir + "\stddlgs.o"
          endif
@@ -3874,7 +4073,8 @@ static function TBRun()
                   cBuildDir + "\tcontrol.obj " + ;
                   cBuildDir + "\tform.obj " + ;
                   cBuildDir + "\tcontrols.obj " + ;
-                  cBuildDir + "\hbbridge.obj"
+                  cBuildDir + "\hbbridge.obj " + ;
+                  cBuildDir + "\hb_db_real.obj"
          if File( cBuildDir + "\stddlgs.obj" )
             cObjs += " " + cBuildDir + "\stddlgs.obj"
          endif
@@ -3962,6 +4162,29 @@ static function TBRun()
       W32_BuildErrorDialog( "Build Failed", cLog )
    else
       nLastHash := nHash  // remember successful build hash
+      // Copy DB runtime DLLs alongside exe. Arch-specific name preserved
+      // (hb_db_real.cpp does LoadLibrary("libmysql64.dll") on x64,
+      // "libmysql.dll" on x86). Both shipped, exe picks correct one.
+      cBin64 := ( "64" $ cHbLib )
+      cMyDll := iif( cBin64, "libmysql64.dll", "libmysql.dll" )
+      W32_ShellExec( 'cmd /c copy /y "' + cProjDir + '\bin\' + cMyDll + '" "' + cBuildDir + '\" >nul 2>&1' )
+      // libpq.dll fallback (PostgreSQL install)
+      W32_ShellExec( 'cmd /c if exist "C:\Program Files\PostgreSQL\18\bin\libpq.dll" copy /y "C:\Program Files\PostgreSQL\18\bin\libpq.dll" "' + cBuildDir + '\" >nul' )
+      // Copy exe to project folder with smart name from cAppTitle or folder name
+      // (mirrors Linux f821f11 + d8ce000)
+      if ! Empty( cCurrentFile )
+         cDestDir := Left( cCurrentFile, RAt( "\", cCurrentFile ) )
+         cSmart := AllTrim( cAppTitle )
+         cSmart := StrTran( cSmart, " ", "_" )
+         if Empty( cSmart )
+            cSmart := Left( cDestDir, Len( cDestDir ) - 1 )
+            cSmart := SubStr( cSmart, RAt( "\", cSmart ) + 1 )
+         endif
+         cAppExe := iif( ! Empty( cSmart ), cSmart, "UserApp" ) + ".exe"
+         W32_ShellExec( 'cmd /c copy /y "' + cExePath + '" "' + cDestDir + cAppExe + '" >nul' )
+         W32_ShellExec( 'cmd /c if exist "' + cBuildDir + '\' + cMyDll + '" copy /y "' + cBuildDir + '\' + cMyDll + '" "' + cDestDir + '" >nul' )
+         W32_ShellExec( 'cmd /c if exist "' + cBuildDir + '\libpq.dll" copy /y "' + cBuildDir + '\libpq.dll" "' + cDestDir + '" >nul' )
+      endif
       W32_RunExe( cExePath )
       RefreshIDEToolbars()
    endif
@@ -6025,6 +6248,7 @@ static function ComponentTypeName( nType )
       case nType == 131; return "CT_COMPARRAY"
       case nType == 132; return "CT_BAND"
       case nType == 200; return "CT_MAINMENU"
+      case nType == 201; return "CT_POPUPMENU"
    endcase
 return "CT_UNKNOWN_" + LTrim( Str( nType ) )
 
@@ -6074,7 +6298,8 @@ static function ComponentTypeFromName( cName )
       { "CT_GITBLAME", 129 }, { "CT_GITMERGE", 130 }, ;
       { "CT_COMPARRAY", 131 }, ;
       { "CT_BAND", 132 }, ;
-      { "CT_MAINMENU", 200 } }
+      { "CT_MAINMENU", 200 }, ;
+      { "CT_POPUPMENU", 201 } }
    for i := 1 to Len( aMap )
       if Upper( cName ) == aMap[i][1]
          return aMap[i][2]

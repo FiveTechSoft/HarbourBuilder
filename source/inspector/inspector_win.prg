@@ -1438,7 +1438,7 @@ static LRESULT CALLBACK InsWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
       case WM_SIZE:
       {
          int w = LOWORD(lParam), h = HIWORD(lParam);
-         int comboH = 28, tabH = 28, topY = comboH + tabH + 8;
+         int comboH = 32, tabH = 32, topY = comboH + tabH + 8;
          if( d )
          {
             if( d->hCombo ) MoveWindow( d->hCombo, 2, 2, w - 4, 200, TRUE );
@@ -2329,7 +2329,7 @@ HB_FUNC( INS_CREATE )
    LVCOLUMNA lvc = {0};
    TCITEMA tci = {0};
    static BOOL bReg = FALSE;
-   int comboH = 28, tabH = 28, topY;
+   int comboH = 32, tabH = 32, topY;
 
    d = (INSDATA *) malloc( sizeof(INSDATA) );
    memset( d, 0, sizeof(INSDATA) );
@@ -2346,14 +2346,14 @@ HB_FUNC( INS_CREATE )
    { LOGFONTA lf = {0};
      /* Scale font + name-column width by current system DPI with a 50%
         dampening factor so they grow with DPI but don't dominate
-        (font 9pt -> 12pt at 200% DPI; col 205 -> 308 at 200%). */
+        (font 13pt -> 17pt at 200% DPI; col 205 -> 308 at 200%). */
      int sysDpi = 96;
      { HDC hScreen = GetDC( NULL );
        sysDpi = GetDeviceCaps( hScreen, LOGPIXELSY );
        ReleaseDC( NULL, hScreen ); }
      int dampedDpi = 96 + ( sysDpi - 96 ) / 2;  /* 96 at 96, 144 at 192 */
      if( dampedDpi < 96 ) dampedDpi = 96;
-     lf.lfHeight = -MulDiv( 9, dampedDpi, 72 );
+     lf.lfHeight = -MulDiv( 13, dampedDpi, 72 );
      lf.lfCharSet = DEFAULT_CHARSET;
      lstrcpyA(lf.lfFaceName, "Segoe UI");
      d->hFont = CreateFontIndirectA(&lf);

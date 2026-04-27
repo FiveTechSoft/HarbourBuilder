@@ -452,7 +452,15 @@ void TToolBar::LoadImages( const char * szBmpPath )
             HBITMAP hOut = CreateCompatibleBitmap( hdcS, dstW, dstH );
             HGDIOBJ oS = SelectObject( hSrc, hBmp );
             HGDIOBJ oD = SelectObject( hDst, hOut );
-            SetStretchBltMode( hDst, HALFTONE );
+            /* Pre-fill destination with the mask color (RGB 255,0,255).
+               Combined with COLORONCOLOR (nearest-neighbor) stretch, this
+               keeps edge pixels at exact mask RGB so ImageList_AddMasked
+               removes them cleanly — no fuchsia halo around scaled icons. */
+            { RECT rcF = { 0, 0, dstW, dstH };
+              HBRUSH hbrM = CreateSolidBrush( RGB(255,0,255) );
+              FillRect( hDst, &rcF, hbrM );
+              DeleteObject( hbrM ); }
+            SetStretchBltMode( hDst, COLORONCOLOR );
             SetBrushOrgEx( hDst, 0, 0, NULL );
             StretchBlt( hDst, 0, 0, dstW, dstH, hSrc, 0, 0, srcW, srcH, SRCCOPY );
             SelectObject( hSrc, oS );
@@ -1509,9 +1517,14 @@ static LRESULT CALLBACK PaletteTabSubProc( HWND hWnd, UINT msg, WPARAM wParam, L
          /* Draw icon centered — special-case CT_MAINMENU since palette.bmp
             has no slot for it; render a vector menubar glyph instead. */
          {
-            int iconW = 24, iconH = 24;
-            int cx = di->rcItem.left + (di->rcItem.right - di->rcItem.left - iconW) / 2;
-            int cy = di->rcItem.top + (di->rcItem.bottom - di->rcItem.top - iconH) / 2;
+            int iconW = 48, iconH = 48;
+            /* Cap icon to button area so larger icons don't overflow narrow tabs */
+            int btnW = di->rcItem.right - di->rcItem.left;
+            int btnH = di->rcItem.bottom - di->rcItem.top;
+            if( iconW > btnW - 4 ) iconW = btnW - 4;
+            if( iconH > btnH - 4 ) iconH = btnH - 4;
+            int cx = di->rcItem.left + (btnW - iconW) / 2;
+            int cy = di->rcItem.top + (btnH - iconH) / 2;
             int nCtrlType = -1;
             if( pal )
             {
@@ -1528,8 +1541,8 @@ static LRESULT CALLBACK PaletteTabSubProc( HWND hWnd, UINT msg, WPARAM wParam, L
                HDC hMem = CreateCompatibleDC( di->hDC );
                HBITMAP hOld = (HBITMAP) SelectObject( hMem, pal->FCompIconOverride[nCtrlType] );
                BLENDFUNCTION bf = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
-               AlphaBlend( di->hDC, cx - 4, cy - 4, 32, 32,
-                           hMem, 0, 0, 32, 32, bf );
+               AlphaBlend( di->hDC, cx, cy, iconW, iconH,
+                           hMem, 0, 0, 48, 48, bf );
                SelectObject( hMem, hOld );
                DeleteDC( hMem );
             }
@@ -1852,7 +1865,7 @@ static HBITMAP LoadPng32( const char * szPath )
    Gdiplus::Bitmap * src = Gdiplus::Bitmap::FromFile( wpath, FALSE );
    if( src && src->GetLastStatus() == Gdiplus::Ok )
    {
-      Gdiplus::Bitmap dst( 32, 32, PixelFormat32bppPARGB );
+      Gdiplus::Bitmap dst( 48, 48, PixelFormat32bppPARGB );
       Gdiplus::Graphics g( &dst );
       g.SetInterpolationMode( Gdiplus::InterpolationModeHighQualityBicubic );
       g.SetSmoothingMode( Gdiplus::SmoothingModeHighQuality );
@@ -1860,10 +1873,14 @@ static HBITMAP LoadPng32( const char * szPath )
 
       UINT sw = src->GetWidth(), sh = src->GetHeight();
       UINT dw = sw, dh = sh;
-      if( dw > 24 ) dw = 24;
-      if( dh > 24 ) dh = 24;
-      int x = ( 32 - (int)dw ) / 2;
-      int y = ( 32 - (int)dh ) / 2;
+      if( dw < 40 || dh < 40 ) {
+         /* Upscale tiny source PNG (16/24px) so it fills the larger 48px slot */
+         dw = 40; dh = 40;
+      }
+      if( dw > 40 ) dw = 40;
+      if( dh > 40 ) dh = 40;
+      int x = ( 48 - (int)dw ) / 2;
+      int y = ( 48 - (int)dh ) / 2;
       g.DrawImage( src, Gdiplus::Rect( x, y, dw, dh ),
                    0, 0, sw, sh, Gdiplus::UnitPixel );
       dst.GetHBITMAP( Gdiplus::Color( 0, 0, 0, 0 ), &hbm );

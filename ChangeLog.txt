@@ -1,6 +1,72 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-04-27b
+
+  - fix(build_win.bat): MSVC branch HBBIN was set to %HBDIR%\bin
+    but harbour.exe lives under bin\win\msvc(64). Switched to
+    per-arch (msvc / msvc64) with a fallback to %HBDIR%\bin so
+    the IDE build no longer dies with "harbour.exe not
+    recognized" right after Step 1.
+
+  - feat(db): Real HBMYSQL_* / HBPGSQL_* implementation for
+    Windows in source/cpp/hb_db_real.cpp. Replaces the temporary
+    no-op stub. Uses runtime LoadLibrary so a single binary
+    works for both archs:
+      32-bit exe -> bin\libmysql.dll
+      64-bit exe -> bin\libmysql64.dll
+      libpq via libpq.dll (PostgreSQL install fallback).
+    No mysql.h / libpq-fe.h includes; types and signatures are
+    forward-declared so build_win.bat and TBRun no longer link
+    libmysql.lib / libpq.lib. Both DLLs are now shipped under
+    bin/ and tracked in git. TBRun copies the arch-correct DLL
+    to the build dir + project folder after a successful build.
+
+  - feat(win-palette): Ported TPopupMenu (CT_POPUPMENU = 201)
+    from Mac/Linux. Adds palette entry, drop handler, codegen
+    block (DEFINE POPUPMENU ... END POPUPMENU with ACTION /
+    ACCEL), restore parser in RestoreFormFromCode, type-name
+    map, and reverse map.
+
+  - feat(win-build): TBRun copies the produced exe to the
+    project folder with a smart name derived from cAppTitle (or
+    project folder when AppTitle empty), mirroring the Linux
+    f821f11 + d8ce000 behaviour. Useful so the user app ends up
+    next to its source instead of staying in c:\hbbuilder_build.
+
+  - feat(win-palette): Git tab now shows real icons. Added 10
+    PNG mappings (CT_GITREPO..CT_GITMERGE) backed by existing
+    resources/menu_icons/menu_git_*.png; previously the tab
+    rendered text-only colour squares because no PNG override
+    existed for slots 121..130.
+
+  - feat(win-palette): Bumped palette button icon size 32 -> 48.
+    LoadPng32 now produces a 48x48 PARGB bitmap (drawing the
+    source PNG up to 40x40, upscaling small 16/24px icons), and
+    the owner-draw button caps icon to button area to avoid
+    overflow on narrow tabs. Affects every tab including
+    Standard.
+
+  - fix(win-toolbar): Toolbar icons no longer render with a
+    fuchsia halo around their edges. The DPI-scaling StretchBlt
+    used HALFTONE which interpolates pixels, so anti-aliased
+    edges blended with the RGB(255,0,255) mask and produced
+    near-magenta values that ImageList_AddMasked could not
+    strip. Switched to COLORONCOLOR (nearest-neighbor) and
+    pre-fill the destination with the mask colour first, so
+    edge pixels stay at exact mask RGB and get masked cleanly.
+
+  - feat(win-inspector): Bumped inspector font from 9pt to 13pt
+    in source/inspector/inspector_win.prg with combo/tab height
+    28 -> 32 to fit. Earlier 9pt variant lived in the regenerated
+    hbbuilder_win.c which is overwritten on every Harbour
+    compile, so the change had to move into the inspector .prg
+    BEGINDUMP block instead.
+
+  - feat(win-ide): Reduced main IDE bar height by 10px
+    (nBarH min cap 120 -> 110) so the editor / inspector get a
+    bit more vertical real-estate.
+
 2026-04-27a
 
   - feat(interop): Real implementations for TRust, TNode, TDotNet,
