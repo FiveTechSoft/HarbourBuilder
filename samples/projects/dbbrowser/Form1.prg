@@ -184,16 +184,16 @@ static function ShowRecord()
    local cStatus
 
    if ! lDbfOpen
-      oMemo:Text := "No database is open." + Chr(13) + Chr(10) + ;
+      oMemo:cText := "No database is open." + Chr(13) + Chr(10) + ;
                      "Click 'Open DBF' to create or open a sample database."
-      oLblStatus:Text := "No database open"
+      oLblStatus:cText := "No database open"
       return nil
    endif
 
    // Check for empty table or past-end-of-file
    if ( cAlias )->( RecCount() ) == 0
-      oMemo:Text := "The table is empty.  Click 'Add' to create a new record."
-      oLblStatus:Text := "Record 0 / 0  -  " + cDbfPath
+      oMemo:cText := "The table is empty.  Click 'Add' to create a new record."
+      oLblStatus:cText := "Record 0 / 0  -  " + cDbfPath
       return nil
    endif
 
@@ -222,13 +222,13 @@ static function ShowRecord()
       cText += "  ** This record is marked for deletion **" + Chr(13) + Chr(10)
    endif
 
-   oMemo:Text := cText
+   oMemo:cText := cText
 
    // Update the status label
    cStatus := "Record " + AllTrim( Str( ( cAlias )->( RecNo() ) ) ) + ;
               " / " + AllTrim( Str( ( cAlias )->( RecCount() ) ) ) + ;
               "  -  " + cDbfPath
-   oLblStatus:Text := cStatus
+   oLblStatus:cText := cStatus
 
 return nil
 

@@ -46,8 +46,8 @@ static function DoLogin()
 
    local cUser, cPass
 
-   cUser := oUser:Text
-   cPass := oPass:Text
+   cUser := oUser:cText
+   cPass := oPass:cText
 
    // Simple validation (in production: check against database)
    if Empty( cUser )

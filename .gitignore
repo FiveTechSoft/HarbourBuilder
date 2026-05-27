@@ -62,6 +62,7 @@ tests/gtk3_core.o
 hbbuilder.ini
 
 # Misc generated
+build_out.txt
 samples/prefs.json
 samples/canvas.html
 samples/form.html

@@ -19,14 +19,14 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm2
 
-   ::Title  := "Sales Report - Acme Corp."
-   ::Left   := 1205
-   ::Top    := 258
-   ::Width  := 870
-   ::Height := 720
-   ::FontName := "Segoe UI"
-   ::FontSize := 9
-   ::Color  := 2960685
+   ::cTitle  := "Sales Report - Acme Corp."
+   ::nLeft   := 1205
+   ::nTop    := 258
+   ::nWidth  := 870
+   ::nHeight := 720
+   ::cFontName := "Segoe UI"
+   ::nFontSize := 9
+   ::nClrPane  := 2960685
 
    @ 20, 20 BAND ::oBandHeader OF Self SIZE 832, 80 TYPE "Header"
    REPORTFIELD ::oHdrCompany TYPE "label" PROMPT "Acme Corporation" OF ::oBandHeader AT 5,0 SIZE 810,24

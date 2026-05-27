@@ -15,14 +15,14 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "Form1"
-   ::Left   := 1129
-   ::Top    := 456
-   ::Width  := 650
-   ::Height := 421
-   ::FontName := "Segoe UI"
-   ::FontSize := 9
-   ::Color  := 2960685
+   ::cTitle  := "Form1"
+   ::nLeft   := 1129
+   ::nTop    := 456
+   ::nWidth  := 650
+   ::nHeight := 421
+   ::cFontName := "Segoe UI"
+   ::nFontSize := 9
+   ::nClrPane  := 2960685
 
    COMPONENT ::oOpenDialog1 TYPE CT_OPENDIALOG OF Self  // TOpenDialog
 

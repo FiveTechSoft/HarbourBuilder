@@ -86,7 +86,7 @@ function Main()
 
    // C++Builder classic proportions scaled to current screen
    // Reference: 1024x768 -> Inspector 250px (24.4%), Bar 100px (13%)
-   nBarH    := 84                            // two toolbar rows(28+28) + tabs(24) + margins(4)
+   nBarH    := 100                           // two toolbar rows(28+28) + tabs(24) + 48x48 palette buttons
    nInsW    := Int( nScreenW * 0.18 )        // ~18% of screen width
 
    // === Window 1: Main Bar (full screen width) ===
@@ -107,9 +107,9 @@ function Main()
    nBottomY := nScreenH                        // no bottom margin
    nEditorH := nBottomY - nEditorTop
 
-   // Form Designer: centered in editor area, slightly above center
-   nFormX := nEditorX + Int( ( nEditorW - 400 ) / 2 )
-   nFormY := nEditorTop + Int( ( nEditorH - 300 ) * 0.35 )
+   // Form Designer: fixed position
+   nFormX := 883
+   nFormY := 361
 
    // Menu bar
    DEFINE MENUBAR OF oIDE
@@ -353,6 +353,9 @@ function Main()
    // Dark mode for all IDE windows (macOS 10.14+)
    MAC_SetAppDarkMode( .T. )
 
+   // Show AI Assistant by default at startup
+   MAC_AIAssistantPanel()
+
    // When IDE closes, destroy all secondary windows
    oIDE:OnClose := { || IDE_DebugStop(), DestroyAllForms(), InspectorClose(), ;
                        CodeEditorDestroy( hCodeEditor ) }
@@ -385,6 +388,7 @@ static function CreatePalette()
    oPal:AddComp( nTab, "Pnl",  "Panel",      25 )
    oPal:AddComp( nTab, "SB",   "ScrollBar",  26 )
    oPal:AddComp( nTab, "MM",   "MainMenu",  200 )
+   oPal:AddComp( nTab, "Pop",  "PopupMenu", 201 )
 
    // Additional tab (C++Builder)
    nTab := oPal:AddTab( "Additional" )
@@ -487,7 +491,6 @@ static function CreatePalette()
    nTab := oPal:AddTab( "ERP" )
    oPal:AddComp( nTab, "PP",   "Preprocessor",  90 )
    oPal:AddComp( nTab, "Scr",  "ScriptEngine",  91 )
-   oPal:AddComp( nTab, "Rpt",  "ReportDesigner", 92 )
    oPal:AddComp( nTab, "BC",   "Barcode",       93 )
    oPal:AddComp( nTab, "PDF",  "PDFGenerator",  94 )
    oPal:AddComp( nTab, "XLS",  "ExcelExport",   95 )
@@ -549,6 +552,137 @@ static function CreatePalette()
    // Load palette icons (Silk icon set by famfamfam, CC BY 2.5)
    UI_PaletteLoadImages( oPal:hCpp, ResPath( "palette.bmp" ) )
 
+   // Per-component PNG overrides (Lazarus icon set, /Applications/Lazarus/images/components)
+   AEval( { ;
+      {   1, "tlabel.png"        }, ;  // Label
+      {   2, "tedit.png"         }, ;  // Edit
+      {   3, "tbutton.png"       }, ;  // Button
+      {   4, "tcheckbox.png"     }, ;  // CheckBox
+      {   5, "tcombobox.png"     }, ;  // ComboBox
+      {   6, "tgroupbox.png"     }, ;  // GroupBox
+      {   7, "tlistbox.png"      }, ;  // ListBox
+      {   8, "tradiobutton.png"  }, ;  // RadioButton
+      {  12, "tbitbtn.png"       }, ;  // BitBtn
+      {  13, "tspeedbutton.png"  }, ;  // SpeedButton
+      {  14, "timage.png"        }, ;  // Image
+      {  15, "tshape.png"        }, ;  // Shape
+      {  16, "tbevel.png"        }, ;  // Bevel
+      {  20, "ttreeview.png"     }, ;  // TTreeView
+      {  21, "tlistview.png"     }, ;  // TableView
+      {  22, "tprogressbar.png"  }, ;  // ProgressBar
+      {  24, "tmemo.png"         }, ;  // Memo
+      {  25, "tpanel.png"        }, ;  // Panel
+      {  26, "tscrollbar.png"    }, ;  // ScrollBar
+      {  28, "tmaskedit.png"     }, ;  // MaskEdit
+      {  29, "tstringgrid.png"   }, ;  // StringGrid
+      {  30, "tscrollbox.png"    }, ;  // ScrollBox
+      {  31, "tstatictext.png"   }, ;  // StaticText
+      {  32, "tlabelededit.png"  }, ;  // LabeledEdit
+      {  33, "tpagecontrol.png"  }, ;  // TFolder
+      {  34, "ttrackbar.png"     }, ;  // Slider
+      {  35, "tupdown.png"       }, ;  // Stepper
+      {  36, "tdateedit.png"     }, ;  // DatePicker
+      {  37, "tcalendar.png"     }, ;  // Calendar
+      {  38, "ttimer.png"        }, ;  // Timer
+      {  39, "tpaintbox.png"     }, ;  // PaintBox
+      {  40, "topendialog.png"   }, ;  // OpenPanel
+      {  41, "tsavedialog.png"   }, ;  // SavePanel
+      {  42, "tfontdialog.png"   }, ;  // FontPanel
+      {  43, "tcolordialog.png"  }, ;  // ColorPanel
+      {  44, "tfinddialog.png"   }, ;  // FindPanel
+      {  45, "treplacedialog.png"}, ;  // ReplacePanel
+      {  80, "tdbgrid.png"       }, ;  // DBGrid
+      {  81, "tdbnavigator.png"  }, ;  // DBNavigator
+      {  82, "tdbtext.png"       }, ;  // DBText
+      {  83, "tdbedit.png"       }, ;  // DBEdit
+      {  84, "tdbcombobox.png"   }, ;  // DBComboBox
+      {  85, "tdbcheckbox.png"   }, ;  // DBCheckBox
+      {  86, "tdbimage.png"      }, ;  // DBImage
+      { 112, "tpython.png"       }, ;  // Python
+      { 113, "tswift.png"        }, ;  // Swift
+      { 114, "tgo.png"           }, ;  // Go
+      { 115, "tnode.png"         }, ;  // Node
+      { 116, "trust.png"         }, ;  // Rust
+      { 117, "tjava.png"         }, ;  // Java
+      { 118, "tdotnet.png"       }, ;  // DotNet
+      { 119, "tlua.png"          }, ;  // Lua
+      { 120, "truby.png"         }, ;  // Ruby
+      {  23, "ttextview.png"     }, ;  // TextView
+      {  53, "tdbftable.png"     }, ;  // DBFTable
+      {  54, "tmysql.png"        }, ;  // MySQL
+      {  55, "tmariadb.png"      }, ;  // MariaDB
+      {  56, "tpostgresql.png"   }, ;  // PostgreSQL
+      {  57, "tsqlite.png"       }, ;  // SQLite
+      {  58, "tfirebird.png"     }, ;  // Firebird
+      {  59, "tmssql.png"        }, ;  // SQLServer
+      {  60, "toracle.png"       }, ;  // Oracle
+      {  61, "tmongodb.png"      }, ;  // MongoDB
+      {  63, "tthread.png"       }, ;  // Thread
+      {  64, "tmutex.png"        }, ;  // Mutex
+      {  65, "tsemaphore.png"    }, ;  // Semaphore
+      {  66, "tcriticalsection.png" }, ;  // CriticalSection
+      {  67, "tthreadpool.png"   }, ;  // ThreadPool
+      {  68, "tatomicint.png"    }, ;  // AtomicInt
+      {  69, "tcondvar.png"      }, ;  // CondVar
+      {  70, "tchannel.png"      }, ;  // Channel
+      {  90, "tpreprocessor.png" }, ;  // Preprocessor
+      {  91, "tscriptengine.png" }, ;  // ScriptEngine
+      {  93, "tbarcode.png"      }, ;  // Barcode
+      {  94, "tpdfgenerator.png" }, ;  // PDFGenerator
+      {  95, "texcelexport.png"  }, ;  // ExcelExport
+      {  96, "tauditlog.png"     }, ;  // AuditLog
+      {  97, "tpermissions.png"  }, ;  // Permissions
+      {  98, "tcurrency.png"     }, ;  // Currency
+      {  99, "ttaxengine.png"    }, ;  // TaxEngine
+      { 100, "tdashboard.png"    }, ;  // Dashboard
+      { 101, "tscheduler.png"    }, ;  // Scheduler
+      { 102, "tprinter.png"      }, ;  // Printer
+      { 103, "treport.png"       }, ;  // Report
+      { 104, "tlabels.png"       }, ;  // Labels
+      { 105, "tprintpreview.png" }, ;  // PrintPreview
+      { 106, "tpagesetup.png"    }, ;  // PageSetup
+      { 107, "tprintdialog.png"  }, ;  // PrintDialog
+      { 108, "treportviewer.png" }, ;  // ReportViewer
+      { 109, "tbarcodeprinter.png" }, ;  // BarcodePrinter
+      { 111, "tembeddings.png"   }, ;  // Embeddings
+      {  52, "ttransformer.png"  }, ;  // Transformer
+      { 132, "tband.png"         }, ;  // Band
+      { 133, "treportlabel.png"  }, ;  // ReportLabel
+      { 134, "treportfield.png"  }, ;  // ReportField
+      { 135, "treportimage.png"  }, ;  // ReportImage
+      { 140, "tmap.png"          }, ;  // Map
+      { 141, "tscene3d.png"      }, ;  // Scene3D
+      { 142, "tearthview.png"    }, ;  // EarthView
+      {  62, "twebview.png"      }, ;  // WebView
+      {  71, "twebserver.png"    }, ;  // WebServer
+      {  72, "twebsocket.png"    }, ;  // WebSocket
+      {  73, "thttpclient.png"   }, ;  // HttpClient
+      {  74, "tftpclient.png"    }, ;  // FtpClient
+      {  75, "tsmtpclient.png"   }, ;  // SmtpClient
+      {  76, "ttcpserver.png"    }, ;  // TcpServer
+      {  77, "ttcpclient.png"    }, ;  // TcpClient
+      {  78, "tudpsocket.png"    }, ;  // UdpSocket
+      {  46, "topenai.png"       }, ;  // OpenAI
+      {  47, "tgemini.png"       }, ;  // Gemini
+      {  48, "tclaude.png"       }, ;  // Claude
+      {  49, "tdeepseek.png"     }, ;  // DeepSeek
+      {  50, "tgrok.png"         }, ;  // Grok
+      {  51, "tollama.png"       }, ;  // Ollama
+      { 110, "topenai.png"       }, ;  // Whisper (OpenAI)
+      { 200, "tmainmenu.png"     }, ;  // MainMenu
+      { 201, "tpopupmenu.png"    }, ;  // PopupMenu
+      { 121, "menu_icons/menu_git_init.png"   }, ;  // GitRepo
+      { 122, "menu_icons/menu_git_commit.png" }, ;  // GitCommit
+      { 123, "menu_icons/menu_git_branch.png" }, ;  // GitBranch
+      { 124, "menu_icons/menu_git_log.png"    }, ;  // GitLog
+      { 125, "menu_icons/menu_git_diff.png"   }, ;  // GitDiff
+      { 126, "menu_icons/menu_git_clone.png"  }, ;  // GitRemote
+      { 127, "menu_icons/menu_git_stash.png"  }, ;  // GitStash
+      { 128, "menu_icons/menu_git_status.png" }, ;  // GitTag
+      { 129, "menu_icons/menu_git_log.png"    }, ;  // GitBlame
+      { 130, "menu_icons/menu_git_pull.png"   }  ;  // GitMerge
+   }, {| a | UI_PaletteSetCompIcon( a[ 1 ], ResPath( a[ 2 ] ) ) } )
+
 return nil
 
 static function CreateDesignForm( nX, nY )
@@ -560,7 +694,7 @@ static function CreateDesignForm( nX, nY )
    cName := "Form" + LTrim( Str( nIdx ) )
 
    // Create new empty form (like C++Builder File > New > VCL Forms Application)
-   DEFINE FORM oDesignForm TITLE cName SIZE 400, 300 FONT "Helvetica Neue", 12
+   DEFINE FORM oDesignForm TITLE cName SIZE 572, 333 FONT "Helvetica Neue", 12
    UI_FormSetPos( oDesignForm:hCpp, nX, nY )
 
    // Register in project form list
@@ -671,7 +805,7 @@ static function GenerateProjectCode()
    cCode += "   local oApp" + e
    cCode += e
    cCode += "   oApp := TApplication():New()" + e
-   cCode += '   oApp:Title := "Project1"' + e
+   cCode += '   oApp:cTitle := "Project1"' + e
 
    for i := 1 to Len( aForms )
       cCode += "   oApp:CreateForm( T" + aForms[i][1] + "():New() )" + e
@@ -728,8 +862,8 @@ static function RegenerateFormCode( cName, hForm )
       cTitle := cName
       nFL    := 0
       nFT    := 0
-      nW     := 400
-      nH     := 300
+      nW     := 572
+      nH     := 333
       nClr   := 15790320  // 0x00F0F0F0
    endif
 
@@ -843,7 +977,7 @@ static function RegenerateFormCode( cName, hForm )
                   ' MEMO ::o' + cCtrlName + ' OF ' + cParent + ' SIZE ' + ;
                   LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
                if ! Empty( cText )
-                  cCreate += '   ::o' + cCtrlName + ':Text := "' + ;
+                  cCreate += '   ::o' + cCtrlName + ':cText := "' + ;
                      StrTran( StrTran( cText, '"', '""' ), Chr(10), '" + Chr(10) + "' ) + ;
                      '"' + e
                endif
@@ -884,7 +1018,7 @@ static function RegenerateFormCode( cName, hForm )
                cCreate += e
                cVal := UI_GetProp( hCtrl, "nMapType" )
                if ValType( cVal ) == "N" .and. cVal > 0
-                  cCreate += '   ::o' + cCtrlName + ':MapType := ' + LTrim( Str( cVal ) ) + e
+                  cCreate += '   ::o' + cCtrlName + ':nMapType := ' + LTrim( Str( cVal ) ) + e
                endif
             case nType == 62  // WebView
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
@@ -918,11 +1052,11 @@ static function RegenerateFormCode( cName, hForm )
                cCreate += e
                cVal := UI_GetProp( hCtrl, "nFixedRows" )
                if ValType( cVal ) == "N" .and. cVal != 1
-                  cCreate += '   ::o' + cCtrlName + ':FixedRows := ' + LTrim( Str( cVal ) ) + e
+                  cCreate += '   ::o' + cCtrlName + ':nFixedRows := ' + LTrim( Str( cVal ) ) + e
                endif
                cVal := UI_GetProp( hCtrl, "nFixedCols" )
                if ValType( cVal ) == "N" .and. cVal != 0
-                  cCreate += '   ::o' + cCtrlName + ':FixedCols := ' + LTrim( Str( cVal ) ) + e
+                  cCreate += '   ::o' + cCtrlName + ':nFixedCols := ' + LTrim( Str( cVal ) ) + e
                endif
             case nType == 28  // MaskEdit
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
@@ -973,11 +1107,11 @@ static function RegenerateFormCode( cName, hForm )
                cCreate += e
                cVal := UI_GetProp( hCtrl, "nPenColor" )
                if ValType( cVal ) == "N" .and. cVal != 0
-                  cCreate += '   ::o' + cCtrlName + ':PenColor := ' + LTrim( Str( cVal ) ) + e
+                  cCreate += '   ::o' + cCtrlName + ':nPenColor := ' + LTrim( Str( cVal ) ) + e
                endif
                cVal := UI_GetProp( hCtrl, "nPenWidth" )
                if ValType( cVal ) == "N" .and. cVal != 1
-                  cCreate += '   ::o' + cCtrlName + ':PenWidth := ' + LTrim( Str( cVal ) ) + e
+                  cCreate += '   ::o' + cCtrlName + ':nPenWidth := ' + LTrim( Str( cVal ) ) + e
                endif
             case nType == 12 .or. nType == 13  // BitBtn / SpeedButton
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
@@ -1009,6 +1143,29 @@ static function RegenerateFormCode( cName, hForm )
                      // Preserve leading whitespace (indentation = hierarchy);
                      // only strip trailing spaces.
                      cCreate += '"' + RTrim( aHdrs[kk] ) + '"'
+                  next
+               endif
+               cCreate += e
+            case nType == 21  // ListView (TListView)
+               cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
+                  ' LISTVIEW ::o' + cCtrlName + ' OF ' + cParent + ' SIZE ' + ;
+                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH))
+               cVal := UI_GetProp( hCtrl, "aColumns" )
+               if ValType( cVal ) == "C" .and. ! Empty( cVal )
+                  aHdrs := hb_ATokens( cVal, "|" )
+                  cCreate += ' COLUMNS '
+                  for kk := 1 to Len( aHdrs )
+                     if kk > 1; cCreate += ', '; endif
+                     cCreate += '"' + aHdrs[kk] + '"'
+                  next
+               endif
+               cVal := UI_GetProp( hCtrl, "aItems" )
+               if ValType( cVal ) == "C" .and. ! Empty( cVal )
+                  aHdrs := hb_ATokens( cVal, "|" )
+                  cCreate += ' ITEMS '
+                  for kk := 1 to Len( aHdrs )
+                     if kk > 1; cCreate += ', '; endif
+                     cCreate += '"' + aHdrs[kk] + '"'
                   next
                endif
                cCreate += e
@@ -1169,30 +1326,72 @@ static function RegenerateFormCode( cName, hForm )
                      if ValType( nInterval ) == "N" .and. nInterval != 1000
                         cCreate += '   ::o' + cCtrlName + ':nInterval := ' + LTrim( Str( nInterval ) ) + e
                      endif
+                  elseif nType == 201  // CT_POPUPMENU
+                     cVal := UI_GetProp( hCtrl, "aMenuItems" )
+                     if ValType( cVal ) == "C" .and. ! Empty( cVal )
+                        aMenuNodes := HB_ATokens( cVal, "|" )
+                        nPendingLevels := {}
+                        cCreate += '   DEFINE POPUPMENU ::o' + cCtrlName + e
+                        for nMI := 1 to Len( aMenuNodes )
+                           cMNode := aMenuNodes[nMI]
+                           aMFields := HB_ATokens( cMNode, Chr(1) )
+                           if Len( aMFields ) < 5; loop; endif
+                           cCap  := aMFields[1]
+                           cScut := iif( Len(aMFields) >= 2, aMFields[2], "" )
+                           cHndl := iif( Len(aMFields) >= 3, aMFields[3], "" )
+                           nLv   := iif( Len(aMFields) >= 5, Val( aMFields[5] ), 0 )
+                           do while Len( nPendingLevels ) > 0 .and. ;
+                                     ATail( nPendingLevels ) >= nLv
+                              nPL := ATail( nPendingLevels )
+                              cCreate += Replicate( "   ", nPL + 2 ) + 'END POPUP' + e
+                              ASize( nPendingLevels, Len( nPendingLevels ) - 1 )
+                           enddo
+                           cInd := Replicate( "   ", nLv + 2 )
+                           if cCap == "---"
+                              cCreate += cInd + 'MENUSEPARATOR' + e
+                           else
+                              bIsPopup := .F.
+                              if nMI < Len( aMenuNodes )
+                                 aNextF := HB_ATokens( aMenuNodes[nMI+1], Chr(1) )
+                                 if Len(aNextF) >= 5 .and. Val(aNextF[5]) > nLv
+                                    bIsPopup := .T.
+                                 endif
+                              endif
+                              if bIsPopup
+                                 cCreate += cInd + 'DEFINE POPUP "' + cCap + '"' + e
+                                 AAdd( nPendingLevels, nLv )
+                              else
+                                 cCreate += cInd + 'MENUITEM "' + cCap + '"'
+                                 if ! Empty( cHndl )
+                                    if ":" $ cHndl .or. "(" $ cHndl
+                                       cCreate += ' ACTION ' + cHndl
+                                       if !( "(" $ cHndl ); cCreate += '()'; endif
+                                    else
+                                       cCreate += ' ACTION ' + cHndl + '( Self, oMenuItem )'
+                                       if AScan( aMenuHandlers, cHndl ) == 0
+                                          AAdd( aMenuHandlers, cHndl )
+                                       endif
+                                    endif
+                                 endif
+                                 if ! Empty( cScut )
+                                    cCreate += ' ACCEL "' + cScut + '"'
+                                 endif
+                                 cCreate += e
+                              endif
+                           endif
+                        next
+                        do while Len( nPendingLevels ) > 0
+                           nPL := ATail( nPendingLevels )
+                           cCreate += Replicate( "   ", nPL + 2 ) + 'END POPUP' + e
+                           ASize( nPendingLevels, Len( nPendingLevels ) - 1 )
+                        enddo
+                        cCreate += '   END POPUPMENU' + e
+                     endif
                   elseif nType == 200  // CT_MAINMENU
                      cVal := UI_GetProp( hCtrl, "aMenuItems" )
                      if ValType( cVal ) == "C" .and. ! Empty( cVal )
                         aMenuNodes := HB_ATokens( cVal, "|" )
-                        lHasHandlers := .F.
-                        for nMI := 1 to Len( aMenuNodes )
-                           aMFields := HB_ATokens( aMenuNodes[nMI], Chr(1) )
-                           cHndl := iif( Len(aMFields) >= 3, aMFields[3], "" )
-                           if ! Empty( cHndl ); lHasHandlers := .T.; exit; endif
-                        next
-                        if lHasHandlers
-                           cCreate += '   ::o' + cCtrlName + ':aOnClick := { '
-                           for nMI := 1 to Len( aMenuNodes )
-                              aMFields := HB_ATokens( aMenuNodes[nMI], Chr(1) )
-                              cHndl := iif( Len(aMFields) >= 3, aMFields[3], "" )
-                              if nMI > 1; cCreate += ", "; endif
-                              if ! Empty( cHndl )
-                                 cCreate += '{|| ' + cHndl + '( Self, nil )}'
-                              else
-                                 cCreate += 'nil'
-                              endif
-                           next
-                           cCreate += ' }' + e
-                        endif
+                        // aOnClick auto-built by _HBMenuEnd from per-item bAction
                         nPendingLevels := {}
                         cCreate += '   DEFINE MENUBAR ::o' + cCtrlName + e
                         for nMI := 1 to Len( aMenuNodes )
@@ -1226,9 +1425,14 @@ static function RegenerateFormCode( cName, hForm )
                               else
                                  cCreate += cInd + 'MENUITEM "' + cCap + '"'
                                  if ! Empty( cHndl )
-                                    cCreate += ' ACTION ' + cHndl + '( Self, oMenuItem )'
-                                    if AScan( aMenuHandlers, cHndl ) == 0
-                                       AAdd( aMenuHandlers, cHndl )
+                                    if ":" $ cHndl .or. "(" $ cHndl
+                                       cCreate += ' ACTION ' + cHndl
+                                       if !( "(" $ cHndl ); cCreate += '()'; endif
+                                    else
+                                       cCreate += ' ACTION ' + cHndl + '( Self, oMenuItem )'
+                                       if AScan( aMenuHandlers, cHndl ) == 0
+                                          AAdd( aMenuHandlers, cHndl )
+                                       endif
                                     endif
                                  endif
                                  if ! Empty( cScut )
@@ -1321,7 +1525,7 @@ static function RegenerateFormCode( cName, hForm )
             // Emit ControlAlign if non-default (0=alNone)
             cVal := UI_GetProp( hCtrl, "nControlAlign" )
             if ValType( cVal ) == "N" .and. cVal != 0
-               cCreate += '   ::o' + cCtrlName + ':ControlAlign := ' + LTrim( Str( cVal ) ) + e
+               cCreate += '   ::o' + cCtrlName + ':nControlAlign := ' + LTrim( Str( cVal ) ) + e
             endif
 
             // Emit oFont if non-default
@@ -1354,7 +1558,7 @@ static function RegenerateFormCode( cName, hForm )
                   // lTransparent, nAlign, oFont) to prevent accumulation when values change
                   if ":nClrPane" $ cLine .or. ":nClrText" $ cLine .or. ;
                      ":lTransparent" $ cLine .or. ":nAlign" $ cLine .or. ;
-                     ":ControlAlign" $ cLine .or. ":oFont" $ cLine
+                     ":nControlAlign" $ cLine .or. ":oFont" $ cLine
                      nPos += Len( cEvName )
                      loop
                   endif
@@ -1507,24 +1711,24 @@ static function RegenerateFormCode( cName, hForm )
    cCode += e
    cCode += "METHOD CreateForm() CLASS " + cClass + e
    cCode += e
-   cCode += '   ::Title  := "' + cTitle + '"' + e
-   cCode += "   ::Left   := " + LTrim(Str(nFL)) + e
-   cCode += "   ::Top    := " + LTrim(Str(nFT)) + e
-   cCode += "   ::Width  := " + LTrim(Str(nW)) + e
-   cCode += "   ::Height := " + LTrim(Str(nH)) + e
+   cCode += '   ::cTitle  := "' + cTitle + '"' + e
+   cCode += "   ::nLeft   := " + LTrim(Str(nFL)) + e
+   cCode += "   ::nTop    := " + LTrim(Str(nFT)) + e
+   cCode += "   ::nWidth  := " + LTrim(Str(nW)) + e
+   cCode += "   ::nHeight := " + LTrim(Str(nH)) + e
    if nClr != 15790320  // non-default color
-      cCode += "   ::Color  := " + LTrim(Str(nClr)) + e
+      cCode += "   ::nClrPane := " + LTrim(Str(nClr)) + e
    endif
    nInterval := UI_GetProp( hForm, "nPosition" )
    if ValType( nInterval ) == "N" .and. nInterval > 0
-      cCode += "   ::Position := " + LTrim(Str(nInterval)) + e
+      cCode += "   ::nPosition := " + LTrim(Str(nInterval)) + e
    endif
    nInterval := UI_GetProp( hForm, "nBorderStyle" )
    if ValType( nInterval ) == "N" .and. nInterval != 2  // != bsSizeable (default)
-      cCode += "   ::BorderStyle := " + LTrim(Str(nInterval)) + e
+      cCode += "   ::nBorderStyle := " + LTrim(Str(nInterval)) + e
    endif
    if ! Empty( cAppTitle )
-      cCode += '   ::AppTitle := "' + cAppTitle + '"' + e
+      cCode += '   ::cAppTitle := "' + cAppTitle + '"' + e
    endif
    if ! Empty( cCreate )
       cCode += e
@@ -1589,14 +1793,16 @@ static function RestoreFormFromCode( hForm, cCode )
       cCode := StrTran( cCode, " ;" + Chr(10) + " ", " " )
    enddo
 
+   // Normalize CRLF to LF so AllTrim'd lines compare cleanly (e.g. "END POPUP" exact match)
+   cCode := StrTran( cCode, Chr(13), "" )
    aLines := HB_ATokens( cCode, Chr(10) )
 
    for i := 1 to Len( aLines )
       cLine := aLines[i]
       cTrim := AllTrim( cLine )
 
-      // Parse form properties: ::Title, ::Width, ::Height, ::Left, ::Top
-      if '::Title' $ cTrim .and. ':=' $ cTrim
+      // Parse form properties: ::cTitle, ::nWidth, ::nHeight, ::nLeft, ::nTop
+      if '::cTitle' $ cTrim .and. ':=' $ cTrim
          nPos := At( '"', cTrim )
          nPos2 := RAt( '"', cTrim )
          if nPos > 0 .and. nPos2 > nPos
@@ -1605,35 +1811,35 @@ static function RestoreFormFromCode( hForm, cCode )
          endif
          loop
       endif
-      if '::Width' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
+      if '::nWidth' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
          UI_SetProp( hForm, "nWidth", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
          loop
       endif
-      if '::Height' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
+      if '::nHeight' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
          UI_SetProp( hForm, "nHeight", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
          loop
       endif
-      if '::Left' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
+      if '::nLeft' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
          UI_SetProp( hForm, "nLeft", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
          loop
       endif
-      if '::Top' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
+      if '::nTop' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
          UI_SetProp( hForm, "nTop", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
          loop
       endif
-      if '::Color' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
+      if '::nClrPane' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
          UI_SetProp( hForm, "nClrPane", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
          loop
       endif
-      if '::Position' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
+      if '::nPosition' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
          UI_SetProp( hForm, "nPosition", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
          loop
       endif
-      if '::BorderStyle' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
+      if '::nBorderStyle' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
          UI_SetProp( hForm, "nBorderStyle", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
          loop
       endif
-      if '::AppTitle' $ cTrim .and. ':=' $ cTrim
+      if '::cAppTitle' $ cTrim .and. ':=' $ cTrim
          nPos := At( '"', cTrim )
          nPos2 := RAt( '"', cTrim )
          if nPos > 0 .and. nPos2 > nPos
@@ -1682,8 +1888,9 @@ static function RestoreFormFromCode( hForm, cCode )
          loop
       endif
 
-      // Parse DEFINE MENUBAR block for TMainMenu
-      if Upper( AllTrim( cTrim ) ) == "DEFINE MENUBAR"
+      // Parse DEFINE MENUBAR block for TMainMenu (accept "DEFINE MENUBAR" or "DEFINE MENUBAR <oMenu>")
+      if Upper( AllTrim( cTrim ) ) == "DEFINE MENUBAR" .or. ;
+         Left( Upper( AllTrim( cTrim ) ), 15 ) == "DEFINE MENUBAR "
          cMenuSerial := ""
          nMenuLevel  := 0
          aParentStack := {}
@@ -1725,9 +1932,14 @@ static function RestoreFormFromCode( hForm, cCode )
                nAct := At( "ACTION ", cMLU )
                if nAct > 0
                   cItHndl := SubStr( cML, nAct + 7 )
-                  nPos := At( " ", cItHndl )
-                  if nPos > 0; cItHndl := Left(cItHndl,nPos-1); endif
-                  if Right(cItHndl,2) == "()"; cItHndl := Left(cItHndl,Len(cItHndl)-2); endif
+                  // Truncate at " ACCEL " clause if present (action expr may contain spaces)
+                  nPos := At( ' ACCEL "', Upper( cItHndl ) )
+                  if nPos > 0; cItHndl := Left( cItHndl, nPos - 1 ); endif
+                  cItHndl := AllTrim( cItHndl )
+                  // Strip empty trailing "()" only for bare names without args
+                  if Right(cItHndl,2) == "()" .and. ! "(" $ Left(cItHndl,Len(cItHndl)-2)
+                     cItHndl := Left(cItHndl,Len(cItHndl)-2)
+                  endif
                endif
                nAccl := At( 'ACCEL "', cML )
                if nAccl > 0
@@ -1749,6 +1961,85 @@ static function RestoreFormFromCode( hForm, cCode )
             for jjC := nCC to 1 step -1
                hC := UI_GetChild( hForm, jjC )
                if UI_GetType(hC) == 200  // CT_MAINMENU
+                  UI_SetProp( hC, "aMenuItems", cMenuSerial )
+                  exit
+               endif
+            next
+         endif
+         loop
+      endif
+
+      // Parse DEFINE POPUPMENU block for TPopupMenu (same body as MENUBAR)
+      if Upper( AllTrim( cTrim ) ) == "DEFINE POPUPMENU" .or. ;
+         Left( Upper( AllTrim( cTrim ) ), 17 ) == "DEFINE POPUPMENU "
+         cMenuSerial := ""
+         nMenuLevel  := 0
+         aParentStack := {}
+         nFirstNode  := .T.
+         jj := i + 1
+         do while jj <= Len( aLines )
+            cML  := AllTrim( aLines[jj] )
+            cMLU := Upper( cML )
+            if cMLU == "END POPUPMENU"
+               exit
+            elseif Left( cMLU, 12 ) == "DEFINE POPUP"
+               nQ1 := At( '"', cML )
+               nQ2 := iif( nQ1 > 0, At( '"', SubStr( cML, nQ1+1 ) ), 0 )
+               cPopCap := iif( nQ1>0 .and. nQ2>0, SubStr( cML, nQ1+1, nQ2-1 ), "" )
+               nPar := iif( Len( aParentStack ) > 0, ATail(aParentStack), -1 )
+               if ! nFirstNode; cMenuSerial += "|"; endif
+               cMenuSerial += cPopCap + Chr(1) + Chr(1) + Chr(1) + "1" + Chr(1) + ;
+                              LTrim(Str(nMenuLevel)) + Chr(1) + LTrim(Str(nPar))
+               AAdd( aParentStack, Len( HB_ATokens( cMenuSerial, "|" ) ) - 1 )
+               nMenuLevel++
+               nFirstNode := .F.
+            elseif cMLU == "END POPUP"
+               nMenuLevel--
+               if Len( aParentStack ) > 0
+                  ASize( aParentStack, Len(aParentStack)-1 )
+               endif
+            elseif Left( cMLU, 11 ) == "MENUSEPARAT"
+               nPar2 := iif( Len(aParentStack)>0, ATail(aParentStack), -1 )
+               if ! nFirstNode; cMenuSerial += "|"; endif
+               cMenuSerial += "---" + Chr(1) + Chr(1) + Chr(1) + "0" + Chr(1) + ;
+                              LTrim(Str(nMenuLevel)) + Chr(1) + LTrim(Str(nPar2))
+               nFirstNode := .F.
+            elseif Left( cMLU, 8 ) == "MENUITEM"
+               nQ3  := At( '"', cML )
+               nQ4  := iif( nQ3>0, At( '"', SubStr(cML,nQ3+1) ), 0 )
+               cItCap := iif( nQ3>0 .and. nQ4>0, SubStr(cML,nQ3+1,nQ4-1), "" )
+               cItHndl := ""
+               cItAccl := ""
+               nAct := At( "ACTION ", cMLU )
+               if nAct > 0
+                  cItHndl := SubStr( cML, nAct + 7 )
+                  nPos := At( ' ACCEL "', Upper( cItHndl ) )
+                  if nPos > 0; cItHndl := Left( cItHndl, nPos - 1 ); endif
+                  cItHndl := AllTrim( cItHndl )
+                  if Right(cItHndl,2) == "()" .and. ! "(" $ Left(cItHndl,Len(cItHndl)-2)
+                     cItHndl := Left(cItHndl,Len(cItHndl)-2)
+                  endif
+               endif
+               nAccl := At( 'ACCEL "', cML )
+               if nAccl > 0
+                  cItAccl := SubStr( cML, nAccl+7 )
+                  nQ5 := At( '"', cItAccl )
+                  if nQ5>0; cItAccl := Left(cItAccl,nQ5-1); endif
+               endif
+               nPar3 := iif( Len(aParentStack)>0, ATail(aParentStack), -1 )
+               if ! nFirstNode; cMenuSerial += "|"; endif
+               cMenuSerial += cItCap + Chr(1) + cItAccl + Chr(1) + cItHndl + Chr(1) + ;
+                              "1" + Chr(1) + LTrim(Str(nMenuLevel)) + Chr(1) + LTrim(Str(nPar3))
+               nFirstNode := .F.
+            endif
+            jj++
+         enddo
+         i := jj
+         if ! Empty( cMenuSerial )
+            nCC := UI_GetChildCount( hForm )
+            for jjC := nCC to 1 step -1
+               hC := UI_GetChild( hForm, jjC )
+               if UI_GetType(hC) == 201  // CT_POPUPMENU
                   UI_SetProp( hC, "aMenuItems", cMenuSerial )
                   exit
                endif
@@ -2387,6 +2678,47 @@ static function RestoreFormFromCode( hForm, cCode )
                   UI_SetProp( hCtrl, "aItems", cVal )
                endif
             endif
+         case " LISTVIEW " $ Upper( cTrim )
+            hCtrl := UI_ListViewNew( hForm, nL, nT, nW, nH )
+            // COLUMNS "c1", "c2" ... ITEMS "r1c1;r1c2", "r2c1;r2c2"
+            nPos := At( "COLUMNS ", Upper( cTrim ) )
+            if nPos > 0
+               cText := SubStr( cTrim, nPos + 8 )
+               nPos2 := At( "ITEMS ", Upper( cText ) )
+               if nPos2 > 0; cText := Left( cText, nPos2 - 1 ); endif
+               cVal := ""
+               do while ! Empty( cText )
+                  nPos2 := At( '"', cText )
+                  if nPos2 == 0; exit; endif
+                  cText := SubStr( cText, nPos2 + 1 )
+                  nPos2 := At( '"', cText )
+                  if nPos2 == 0; exit; endif
+                  if ! Empty( cVal ); cVal += "|"; endif
+                  cVal += Left( cText, nPos2 - 1 )
+                  cText := SubStr( cText, nPos2 + 1 )
+               enddo
+               if hCtrl != 0 .and. ! Empty( cVal )
+                  UI_SetProp( hCtrl, "aColumns", cVal )
+               endif
+            endif
+            nPos := At( "ITEMS ", Upper( cTrim ) )
+            if nPos > 0
+               cText := SubStr( cTrim, nPos + 6 )
+               cVal := ""
+               do while ! Empty( cText )
+                  nPos2 := At( '"', cText )
+                  if nPos2 == 0; exit; endif
+                  cText := SubStr( cText, nPos2 + 1 )
+                  nPos2 := At( '"', cText )
+                  if nPos2 == 0; exit; endif
+                  if ! Empty( cVal ); cVal += "|"; endif
+                  cVal += Left( cText, nPos2 - 1 )
+                  cText := SubStr( cText, nPos2 + 1 )
+               enddo
+               if hCtrl != 0 .and. ! Empty( cVal )
+                  UI_SetProp( hCtrl, "aItems", cVal )
+               endif
+            endif
          case " FOLDER " $ Upper( cTrim )
             hCtrl := UI_TabControlNew( hForm, nL, nT, nW, nH )
             nPos := At( "PROMPTS ", Upper( cTrim ) )
@@ -2878,6 +3210,7 @@ static function OnComponentDrop( hForm, nType, nL, nT, nW, nH )
    static aCnt := nil
    static nBandCnt := 0
    static nMenuCnt := 0
+   static nPopupCnt := 0
    static aNames := { ;
       "Label", "Edit", "Button", "CheckBox", "ComboBox", "GroupBox", ;
       "ListBox", "RadioButton", "", "", "", "BitBtn", "SpeedButton", ;
@@ -2915,6 +3248,21 @@ static function OnComponentDrop( hForm, nType, nL, nT, nW, nH )
    if nType == 200
       nMenuCnt++
       cName := "MainMenu" + LTrim( Str( nMenuCnt ) )
+      nCount := UI_GetChildCount( hForm )
+      hCtrl  := UI_GetChild( hForm, nCount )
+      if hCtrl != 0
+         UI_SetProp( hCtrl, "cName", cName )
+      endif
+      SyncDesignerToCode()
+      INS_ComboSelect( _InsGetData(), UI_GetChildCount( hForm ) )
+      InspectorRefresh( hLastCtrl )
+      return nil
+   endif
+
+   // CT_POPUPMENU (201) — same out-of-range handling as MainMenu
+   if nType == 201
+      nPopupCnt++
+      cName := "PopupMenu" + LTrim( Str( nPopupCnt ) )
       nCount := UI_GetChildCount( hForm )
       hCtrl  := UI_GetChild( hForm, nCount )
       if hCtrl != 0
@@ -3627,6 +3975,8 @@ static function TBRun()
    local cResDir, cBackends, cSciInc, cSciCocoa, cLexInc, cSciLib
    local cOldTab, cSepLine, nP1, nP2, cUserCode
    local cAppTitle, cAppName
+   local cMysqlPfx, cPgsqlPfx
+   local cArch, cArchFlags
    local hForm, nCount, hCtrl, oReport, oBand, cBandType, nBandH
    static nLastHash := 0
 
@@ -3736,9 +4086,14 @@ static function TBRun()
    for i := 1 to Len( aModules )
       cAllCode += CodeEditorGetTabText( hCodeEditor, 1 + Len(aForms) + i )
    next
-   nHash := Len( cAllCode )
-   for i := 1 to Min( Len( cAllCode ), 5000 )
-      nHash := nHash + Asc( SubStr( cAllCode, i, 1 ) ) * i
+   // Full-content hash (FNV-1a 32-bit). Previous version sampled only the
+   // first 5000 chars by position — small AI-driven edits (centering a
+   // control, renaming text, etc.) often left it unchanged, so the cached
+   // app got launched instead of being rebuilt.
+   nHash := 2166136261
+   for i := 1 to Len( cAllCode )
+      nHash := hb_BitXor( nHash, Asc( SubStr( cAllCode, i, 1 ) ) )
+      nHash := hb_BitAnd( nHash * 16777619, 4294967295 )
    next
    if nHash == nLastHash .and. nLastHash != 0 .and. ;
       File( cBuildDir + "/" + cAppName + ".app/Contents/MacOS/" + cAppName )
@@ -3897,11 +4252,14 @@ static function TBRun()
       endif
    endif
 
-   // Step 6: Compile Cocoa backend + editor + GT dummy
+   // Step 6: Compile Cocoa backend + editor + GT dummy + DB bindings
    if ! lError
       MAC_ProgressStep( 6, "Compiling Cocoa backend..." )
       cLog += "[6] Compiling Cocoa backend..." + Chr(10)
-      cCmd := "clang -c -O2 -fobjc-arc -I" + cHbInc + ;
+      // Detect host architecture (arm64 or x86_64)
+      cArch := AllTrim( MAC_ShellExec( "uname -m" ) )
+      cArchFlags := iif( cArch == "arm64", " -arch arm64", "" )
+      cCmd := "clang -c -O2" + cArchFlags + " -fobjc-arc -I" + cHbInc + ;
               " " + cBackends + "/cocoa_core.m" + ;
               " -o " + cBuildDir + "/cocoa_core.o 2>&1"
       MAC_ShellExec( cCmd )
@@ -3926,6 +4284,36 @@ static function TBRun()
                  " -o " + cBuildDir + "/stddlgs_mac.o 2>&1"
          MAC_ShellExec( cCmd )
       endif
+      // MySQL bindings: probe brew prefix (Intel + Apple Silicon)
+      cMysqlPfx := ""
+      if hb_DirExists( "/usr/local/opt/mysql-client" )
+         cMysqlPfx := "/usr/local/opt/mysql-client"
+      elseif hb_DirExists( "/opt/homebrew/opt/mysql-client" )
+         cMysqlPfx := "/opt/homebrew/opt/mysql-client"
+      endif
+      if ! Empty( cMysqlPfx )
+         if File( cBackends + "/cocoa_mysql.c" )
+            cCmd := "clang -c -O2" + cArchFlags + " -I" + cHbInc + " -I" + cMysqlPfx + "/include/mysql" + ;
+                    " " + cBackends + "/cocoa_mysql.c" + ;
+                    " -o " + cBuildDir + "/cocoa_mysql.o 2>&1"
+            MAC_ShellExec( cCmd )
+         endif
+      endif
+      // PostgreSQL bindings
+      cPgsqlPfx := ""
+      if hb_DirExists( "/usr/local/opt/libpq" )
+         cPgsqlPfx := "/usr/local/opt/libpq"
+      elseif hb_DirExists( "/opt/homebrew/opt/libpq" )
+         cPgsqlPfx := "/opt/homebrew/opt/libpq"
+      endif
+      if ! Empty( cPgsqlPfx )
+         if File( cBackends + "/cocoa_pgsql.c" )
+            cCmd := "clang -c -O2" + cArchFlags + " -I" + cHbInc + " -I" + cPgsqlPfx + "/include" + ;
+                    " " + cBackends + "/cocoa_pgsql.c" + ;
+                    " -o " + cBuildDir + "/cocoa_pgsql.o 2>&1"
+            MAC_ShellExec( cCmd )
+         endif
+      endif
       cLog += "    OK" + Chr(10)
    endif
 
@@ -3941,6 +4329,8 @@ static function TBRun()
               " " + cBuildDir + "/cocoa_editor.o" + ;
               " " + cBuildDir + "/gt_dummy.o" + ;
               If( File( cBuildDir + "/stddlgs_mac.o" ), " " + cBuildDir + "/stddlgs_mac.o", "" ) + ;
+              If( File( cBuildDir + "/cocoa_mysql.o" ), " " + cBuildDir + "/cocoa_mysql.o", "" ) + ;
+              If( File( cBuildDir + "/cocoa_pgsql.o" ), " " + cBuildDir + "/cocoa_pgsql.o", "" ) + ;
               " " + cBuildDir + "/hix_runtime.o" + ;
               " " + cBuildDir + "/hix_template.o" + ;
               " " + cSciLib + "/libscintilla.a" + ;
@@ -3952,6 +4342,8 @@ static function TBRun()
               " -lrddntx -lrddnsx -lrddcdx -lrddfpt" + ;
               " -lhbhsx -lhbsix -lhbusrrdd" + ;
               " -lgtcgi -lgtstd" + ;
+              If( File( cBuildDir + "/cocoa_mysql.o" ) .and. ! Empty( cMysqlPfx ), " -L" + cMysqlPfx + "/lib -lmysqlclient", "" ) + ;
+              If( File( cBuildDir + "/cocoa_pgsql.o" ) .and. ! Empty( cPgsqlPfx ), " -L" + cPgsqlPfx + "/lib -lpq", "" ) + ;
               " -framework Cocoa -framework QuartzCore -framework MapKit -framework CoreLocation -framework SceneKit -framework WebKit" + If( Val( MAC_ShellExec( "sw_vers -productVersion | cut -d. -f1" ) ) >= 11, " -framework UniformTypeIdentifiers", "" ) + ;
               " -lm -lpthread -lc++ -lsqlite3 -lcups 2>&1"
       cOutput := MAC_ShellExec( cCmd )
@@ -4505,6 +4897,386 @@ static function ShowAIAssistant()
    MAC_AIAssistantPanel()
 return nil
 
+// AIRunProject() - public wrapper called from Obj-C when LLM emits {"action":"run"}
+function AIRunProject()
+   TBRun()
+return nil
+
+// AIResizeForm( nW, nH ) - resize current design form to given size.
+function AIResizeForm( nW, nH )
+   local hForm
+   if oDesignForm == nil
+      return nil
+   endif
+   hForm := oDesignForm:hCpp
+   if HB_ISNUMERIC( nW ) .and. nW > 50
+      UI_SetProp( hForm, "nWidth",  nW )
+   endif
+   if HB_ISNUMERIC( nH ) .and. nH > 50
+      UI_SetProp( hForm, "nHeight", nH )
+   endif
+   InspectorRefresh( hForm )
+   SyncDesignerToCode()
+return nil
+
+// AIFitForm() - resize current form to fit all its child controls.
+function AIFitForm()
+   local hForm, nCount, i, hCtrl, nMaxR := 0, nMaxB := 0, nR, nB
+   if oDesignForm == nil
+      return nil
+   endif
+   hForm := oDesignForm:hCpp
+   nCount := UI_GetChildCount( hForm )
+   for i := 1 to nCount
+      hCtrl := UI_GetChild( hForm, i )
+      if hCtrl == 0
+         loop
+      endif
+      nR := UI_GetProp( hCtrl, "nLeft" ) + UI_GetProp( hCtrl, "nWidth" )
+      nB := UI_GetProp( hCtrl, "nTop" )  + UI_GetProp( hCtrl, "nHeight" )
+      if nR > nMaxR; nMaxR := nR; endif
+      if nB > nMaxB; nMaxB := nB; endif
+   next
+   if nMaxR > 0
+      UI_SetProp( hForm, "nWidth",  nMaxR + 30 )
+   endif
+   if nMaxB > 0
+      UI_SetProp( hForm, "nHeight", nMaxB + 60 )   // extra room for title bar
+   endif
+   InspectorRefresh( hForm )
+   SyncDesignerToCode()
+return nil
+
+// AIDescribeDbf( cPath ) - return JSON array describing fields of a DBF file.
+// Tries cPath as-is, then relative to project dir. Returns "" on failure.
+function AIDescribeDbf( cPath )
+   local aStruct, i, cJson, hField
+   local aFields := {}
+   local cTried := cPath
+   local oErr
+
+   if ! HB_ISCHAR( cPath ) .or. Empty( cPath )
+      return ""
+   endif
+
+   if ! File( cTried )
+      cTried := hb_DirBase() + cPath
+      if ! File( cTried )
+         cTried := "./" + cPath
+      endif
+   endif
+   if ! File( cTried )
+      return ""
+   endif
+
+   begin sequence with { | e | break( e ) }
+      dbUseArea( .T., , cTried, "AIDESCRIBE_TMP", .T., .T. )
+      aStruct := dbStruct()
+      dbCloseArea()
+   recover using oErr
+      aStruct := nil
+   end sequence
+
+   if aStruct == nil .or. ! HB_ISARRAY( aStruct )
+      return ""
+   endif
+
+   for i := 1 to Len( aStruct )
+      hField := { => }
+      hField[ "name" ] := aStruct[i][1]
+      hField[ "type" ] := aStruct[i][2]
+      hField[ "len"  ] := aStruct[i][3]
+      hField[ "dec"  ] := aStruct[i][4]
+      AAdd( aFields, hField )
+   next
+
+   cJson := hb_jsonEncode( aFields )
+return cJson
+
+// AIDescribeActiveForm() - return JSON description of the active design form:
+// title, size, and array of existing controls. Empty string if no active form.
+// Lets the LLM know what controls already exist so it modifies instead of
+// recreating them.
+function AIDescribeActiveForm()
+   local hForm, hSpec, aCtrls := {}, hCtrl, hChild, i, nCount, cType, cName
+   if oDesignForm == nil
+      return ""
+   endif
+   hForm := oDesignForm:hCpp
+   hSpec := { => }
+   hSpec[ "class" ] := AIGetActiveFormClass()
+   hSpec[ "title" ] := UI_GetProp( hForm, "cText" )
+   hSpec[ "w"     ] := UI_GetProp( hForm, "nWidth"  )
+   hSpec[ "h"     ] := UI_GetProp( hForm, "nHeight" )
+   nCount := UI_GetChildCount( hForm )
+   for i := 1 to nCount
+      hChild := UI_GetChild( hForm, i )
+      if hChild == 0
+         loop
+      endif
+      cName := UI_GetProp( hChild, "cName" )
+      if Empty( cName )
+         loop
+      endif
+      cType := UI_GetProp( hChild, "cClassName" )
+      if Empty( cType )
+         cType := "T?"
+      endif
+      hCtrl := { => }
+      hCtrl[ "type" ] := cType
+      hCtrl[ "name" ] := cName
+      hCtrl[ "x"    ] := UI_GetProp( hChild, "nLeft"   )
+      hCtrl[ "y"    ] := UI_GetProp( hChild, "nTop"    )
+      hCtrl[ "w"    ] := UI_GetProp( hChild, "nWidth"  )
+      hCtrl[ "h"    ] := UI_GetProp( hChild, "nHeight" )
+      hCtrl[ "text" ] := UI_GetProp( hChild, "cText"   )
+      AAdd( aCtrls, hCtrl )
+   next
+   hSpec[ "controls" ] := aCtrls
+return hb_jsonEncode( hSpec )
+
+// AIGetActiveFormClass() - return the Harbour CLASS name of the active design
+// form (e.g. "TForm2"). Empty string if there is no active form.
+function AIGetActiveFormClass()
+   local cName
+   if oDesignForm == nil .or. nActiveForm == nil .or. nActiveForm < 1 .or. ;
+      nActiveForm > Len( aForms )
+      return ""
+   endif
+   cName := aForms[ nActiveForm ][ 1 ]   // e.g. "Form2"
+   if Empty( cName )
+      return ""
+   endif
+return "T" + cName
+
+// AIAddCode( cCode ) - append code to the current form's .prg tab and
+// highlight the inserted lines with a green background marker.
+// Triggered when LLM emits {"action":"add_code","code":"..."}.
+// Find an existing child control on hForm by its cName property.
+// Returns the control handle or 0.
+static function AI_FindCtrlByName( hForm, cName )
+   local i, nCount, hChild
+   if Empty( cName ) .or. hForm == 0
+      return 0
+   endif
+   nCount := UI_GetChildCount( hForm )
+   for i := 1 to nCount
+      hChild := UI_GetChild( hForm, i )
+      if hChild != 0 .and. UI_GetProp( hChild, "cName" ) == cName
+         return hChild
+      endif
+   next
+return 0
+
+// Replace every occurrence of "CLASS T<identifier>" in cCode with "CLASS <cNew>"
+// (where cNew already includes the leading T). Identifier = letters/digits/_.
+static function AI_RewriteClassName( cCode, cNew )
+   local cResult := "", nPos, nEnd, cChar, nLen
+   nLen := Len( cCode )
+   nPos := 1
+   do while nPos <= nLen
+      nEnd := hb_At( "CLASS T", cCode, nPos )
+      if nEnd == 0
+         cResult += SubStr( cCode, nPos )
+         exit
+      endif
+      cResult += SubStr( cCode, nPos, nEnd - nPos ) + "CLASS " + cNew
+      nPos := nEnd + 7   // past "CLASS T"
+      // skip the rest of the identifier characters
+      do while nPos <= nLen
+         cChar := SubStr( cCode, nPos, 1 )
+         if ! ( ( cChar >= "A" .and. cChar <= "Z" ) .or. ;
+                ( cChar >= "a" .and. cChar <= "z" ) .or. ;
+                ( cChar >= "0" .and. cChar <= "9" ) .or. ;
+                cChar == "_" )
+            exit
+         endif
+         nPos++
+      enddo
+   enddo
+return cResult
+
+function AIAddCode( cCode )
+   local cExisting, cNew, nTab, nFromLine, nToLine, cActiveCls
+   if ! HB_ISCHAR( cCode ) .or. Empty( cCode )
+      return nil
+   endif
+   nTab := CodeEditorGetActiveTab( hCodeEditor )
+   if nTab < 1
+      return nil
+   endif
+   // Defensive: rewrite any stale "CLASS TFormN" the model emitted to match
+   // the actual active form's class. Catches cases where the few-shot used
+   // TForm1 but the active form is TForm2.
+   cActiveCls := AIGetActiveFormClass()
+   if ! Empty( cActiveCls )
+      cCode := AI_RewriteClassName( cCode, cActiveCls )
+   endif
+   cExisting := CodeEditorGetText2( hCodeEditor, nTab )
+   if ! HB_ISCHAR( cExisting )
+      cExisting := ""
+   endif
+   if ! ( Right( cExisting, 1 ) == Chr(10) )
+      cExisting += Chr(10)
+   endif
+   // Scintilla lines are 0-based: existing lines = number of \n chars
+   nFromLine := Len( hb_ATokens( cExisting + Chr(10), Chr(10) ) ) - 2  // first NEW line (0-based)
+   cNew := cExisting + Chr(10) + cCode + Chr(10)
+   CodeEditorSetTabText( hCodeEditor, nTab, cNew )
+   nToLine := Len( hb_ATokens( cNew, Chr(10) ) ) - 2
+   CodeEditorClearMarks( hCodeEditor )
+   CodeEditorMarkLines( hCodeEditor, nFromLine, nToLine, 32896 )  // 0x008080 = olive BGR
+
+   // Trigger code regeneration so SyncDesignerToCode picks up the new METHOD
+   // and auto-wires the matching ::OnXxx event in CreateForm()
+   SyncDesignerToCode()
+return nil
+
+// AIBuildForm( cJson ) - called from Obj-C after Ollama returns JSON form spec.
+// Public (non-static) so it's reachable via hb_dynsymFindName.
+function AIBuildForm( cJson )
+
+   local hSpec, aCtrls, hCtrlSpec, cType, nL, nT, nW, nH, cText, cName
+   local hForm, hCtrlNew, i, oErr
+
+   if ! HB_ISCHAR( cJson ) .or. Empty( cJson )
+      return nil
+   endif
+
+   begin sequence with { | e | break( e ) }
+      hSpec := hb_jsonDecode( cJson )
+   recover using oErr
+      hSpec := nil
+   end sequence
+
+   if ! HB_ISHASH( hSpec )
+      return nil
+   endif
+
+   // Single rule: "title" key signals a NEW form. Otherwise operate on the
+   // currently-active form. Skill is responsible for choosing the right shape.
+   if "title" $ hSpec
+      MenuNewForm()
+   endif
+   if oDesignForm == nil
+      return nil
+   endif
+   hForm := oDesignForm:hCpp
+
+   // Apply form-level properties when present
+   if "title" $ hSpec .and. HB_ISCHAR( hSpec[ "title" ] )
+      UI_SetProp( hForm, "cText", hSpec[ "title" ] )
+   endif
+   if "w" $ hSpec .and. HB_ISNUMERIC( hSpec[ "w" ] ) .and. hSpec[ "w" ] > 50
+      UI_SetProp( hForm, "nWidth", hSpec[ "w" ] )
+   endif
+   if "h" $ hSpec .and. HB_ISNUMERIC( hSpec[ "h" ] ) .and. hSpec[ "h" ] > 50
+      UI_SetProp( hForm, "nHeight", hSpec[ "h" ] )
+   endif
+
+   // Add or update controls
+   if "controls" $ hSpec .and. HB_ISARRAY( hSpec[ "controls" ] )
+      aCtrls := hSpec[ "controls" ]
+      for i := 1 to Len( aCtrls )
+         hCtrlSpec := aCtrls[ i ]
+         if ! HB_ISHASH( hCtrlSpec )
+            loop
+         endif
+         cType := iif( "type" $ hCtrlSpec .and. HB_ISCHAR( hCtrlSpec[ "type" ] ), Upper( hCtrlSpec[ "type" ] ), "" )
+         nL    := iif( "x" $ hCtrlSpec .and. HB_ISNUMERIC( hCtrlSpec[ "x" ] ), hCtrlSpec[ "x" ], 10 )
+         nT    := iif( "y" $ hCtrlSpec .and. HB_ISNUMERIC( hCtrlSpec[ "y" ] ), hCtrlSpec[ "y" ], 10 )
+         nW    := iif( "w" $ hCtrlSpec .and. HB_ISNUMERIC( hCtrlSpec[ "w" ] ), hCtrlSpec[ "w" ], 80 )
+         nH    := iif( "h" $ hCtrlSpec .and. HB_ISNUMERIC( hCtrlSpec[ "h" ] ), hCtrlSpec[ "h" ], 24 )
+         cText := iif( "text" $ hCtrlSpec .and. HB_ISCHAR( hCtrlSpec[ "text" ] ), hCtrlSpec[ "text" ], "" )
+         cName := iif( "name" $ hCtrlSpec .and. HB_ISCHAR( hCtrlSpec[ "name" ] ), hCtrlSpec[ "name" ], "" )
+
+         // If a control with this name already exists on the form, UPDATE it
+         // (move/resize/relabel) instead of creating a duplicate.
+         hCtrlNew := AI_FindCtrlByName( hForm, cName )
+         if hCtrlNew != 0
+            if "x" $ hCtrlSpec; UI_SetProp( hCtrlNew, "nLeft",   nL ); endif
+            if "y" $ hCtrlSpec; UI_SetProp( hCtrlNew, "nTop",    nT ); endif
+            if "w" $ hCtrlSpec; UI_SetProp( hCtrlNew, "nWidth",  nW ); endif
+            if "h" $ hCtrlSpec; UI_SetProp( hCtrlNew, "nHeight", nH ); endif
+            if "text" $ hCtrlSpec .and. ! Empty( cText )
+               UI_SetProp( hCtrlNew, "cText", cText )
+            endif
+            if "items" $ hCtrlSpec .and. HB_ISARRAY( hCtrlSpec[ "items" ] )
+               UI_SetProp( hCtrlNew, "aItems", hCtrlSpec[ "items" ] )
+            endif
+            loop
+         endif
+
+         do case
+         case cType == "TLABEL"
+            hCtrlNew := UI_LabelNew( hForm, cText, nL, nT, nW, nH )
+         case cType == "TEDIT"
+            hCtrlNew := UI_EditNew( hForm, cText, nL, nT, nW, nH )
+         case cType == "TBUTTON"
+            hCtrlNew := UI_ButtonNew( hForm, cText, nL, nT, nW, nH )
+         case cType == "TCHECKBOX"
+            hCtrlNew := UI_CheckBoxNew( hForm, cText, nL, nT, nW, nH )
+         case cType == "TCOMBOBOX"
+            hCtrlNew := UI_ComboBoxNew( hForm, nL, nT, nW, nH )
+         case cType == "TGROUPBOX"
+            hCtrlNew := UI_GroupBoxNew( hForm, cText, nL, nT, nW, nH )
+         case cType == "TRADIOBUTTON"
+            hCtrlNew := UI_RadioButtonNew( hForm, cText, nL, nT, nW, nH )
+         case cType == "TMEMO"
+            hCtrlNew := UI_MemoNew( hForm, cText, nL, nT, nW, nH )
+         case cType == "TTREEVIEW"
+            hCtrlNew := UI_TreeViewNew( hForm, nL, nT, nW, nH )
+         case cType == "TLISTVIEW"
+            hCtrlNew := UI_ListViewNew( hForm, nL, nT, nW, nH )
+         case cType == "TLISTBOX"
+            hCtrlNew := UI_ListBoxNew( hForm, nL, nT, nW, nH )
+         case cType == "TPROGRESSBAR"
+            hCtrlNew := UI_ProgressBarNew( hForm, nL, nT, nW, nH )
+         case cType == "TIMAGE"
+            hCtrlNew := UI_ImageNew( hForm, nL, nT, nW, nH )
+         case cType == "TBEVEL"
+            hCtrlNew := UI_BevelNew( hForm, nL, nT, nW, nH )
+         case cType == "TSHAPE"
+            hCtrlNew := UI_ShapeNew( hForm, nL, nT, nW, nH )
+         case cType == "TBITBTN"
+            hCtrlNew := UI_BitBtnNew( hForm, cText, nL, nT, nW, nH )
+         case cType == "TTABCONTROL"
+            hCtrlNew := UI_TabControlNew( hForm, nL, nT, nW, nH )
+         case cType == "TMASKEDIT"
+            hCtrlNew := UI_MaskEditNew( hForm, cText, nL, nT, nW, nH )   // cText carries the mask string
+         case cType == "TSTRINGGRID"
+            hCtrlNew := UI_StringGridNew( hForm, nL, nT, nW, nH )
+         case cType == "TSPEEDBUTTON"
+            hCtrlNew := UI_SpeedBtnNew( hForm, cText, nL, nT, nW, nH )
+         case cType == "TSTATICTEXT"
+            hCtrlNew := UI_StaticTextNew( hForm, cText, nL, nT, nW, nH )
+         case cType == "TSCROLLBOX"
+            hCtrlNew := UI_ScrollBoxNew( hForm, nL, nT, nW, nH )
+         case cType == "TLABELEDEDIT"
+            hCtrlNew := UI_LabeledEditNew( hForm, cText, nL, nT, nW, nH )
+         endcase
+
+         if hCtrlNew != nil .and. hCtrlNew != 0
+            if ! Empty( cName )
+               UI_SetProp( hCtrlNew, "cName", cName )
+            endif
+            if "items" $ hCtrlSpec .and. HB_ISARRAY( hCtrlSpec[ "items" ] )
+               UI_SetProp( hCtrlNew, "aItems", hCtrlSpec[ "items" ] )
+            endif
+         endif
+      next
+   endif
+
+   // Refresh inspector and regenerate code
+   // Materialize NSViews for the newly-added controls (form already shown)
+   UI_FormRealizeChildren( hForm )
+
+   InspectorPopulateCombo( hForm )
+   InspectorRefresh( hForm )
+   SyncDesignerToCode()
+
+return nil
+
 // === Project Inspector ===
 
 static function ShowProjectInspector()
@@ -4777,7 +5549,7 @@ static function IsNonVisual( nType )
       nType == 140 .or. nType == 141 .or. nType == 142
       return .F.
    endif
-   if nType == 200  // CT_MAINMENU
+   if nType == 200 .or. nType == 201  // CT_MAINMENU / CT_POPUPMENU
       return .T.
    endif
 return nType >= 38
@@ -4877,6 +5649,7 @@ static function ComponentTypeName( nType )
       case nType == 131; return "CT_COMPARRAY"
       case nType == 132; return "CT_BAND"
       case nType == 200; return "CT_MAINMENU"
+      case nType == 201; return "CT_POPUPMENU"
       case nType == 133; return "CT_REPORTLABEL"
       case nType == 134; return "CT_REPORTFIELD"
       case nType == 135; return "CT_REPORTIMAGE"
@@ -4929,7 +5702,7 @@ static function ResolveComponentType( cName )
       { "CT_COMPARRAY", 131 }, ;
       { "CT_BAND", 132 }, ;
       { "CT_REPORTLABEL", 133 }, { "CT_REPORTFIELD", 134 }, { "CT_REPORTIMAGE", 135 }, ;
-      { "CT_MAINMENU", 200 } }
+      { "CT_MAINMENU", 200 }, { "CT_POPUPMENU", 201 } }
    for i := 1 to Len( aMap )
       if Upper( cName ) == aMap[i][1]
          return aMap[i][2]

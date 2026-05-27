@@ -8,7 +8,7 @@ PROCEDURE Main()
    local oApp
 
    oApp := TApplication():New()
-   oApp:Title := "WebServer Demo"
+   oApp:cTitle := "WebServer Demo"
    oApp:CreateForm( TForm1():New() )
    oApp:Run()
 

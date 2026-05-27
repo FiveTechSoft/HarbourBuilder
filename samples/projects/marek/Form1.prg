@@ -18,12 +18,12 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "Okno główne aplikacji test1"
-   ::Left   := 1011
-   ::Top    := 260
-   ::Width  := 709
-   ::Height := 436
-   ::Color  := 16776563
+   ::cTitle  := "Okno główne aplikacji test1"
+   ::nLeft   := 1011
+   ::nTop    := 260
+   ::nWidth  := 709
+   ::nHeight := 436
+   ::nClrPane  := 16776563
 
    @ 24, 328 SAY ::oLabel1 PROMPT "To moja aplikacja testowa" OF Self SIZE 320
    ::oLabel1:nClrPane := 9640787
@@ -56,9 +56,9 @@ return nil
 //--------------------------------------------------------------------
 static function Button1Click( oForm )
 
-	//W32_MsgBox(::PoleTekstowe:Text)
-   msginfo( oForm:oEdit1:Text)
-	hb_memowrit("/users/marekolszewski/projekty/test1/test1.txt", oForm:oEdit1:Text)
+	//W32_MsgBox(::PoleTekstowe:cText)
+   msginfo( oForm:oEdit1:cText)
+	hb_memowrit("/users/marekolszewski/projekty/test1/test1.txt", oForm:oEdit1:cText)
 
 return nil
 

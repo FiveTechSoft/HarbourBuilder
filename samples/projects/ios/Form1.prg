@@ -17,12 +17,12 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "Hello iOS"
-   ::Left   := 1056
-   ::Top    := 260
-   ::Width  := 400
-   ::Height := 600
-   ::Color  := 10679296
+   ::cTitle  := "Hello iOS"
+   ::nLeft   := 1056
+   ::nTop    := 260
+   ::nWidth  := 400
+   ::nHeight := 600
+   ::nClrPane  := 10679296
 
    @ 20, 20 SAY ::oLabel1 PROMPT "Type your name:" OF Self SIZE 300
    ::oLabel1:oFont := ".AppleSystemUIFont,12"
@@ -39,7 +39,7 @@ return nil
 
 static function Button1Click( oForm )
 
-   oForm:oLabel1:Text := "Hello, " + oForm:oEdit1:Text + " !"
+   oForm:oLabel1:cText := "Hello, " + oForm:oEdit1:cText + " !"
 
 return nil
 

@@ -7,7 +7,7 @@ function Main()
    local oApp
 
    oApp := TApplication():New()
-   oApp:Title := "Report"
+   oApp:cTitle := "Report"
    oApp:CreateForm( TForm1():New() )
    oApp:Run()
 

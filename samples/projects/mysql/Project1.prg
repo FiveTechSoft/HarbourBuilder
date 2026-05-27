@@ -9,17 +9,17 @@ PROCEDURE Main()
    local oForm1
 
    oApp := TApplication():New()
-   oApp:Title := "TMySQL Sample"
+   oApp:cTitle := "TMySQL Sample"
 
    oForm1 := TForm1():New()
    oApp:CreateForm( oForm1 )
 
    // Wire MySQL events on the connection component
-   oForm1:oDb1:bOnConnect    := { || oForm1:oStatus1:Text := "Connected to " + ;
+   oForm1:oDb1:bOnConnect    := { || oForm1:oStatus1:cText := "Connected to " + ;
                                        oForm1:oDb1:cServer + ":" + ;
                                        hb_ValToStr( oForm1:oDb1:nPort ) }
-   oForm1:oDb1:bOnDisconnect := { || oForm1:oStatus1:Text := "Disconnected" }
-   oForm1:oDb1:bOnError      := { | cMsg | oForm1:oStatus1:Text := "ERROR: " + cMsg }
+   oForm1:oDb1:bOnDisconnect := { || oForm1:oStatus1:cText := "Disconnected" }
+   oForm1:oDb1:bOnError      := { | cMsg | oForm1:oStatus1:cText := "ERROR: " + cMsg }
 
    // Wire button click
    oForm1:oBtnConnect:OnClick := { || ConnectAndList( oForm1 ) }
@@ -35,11 +35,11 @@ static function ConnectAndList( oForm )
    local aTables, i
 
    // Push current edit values into the component
-   oForm:oDb1:cServer   := oForm:oEdHost:Text
-   oForm:oDb1:nPort     := Val( oForm:oEdPort:Text )
-   oForm:oDb1:cUser     := oForm:oEdUser:Text
-   oForm:oDb1:cPassword := oForm:oEdPass:Text
-   oForm:oDb1:cDatabase := oForm:oEdDb:Text
+   oForm:oDb1:cServer   := oForm:oEdHost:cText
+   oForm:oDb1:nPort     := Val( oForm:oEdPort:cText )
+   oForm:oDb1:cUser     := oForm:oEdUser:cText
+   oForm:oDb1:cPassword := oForm:oEdPass:cText
+   oForm:oDb1:cDatabase := oForm:oEdDb:cText
 
    if oForm:oDb1:IsConnected()
       oForm:oDb1:Close()
@@ -54,7 +54,7 @@ static function ConnectAndList( oForm )
    for i := 1 to Len( aTables )
       oForm:oLstTables:Add( aTables[ i ] )
    next
-   oForm:oStatus1:Text := "Connected. " + hb_ValToStr( Len( aTables ) ) + " table(s)."
+   oForm:oStatus1:cText := "Connected. " + hb_ValToStr( Len( aTables ) ) + " table(s)."
 
 return nil
 
@@ -64,13 +64,13 @@ static function ExecQuery( oForm )
    local cSQL, aRows, aRow, cOut := "", i, j
 
    if ! oForm:oDb1:IsConnected()
-      oForm:oStatus1:Text := "Connect first."
+      oForm:oStatus1:cText := "Connect first."
       return nil
    endif
 
-   cSQL := AllTrim( oForm:oMemSQL:Text )
+   cSQL := AllTrim( oForm:oMemSQL:cText )
    if Empty( cSQL )
-      oForm:oStatus1:Text := "Enter a SQL statement."
+      oForm:oStatus1:cText := "Enter a SQL statement."
       return nil
    endif
 
@@ -92,7 +92,7 @@ static function ExecQuery( oForm )
       endif
    endif
 
-   oForm:oMemOut:Text := cOut
+   oForm:oMemOut:cText := cOut
 
 return nil
 //--------------------------------------------------------------------

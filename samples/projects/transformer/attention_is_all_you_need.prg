@@ -159,6 +159,6 @@ static function RunPipeline()
    cOut += "COMPLETE - The entire forward pass of a Transformer" + e
    cOut += cSep
 
-   oOutput:Text := cOut
+   oOutput:cText := cOut
 
 return nil

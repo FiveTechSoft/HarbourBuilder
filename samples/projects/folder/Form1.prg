@@ -16,12 +16,12 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "Form1"
-   ::Left   := 514
-   ::Top    := 236
-   ::Width  := 650
-   ::Height := 421
-   ::Color  := 2960685
+   ::cTitle  := "Form1"
+   ::nLeft   := 514
+   ::nTop    := 236
+   ::nWidth  := 650
+   ::nHeight := 421
+   ::nClrPane  := 2960685
 
    @ 48, 144 FOLDER ::oFolder1 OF Self SIZE 355, 194 PROMPTS "Uno", "Dos", "Tres"
    ::oFolder1:oFont := "Segoe UI,12"

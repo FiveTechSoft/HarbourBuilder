@@ -22,11 +22,11 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "TJava — Getting started"
-   ::Left   := 260
-   ::Top    := 150
-   ::Width  := 660
-   ::Height := 540
+   ::cTitle  := "TJava — Getting started"
+   ::nLeft   := 260
+   ::nTop    := 150
+   ::nWidth  := 660
+   ::nHeight := 540
 
    COMPONENT ::oJava TYPE CT_JAVA OF Self
    ::oJava:cRuntimePath := ""
@@ -58,7 +58,7 @@ METHOD CreateForm() CLASS TForm1
    @ 320, 16 SAY ::oLblOutput PROMPT "Output:" OF Self SIZE 200
    @ 340, 16 MEMO ::oOutput OF Self SIZE 624, 160
 
-   ::oScriptEdit:Text := ;
+   ::oScriptEdit:cText := ;
       "public class Main {" + Chr(10) + ;
       "    public static void main(String[] a) {" + Chr(10) + ;
       "        System.out.println(\"Hello, world from Java!\");" + Chr(10) + ;
@@ -91,17 +91,17 @@ METHOD LoadSample( nIdx ) CLASS TForm1
    case nIdx == 4
       cCode := "Math.sqrt(144) + 1"
    endcase
-   ::oScriptEdit:Text := cCode
+   ::oScriptEdit:cText := cCode
 return nil
 //--------------------------------------------------------------------
 
 METHOD DoRun() CLASS TForm1
    ::Log( "=== Run ===" )
-   ::oJava:Exec( ::oScriptEdit:Text )
+   ::oJava:Exec( ::oScriptEdit:cText )
 return nil
 
 METHOD DoEval() CLASS TForm1
-   local cExpr := AllTrim( ::oScriptEdit:Text ), cValue
+   local cExpr := AllTrim( ::oScriptEdit:cText ), cValue
    if Empty( cExpr ); ::Log( "(empty)" ); return nil; endif
    cValue := ::oJava:Eval( cExpr )
    ::Log( "=== Eval: " + cExpr + " ===" )
@@ -110,14 +110,14 @@ return nil
 
 METHOD DoBuild() CLASS TForm1
    ::Log( "=== Build ===" )
-   ::oJava:Build( ::oScriptEdit:Text )
+   ::oJava:Build( ::oScriptEdit:cText )
 return nil
 
 METHOD DoClear() CLASS TForm1
-   ::oOutput:Text := ""
+   ::oOutput:cText := ""
 return nil
 
 METHOD Log( cMsg ) CLASS TForm1
-   ::oOutput:Text := ::oOutput:Text + cMsg + Chr(10)
+   ::oOutput:cText := ::oOutput:cText + cMsg + Chr(10)
 return nil
 //--------------------------------------------------------------------

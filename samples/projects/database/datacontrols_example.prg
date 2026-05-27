@@ -71,28 +71,28 @@ function Main()
    ?
 
    oDS:MoveFirst()
-   ? "First: " + oName:Text + " | " + oDept:Text
+   ? "First: " + oName:cText + " | " + oDept:cText
 
    oDS:MoveNext()
-   ? "Next:  " + oName:Text + " | " + oDept:Text
+   ? "Next:  " + oName:cText + " | " + oDept:cText
 
    oDS:MoveNext()
-   ? "Next:  " + oName:Text + " | " + oDept:Text
+   ? "Next:  " + oName:cText + " | " + oDept:cText
 
    oDS:MoveLast()
-   ? "Last:  " + oName:Text + " | " + oDept:Text
+   ? "Last:  " + oName:cText + " | " + oDept:cText
 
    oDS:MovePrev()
-   ? "Prev:  " + oName:Text + " | " + oDept:Text
+   ? "Prev:  " + oName:cText + " | " + oDept:cText
 
    ?
    ? "Navigator buttons:"
    oNav:First()
-   ? "  First(): " + oName:Text
+   ? "  First(): " + oName:cText
    oNav:Next()
-   ? "  Next():  " + oName:Text
+   ? "  Next():  " + oName:cText
    oNav:Last()
-   ? "  Last():  " + oName:Text
+   ? "  Last():  " + oName:cText
 
    ?
    ? "Total records: " + LTrim(Str(oDb:RecCount()))

@@ -25,11 +25,11 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "TPostgreSQL Demo (props + events + cursor)"
-   ::Left   := 200
-   ::Top    := 100
-   ::Width  := 820
-   ::Height := 620
+   ::cTitle  := "TPostgreSQL Demo (props + events + cursor)"
+   ::nLeft   := 200
+   ::nTop    := 100
+   ::nWidth  := 820
+   ::nHeight := 620
 
    // --- Non-visual TPostgreSQL component ---
    COMPONENT ::oDb1 TYPE CT_POSTGRESQL OF Self

@@ -11,7 +11,7 @@ PROCEDURE Main()
    local oApp
 
    oApp := TApplication():New()
-   oApp:Title := "WebView Demo"
+   oApp:cTitle := "WebView Demo"
    oApp:CreateForm( TForm1():New() )
    oApp:Run()
 

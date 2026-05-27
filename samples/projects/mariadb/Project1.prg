@@ -8,16 +8,16 @@ PROCEDURE Main()
    local oApp, oForm1
 
    oApp := TApplication():New()
-   oApp:Title := "TMariaDB Sample"
+   oApp:cTitle := "TMariaDB Sample"
 
    oForm1 := TForm1():New()
    oApp:CreateForm( oForm1 )
 
-   oForm1:oDb1:bOnConnect    := { || oForm1:oStatus1:Text := "Connected to MariaDB " + ;
+   oForm1:oDb1:bOnConnect    := { || oForm1:oStatus1:cText := "Connected to MariaDB " + ;
                                        oForm1:oDb1:cServer + ":" + ;
                                        hb_ValToStr( oForm1:oDb1:nPort ) }
-   oForm1:oDb1:bOnDisconnect := { || oForm1:oStatus1:Text := "Disconnected" }
-   oForm1:oDb1:bOnError      := { | cMsg | oForm1:oStatus1:Text := "ERROR: " + cMsg }
+   oForm1:oDb1:bOnDisconnect := { || oForm1:oStatus1:cText := "Disconnected" }
+   oForm1:oDb1:bOnError      := { | cMsg | oForm1:oStatus1:cText := "ERROR: " + cMsg }
 
    oForm1:oBtnConnect:OnClick := { || ConnectAndList( oForm1 ) }
    oForm1:oBtnExec:OnClick    := { || ExecQuery( oForm1 ) }
@@ -31,11 +31,11 @@ static function ConnectAndList( oForm )
 
    local aTables, i
 
-   oForm:oDb1:cServer   := oForm:oEdHost:Text
-   oForm:oDb1:nPort     := Val( oForm:oEdPort:Text )
-   oForm:oDb1:cUser     := oForm:oEdUser:Text
-   oForm:oDb1:cPassword := oForm:oEdPass:Text
-   oForm:oDb1:cDatabase := oForm:oEdDb:Text
+   oForm:oDb1:cServer   := oForm:oEdHost:cText
+   oForm:oDb1:nPort     := Val( oForm:oEdPort:cText )
+   oForm:oDb1:cUser     := oForm:oEdUser:cText
+   oForm:oDb1:cPassword := oForm:oEdPass:cText
+   oForm:oDb1:cDatabase := oForm:oEdDb:cText
 
    if oForm:oDb1:IsConnected()
       oForm:oDb1:Close()
@@ -47,7 +47,7 @@ static function ConnectAndList( oForm )
    for i := 1 to Len( aTables )
       oForm:oLstTables:Add( aTables[ i ] )
    next
-   oForm:oStatus1:Text := "Connected. " + hb_ValToStr( Len( aTables ) ) + " table(s)."
+   oForm:oStatus1:cText := "Connected. " + hb_ValToStr( Len( aTables ) ) + " table(s)."
 
 return nil
 
@@ -57,11 +57,11 @@ static function ExecQuery( oForm )
    local cSQL, aRows, aRow, cOut := "", i, j
 
    if ! oForm:oDb1:IsConnected()
-      oForm:oStatus1:Text := "Connect first."
+      oForm:oStatus1:cText := "Connect first."
       return nil
    endif
 
-   cSQL := AllTrim( oForm:oMemSQL:Text )
+   cSQL := AllTrim( oForm:oMemSQL:cText )
    if Empty( cSQL ); return nil; endif
 
    if Upper( Left( cSQL, 6 ) ) == "SELECT" .or. Upper( Left( cSQL, 4 ) ) == "SHOW"
@@ -82,7 +82,7 @@ static function ExecQuery( oForm )
       endif
    endif
 
-   oForm:oMemOut:Text := cOut
+   oForm:oMemOut:cText := cOut
 
 return nil
 //--------------------------------------------------------------------

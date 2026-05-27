@@ -15,11 +15,11 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "Form1"
-   ::Left   := 970
-   ::Top    := 281
-   ::Width  := 400
-   ::Height := 300
+   ::cTitle  := "Form1"
+   ::nLeft   := 970
+   ::nTop    := 281
+   ::nWidth  := 400
+   ::nHeight := 300
 
    COMPONENT ::oDBFTable1 TYPE CT_DBFTABLE OF Self  // TDbfTable @ 24,236
    ::oDBFTable1:cFileName := CustomerDbfPath()

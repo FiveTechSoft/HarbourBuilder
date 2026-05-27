@@ -22,11 +22,11 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "TDotNet — Getting started"
-   ::Left   := 240
-   ::Top    := 140
-   ::Width  := 660
-   ::Height := 540
+   ::cTitle  := "TDotNet — Getting started"
+   ::nLeft   := 240
+   ::nTop    := 140
+   ::nWidth  := 660
+   ::nHeight := 540
 
    COMPONENT ::oDotNet TYPE CT_DOTNET OF Self
    ::oDotNet:cRuntimePath := ""
@@ -57,7 +57,7 @@ METHOD CreateForm() CLASS TForm1
    @ 320, 16 SAY ::oLblOutput PROMPT "Output:" OF Self SIZE 200
    @ 340, 16 MEMO ::oOutput OF Self SIZE 624, 160
 
-   ::oScriptEdit:Text := ;
+   ::oScriptEdit:cText := ;
       "using System;" + Chr(10) + ;
       "Console.WriteLine(\"Hello, world from .NET!\");" + Chr(10)
 
@@ -80,17 +80,17 @@ METHOD LoadSample( nIdx ) CLASS TForm1
    case nIdx == 4
       cCode := "Math.Sqrt(144) + 1"
    endcase
-   ::oScriptEdit:Text := cCode
+   ::oScriptEdit:cText := cCode
 return nil
 //--------------------------------------------------------------------
 
 METHOD DoRun() CLASS TForm1
    ::Log( "=== Run (this can take 5-15s on first build) ===" )
-   ::oDotNet:Exec( ::oScriptEdit:Text )
+   ::oDotNet:Exec( ::oScriptEdit:cText )
 return nil
 
 METHOD DoEval() CLASS TForm1
-   local cExpr := AllTrim( ::oScriptEdit:Text ), cValue
+   local cExpr := AllTrim( ::oScriptEdit:cText ), cValue
    if Empty( cExpr ); ::Log( "(empty)" ); return nil; endif
    cValue := ::oDotNet:Eval( cExpr )
    ::Log( "=== Eval: " + cExpr + " ===" )
@@ -99,14 +99,14 @@ return nil
 
 METHOD DoBuild() CLASS TForm1
    ::Log( "=== Build ===" )
-   ::oDotNet:Build( ::oScriptEdit:Text )
+   ::oDotNet:Build( ::oScriptEdit:cText )
 return nil
 
 METHOD DoClear() CLASS TForm1
-   ::oOutput:Text := ""
+   ::oOutput:cText := ""
 return nil
 
 METHOD Log( cMsg ) CLASS TForm1
-   ::oOutput:Text := ::oOutput:Text + cMsg + Chr(10)
+   ::oOutput:cText := ::oOutput:cText + cMsg + Chr(10)
 return nil
 //--------------------------------------------------------------------

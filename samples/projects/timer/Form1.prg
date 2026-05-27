@@ -15,11 +15,11 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "Form1"
-   ::Left   := 100
-   ::Top    := 100
-   ::Width  := 400
-   ::Height := 300
+   ::cTitle  := "Form1"
+   ::nLeft   := 100
+   ::nTop    := 100
+   ::nWidth  := 400
+   ::nHeight := 300
 
    COMPONENT ::oTimer1 TYPE CT_TIMER OF Self  // TTimer
 
@@ -32,7 +32,7 @@ return nil
 //--------------------------------------------------------------------
 static function Timer1Timer( oForm )
 
-   oForm:Title := Time()
+   oForm:cTitle := Time()
 
 return nil
 

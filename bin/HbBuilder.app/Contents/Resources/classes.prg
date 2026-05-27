@@ -4,6 +4,15 @@
 #include "hbclass.ch"
 #include "hbide.ch"
 
+// xHarbour does not predefine __PLATFORM__WINDOWS. The xHarbour build path
+// is Win32-only, so normalize the macro here — otherwise platform #ifdefs
+// fall through to the GTK/Unix branch and pull in unresolved externals.
+#ifdef __XHARBOUR__
+   #ifndef __PLATFORM__WINDOWS
+      #define __PLATFORM__WINDOWS
+   #endif
+#endif
+
 #ifdef __PLATFORM__WINDOWS
 EXTERNAL UI_STORECLRPANE
 EXTERNAL UI_HASHANDLE
@@ -27,26 +36,26 @@ CLASS TControl
    DATA hCpp    INIT 0
    DATA oParent INIT nil
 
-   ACCESS Name      INLINE UI_GetProp( ::hCpp, "cName" )
-   ASSIGN Name( c ) INLINE UI_SetProp( ::hCpp, "cName", c )
+   ACCESS cName     INLINE UI_GetProp( ::hCpp, "cName" )
+   ASSIGN cName( c ) INLINE UI_SetProp( ::hCpp, "cName", c )
 
-   ACCESS Left      INLINE UI_GetProp( ::hCpp, "nLeft" )
-   ASSIGN Left( n ) INLINE UI_SetProp( ::hCpp, "nLeft", n )
+   ACCESS nLeft     INLINE UI_GetProp( ::hCpp, "nLeft" )
+   ASSIGN nLeft( n ) INLINE UI_SetProp( ::hCpp, "nLeft", n )
 
-   ACCESS Top       INLINE UI_GetProp( ::hCpp, "nTop" )
-   ASSIGN Top( n )  INLINE UI_SetProp( ::hCpp, "nTop", n )
+   ACCESS nTop      INLINE UI_GetProp( ::hCpp, "nTop" )
+   ASSIGN nTop( n ) INLINE UI_SetProp( ::hCpp, "nTop", n )
 
-   ACCESS Width     INLINE UI_GetProp( ::hCpp, "nWidth" )
-   ASSIGN Width( n ) INLINE UI_SetProp( ::hCpp, "nWidth", n )
+   ACCESS nWidth    INLINE UI_GetProp( ::hCpp, "nWidth" )
+   ASSIGN nWidth( n ) INLINE UI_SetProp( ::hCpp, "nWidth", n )
 
-   ACCESS Height    INLINE UI_GetProp( ::hCpp, "nHeight" )
-   ASSIGN Height( n ) INLINE UI_SetProp( ::hCpp, "nHeight", n )
+   ACCESS nHeight   INLINE UI_GetProp( ::hCpp, "nHeight" )
+   ASSIGN nHeight( n ) INLINE UI_SetProp( ::hCpp, "nHeight", n )
 
-   ACCESS Text      INLINE UI_GetProp( ::hCpp, "cText" )
-   ASSIGN Text( c ) INLINE UI_SetProp( ::hCpp, "cText", c )
+   ACCESS cText     INLINE UI_GetProp( ::hCpp, "cText" )
+   ASSIGN cText( c ) INLINE UI_SetProp( ::hCpp, "cText", c )
 
-   ACCESS Enabled        INLINE UI_GetProp( ::hCpp, "lEnabled" )
-   ASSIGN Enabled( l )   INLINE UI_SetProp( ::hCpp, "lEnabled", l )
+   ACCESS lEnabled       INLINE UI_GetProp( ::hCpp, "lEnabled" )
+   ASSIGN lEnabled( l )  INLINE UI_SetProp( ::hCpp, "lEnabled", l )
 
    ASSIGN OnClick( b )  INLINE UI_OnEvent( ::hCpp, "OnClick", b )
    ASSIGN OnChange( b ) INLINE UI_OnEvent( ::hCpp, "OnChange", b )
@@ -56,9 +65,7 @@ CLASS TControl
    ACCESS oFont            INLINE UI_GetProp( ::hCpp, "oFont" )
    ASSIGN oFont( c )       INLINE UI_SetProp( ::hCpp, "oFont", c )
 
-   // Color / nClrPane (available on all controls, not just forms)
-   ACCESS Color            INLINE UI_GetProp( ::hCpp, "nClrPane" )
-   ASSIGN Color( n )       INLINE UI_SetProp( ::hCpp, "nClrPane", n )
+   // nClrPane (available on all controls, not just forms)
    ACCESS nClrPane         INLINE UI_GetProp( ::hCpp, "nClrPane" )
    ASSIGN nClrPane( n )    INLINE UI_SetProp( ::hCpp, "nClrPane", n )
 
@@ -71,8 +78,8 @@ CLASS TControl
    ACCESS nAlign           INLINE UI_GetProp( ::hCpp, "nAlign" )
    ASSIGN nAlign( n )      INLINE UI_SetProp( ::hCpp, "nAlign", n )
 
-   ACCESS ControlAlign     INLINE UI_GetProp( ::hCpp, "nControlAlign" )
-   ASSIGN ControlAlign( n ) INLINE UI_SetProp( ::hCpp, "nControlAlign", n )
+   ACCESS nControlAlign     INLINE UI_GetProp( ::hCpp, "nControlAlign" )
+   ASSIGN nControlAlign( n ) INLINE UI_SetProp( ::hCpp, "nControlAlign", n )
 
    // TPageControl ownership
    ASSIGN oOwner( o )      INLINE UI_SetCtrlOwner( ::hCpp, ;
@@ -89,79 +96,79 @@ ENDCLASS
 
 CLASS TForm INHERIT TControl
 
-   // Title (alias for Text - C++Builder uses Caption/Title)
-   ACCESS Title         INLINE UI_GetProp( ::hCpp, "cText" )
-   ASSIGN Title( c )    INLINE UI_SetProp( ::hCpp, "cText", c )
+   // Title (stored in cText)
+   ACCESS cTitle        INLINE UI_GetProp( ::hCpp, "cText" )
+   ASSIGN cTitle( c )   INLINE UI_SetProp( ::hCpp, "cText", c )
 
    // AppTitle (application menu name on macOS, window title on Windows)
-   ACCESS AppTitle      INLINE UI_GetProp( ::hCpp, "cAppTitle" )
-   ASSIGN AppTitle( c ) INLINE UI_SetProp( ::hCpp, "cAppTitle", c )
+   ACCESS cAppTitle     INLINE UI_GetProp( ::hCpp, "cAppTitle" )
+   ASSIGN cAppTitle( c ) INLINE UI_SetProp( ::hCpp, "cAppTitle", c )
 
    // Font
-   ACCESS FontName      INLINE UI_GetProp( ::hCpp, "cFontName" )
-   ASSIGN FontName( c ) INLINE UI_SetProp( ::hCpp, "cFontName", c )
+   ACCESS cFontName     INLINE UI_GetProp( ::hCpp, "cFontName" )
+   ASSIGN cFontName( c ) INLINE UI_SetProp( ::hCpp, "cFontName", c )
 
-   ACCESS FontSize      INLINE UI_GetProp( ::hCpp, "nFontSize" )
-   ASSIGN FontSize( n ) INLINE UI_SetProp( ::hCpp, "nFontSize", n )
+   ACCESS nFontSize     INLINE UI_GetProp( ::hCpp, "nFontSize" )
+   ASSIGN nFontSize( n ) INLINE UI_SetProp( ::hCpp, "nFontSize", n )
 
    // Window appearance
-   ACCESS BorderStyle      INLINE UI_GetProp( ::hCpp, "nBorderStyle" )
-   ASSIGN BorderStyle( n ) INLINE UI_SetProp( ::hCpp, "nBorderStyle", n )
+   ACCESS nBorderStyle     INLINE UI_GetProp( ::hCpp, "nBorderStyle" )
+   ASSIGN nBorderStyle( n ) INLINE UI_SetProp( ::hCpp, "nBorderStyle", n )
 
-   ACCESS BorderIcons      INLINE UI_GetProp( ::hCpp, "nBorderIcons" )
-   ASSIGN BorderIcons( n ) INLINE UI_SetProp( ::hCpp, "nBorderIcons", n )
+   ACCESS nBorderIcons      INLINE UI_GetProp( ::hCpp, "nBorderIcons" )
+   ASSIGN nBorderIcons( n ) INLINE UI_SetProp( ::hCpp, "nBorderIcons", n )
 
-   ACCESS BorderWidth      INLINE UI_GetProp( ::hCpp, "nBorderWidth" )
-   ASSIGN BorderWidth( n ) INLINE UI_SetProp( ::hCpp, "nBorderWidth", n )
+   ACCESS nBorderWidth      INLINE UI_GetProp( ::hCpp, "nBorderWidth" )
+   ASSIGN nBorderWidth( n ) INLINE UI_SetProp( ::hCpp, "nBorderWidth", n )
 
-   ACCESS Position         INLINE UI_GetProp( ::hCpp, "nPosition" )
-   ASSIGN Position( n )    INLINE UI_SetProp( ::hCpp, "nPosition", n )
+   ACCESS nPosition         INLINE UI_GetProp( ::hCpp, "nPosition" )
+   ASSIGN nPosition( n )    INLINE UI_SetProp( ::hCpp, "nPosition", n )
 
-   ACCESS WindowState      INLINE UI_GetProp( ::hCpp, "nWindowState" )
-   ASSIGN WindowState( n ) INLINE UI_SetProp( ::hCpp, "nWindowState", n )
+   ACCESS nWindowState      INLINE UI_GetProp( ::hCpp, "nWindowState" )
+   ASSIGN nWindowState( n ) INLINE UI_SetProp( ::hCpp, "nWindowState", n )
 
-   ACCESS FormStyle        INLINE UI_GetProp( ::hCpp, "nFormStyle" )
-   ASSIGN FormStyle( n )   INLINE UI_SetProp( ::hCpp, "nFormStyle", n )
+   ACCESS nFormStyle        INLINE UI_GetProp( ::hCpp, "nFormStyle" )
+   ASSIGN nFormStyle( n )   INLINE UI_SetProp( ::hCpp, "nFormStyle", n )
 
-   ACCESS Cursor           INLINE UI_GetProp( ::hCpp, "nCursor" )
-   ASSIGN Cursor( n )      INLINE UI_SetProp( ::hCpp, "nCursor", n )
+   ACCESS nCursor           INLINE UI_GetProp( ::hCpp, "nCursor" )
+   ASSIGN nCursor( n )      INLINE UI_SetProp( ::hCpp, "nCursor", n )
 
    // Behavior
-   ACCESS Sizable       INLINE UI_GetProp( ::hCpp, "lSizable" )
-   ASSIGN Sizable( l )  INLINE UI_SetProp( ::hCpp, "lSizable", l )
+   ACCESS lSizable       INLINE UI_GetProp( ::hCpp, "lSizable" )
+   ASSIGN lSizable( l )  INLINE UI_SetProp( ::hCpp, "lSizable", l )
 
-   ACCESS AppBar        INLINE UI_GetProp( ::hCpp, "lAppBar" )
-   ASSIGN AppBar( l )   INLINE UI_SetProp( ::hCpp, "lAppBar", l )
+   ACCESS lAppBar        INLINE UI_GetProp( ::hCpp, "lAppBar" )
+   ASSIGN lAppBar( l )   INLINE UI_SetProp( ::hCpp, "lAppBar", l )
 
-   ACCESS ToolWindow    INLINE UI_GetProp( ::hCpp, "lToolWindow" )
-   ASSIGN ToolWindow( l ) INLINE UI_SetProp( ::hCpp, "lToolWindow", l )
+   ACCESS lToolWindow    INLINE UI_GetProp( ::hCpp, "lToolWindow" )
+   ASSIGN lToolWindow( l ) INLINE UI_SetProp( ::hCpp, "lToolWindow", l )
 
-   ACCESS KeyPreview       INLINE UI_GetProp( ::hCpp, "lKeyPreview" )
-   ASSIGN KeyPreview( l )  INLINE UI_SetProp( ::hCpp, "lKeyPreview", l )
+   ACCESS lKeyPreview       INLINE UI_GetProp( ::hCpp, "lKeyPreview" )
+   ASSIGN lKeyPreview( l )  INLINE UI_SetProp( ::hCpp, "lKeyPreview", l )
 
-   ACCESS ShowHint         INLINE UI_GetProp( ::hCpp, "lShowHint" )
-   ASSIGN ShowHint( l )    INLINE UI_SetProp( ::hCpp, "lShowHint", l )
+   ACCESS lShowHint         INLINE UI_GetProp( ::hCpp, "lShowHint" )
+   ASSIGN lShowHint( l )    INLINE UI_SetProp( ::hCpp, "lShowHint", l )
 
-   ACCESS Hint             INLINE UI_GetProp( ::hCpp, "cHint" )
-   ASSIGN Hint( c )        INLINE UI_SetProp( ::hCpp, "cHint", c )
+   ACCESS cHint             INLINE UI_GetProp( ::hCpp, "cHint" )
+   ASSIGN cHint( c )        INLINE UI_SetProp( ::hCpp, "cHint", c )
 
-   ACCESS AutoScroll       INLINE UI_GetProp( ::hCpp, "lAutoScroll" )
-   ASSIGN AutoScroll( l )  INLINE UI_SetProp( ::hCpp, "lAutoScroll", l )
+   ACCESS lAutoScroll       INLINE UI_GetProp( ::hCpp, "lAutoScroll" )
+   ASSIGN lAutoScroll( l )  INLINE UI_SetProp( ::hCpp, "lAutoScroll", l )
 
-   ACCESS DoubleBuffered       INLINE UI_GetProp( ::hCpp, "lDoubleBuffered" )
-   ASSIGN DoubleBuffered( l )  INLINE UI_SetProp( ::hCpp, "lDoubleBuffered", l )
+   ACCESS lDoubleBuffered       INLINE UI_GetProp( ::hCpp, "lDoubleBuffered" )
+   ASSIGN lDoubleBuffered( l )  INLINE UI_SetProp( ::hCpp, "lDoubleBuffered", l )
 
    // Transparency
-   ACCESS AlphaBlend          INLINE UI_GetProp( ::hCpp, "lAlphaBlend" )
-   ASSIGN AlphaBlend( l )     INLINE UI_SetProp( ::hCpp, "lAlphaBlend", l )
+   ACCESS lAlphaBlend          INLINE UI_GetProp( ::hCpp, "lAlphaBlend" )
+   ASSIGN lAlphaBlend( l )     INLINE UI_SetProp( ::hCpp, "lAlphaBlend", l )
 
-   ACCESS AlphaBlendValue     INLINE UI_GetProp( ::hCpp, "nAlphaBlendValue" )
-   ASSIGN AlphaBlendValue( n ) INLINE UI_SetProp( ::hCpp, "nAlphaBlendValue", n )
+   ACCESS nAlphaBlendValue     INLINE UI_GetProp( ::hCpp, "nAlphaBlendValue" )
+   ASSIGN nAlphaBlendValue( n ) INLINE UI_SetProp( ::hCpp, "nAlphaBlendValue", n )
 
    // Read-only
-   ACCESS ClientWidth    INLINE UI_GetProp( ::hCpp, "nClientWidth" )
-   ACCESS ClientHeight   INLINE UI_GetProp( ::hCpp, "nClientHeight" )
-   ACCESS ModalResult    INLINE UI_FormResult( ::hCpp )
+   ACCESS nClientWidth    INLINE UI_GetProp( ::hCpp, "nClientWidth" )
+   ACCESS nClientHeight   INLINE UI_GetProp( ::hCpp, "nClientHeight" )
+   ACCESS nModalResult    INLINE UI_FormResult( ::hCpp )
 
    // Events
    ASSIGN OnActivate( b )   INLINE UI_OnEvent( ::hCpp, "OnActivate", b )
@@ -301,11 +308,11 @@ return Self
 
 CLASS TButton INHERIT TControl
 
-   ACCESS Default      INLINE UI_GetProp( ::hCpp, "lDefault" )
-   ASSIGN Default( l ) INLINE UI_SetProp( ::hCpp, "lDefault", l )
+   ACCESS lDefault      INLINE UI_GetProp( ::hCpp, "lDefault" )
+   ASSIGN lDefault( l ) INLINE UI_SetProp( ::hCpp, "lDefault", l )
 
-   ACCESS Cancel       INLINE UI_GetProp( ::hCpp, "lCancel" )
-   ASSIGN Cancel( l )  INLINE UI_SetProp( ::hCpp, "lCancel", l )
+   ACCESS lCancel       INLINE UI_GetProp( ::hCpp, "lCancel" )
+   ASSIGN lCancel( l )  INLINE UI_SetProp( ::hCpp, "lCancel", l )
 
    METHOD New( oParent, cText, nLeft, nTop, nWidth, nHeight )
 
@@ -327,23 +334,20 @@ return Self
 
 CLASS TBitBtn INHERIT TControl
 
-   ACCESS Kind            INLINE UI_GetProp( ::hCpp, "nKind" )
-   ASSIGN Kind( n )       INLINE UI_SetProp( ::hCpp, "nKind", n )
+   ACCESS nKind           INLINE UI_GetProp( ::hCpp, "nKind" )
+   ASSIGN nKind( n )      INLINE UI_SetProp( ::hCpp, "nKind", n )
 
    ACCESS cPicture        INLINE UI_GetProp( ::hCpp, "cPicture" )
    ASSIGN cPicture( c )   INLINE UI_SetProp( ::hCpp, "cPicture", c )
 
-   ACCESS Glyph           INLINE UI_GetProp( ::hCpp, "cPicture" )
-   ASSIGN Glyph( c )      INLINE UI_SetProp( ::hCpp, "cPicture", c )
+   ACCESS nModalResult     INLINE UI_GetProp( ::hCpp, "nModalResult" )
+   ASSIGN nModalResult( n ) INLINE UI_SetProp( ::hCpp, "nModalResult", n )
 
-   ACCESS ModalResult     INLINE UI_GetProp( ::hCpp, "nModalResult" )
-   ASSIGN ModalResult( n ) INLINE UI_SetProp( ::hCpp, "nModalResult", n )
+   ACCESS lDefault        INLINE UI_GetProp( ::hCpp, "lDefault" )
+   ASSIGN lDefault( l )   INLINE UI_SetProp( ::hCpp, "lDefault", l )
 
-   ACCESS Default         INLINE UI_GetProp( ::hCpp, "lDefault" )
-   ASSIGN Default( l )    INLINE UI_SetProp( ::hCpp, "lDefault", l )
-
-   ACCESS Cancel          INLINE UI_GetProp( ::hCpp, "lCancel" )
-   ASSIGN Cancel( l )     INLINE UI_SetProp( ::hCpp, "lCancel", l )
+   ACCESS lCancel         INLINE UI_GetProp( ::hCpp, "lCancel" )
+   ASSIGN lCancel( l )    INLINE UI_SetProp( ::hCpp, "lCancel", l )
 
    METHOD New( oParent, cText, nLeft, nTop, nWidth, nHeight, nKind, cPic )
 
@@ -357,7 +361,7 @@ METHOD New( oParent, cText, nLeft, nTop, nWidth, nHeight, nKind, cPic ) CLASS TB
    ::oParent := oParent
    ::hCpp := UI_BitBtnNew( oParent:hCpp, cText, nLeft, nTop, nWidth, nHeight )
 
-   if nKind != nil;  ::Kind     := nKind;  endif
+   if nKind != nil;  ::nKind    := nKind;  endif
    if cPic  != nil;  ::cPicture := cPic;   endif
 
 return Self
@@ -368,17 +372,14 @@ return Self
 
 CLASS TSpeedButton INHERIT TControl
 
-   ACCESS Kind            INLINE UI_GetProp( ::hCpp, "nKind" )
-   ASSIGN Kind( n )       INLINE UI_SetProp( ::hCpp, "nKind", n )
+   ACCESS nKind           INLINE UI_GetProp( ::hCpp, "nKind" )
+   ASSIGN nKind( n )      INLINE UI_SetProp( ::hCpp, "nKind", n )
 
    ACCESS cPicture        INLINE UI_GetProp( ::hCpp, "cPicture" )
    ASSIGN cPicture( c )   INLINE UI_SetProp( ::hCpp, "cPicture", c )
 
-   ACCESS Glyph           INLINE UI_GetProp( ::hCpp, "cPicture" )
-   ASSIGN Glyph( c )      INLINE UI_SetProp( ::hCpp, "cPicture", c )
-
-   ACCESS Flat            INLINE UI_GetProp( ::hCpp, "lFlat" )
-   ASSIGN Flat( l )       INLINE UI_SetProp( ::hCpp, "lFlat", l )
+   ACCESS lFlat           INLINE UI_GetProp( ::hCpp, "lFlat" )
+   ASSIGN lFlat( l )      INLINE UI_SetProp( ::hCpp, "lFlat", l )
 
    METHOD New( oParent, cText, nLeft, nTop, nWidth, nHeight, nKind, cPic )
 
@@ -392,7 +393,7 @@ METHOD New( oParent, cText, nLeft, nTop, nWidth, nHeight, nKind, cPic ) CLASS TS
    ::oParent := oParent
    ::hCpp := UI_SpeedBtnNew( oParent:hCpp, cText, nLeft, nTop, nWidth, nHeight )
 
-   if nKind != nil;  ::Kind     := nKind;  endif
+   if nKind != nil;  ::nKind    := nKind;  endif
    if cPic  != nil;  ::cPicture := cPic;   endif
 
 return Self
@@ -405,9 +406,6 @@ CLASS TImage INHERIT TControl
 
    ACCESS cPicture        INLINE UI_GetProp( ::hCpp, "cPicture" )
    ASSIGN cPicture( c )   INLINE UI_SetProp( ::hCpp, "cPicture", c )
-
-   ACCESS Picture         INLINE UI_GetProp( ::hCpp, "cPicture" )
-   ASSIGN Picture( c )    INLINE UI_SetProp( ::hCpp, "cPicture", c )
 
    METHOD New( oParent, nLeft, nTop, nWidth, nHeight, cPic )
 
@@ -431,14 +429,14 @@ return Self
 
 CLASS TShape INHERIT TControl
 
-   ACCESS Shape           INLINE UI_GetProp( ::hCpp, "nShape" )
-   ASSIGN Shape( n )      INLINE UI_SetProp( ::hCpp, "nShape", n )
+   ACCESS nShape          INLINE UI_GetProp( ::hCpp, "nShape" )
+   ASSIGN nShape( n )     INLINE UI_SetProp( ::hCpp, "nShape", n )
 
-   ACCESS PenColor        INLINE UI_GetProp( ::hCpp, "nPenColor" )
-   ASSIGN PenColor( n )   INLINE UI_SetProp( ::hCpp, "nPenColor", n )
+   ACCESS nPenColor       INLINE UI_GetProp( ::hCpp, "nPenColor" )
+   ASSIGN nPenColor( n )  INLINE UI_SetProp( ::hCpp, "nPenColor", n )
 
-   ACCESS PenWidth        INLINE UI_GetProp( ::hCpp, "nPenWidth" )
-   ASSIGN PenWidth( n )   INLINE UI_SetProp( ::hCpp, "nPenWidth", n )
+   ACCESS nPenWidth       INLINE UI_GetProp( ::hCpp, "nPenWidth" )
+   ASSIGN nPenWidth( n )  INLINE UI_SetProp( ::hCpp, "nPenWidth", n )
 
    METHOD New( oParent, nLeft, nTop, nWidth, nHeight, nShape )
 
@@ -452,7 +450,7 @@ METHOD New( oParent, nLeft, nTop, nWidth, nHeight, nShape ) CLASS TShape
    ::oParent := oParent
    ::hCpp := UI_ShapeNew( oParent:hCpp, nLeft, nTop, nWidth, nHeight )
 
-   if nShape != nil;  ::Shape := nShape;  endif
+   if nShape != nil;  ::nShape := nShape;  endif
 
 return Self
 
@@ -462,11 +460,11 @@ return Self
 
 CLASS TBevel INHERIT TControl
 
-   ACCESS Shape       INLINE UI_GetProp( ::hCpp, "nShape" )
-   ASSIGN Shape( n )  INLINE UI_SetProp( ::hCpp, "nShape", n )
+   ACCESS nShape      INLINE UI_GetProp( ::hCpp, "nShape" )
+   ASSIGN nShape( n ) INLINE UI_SetProp( ::hCpp, "nShape", n )
 
-   ACCESS Style       INLINE UI_GetProp( ::hCpp, "nStyle" )
-   ASSIGN Style( n )  INLINE UI_SetProp( ::hCpp, "nStyle", n )
+   ACCESS nStyle      INLINE UI_GetProp( ::hCpp, "nStyle" )
+   ASSIGN nStyle( n ) INLINE UI_SetProp( ::hCpp, "nStyle", n )
 
    METHOD New( oParent, nLeft, nTop, nWidth, nHeight, nShape, nStyle )
 
@@ -480,8 +478,8 @@ METHOD New( oParent, nLeft, nTop, nWidth, nHeight, nShape, nStyle ) CLASS TBevel
    ::oParent := oParent
    ::hCpp := UI_BevelNew( oParent:hCpp, nLeft, nTop, nWidth, nHeight )
 
-   if nShape != nil;  ::Shape := nShape;  endif
-   if nStyle != nil;  ::Style := nStyle;  endif
+   if nShape != nil;  ::nShape := nShape;  endif
+   if nStyle != nil;  ::nStyle := nStyle;  endif
 
 return Self
 
@@ -518,10 +516,10 @@ return Self
 
 CLASS TEarthView INHERIT TControl
 
-   ACCESS Lat              INLINE UI_GetProp( ::hCpp, "nLat" )
-   ASSIGN Lat( n )         INLINE UI_SetProp( ::hCpp, "nLat", n )
-   ACCESS Lon              INLINE UI_GetProp( ::hCpp, "nLon" )
-   ASSIGN Lon( n )         INLINE UI_SetProp( ::hCpp, "nLon", n )
+   ACCESS nLat             INLINE UI_GetProp( ::hCpp, "nLat" )
+   ASSIGN nLat( n )        INLINE UI_SetProp( ::hCpp, "nLat", n )
+   ACCESS nLon             INLINE UI_GetProp( ::hCpp, "nLon" )
+   ASSIGN nLon( n )        INLINE UI_SetProp( ::hCpp, "nLon", n )
    ACCESS lAutoRotate      INLINE UI_GetProp( ::hCpp, "lAutoRotate" )
    ASSIGN lAutoRotate( l ) INLINE UI_SetProp( ::hCpp, "lAutoRotate", l )
 
@@ -545,14 +543,14 @@ return Self
 
 CLASS TMap INHERIT TControl
 
-   ACCESS Lat           INLINE UI_GetProp( ::hCpp, "nLat" )
-   ASSIGN Lat( n )      INLINE UI_SetProp( ::hCpp, "nLat", n )
-   ACCESS Lon           INLINE UI_GetProp( ::hCpp, "nLon" )
-   ASSIGN Lon( n )      INLINE UI_SetProp( ::hCpp, "nLon", n )
-   ACCESS Zoom          INLINE UI_GetProp( ::hCpp, "nZoom" )
-   ASSIGN Zoom( n )     INLINE UI_SetProp( ::hCpp, "nZoom", n )
-   ACCESS MapType       INLINE UI_GetProp( ::hCpp, "nMapType" )
-   ASSIGN MapType( n )  INLINE UI_SetProp( ::hCpp, "nMapType", n )
+   ACCESS nLat          INLINE UI_GetProp( ::hCpp, "nLat" )
+   ASSIGN nLat( n )     INLINE UI_SetProp( ::hCpp, "nLat", n )
+   ACCESS nLon          INLINE UI_GetProp( ::hCpp, "nLon" )
+   ASSIGN nLon( n )     INLINE UI_SetProp( ::hCpp, "nLon", n )
+   ACCESS nZoom         INLINE UI_GetProp( ::hCpp, "nZoom" )
+   ASSIGN nZoom( n )    INLINE UI_SetProp( ::hCpp, "nZoom", n )
+   ACCESS nMapType      INLINE UI_GetProp( ::hCpp, "nMapType" )
+   ASSIGN nMapType( n ) INLINE UI_SetProp( ::hCpp, "nMapType", n )
 
    METHOD New( oParent, nLeft, nTop, nWidth, nHeight, nLat, nLon, nZoom )
    METHOD SetRegion( nLat, nLon, nZoom ) INLINE UI_MapSetRegion( ::hCpp, nLat, nLon, nZoom )
@@ -578,17 +576,17 @@ return Self
 
 CLASS TStringGrid INHERIT TControl
 
-   ACCESS ColCount       INLINE UI_GetProp( ::hCpp, "nColCount" )
-   ASSIGN ColCount( n )  INLINE UI_SetProp( ::hCpp, "nColCount", n )
+   ACCESS nColCount       INLINE UI_GetProp( ::hCpp, "nColCount" )
+   ASSIGN nColCount( n )  INLINE UI_SetProp( ::hCpp, "nColCount", n )
 
-   ACCESS RowCount       INLINE UI_GetProp( ::hCpp, "nRowCount" )
-   ASSIGN RowCount( n )  INLINE UI_SetProp( ::hCpp, "nRowCount", n )
+   ACCESS nRowCount       INLINE UI_GetProp( ::hCpp, "nRowCount" )
+   ASSIGN nRowCount( n )  INLINE UI_SetProp( ::hCpp, "nRowCount", n )
 
-   ACCESS FixedRows      INLINE UI_GetProp( ::hCpp, "nFixedRows" )
-   ASSIGN FixedRows( n ) INLINE UI_SetProp( ::hCpp, "nFixedRows", n )
+   ACCESS nFixedRows      INLINE UI_GetProp( ::hCpp, "nFixedRows" )
+   ASSIGN nFixedRows( n ) INLINE UI_SetProp( ::hCpp, "nFixedRows", n )
 
-   ACCESS FixedCols      INLINE UI_GetProp( ::hCpp, "nFixedCols" )
-   ASSIGN FixedCols( n ) INLINE UI_SetProp( ::hCpp, "nFixedCols", n )
+   ACCESS nFixedCols      INLINE UI_GetProp( ::hCpp, "nFixedCols" )
+   ASSIGN nFixedCols( n ) INLINE UI_SetProp( ::hCpp, "nFixedCols", n )
 
    METHOD New( oParent, nLeft, nTop, nWidth, nHeight, nCols, nRows )
    METHOD SetCell( nCol, nRow, cText ) INLINE UI_GridSetCell( ::hCpp, nCol - 1, nRow - 1, cText )
@@ -610,11 +608,11 @@ return Self
 
 CLASS TMaskEdit INHERIT TControl
 
-   ACCESS EditMask        INLINE UI_GetProp( ::hCpp, "cEditMask" )
-   ASSIGN EditMask( c )   INLINE UI_SetProp( ::hCpp, "cEditMask", c )
+   ACCESS cEditMask       INLINE UI_GetProp( ::hCpp, "cEditMask" )
+   ASSIGN cEditMask( c )  INLINE UI_SetProp( ::hCpp, "cEditMask", c )
 
-   ACCESS MaskKind        INLINE UI_GetProp( ::hCpp, "nMaskKind" )
-   ASSIGN MaskKind( n )   INLINE UI_SetProp( ::hCpp, "nMaskKind", n )
+   ACCESS nMaskKind       INLINE UI_GetProp( ::hCpp, "nMaskKind" )
+   ASSIGN nMaskKind( n )  INLINE UI_SetProp( ::hCpp, "nMaskKind", n )
 
    METHOD New( oParent, xMask, nLeft, nTop, nWidth, nHeight )
 
@@ -629,7 +627,7 @@ METHOD New( oParent, xMask, nLeft, nTop, nWidth, nHeight ) CLASS TMaskEdit
    /* xMask may be a mask string or a preset number (meDate, mePhone, ...) */
    if ValType( xMask ) == "N"
       ::hCpp := UI_MaskEditNew( oParent:hCpp, "", nLeft, nTop, nWidth, nHeight )
-      ::MaskKind := xMask
+      ::nMaskKind := xMask
    else
       ::hCpp := UI_MaskEditNew( oParent:hCpp, xMask, nLeft, nTop, nWidth, nHeight )
    endif
@@ -642,8 +640,8 @@ return Self
 
 CLASS TCheckBox INHERIT TControl
 
-   ACCESS Checked      INLINE UI_GetProp( ::hCpp, "lChecked" )
-   ASSIGN Checked( l ) INLINE UI_SetProp( ::hCpp, "lChecked", l )
+   ACCESS lChecked      INLINE UI_GetProp( ::hCpp, "lChecked" )
+   ASSIGN lChecked( l ) INLINE UI_SetProp( ::hCpp, "lChecked", l )
 
    METHOD New( oParent, cText, nLeft, nTop, nWidth, nHeight )
 
@@ -716,8 +714,8 @@ return Self
 
 CLASS TRadioButton INHERIT TControl
 
-   ACCESS Checked      INLINE UI_GetProp( ::hCpp, "lChecked" )
-   ASSIGN Checked( l ) INLINE UI_SetProp( ::hCpp, "lChecked", l )
+   ACCESS lChecked      INLINE UI_GetProp( ::hCpp, "lChecked" )
+   ASSIGN lChecked( l ) INLINE UI_SetProp( ::hCpp, "lChecked", l )
 
    METHOD New( oParent, cText, nLeft, nTop, nWidth, nHeight )
 
@@ -1555,8 +1553,8 @@ CLASS TTimer
 
    ASSIGN OnTimer( b )    INLINE ( ::bOnTimer := b, iif( ::hCpp != 0, UI_OnEvent( ::hCpp, "OnTimer", b ), nil ) )
    ASSIGN nInterval( n )  INLINE ( ::nInterval := n, iif( ::hCpp != 0, UI_SetProp( ::hCpp, "nInterval", n ), nil ) )
-   ACCESS Enabled         INLINE iif( ::hCpp != 0, UI_GetProp( ::hCpp, "lEnabled" ), .F. )
-   ASSIGN Enabled( l )    INLINE iif( ::hCpp != 0, UI_SetProp( ::hCpp, "lEnabled", l ), nil )
+   ACCESS lEnabled        INLINE iif( ::hCpp != 0, UI_GetProp( ::hCpp, "lEnabled" ), .F. )
+   ASSIGN lEnabled( l )   INLINE iif( ::hCpp != 0, UI_SetProp( ::hCpp, "lEnabled", l ), nil )
 
    METHOD New() CONSTRUCTOR
 
@@ -1710,7 +1708,7 @@ return Self
 
 CLASS TApplication
 
-   DATA Title     INIT "Application"
+   DATA cTitle    INIT "Application"
    DATA aForms    INIT {}
    DATA oMainForm INIT nil
 
@@ -1994,7 +1992,7 @@ METHOD RefreshFromDB() CLASS TDBText
    local xVal
    if ::oDataSource != nil .and. ::oDataSource:oDatabase != nil .and. ::nFieldIndex > 0
       xVal := ::oDataSource:oDatabase:FieldGet( ::nFieldIndex )
-      ::Text := hb_ValToStr( xVal )
+      ::cText := hb_ValToStr( xVal )
    endif
 return nil
 
@@ -2011,13 +2009,13 @@ METHOD RefreshFromDB() CLASS TDBEdit
    local xVal
    if ::oDataSource != nil .and. ::oDataSource:oDatabase != nil .and. ::nFieldIndex > 0
       xVal := ::oDataSource:oDatabase:FieldGet( ::nFieldIndex )
-      ::Text := hb_ValToStr( xVal )
+      ::cText := hb_ValToStr( xVal )
    endif
 return nil
 
 METHOD WriteToDB() CLASS TDBEdit
    if ::oDataSource != nil .and. ::oDataSource:oDatabase != nil .and. ::nFieldIndex > 0
-      ::oDataSource:oDatabase:FieldPut( ::nFieldIndex, ::Text )
+      ::oDataSource:oDatabase:FieldPut( ::nFieldIndex, ::cText )
    endif
 return nil
 
@@ -2033,7 +2031,7 @@ METHOD RefreshFromDB() CLASS TDBComboBox
    local xVal
    if ::oDataSource != nil .and. ::oDataSource:oDatabase != nil .and. ::nFieldIndex > 0
       xVal := ::oDataSource:oDatabase:FieldGet( ::nFieldIndex )
-      ::Text := hb_ValToStr( xVal )
+      ::cText := hb_ValToStr( xVal )
    endif
 return nil
 
@@ -3735,7 +3733,7 @@ METHOD New( oParent, cType, nHeight ) CLASS TBand
    ::nHeight     := iif( ValType( nHeight ) == "N", nHeight, 65 )
    ::nLeft       := 0
    ::nTop        := 0
-   ::nWidth      := iif( oParent != nil, oParent:Width, 600 )
+   ::nWidth      := iif( oParent != nil, oParent:nWidth, 600 )
    nOrd := ::BandOrder()
    ::lPrintOnEveryPage := ( nOrd == 2 .or. nOrd == 4 )
    do case
@@ -4967,6 +4965,115 @@ return "/Users/usuario/HarbourBuilder/data/customer.dbf"
 #else
 return "C:\HarbourBuilder\data\customer.dbf"
 #endif
+
+//----------------------------------------------------------------------------//
+// xHarbour compatibility shim
+// xHarbour lacks several hb_*-prefixed RTL functions that Harbour provides.
+// These wrappers map them onto xHarbour equivalents. Compiled only when the
+// project is built with xHarbour (__XHARBOUR__); stripped for Harbour.
+//----------------------------------------------------------------------------//
+#ifdef __XHARBOUR__
+
+FUNCTION hb_MemoRead( cFile )
+   RETURN MemoRead( cFile )
+
+FUNCTION hb_GetEnv( cName, cDefault )
+   LOCAL cVal := GetEnv( cName )
+   RETURN iif( Empty( cVal ), iif( cDefault == NIL, "", cDefault ), cVal )
+
+FUNCTION hb_StrReplace( cString, xSearch, xReplace )
+   RETURN StrTran( cString, xSearch, xReplace )
+
+FUNCTION hb_HHasKey( hHash, xKey )
+   RETURN HHasKey( hHash, xKey )
+
+FUNCTION hb_HKeys( hHash )
+   RETURN HGetKeys( hHash )
+
+FUNCTION hb_DirCreate( cDir )
+   RETURN MakeDir( cDir )
+
+FUNCTION hb_milliSeconds()
+   RETURN Int( Seconds() * 1000 )
+
+FUNCTION hb_Symbol_Unused( xArg )
+   LOCAL xLocal := xArg   // touch the argument; no-op
+   RETURN xLocal == NIL
+
+// Harbour hb_FNameName: base name without path and without extension.
+FUNCTION hb_FNameName( cPath )
+   LOCAL nSlash, nDot, cName
+   cPath  := StrTran( cPath, "/", "\" )
+   nSlash := RAt( "\", cPath )
+   cName  := iif( nSlash > 0, SubStr( cPath, nSlash + 1 ), cPath )
+   nDot   := RAt( ".", cName )
+   RETURN iif( nDot > 0, Left( cName, nDot - 1 ), cName )
+
+// Harbour hb_FNameDir: directory part, including the trailing separator.
+FUNCTION hb_FNameDir( cPath )
+   LOCAL nSlash
+   cPath  := StrTran( cPath, "/", "\" )
+   nSlash := RAt( "\", cPath )
+   RETURN iif( nSlash > 0, Left( cPath, nSlash ), "" )
+
+// Minimal hb_StrFormat: substitutes %s / %d / %1..%9 tokens, left to right.
+FUNCTION hb_StrFormat( cFmt, x1, x2, x3, x4 )
+   LOCAL aArgs := { x1, x2, x3, x4 }, c := cFmt, i, nPos, cTok
+
+   FOR i := 1 TO Len( aArgs )
+      IF aArgs[ i ] == NIL
+         EXIT
+      ENDIF
+      cTok := iif( ValType( aArgs[i] ) == "C", aArgs[i], ;
+               iif( ValType( aArgs[i] ) == "N", LTrim( Str( aArgs[i] ) ), ;
+               iif( ValType( aArgs[i] ) == "L", iif( aArgs[i], ".T.", ".F." ), ;
+               iif( ValType( aArgs[i] ) == "D", DToC( aArgs[i] ), "" ) ) ) )
+      nPos := At( "%" + LTrim( Str( i ) ), c )
+      IF nPos > 0
+         c := Stuff( c, nPos, 2, cTok )
+      ELSE
+         nPos := At( "%d", c )
+         IF nPos == 0 ; nPos := At( "%s", c ) ; ENDIF
+         IF nPos > 0
+            c := Stuff( c, nPos, 2, cTok )
+         ENDIF
+      ENDIF
+   NEXT
+   RETURN c
+
+// xHarbour threading: map onto StartThread (codeblock form).
+FUNCTION hb_threadStart( bAction )
+   RETURN StartThread( bAction )
+
+// hb_processRun: run a command, capture stdout+stderr, return exit code.
+// xHarbour lacks hb_processRun; emulate via cmd.exe redirection to a temp
+// file. Exit code is read from %ERRORLEVEL%.
+FUNCTION hb_processRun( cCommand, cStdIn, cStdOut, cStdErr )
+   LOCAL cBase  := hb_DirTemp() + "hbpr_" + LTrim( Str( hb_milliSeconds() ) )
+   LOCAL cOut   := cBase + ".out"
+   LOCAL cRc    := cBase + ".rc"
+   LOCAL nRc    := -1, cText
+
+   HB_SYMBOL_UNUSED( cStdIn )
+
+   __Run( 'cmd /c (' + cCommand + ') > "' + cOut + '" 2>&1 & call echo %^ERRORLEVEL% > "' + cRc + '"' )
+
+   cText := MemoRead( cOut )
+   IF PCount() >= 3
+      cStdOut := cText
+   ENDIF
+   IF PCount() >= 4
+      cStdErr := ""
+   ENDIF
+   IF File( cRc )
+      nRc := Val( AllTrim( StrTran( StrTran( MemoRead( cRc ), Chr(13), "" ), Chr(10), "" ) ) )
+   ENDIF
+
+   FErase( cOut )
+   FErase( cRc )
+   RETURN nRc
+
+#endif /* __XHARBOUR__ */
 
 //----------------------------------------------------------------------------//
 // Python backend (runtime dlopen of libpython) — used by TPython

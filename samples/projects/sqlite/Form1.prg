@@ -16,11 +16,11 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "Form1"
-   ::Left   := 574
-   ::Top    := 222
-   ::Width  := 1172
-   ::Height := 687
+   ::cTitle  := "Form1"
+   ::nLeft   := 574
+   ::nTop    := 222
+   ::nWidth  := 1172
+   ::nHeight := 687
 
    COMPONENT ::oSQLite1 TYPE CT_SQLITE OF Self  // TSQLite @ 16,220
    ::oSQLite1:cFileName := "/Users/usuario/HarbourBuilder/data/NatalData"
@@ -28,7 +28,7 @@ METHOD CreateForm() CLASS TForm1
    @ 0, 0 DBGRID ::oDBGrid1 OF Self SIZE 1172, 687
    ::oDBGrid1:oDataSource := "SQLite1"
    ::oDBGrid1:nAlign := 5
-   ::oDBGrid1:ControlAlign := 5
+   ::oDBGrid1:nControlAlign := 5
    ::oDBGrid1:oFont := ".AppleSystemUIFont,12"
 
    // Event wiring

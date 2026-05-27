@@ -39,7 +39,7 @@ static function AnalyzeSentiment()
    local aPositive, aNegative, nPosCount, nNegCount, cSentiment
 
    e := Chr(13) + Chr(10)
-   cText := Lower( oInput:Text )
+   cText := Lower( oInput:cText )
 
    // Simplified sentiment analysis
    // Real implementation: TTransformer encoder with classification head
@@ -71,7 +71,7 @@ static function AnalyzeSentiment()
       cSentiment := "NEUTRAL"
    endif
 
-   oResult:Text := "Result: " + cSentiment + ;
+   oResult:cText := "Result: " + cSentiment + ;
       " (pos:" + LTrim(Str(nPositive,5,2)) + ;
       " neg:" + LTrim(Str(nNegative,5,2)) + ;
       " neu:" + LTrim(Str(nNeutral,5,2)) + ")"
@@ -98,6 +98,6 @@ static function AnalyzeSentiment()
    cOut += "each token can attend to ALL other tokens (no causal mask)." + e
    cOut += "This makes it ideal for classification, not generation."
 
-   oOutput:Text := cOut
+   oOutput:cText := cOut
 
 return nil

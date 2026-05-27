@@ -252,8 +252,8 @@ static function OnDesignSelChange( hCtrl )
    if oIDE:hCpp != 0
       cPos := LTrim( Str( UI_GetProp( hTarget, "nLeft" ) ) ) + ":" + ;
               LTrim( Str( UI_GetProp( hTarget, "nTop" ) ) )
-      cDim := LTrim( Str( oDesignForm:Width ) ) + " x " + ;
-              LTrim( Str( oDesignForm:Height ) )
+      cDim := LTrim( Str( oDesignForm:nWidth ) ) + " x " + ;
+              LTrim( Str( oDesignForm:nHeight ) )
       UI_StatusBarSetText( oIDE:hCpp, 0, cPos )
       UI_StatusBarSetText( oIDE:hCpp, 2, cDim )
    endif

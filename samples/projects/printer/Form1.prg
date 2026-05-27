@@ -29,11 +29,11 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "TPrinter Demo"
-   ::Left   := 982
-   ::Top    := 278
-   ::Width  := 620
-   ::Height := 560
+   ::cTitle  := "TPrinter Demo"
+   ::nLeft   := 982
+   ::nTop    := 278
+   ::nWidth  := 620
+   ::nHeight := 560
 
    COMPONENT ::oPrinter1 TYPE CT_PRINTER OF Self  // TPrinter @ 8,456
 
@@ -50,7 +50,7 @@ METHOD CreateForm() CLASS TForm1
    // Log memo
    @ 100, 10 MEMO ::oLog OF Self SIZE 590, 420
 
-   ::oLog:Text := "Press Print or Preview to select and use a printer." + Chr(13) + Chr(10)
+   ::oLog:cText := "Press Print or Preview to select and use a printer." + Chr(13) + Chr(10)
 
    // Event wiring
    ::oPrinter1:OnBeginDoc := { || ::OnBeginDoc()      }
@@ -76,8 +76,8 @@ METHOD OnPrintClick() CLASS TForm1
    nPrinter := ::oCbPrinter:Value + 1
    if nPrinter < 1 .or. nPrinter > Len( aP ); nPrinter := 1; ::oCbPrinter:Value := 0; endif
    ::oPrinter1:cPrinterName := aP[ nPrinter ]
-   ::oLog:Text += "Printer: " + ::oPrinter1:cPrinterName + Chr(13)+Chr(10)
-   ::oPrinter1:lLandscape := ::oCbLandscape:Checked
+   ::oLog:cText += "Printer: " + ::oPrinter1:cPrinterName + Chr(13)+Chr(10)
+   ::oPrinter1:lLandscape := ::oCbLandscape:lChecked
    ::oPrinter1:nCopies    := iif( nSel >= 1 .and. nSel <= Len(aCopies), aCopies[nSel], 1 )
    ::oPrinter1:lPreview   := .F.
    ::DoPrint()
@@ -93,8 +93,8 @@ METHOD OnPreviewClick() CLASS TForm1
    nPrinter := ::oCbPrinter:Value + 1
    if nPrinter < 1 .or. nPrinter > Len( aP ); nPrinter := 1; ::oCbPrinter:Value := 0; endif
    ::oPrinter1:cPrinterName := aP[ nPrinter ]
-   ::oLog:Text += "Printer: " + ::oPrinter1:cPrinterName + Chr(13)+Chr(10)
-   ::oPrinter1:lLandscape := ::oCbLandscape:Checked
+   ::oLog:cText += "Printer: " + ::oPrinter1:cPrinterName + Chr(13)+Chr(10)
+   ::oPrinter1:lLandscape := ::oCbLandscape:lChecked
    ::oPrinter1:nCopies    := 1
    ::oPrinter1:lPreview   := .T.
    ::DoPrint()
@@ -125,17 +125,17 @@ METHOD DoPrint() CLASS TForm1
 return nil
 
 METHOD OnBeginDoc() CLASS TForm1
-   ::oLog:Text += "[Event] OnBeginDoc fired" + Chr(13) + Chr(10)
+   ::oLog:cText += "[Event] OnBeginDoc fired" + Chr(13) + Chr(10)
 return nil
 
 METHOD OnEndDoc() CLASS TForm1
-   ::oLog:Text += "[Event] OnEndDoc fired" + Chr(13) + Chr(10)
+   ::oLog:cText += "[Event] OnEndDoc fired" + Chr(13) + Chr(10)
 return nil
 
 METHOD OnNewPage() CLASS TForm1
-   ::oLog:Text += "[Event] OnNewPage fired" + Chr(13) + Chr(10)
+   ::oLog:cText += "[Event] OnNewPage fired" + Chr(13) + Chr(10)
 return nil
 
 METHOD OnPrinterError() CLASS TForm1
-   ::oLog:Text += "[Event] OnError fired" + Chr(13) + Chr(10)
+   ::oLog:cText += "[Event] OnError fired" + Chr(13) + Chr(10)
 return nil

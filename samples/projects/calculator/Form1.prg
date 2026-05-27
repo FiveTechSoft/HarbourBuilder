@@ -38,7 +38,7 @@ function Form1()
 
    // --- Display field at the top (read-only, shows current number) ---
    @ 10, nLeft GET oDisplay VAR "0" OF oForm SIZE 252, 30
-   oDisplay:Text := "0"
+   oDisplay:cText := "0"
 
    // --- Create 4 rows x 4 columns of buttons ---
    for nRow := 1 to 4
@@ -96,7 +96,7 @@ static function CalcPress( cKey )
       nAccum     := 0
       cOp        := ""
       lNewNumber := .t.
-      oDisplay:Text := "0"
+      oDisplay:cText := "0"
       return nil
    endif
 
@@ -104,16 +104,16 @@ static function CalcPress( cKey )
    if cKey >= "0" .and. cKey <= "9"
       if lNewNumber
          // Start a fresh number
-         oDisplay:Text := cKey
+         oDisplay:cText := cKey
          lNewNumber := .f.
       else
          // Append digit to current display
-         cDisplay := oDisplay:Text
+         cDisplay := oDisplay:cText
          if cDisplay == "0"
             // Replace leading zero
-            oDisplay:Text := cKey
+            oDisplay:cText := cKey
          else
-            oDisplay:Text := cDisplay + cKey
+            oDisplay:cText := cDisplay + cKey
          endif
       endif
       return nil
@@ -121,7 +121,7 @@ static function CalcPress( cKey )
 
    // --- Operator or Equals ---
    // First, evaluate any pending operation
-   nCurrent := Val( oDisplay:Text )
+   nCurrent := Val( oDisplay:cText )
 
    if !Empty( cOp )
       // Apply the pending operator
@@ -132,7 +132,7 @@ static function CalcPress( cKey )
    endif
 
    // Update display with the result so far
-   oDisplay:Text := LTrim( Str( nAccum ) )
+   oDisplay:cText := LTrim( Str( nAccum ) )
 
    if cKey == "="
       // Equals: clear the pending operator

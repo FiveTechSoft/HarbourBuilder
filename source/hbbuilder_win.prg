@@ -917,7 +917,7 @@ static function GenerateProjectCode()
    next
    cCode += e
    cCode += "   oApp := TApplication():New()" + e
-   cCode += '   oApp:Title := "Project1"' + e
+   cCode += '   oApp:cTitle := "Project1"' + e
 
    for i := 1 to Len( aForms )
       cCode += "   o" + aForms[i][1] + " := T" + aForms[i][1] + "():New()" + e
@@ -1466,7 +1466,7 @@ static function RegenerateFormCode( cName, hForm )
          // ControlAlign (non-zero = non-default)
          cVal := UI_GetProp( hCtrl, "nControlAlign" )
          if ValType( cVal ) == "N" .and. cVal != 0
-            cCreate += '   ::o' + cCtrlName + ':ControlAlign := ' + LTrim( Str( cVal ) ) + e
+            cCreate += '   ::o' + cCtrlName + ':nControlAlign := ' + LTrim( Str( cVal ) ) + e
          endif
 
          // Scan for event handlers matching this control
@@ -1538,22 +1538,22 @@ static function RegenerateFormCode( cName, hForm )
    cCode += e
    cCode += "METHOD CreateForm() CLASS " + cClass + e
    cCode += e
-   cCode += '   ::Title  := "' + cTitle + '"' + e
-   cCode += "   ::Left   := " + LTrim(Str(nFL)) + e
-   cCode += "   ::Top    := " + LTrim(Str(nFT)) + e
-   cCode += "   ::Width  := " + LTrim(Str(nW)) + e
-   cCode += "   ::Height := " + LTrim(Str(nH)) + e
-   cCode += '   ::FontName := "Segoe UI"' + e
-   cCode += "   ::FontSize := 9" + e
+   cCode += '   ::cTitle  := "' + cTitle + '"' + e
+   cCode += "   ::nLeft   := " + LTrim(Str(nFL)) + e
+   cCode += "   ::nTop    := " + LTrim(Str(nFT)) + e
+   cCode += "   ::nWidth  := " + LTrim(Str(nW)) + e
+   cCode += "   ::nHeight := " + LTrim(Str(nH)) + e
+   cCode += '   ::cFontName := "Segoe UI"' + e
+   cCode += "   ::nFontSize := 9" + e
    nBStyle := UI_GetProp( hForm, "nBorderStyle" )
    if ValType( nBStyle ) == "N" .and. nBStyle != 2  // != bsSizeable (default)
-      cCode += "   ::BorderStyle := " + LTrim( Str( nBStyle ) ) + e
+      cCode += "   ::nBorderStyle := " + LTrim( Str( nBStyle ) ) + e
    endif
    if nClr != 15790320  // non-default color
-      cCode += "   ::Color  := " + LTrim(Str(nClr)) + e
+      cCode += "   ::nClrPane := " + LTrim(Str(nClr)) + e
    endif
    if ! Empty( cAppTitle )
-      cCode += '   ::AppTitle := "' + cAppTitle + '"' + e
+      cCode += '   ::cAppTitle := "' + cAppTitle + '"' + e
    endif
    if ! Empty( cCreate )
       cCode += e
@@ -2456,8 +2456,8 @@ static function RestoreFormFromCode( hForm, cCode )
          loop
       endif
 
-      // Parse form properties: ::Title, ::Width, ::Height, ::Left, ::Top, ::Color
-      if '::Title' $ cTrim .and. ':=' $ cTrim
+      // Parse form properties: ::cTitle, ::nWidth, ::nHeight, ::nLeft, ::nTop, ::nClrPane
+      if '::cTitle' $ cTrim .and. ':=' $ cTrim
          nPos := At( '"', cTrim )
          nPos2 := RAt( '"', cTrim )
          if nPos > 0 .and. nPos2 > nPos
@@ -2466,31 +2466,31 @@ static function RestoreFormFromCode( hForm, cCode )
          endif
          loop
       endif
-      if '::Width' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
+      if '::nWidth' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
          UI_SetProp( hForm, "nWidth", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
          loop
       endif
-      if '::Height' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
+      if '::nHeight' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
          UI_SetProp( hForm, "nHeight", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
          loop
       endif
-      if '::Left' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
+      if '::nLeft' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
          nPos := Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) )
          UI_SetProp( hForm, "nLeft", nPos )
          PosTrace( "RestoreFormFromCode Left := " + LTrim( Str( nPos ) ) )
          loop
       endif
-      if '::Top' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
+      if '::nTop' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
          nPos := Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) )
          UI_SetProp( hForm, "nTop", nPos )
          PosTrace( "RestoreFormFromCode Top  := " + LTrim( Str( nPos ) ) )
          loop
       endif
-      if '::Color' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
+      if '::nClrPane' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
          UI_SetProp( hForm, "nClrPane", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
          loop
       endif
-      if '::AppTitle' $ cTrim .and. ':=' $ cTrim
+      if '::cAppTitle' $ cTrim .and. ':=' $ cTrim
          nPos := At( '"', cTrim )
          nPos2 := RAt( '"', cTrim )
          if nPos > 0 .and. nPos2 > nPos
@@ -4949,22 +4949,22 @@ static function TranslateHandlers( aBind, cEventTab, aCtrlNames )
          for j := 1 to Len( aCtrlNames )
             cCtrl := aCtrlNames[j]
             // Setter first (longer match). We turn
-            //   ::oLabel1:Text := expr
+            //   ::oLabel1:cText := expr
             // into
             //   UI_SetText( hLabel1, expr )
-            cSetter := "::o" + cCtrl + ":Text :="
+            cSetter := "::o" + cCtrl + ":cText :="
             if cSetter $ cLine
                cLine := StrTran( cLine, cSetter, ;
                                  "UI_SetText( h" + cCtrl + ", " ) + " )"
             else
-               cSetter := "::o" + cCtrl + ":Text:="
+               cSetter := "::o" + cCtrl + ":cText:="
                if cSetter $ cLine
                   cLine := StrTran( cLine, cSetter, ;
                                     "UI_SetText( h" + cCtrl + ", " ) + " )"
                endif
             endif
             // Remaining bare accesses are getters.
-            cLine := StrTran( cLine, "::o" + cCtrl + ":Text", ;
+            cLine := StrTran( cLine, "::o" + cCtrl + ":cText", ;
                               "UI_GetText( h" + cCtrl + " )" )
          next
          aLines[k] := cLine

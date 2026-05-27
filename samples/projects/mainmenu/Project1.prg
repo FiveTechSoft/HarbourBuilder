@@ -9,7 +9,7 @@ PROCEDURE Main()
    local oForm1   // AS TForm1
 
    oApp := TApplication():New()
-   oApp:Title := "TMainMenu Sample"
+   oApp:cTitle := "TMainMenu Sample"
    oForm1 := TForm1():New()
    oApp:CreateForm( oForm1 )
    oApp:Run()

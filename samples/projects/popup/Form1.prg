@@ -17,11 +17,11 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "TPopupMenu Sample"
-   ::Left   := 1042
-   ::Top    := 323
-   ::Width  := 480
-   ::Height := 280
+   ::cTitle  := "TPopupMenu Sample"
+   ::nLeft   := 1042
+   ::nTop    := 323
+   ::nWidth  := 480
+   ::nHeight := 280
 
    COMPONENT ::oPopup1 TYPE CT_POPUPMENU OF Self  // TPopupMenu
    DEFINE POPUPMENU ::oPopup1
@@ -47,7 +47,7 @@ return nil
 //--------------------------------------------------------------------
 static function PopAction( oForm, cWhat )
    if oForm:oStatus1 != nil
-      oForm:oStatus1:Text := "Picked: " + cWhat
+      oForm:oStatus1:cText := "Picked: " + cWhat
    endif
 return nil
 

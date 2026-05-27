@@ -136,11 +136,11 @@
       [ <toolwin: TOOLWINDOW> ] ;
    => ;
       <oForm> := TForm():New( <cTitle>, <nWidth>, <nHeight> ) ;
-      [; <oForm>:FontName := <cFont> ] ;
-      [; <oForm>:FontSize := <nSize> ] ;
-      [; <oForm>:Sizable := <.sizable.> ] ;
-      [; <oForm>:AppBar := <.appbar.> ] ;
-      [; <oForm>:ToolWindow := <.toolwin.> ]
+      [; <oForm>:cFontName := <cFont> ] ;
+      [; <oForm>:nFontSize := <nSize> ] ;
+      [; <oForm>:lSizable := <.sizable.> ] ;
+      [; <oForm>:lAppBar := <.appbar.> ] ;
+      [; <oForm>:lToolWindow := <.toolwin.> ]
 
 #xcommand ACTIVATE FORM <oForm> [ <center: CENTERED> ] => ;
       <oForm>:Activate()
@@ -176,8 +176,8 @@
       [ <cancel: CANCEL> ] ;
    => ;
       <oCtrl> := TButton():New( <oParent>, <cText>, <nLeft>, <nTop>, <nWidth>, <nHeight> ) ;
-      [; <oCtrl>:Default := <.default.> ] ;
-      [; <oCtrl>:Cancel := <.cancel.> ]
+      [; <oCtrl>:lDefault := <.default.> ] ;
+      [; <oCtrl>:lCancel := <.cancel.> ]
 
 // BitBtn (button with image/kind)
 #xcommand @ <nTop>, <nLeft> BITBTN <oCtrl> ;
@@ -346,7 +346,7 @@
       [ <checked: CHECKED> ] ;
    => ;
       <oCtrl> := TCheckBox():New( <oParent>, <cText>, <nLeft>, <nTop>, <nWidth> ) ;
-      [; <oCtrl>:Checked := <.checked.> ]
+      [; <oCtrl>:lChecked := <.checked.> ]
 
 // ComboBox
 #xcommand @ <nTop>, <nLeft> COMBOBOX <oCtrl> ;
@@ -365,7 +365,7 @@
       [ <checked: CHECKED> ] ;
    => ;
       <oCtrl> := TRadioButton():New( <oParent>, <cText>, <nLeft>, <nTop>, <nWidth> ) ;
-      [; <oCtrl>:Checked := <.checked.> ]
+      [; <oCtrl>:lChecked := <.checked.> ]
 
 // ListBox
 #xcommand @ <nTop>, <nLeft> LISTBOX <oCtrl> ;

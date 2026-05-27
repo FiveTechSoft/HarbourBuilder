@@ -95,8 +95,8 @@ function Main()
    t6 := Seconds()
 
    for i := 1 to N_PROPGETS
-      xDummy := oBtn:Left
-      xDummy := oBtn:Top
+      xDummy := oBtn:nLeft
+      xDummy := oBtn:nTop
    next
 
    t6 := Seconds() - t6

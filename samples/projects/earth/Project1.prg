@@ -9,7 +9,7 @@ PROCEDURE Main()
    local oForm1   // AS TForm1
 
    oApp := TApplication():New()
-   oApp:Title := "Earth View Demo"
+   oApp:cTitle := "Earth View Demo"
    oForm1 := TForm1():New()
    oApp:CreateForm( oForm1 )
    oApp:Run()

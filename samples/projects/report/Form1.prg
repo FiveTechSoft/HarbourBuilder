@@ -52,11 +52,11 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "Report Designer Demo"
-   ::Left   := 100
-   ::Top    := 100
-   ::Width  := 640
-   ::Height := 580
+   ::cTitle  := "Report Designer Demo"
+   ::nLeft   := 100
+   ::nTop    := 100
+   ::nWidth  := 640
+   ::nHeight := 580
 
    COMPONENT ::oPrinter1 TYPE CT_PRINTER OF Self
    COMPONENT ::oReport1  TYPE CT_REPORT  OF Self
@@ -114,7 +114,7 @@ METHOD CreateForm() CLASS TForm1
    @ 480, 120 BUTTON ::oBtnSetup OF Self PROMPT "Printer Setup" SIZE 120, 30
    @ 520, 10  MEMO   ::oLog      OF Self SIZE 610, 50
 
-   ::oLog:Text := "Press Print to send to printer, or Printer Setup to configure." + Chr(13) + Chr(10)
+   ::oLog:cText := "Press Print to send to printer, or Printer Setup to configure." + Chr(13) + Chr(10)
 
    // Wiring
    ::oReport1:oPrinter := ::oPrinter1
@@ -137,7 +137,7 @@ METHOD OnStartClick() CLASS TForm1
    ::oReport1:nMarginTop   := 15
    ::oReport1:nMarginBottom := 15
    ::oReport1:Print()
-   ::oLog:Text += "Printed." + Chr(13) + Chr(10)
+   ::oLog:cText += "Printed." + Chr(13) + Chr(10)
 return nil
 //--------------------------------------------------------------------
 

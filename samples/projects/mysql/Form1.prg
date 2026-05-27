@@ -31,11 +31,11 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "TMySQL Sample"
-   ::Left   := 200
-   ::Top    := 100
-   ::Width  := 720
-   ::Height := 540
+   ::cTitle  := "TMySQL Sample"
+   ::nLeft   := 200
+   ::nTop    := 100
+   ::nWidth  := 720
+   ::nHeight := 540
 
    // Non-visual MySQL connection
    COMPONENT ::oDb1 TYPE CT_MYSQL OF Self  // TMySQL @ 16,440

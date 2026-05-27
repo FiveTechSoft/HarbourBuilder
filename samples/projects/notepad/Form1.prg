@@ -65,7 +65,7 @@ static function FileNew()
 
    if ! CheckSave(); return nil; endif
 
-   oMemo:Text := ""
+   oMemo:cText := ""
    cCurrentFile := ""
    lModified := .F.
    UpdateTitle()
@@ -85,7 +85,7 @@ static function FileOpen()
    if ! Empty( cFile )
       cContent := MemoRead( cFile )
       if ! Empty( cContent )
-         oMemo:Text := cContent
+         oMemo:cText := cContent
          cCurrentFile := cFile
          lModified := .F.
          UpdateTitle()
@@ -99,7 +99,7 @@ static function FileSave()
    if Empty( cCurrentFile )
       FileSaveAs()
    else
-      MemoWrit( cCurrentFile, oMemo:Text )
+      MemoWrit( cCurrentFile, oMemo:cText )
       lModified := .F.
       UpdateTitle()
    endif
@@ -116,7 +116,7 @@ static function FileSaveAs()
 
    if ! Empty( cFile )
       cCurrentFile := cFile
-      MemoWrit( cCurrentFile, oMemo:Text )
+      MemoWrit( cCurrentFile, oMemo:cText )
       lModified := .F.
       UpdateTitle()
    endif
@@ -147,6 +147,6 @@ static function UpdateTitle()
       cTitle += " *"
    endif
 
-   oForm:Title := cTitle + " - HbNotepad"
+   oForm:cTitle := cTitle + " - HbNotepad"
 
 return nil

@@ -805,7 +805,7 @@ static function GenerateProjectCode()
    cCode += "   local oApp" + e
    cCode += e
    cCode += "   oApp := TApplication():New()" + e
-   cCode += '   oApp:Title := "Project1"' + e
+   cCode += '   oApp:cTitle := "Project1"' + e
 
    for i := 1 to Len( aForms )
       cCode += "   oApp:CreateForm( T" + aForms[i][1] + "():New() )" + e
@@ -977,7 +977,7 @@ static function RegenerateFormCode( cName, hForm )
                   ' MEMO ::o' + cCtrlName + ' OF ' + cParent + ' SIZE ' + ;
                   LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
                if ! Empty( cText )
-                  cCreate += '   ::o' + cCtrlName + ':Text := "' + ;
+                  cCreate += '   ::o' + cCtrlName + ':cText := "' + ;
                      StrTran( StrTran( cText, '"', '""' ), Chr(10), '" + Chr(10) + "' ) + ;
                      '"' + e
                endif
@@ -1018,7 +1018,7 @@ static function RegenerateFormCode( cName, hForm )
                cCreate += e
                cVal := UI_GetProp( hCtrl, "nMapType" )
                if ValType( cVal ) == "N" .and. cVal > 0
-                  cCreate += '   ::o' + cCtrlName + ':MapType := ' + LTrim( Str( cVal ) ) + e
+                  cCreate += '   ::o' + cCtrlName + ':nMapType := ' + LTrim( Str( cVal ) ) + e
                endif
             case nType == 62  // WebView
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
@@ -1052,11 +1052,11 @@ static function RegenerateFormCode( cName, hForm )
                cCreate += e
                cVal := UI_GetProp( hCtrl, "nFixedRows" )
                if ValType( cVal ) == "N" .and. cVal != 1
-                  cCreate += '   ::o' + cCtrlName + ':FixedRows := ' + LTrim( Str( cVal ) ) + e
+                  cCreate += '   ::o' + cCtrlName + ':nFixedRows := ' + LTrim( Str( cVal ) ) + e
                endif
                cVal := UI_GetProp( hCtrl, "nFixedCols" )
                if ValType( cVal ) == "N" .and. cVal != 0
-                  cCreate += '   ::o' + cCtrlName + ':FixedCols := ' + LTrim( Str( cVal ) ) + e
+                  cCreate += '   ::o' + cCtrlName + ':nFixedCols := ' + LTrim( Str( cVal ) ) + e
                endif
             case nType == 28  // MaskEdit
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
@@ -1107,11 +1107,11 @@ static function RegenerateFormCode( cName, hForm )
                cCreate += e
                cVal := UI_GetProp( hCtrl, "nPenColor" )
                if ValType( cVal ) == "N" .and. cVal != 0
-                  cCreate += '   ::o' + cCtrlName + ':PenColor := ' + LTrim( Str( cVal ) ) + e
+                  cCreate += '   ::o' + cCtrlName + ':nPenColor := ' + LTrim( Str( cVal ) ) + e
                endif
                cVal := UI_GetProp( hCtrl, "nPenWidth" )
                if ValType( cVal ) == "N" .and. cVal != 1
-                  cCreate += '   ::o' + cCtrlName + ':PenWidth := ' + LTrim( Str( cVal ) ) + e
+                  cCreate += '   ::o' + cCtrlName + ':nPenWidth := ' + LTrim( Str( cVal ) ) + e
                endif
             case nType == 12 .or. nType == 13  // BitBtn / SpeedButton
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
@@ -1525,7 +1525,7 @@ static function RegenerateFormCode( cName, hForm )
             // Emit ControlAlign if non-default (0=alNone)
             cVal := UI_GetProp( hCtrl, "nControlAlign" )
             if ValType( cVal ) == "N" .and. cVal != 0
-               cCreate += '   ::o' + cCtrlName + ':ControlAlign := ' + LTrim( Str( cVal ) ) + e
+               cCreate += '   ::o' + cCtrlName + ':nControlAlign := ' + LTrim( Str( cVal ) ) + e
             endif
 
             // Emit oFont if non-default
@@ -1558,7 +1558,7 @@ static function RegenerateFormCode( cName, hForm )
                   // lTransparent, nAlign, oFont) to prevent accumulation when values change
                   if ":nClrPane" $ cLine .or. ":nClrText" $ cLine .or. ;
                      ":lTransparent" $ cLine .or. ":nAlign" $ cLine .or. ;
-                     ":ControlAlign" $ cLine .or. ":oFont" $ cLine
+                     ":nControlAlign" $ cLine .or. ":oFont" $ cLine
                      nPos += Len( cEvName )
                      loop
                   endif
@@ -1711,24 +1711,24 @@ static function RegenerateFormCode( cName, hForm )
    cCode += e
    cCode += "METHOD CreateForm() CLASS " + cClass + e
    cCode += e
-   cCode += '   ::Title  := "' + cTitle + '"' + e
-   cCode += "   ::Left   := " + LTrim(Str(nFL)) + e
-   cCode += "   ::Top    := " + LTrim(Str(nFT)) + e
-   cCode += "   ::Width  := " + LTrim(Str(nW)) + e
-   cCode += "   ::Height := " + LTrim(Str(nH)) + e
+   cCode += '   ::cTitle  := "' + cTitle + '"' + e
+   cCode += "   ::nLeft   := " + LTrim(Str(nFL)) + e
+   cCode += "   ::nTop    := " + LTrim(Str(nFT)) + e
+   cCode += "   ::nWidth  := " + LTrim(Str(nW)) + e
+   cCode += "   ::nHeight := " + LTrim(Str(nH)) + e
    if nClr != 15790320  // non-default color
-      cCode += "   ::Color  := " + LTrim(Str(nClr)) + e
+      cCode += "   ::nClrPane := " + LTrim(Str(nClr)) + e
    endif
    nInterval := UI_GetProp( hForm, "nPosition" )
    if ValType( nInterval ) == "N" .and. nInterval > 0
-      cCode += "   ::Position := " + LTrim(Str(nInterval)) + e
+      cCode += "   ::nPosition := " + LTrim(Str(nInterval)) + e
    endif
    nInterval := UI_GetProp( hForm, "nBorderStyle" )
    if ValType( nInterval ) == "N" .and. nInterval != 2  // != bsSizeable (default)
-      cCode += "   ::BorderStyle := " + LTrim(Str(nInterval)) + e
+      cCode += "   ::nBorderStyle := " + LTrim(Str(nInterval)) + e
    endif
    if ! Empty( cAppTitle )
-      cCode += '   ::AppTitle := "' + cAppTitle + '"' + e
+      cCode += '   ::cAppTitle := "' + cAppTitle + '"' + e
    endif
    if ! Empty( cCreate )
       cCode += e
@@ -1801,8 +1801,8 @@ static function RestoreFormFromCode( hForm, cCode )
       cLine := aLines[i]
       cTrim := AllTrim( cLine )
 
-      // Parse form properties: ::Title, ::Width, ::Height, ::Left, ::Top
-      if '::Title' $ cTrim .and. ':=' $ cTrim
+      // Parse form properties: ::cTitle, ::nWidth, ::nHeight, ::nLeft, ::nTop
+      if '::cTitle' $ cTrim .and. ':=' $ cTrim
          nPos := At( '"', cTrim )
          nPos2 := RAt( '"', cTrim )
          if nPos > 0 .and. nPos2 > nPos
@@ -1811,35 +1811,35 @@ static function RestoreFormFromCode( hForm, cCode )
          endif
          loop
       endif
-      if '::Width' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
+      if '::nWidth' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
          UI_SetProp( hForm, "nWidth", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
          loop
       endif
-      if '::Height' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
+      if '::nHeight' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
          UI_SetProp( hForm, "nHeight", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
          loop
       endif
-      if '::Left' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
+      if '::nLeft' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
          UI_SetProp( hForm, "nLeft", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
          loop
       endif
-      if '::Top' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
+      if '::nTop' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
          UI_SetProp( hForm, "nTop", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
          loop
       endif
-      if '::Color' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
+      if '::nClrPane' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
          UI_SetProp( hForm, "nClrPane", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
          loop
       endif
-      if '::Position' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
+      if '::nPosition' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
          UI_SetProp( hForm, "nPosition", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
          loop
       endif
-      if '::BorderStyle' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
+      if '::nBorderStyle' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
          UI_SetProp( hForm, "nBorderStyle", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
          loop
       endif
-      if '::AppTitle' $ cTrim .and. ':=' $ cTrim
+      if '::cAppTitle' $ cTrim .and. ':=' $ cTrim
          nPos := At( '"', cTrim )
          nPos2 := RAt( '"', cTrim )
          if nPos > 0 .and. nPos2 > nPos

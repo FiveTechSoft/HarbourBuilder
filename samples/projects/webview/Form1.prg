@@ -28,11 +28,11 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "WebView Demo"
-   ::Left   := 200
-   ::Top    := 100
-   ::Width  := 900
-   ::Height := 620
+   ::cTitle  := "WebView Demo"
+   ::nLeft   := 200
+   ::nTop    := 100
+   ::nWidth  := 900
+   ::nHeight := 620
 
    // Toolbar row
    @ 8, 8    BUTTON  ::oBtnBack   PROMPT "< Back"   OF Self SIZE 70, 28
@@ -43,7 +43,7 @@ METHOD CreateForm() CLASS TForm1
 
    // WebView — fills the remaining area
    @ 44, 0   WEBVIEW ::oWebView1  OF Self SIZE 900, 550 URL "https://harbour.github.io"
-   ::oWebView1:ControlAlign := 5   // alClient
+   ::oWebView1:nControlAlign := 5   // alClient
 
    // Status label
    @ 0, 0    SAY     ::oLblStatus PROMPT "Ready" OF Self SIZE 900
@@ -63,7 +63,7 @@ return nil
 
 METHOD BtnGoClick() CLASS TForm1
 
-   local cUrl := AllTrim( ::oEdtUrl:Text )
+   local cUrl := AllTrim( ::oEdtUrl:cText )
    if Empty( cUrl ); return nil; endif
    if ! ( "://" $ cUrl )
       cUrl := "https://" + cUrl
@@ -85,15 +85,15 @@ METHOD BtnReloadClick() CLASS TForm1
 return nil
 
 METHOD WebNavigate( cUrl ) CLASS TForm1
-   ::oEdtUrl:Text   := cUrl
-   ::oLblStatus:Text := "Loading: " + cUrl
+   ::oEdtUrl:cText   := cUrl
+   ::oLblStatus:cText := "Loading: " + cUrl
 return nil
 
 METHOD WebLoad() CLASS TForm1
-   ::oLblStatus:Text := "Done — " + ::oWebView1:GetUrl()
+   ::oLblStatus:cText := "Done — " + ::oWebView1:GetUrl()
 return nil
 
 METHOD WebError() CLASS TForm1
-   ::oLblStatus:Text := "Error loading page"
+   ::oLblStatus:cText := "Error loading page"
 return nil
 //--------------------------------------------------------------------

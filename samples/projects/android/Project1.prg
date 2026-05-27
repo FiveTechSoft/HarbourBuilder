@@ -18,7 +18,7 @@ PROCEDURE Main()
    local oApp
 
    oApp := TApplication():New()
-   oApp:Title := "HarbourBuilder Android Sample"
+   oApp:cTitle := "HarbourBuilder Android Sample"
    oApp:CreateForm( TForm1():New() )
    oApp:Run()
 

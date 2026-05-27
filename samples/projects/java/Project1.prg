@@ -4,7 +4,7 @@
 PROCEDURE Main()
    local oApp, oForm
    oApp := TApplication():New()
-   oApp:Title := "TJava Demo"
+   oApp:cTitle := "TJava Demo"
    oForm := TForm1():New()
    oApp:CreateForm( oForm )
    oApp:Run()

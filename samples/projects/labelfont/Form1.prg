@@ -15,14 +15,14 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "Form1"
-   ::Left   := 1122
-   ::Top    := 377
-   ::Width  := 603
-   ::Height := 441
-   ::FontName := "Segoe UI"
-   ::FontSize := 9
-   ::Color  := 2960685
+   ::cTitle  := "Form1"
+   ::nLeft   := 1122
+   ::nTop    := 377
+   ::nWidth  := 603
+   ::nHeight := 441
+   ::cFontName := "Segoe UI"
+   ::nFontSize := 9
+   ::nClrPane  := 2960685
 
    @ 112, 152 SAY ::oLabel1 PROMPT "Hello" OF Self SIZE 240, 104
    ::oLabel1:oFont := "Georgia,60,00FF2E"

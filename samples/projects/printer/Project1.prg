@@ -8,7 +8,7 @@ PROCEDURE Main()
    local oApp
 
    oApp := TApplication():New()
-   oApp:Title := "Printer Demo"
+   oApp:cTitle := "Printer Demo"
    oApp:CreateForm( TForm1():New() )
    oApp:Run()
 

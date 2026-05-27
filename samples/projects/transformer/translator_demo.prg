@@ -43,13 +43,13 @@ static function Translate()
    local aSource, aTarget
 
    e := Chr(13) + Chr(10)
-   cSource := oInput:Text
+   cSource := oInput:cText
 
    // Simple word-level translation (real: learned encoder-decoder)
    aSource := HB_ATokens( cSource, " " )
    aTarget := TranslateWords( aSource )
 
-   oOutput:Text := ArrayToStr( aTarget )
+   oOutput:cText := ArrayToStr( aTarget )
 
    cOut := "=== Encoder-Decoder Translation ===" + e + e
 
@@ -91,7 +91,7 @@ static function Translate()
    cOut += "  This is how the decoder 'reads' the source sentence" + e
    cOut += "  while generating the target sentence word by word."
 
-   oDetails:Text := cOut
+   oDetails:cText := cOut
 
 return nil
 

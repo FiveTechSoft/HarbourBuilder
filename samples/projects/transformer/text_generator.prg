@@ -47,13 +47,13 @@ static function Generate()
    local nTemp, cNextToken, e
 
    e := Chr(13) + Chr(10)
-   cPrompt := oPrompt:Text
+   cPrompt := oPrompt:cText
    nTemp := 0.7
    nMaxTokens := 100
 
    cGenerated := cPrompt
-   oOutput:Text := "=== Generating with temperature " + LTrim(Str(nTemp,4,1)) + " ===" + e + e
-   oOutput:Text += cPrompt
+   oOutput:cText := "=== Generating with temperature " + LTrim(Str(nTemp,4,1)) + " ===" + e + e
+   oOutput:cText += cPrompt
 
    // Simulate token-by-token generation
    // In production: TTransformer:Generate( cPrompt, nMaxTokens, nTemp )
@@ -62,20 +62,20 @@ static function Generate()
       cNextToken := SampleNextToken( cGenerated, nTemp )
       if cNextToken == "<EOS>"; exit; endif
       cGenerated += " " + cNextToken
-      oOutput:Text += " " + cNextToken
+      oOutput:cText += " " + cNextToken
    next
 
-   oOutput:Text += e + e
-   oOutput:Text += "=== Generation complete ===" + e
-   oOutput:Text += "Tokens generated: " + LTrim(Str(i-1)) + e
-   oOutput:Text += e
-   oOutput:Text += "How temperature works:" + e
-   oOutput:Text += "  logits = model_output / temperature" + e
-   oOutput:Text += "  probs  = softmax(logits)" + e
-   oOutput:Text += "  token  = sample(probs)" + e
-   oOutput:Text += e
-   oOutput:Text += "Low temperature (0.1): sharp distribution -> predictable text" + e
-   oOutput:Text += "High temperature (2.0): flat distribution -> creative/random text"
+   oOutput:cText += e + e
+   oOutput:cText += "=== Generation complete ===" + e
+   oOutput:cText += "Tokens generated: " + LTrim(Str(i-1)) + e
+   oOutput:cText += e
+   oOutput:cText += "How temperature works:" + e
+   oOutput:cText += "  logits = model_output / temperature" + e
+   oOutput:cText += "  probs  = softmax(logits)" + e
+   oOutput:cText += "  token  = sample(probs)" + e
+   oOutput:cText += e
+   oOutput:cText += "Low temperature (0.1): sharp distribution -> predictable text" + e
+   oOutput:cText += "High temperature (2.0): flat distribution -> creative/random text"
 
 return nil
 

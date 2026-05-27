@@ -732,7 +732,7 @@ static function GenerateProjectCode()
    cCode += "   local oApp" + e
    cCode += e
    cCode += "   oApp := TApplication():New()" + e
-   cCode += '   oApp:Title := "Project1"' + e
+   cCode += '   oApp:cTitle := "Project1"' + e
 
    for i := 1 to Len( aForms )
       cCode += "   oApp:CreateForm( T" + aForms[i][1] + "():New() )" + e
@@ -1249,16 +1249,16 @@ static function RegenerateFormCode( cName, hForm )
    cCode += e
    cCode += "METHOD CreateForm() CLASS " + cClass + e
    cCode += e
-   cCode += '   ::Title  := "' + cTitle + '"' + e
-   cCode += "   ::Left   := " + LTrim(Str(nFL)) + e
-   cCode += "   ::Top    := " + LTrim(Str(nFT)) + e
-   cCode += "   ::Width  := " + LTrim(Str(nW)) + e
-   cCode += "   ::Height := " + LTrim(Str(nH)) + e
+   cCode += '   ::cTitle  := "' + cTitle + '"' + e
+   cCode += "   ::nLeft   := " + LTrim(Str(nFL)) + e
+   cCode += "   ::nTop    := " + LTrim(Str(nFT)) + e
+   cCode += "   ::nWidth  := " + LTrim(Str(nW)) + e
+   cCode += "   ::nHeight := " + LTrim(Str(nH)) + e
    if nClr != 15790320
-      cCode += "   ::Color  := " + LTrim(Str(nClr)) + e
+      cCode += "   ::nClrPane := " + LTrim(Str(nClr)) + e
    endif
    if ! Empty( cAppTitle )
-      cCode += '   ::AppTitle := "' + cAppTitle + '"' + e
+      cCode += '   ::cAppTitle := "' + cAppTitle + '"' + e
    endif
    if ! Empty( cCreate )
       cCode += e + cCreate
@@ -2038,8 +2038,8 @@ static function RestoreFormFromCode( hForm, cCode )
       cLine := aLines[i]
       cTrim := AllTrim( cLine )
 
-      // Parse form properties: ::Title, ::Width, ::Height, ::Left, ::Top, ::Color
-      if '::Title' $ cTrim .and. ':=' $ cTrim
+      // Parse form properties: ::cTitle, ::nWidth, ::nHeight, ::nLeft, ::nTop, ::nClrPane
+      if '::cTitle' $ cTrim .and. ':=' $ cTrim
          nPos := At( '"', cTrim )
          nPos2 := RAt( '"', cTrim )
          if nPos > 0 .and. nPos2 > nPos
@@ -2048,7 +2048,7 @@ static function RestoreFormFromCode( hForm, cCode )
          endif
          loop
       endif
-      if '::AppTitle' $ cTrim .and. ':=' $ cTrim
+      if '::cAppTitle' $ cTrim .and. ':=' $ cTrim
          nPos := At( '"', cTrim )
          nPos2 := RAt( '"', cTrim )
          if nPos > 0 .and. nPos2 > nPos
@@ -2056,23 +2056,23 @@ static function RestoreFormFromCode( hForm, cCode )
          endif
          loop
       endif
-      if '::Width' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
+      if '::nWidth' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
          UI_SetProp( hForm, "nWidth", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
          loop
       endif
-      if '::Height' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
+      if '::nHeight' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
          UI_SetProp( hForm, "nHeight", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
          loop
       endif
-      if '::Left' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
+      if '::nLeft' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
          UI_SetProp( hForm, "nLeft", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
          loop
       endif
-      if '::Top' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
+      if '::nTop' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
          UI_SetProp( hForm, "nTop", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
          loop
       endif
-      if '::Color' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
+      if '::nClrPane' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
          UI_SetProp( hForm, "nClrPane", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
          loop
       endif

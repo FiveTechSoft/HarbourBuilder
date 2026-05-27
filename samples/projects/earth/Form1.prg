@@ -26,11 +26,11 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "Earth View — Apple MapKit Globe"
-   ::Left   := 953
-   ::Top    := 183
-   ::Width  := 600
-   ::Height := 620
+   ::cTitle  := "Earth View — Apple MapKit Globe"
+   ::nLeft   := 953
+   ::nTop    := 183
+   ::nWidth  := 600
+   ::nHeight := 620
 
    @ 16, 16 SAY ::oLabel1 PROMPT "Real Earth from Apple Maps satellite — auto-rotating. Drag to interact." OF Self SIZE 568
    ::oLabel1:oFont := ".AppleSystemUIFont,12"
@@ -63,26 +63,26 @@ return nil
 
 METHOD GoMadrid() CLASS TForm1
    ::oEarth1:lAutoRotate := .F.
-   ::oEarth1:Lat := 40.4168
-   ::oEarth1:Lon := -3.7038
+   ::oEarth1:nLat:= 40.4168
+   ::oEarth1:nLon:= -3.7038
 return nil
 
 METHOD GoTokyo() CLASS TForm1
    ::oEarth1:lAutoRotate := .F.
-   ::oEarth1:Lat := 35.6762
-   ::oEarth1:Lon := 139.6503
+   ::oEarth1:nLat:= 35.6762
+   ::oEarth1:nLon:= 139.6503
 return nil
 
 METHOD GoNewYork() CLASS TForm1
    ::oEarth1:lAutoRotate := .F.
-   ::oEarth1:Lat := 40.7128
-   ::oEarth1:Lon := -74.0060
+   ::oEarth1:nLat:= 40.7128
+   ::oEarth1:nLon:= -74.0060
 return nil
 
 METHOD GoSydney() CLASS TForm1
    ::oEarth1:lAutoRotate := .F.
-   ::oEarth1:Lat := -33.8688
-   ::oEarth1:Lon := 151.2093
+   ::oEarth1:nLat:= -33.8688
+   ::oEarth1:nLon:= 151.2093
 return nil
 //--------------------------------------------------------------------
 

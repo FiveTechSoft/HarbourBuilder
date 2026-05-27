@@ -18,11 +18,11 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "TMariaDB Sample"
-   ::Left   := 220
-   ::Top    := 120
-   ::Width  := 720
-   ::Height := 540
+   ::cTitle  := "TMariaDB Sample"
+   ::nLeft   := 220
+   ::nTop    := 120
+   ::nWidth  := 720
+   ::nHeight := 540
 
    COMPONENT ::oDb1 TYPE CT_MARIADB OF Self  // TMariaDB
    ::oDb1:cServer   := "127.0.0.1"

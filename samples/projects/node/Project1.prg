@@ -4,7 +4,7 @@
 PROCEDURE Main()
    local oApp, oForm
    oApp := TApplication():New()
-   oApp:Title := "TNode Demo"
+   oApp:cTitle := "TNode Demo"
    oForm := TForm1():New()
    oApp:CreateForm( oForm )
    oApp:Run()

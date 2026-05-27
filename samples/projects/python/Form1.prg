@@ -29,12 +29,12 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "TPython — Getting started"
-   ::Left   := 939
-   ::Top    := 270
-   ::Width  := 620
-   ::Height := 500
-   ::Position := 2
+   ::cTitle  := "TPython — Getting started"
+   ::nLeft   := 939
+   ::nTop    := 270
+   ::nWidth  := 620
+   ::nHeight := 500
+   ::nPosition := 2
 
    COMPONENT ::oPython TYPE CT_PYTHON OF Self  // TPython @ 560,8
    ::oPython:oFont := ".AppleSystemUIFont,12"
@@ -48,7 +48,7 @@ METHOD CreateForm() CLASS TForm1
    @ 48, 16 SAY ::oLblScript PROMPT "Script (editable):" OF Self SIZE 200
    ::oLblScript:oFont := ".AppleSystemUIFont,12"
    @ 68, 16 MEMO ::oScriptEdit OF Self SIZE 588, 160
-   ::oScriptEdit:Text := "# Classic greeting" + Chr(10) + "print( 'Hello, world from Python!' )" + Chr(10) + ""
+   ::oScriptEdit:cText := "# Classic greeting" + Chr(10) + "print( 'Hello, world from Python!' )" + Chr(10) + ""
    ::oScriptEdit:oFont := ".AppleSystemUIFont,12"
    @ 236, 16 BUTTON ::oBtnRun PROMPT "Run" OF Self SIZE 100, 28
    ::oBtnRun:oFont := ".AppleSystemUIFont,12"
@@ -86,18 +86,18 @@ METHOD LoadSample( nIdx ) CLASS TForm1
       cCode := "a, b = 0, 1" + e + "for i in range(10):" + e + ;
                "    print( i, a )" + e + "    a, b = b, a + b" + e
    endcase
-   ::oScriptEdit:Text := cCode
+   ::oScriptEdit:cText := cCode
 return nil
 
 //--------------------------------------------------------------------
 METHOD DoRun() CLASS TForm1
    ::Log( "=== Run ===" )
-   ::oPython:Exec( ::oScriptEdit:Text )
+   ::oPython:Exec( ::oScriptEdit:cText )
 return nil
 
 //--------------------------------------------------------------------
 METHOD DoEval() CLASS TForm1
-   local cExpr := AllTrim( ::oScriptEdit:Text )
+   local cExpr := AllTrim( ::oScriptEdit:cText )
    local cValue
    if Empty( cExpr )
       ::Log( "(nothing to evaluate)" )
@@ -110,12 +110,12 @@ return nil
 
 //--------------------------------------------------------------------
 METHOD DoClear() CLASS TForm1
-   ::oOutput:Text := ""
+   ::oOutput:cText := ""
 return nil
 
 //--------------------------------------------------------------------
 METHOD Log( cMsg ) CLASS TForm1
-   ::oOutput:Text := ::oOutput:Text + cMsg + Chr(10)
+   ::oOutput:cText := ::oOutput:cText + cMsg + Chr(10)
 return nil
 //--------------------------------------------------------------------
 

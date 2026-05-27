@@ -21,11 +21,11 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "TRuby — Getting started"
-   ::Left   := 280
-   ::Top    := 160
-   ::Width  := 620
-   ::Height := 500
+   ::cTitle  := "TRuby — Getting started"
+   ::nLeft   := 280
+   ::nTop    := 160
+   ::nWidth  := 620
+   ::nHeight := 500
 
    COMPONENT ::oRuby TYPE CT_RUBY OF Self
    ::oRuby:cRuntimePath := ""
@@ -51,7 +51,7 @@ METHOD CreateForm() CLASS TForm1
    @ 282, 16 SAY ::oLblOutput PROMPT "Output:" OF Self SIZE 200
    @ 302, 16 MEMO ::oOutput OF Self SIZE 588, 160
 
-   ::oScriptEdit:Text := "puts 'Hello, world from Ruby!'" + Chr(10)
+   ::oScriptEdit:cText := "puts 'Hello, world from Ruby!'" + Chr(10)
 
 return nil
 //--------------------------------------------------------------------
@@ -70,7 +70,7 @@ METHOD LoadSample( nIdx ) CLASS TForm1
    case nIdx == 5
       cCode := "puts \"#{greeting}, #{name}!\"" + e
    endcase
-   ::oScriptEdit:Text := cCode
+   ::oScriptEdit:cText := cCode
 return nil
 //--------------------------------------------------------------------
 
@@ -78,11 +78,11 @@ METHOD DoRun() CLASS TForm1
    ::oRuby:SetVar( "greeting", "Hello" )
    ::oRuby:SetVar( "name",     "Antonio" )
    ::Log( "=== Run ===" )
-   ::oRuby:Exec( ::oScriptEdit:Text )
+   ::oRuby:Exec( ::oScriptEdit:cText )
 return nil
 
 METHOD DoEval() CLASS TForm1
-   local cExpr := AllTrim( ::oScriptEdit:Text ), cValue
+   local cExpr := AllTrim( ::oScriptEdit:cText ), cValue
    if Empty( cExpr ); ::Log( "(empty)" ); return nil; endif
    cValue := ::oRuby:Eval( cExpr )
    ::Log( "=== Eval: " + cExpr + " ===" )
@@ -90,10 +90,10 @@ METHOD DoEval() CLASS TForm1
 return nil
 
 METHOD DoClear() CLASS TForm1
-   ::oOutput:Text := ""
+   ::oOutput:cText := ""
 return nil
 
 METHOD Log( cMsg ) CLASS TForm1
-   ::oOutput:Text := ::oOutput:Text + cMsg + Chr(10)
+   ::oOutput:cText := ::oOutput:cText + cMsg + Chr(10)
 return nil
 //--------------------------------------------------------------------

@@ -16,10 +16,10 @@ function Main()
    @ 45, 10 SAY "Language:" OF oForm SIZE 70
    @ 43, 80 COMBOBOX oCbx OF oForm ITEMS { "Espanol", "English", "Deutsch" } SIZE 150
    oCbx:Value := 0
-   oCbx:Name := "cboLanguage"
+   oCbx:cName := "cboLanguage"
 
    @ 80, 80 CHECKBOX oChk PROMPT "Active" OF oForm SIZE 120 CHECKED
-   oChk:Name := "chkActive"
+   oChk:cName := "chkActive"
 
    // Inspect button - opens inspector for the combobox
    @ 130, 10 BUTTON oBtnInspect PROMPT "Inspect ComboBox" OF oForm SIZE 160, 26

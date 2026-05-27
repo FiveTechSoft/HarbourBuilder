@@ -8,7 +8,7 @@ PROCEDURE Main()
    local oApp
 
    oApp := TApplication():New()
-   oApp:Title := "Python Sample"
+   oApp:cTitle := "Python Sample"
    oApp:CreateForm( TForm1():New() )
    oApp:Run()
 

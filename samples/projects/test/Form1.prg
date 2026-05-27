@@ -17,12 +17,12 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "Okno główne aplikacji test1"
-   ::Left   := 884
-   ::Top    := 244
-   ::Width  := 587
-   ::Height := 436
-   ::Color  := 16776563
+   ::cTitle  := "Okno główne aplikacji test1"
+   ::nLeft   := 884
+   ::nTop    := 244
+   ::nWidth  := 587
+   ::nHeight := 436
+   ::nClrPane  := 16776563
 
    @ 8, 32 SAY ::oLabel1 PROMPT "Jeśli widzisz to okno, to jest to moja pierwsza appka na MacBook" OF Self SIZE 320
    ::oLabel1:nClrPane := 9640787
@@ -48,8 +48,8 @@ return nil
 //--------------------------------------------------------------------
 static function Button1Click( oForm )
 
-	//W32_MsgBox(::PoleTekstowe:Text)
-   MsgInfo( oForm:oEdit1:Text )
+	//W32_MsgBox(::PoleTekstowe:cText)
+   MsgInfo( oForm:oEdit1:cText )
 
 return nil
 

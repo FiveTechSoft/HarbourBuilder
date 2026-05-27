@@ -6,7 +6,7 @@
 PROCEDURE Main()
    local oApp, oForm
    oApp := TApplication():New()
-   oApp:Title := "TRust Demo"
+   oApp:cTitle := "TRust Demo"
    oForm := TForm1():New()
    oApp:CreateForm( oForm )
    oApp:Run()

@@ -23,11 +23,11 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "Scene3D Demo"
-   ::Left   := 963
-   ::Top    := 191
-   ::Width  := 640
-   ::Height := 520
+   ::cTitle  := "Scene3D Demo"
+   ::nLeft   := 963
+   ::nTop    := 191
+   ::nWidth  := 640
+   ::nHeight := 520
 
    @ 16, 16 SAY ::oLabel1 PROMPT "3D viewer — drag to orbit, scroll to zoom, two-finger drag to pan" OF Self SIZE 600
    ::oLabel1:oFont := ".AppleSystemUIFont,12"
@@ -56,7 +56,7 @@ METHOD Button1Click() CLASS TForm1
 
    if ! Empty( cPath )
       ::oScene3D1:cSceneFile := cPath
-      ::oLabel2:Text := "Loaded: " + cPath
+      ::oLabel2:cText := "Loaded: " + cPath
    endif
 
 return nil
@@ -65,7 +65,7 @@ return nil
 METHOD Button2Click() CLASS TForm1
 
    ::oScene3D1:cSceneFile := ""
-   ::oLabel2:Text := "No model loaded (default dodecahedron)"
+   ::oLabel2:cText := "No model loaded (default dodecahedron)"
 
 return nil
 //--------------------------------------------------------------------

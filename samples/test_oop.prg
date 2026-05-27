@@ -9,8 +9,8 @@ function Main()
 
    // Form
    oForm := TForm():New( "Preferencias", 471, 405 )
-   oForm:FontName := "Segoe UI"
-   oForm:FontSize := 12
+   oForm:cFontName := "Segoe UI"
+   oForm:nFontSize := 12
 
    // General group
    TGroupBox():New( oForm, "General", 12, 13, 431, 122 )
@@ -40,21 +40,21 @@ function Main()
 
    // Checkboxes
    oChk := TCheckBox():New( oForm, "Mostrar barra de herramientas", 112, 210, 245 )
-   oChk:Checked := .t.
+   oChk:lChecked := .t.
 
    oChk := TCheckBox():New( oForm, "Mostrar barra de estado", 112, 234, 245 )
-   oChk:Checked := .t.
+   oChk:lChecked := .t.
 
    oChk := TCheckBox():New( oForm, "Confirmar al salir", 112, 259, 245 )
-   oChk:Checked := .t.
+   oChk:lChecked := .t.
 
    // Buttons
    oBtn := TButton():New( oForm, "&Aceptar", 170, 326 )
-   oBtn:Default := .t.
+   oBtn:lDefault := .t.
    oBtn:OnClick := { |h| MsgInfo( "Aceptar!" ) }
 
    oBtn := TButton():New( oForm, "&Cancelar", 266, 326 )
-   oBtn:Cancel := .t.
+   oBtn:lCancel := .t.
 
    // Go!
    oForm:Activate()

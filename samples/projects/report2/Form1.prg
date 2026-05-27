@@ -22,12 +22,12 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "Customer Report - HarbourBuilder Sample"
-   ::Left   := 1222
-   ::Top    := 422
-   ::Width  := 660
-   ::Height := 509
-   ::Color  := 14605931
+   ::cTitle  := "Customer Report - HarbourBuilder Sample"
+   ::nLeft   := 1222
+   ::nTop    := 422
+   ::nWidth  := 660
+   ::nHeight := 509
+   ::nClrPane  := 14605931
 
    @ 12, 12 SAY ::oLblTitle PROMPT "Customer Database Report" OF Self SIZE 630
    ::oLblTitle:nClrPane := 14062743
@@ -77,7 +77,7 @@ function Form1Create( oSelf )
    oDb:Close()
 
    oSelf:oList:SetItems( aItems )
-   oSelf:oLblStatus:Text := "Records: " + hb_NToS( nCount ) + ;
+   oSelf:oLblStatus:cText := "Records: " + hb_NToS( nCount ) + ;
                             "  (showing first " + hb_NToS( Len( aItems ) ) + ")"
 
 return nil

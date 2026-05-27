@@ -21,11 +21,11 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "TNode — Getting started"
-   ::Left   := 220
-   ::Top    := 130
-   ::Width  := 620
-   ::Height := 500
+   ::cTitle  := "TNode — Getting started"
+   ::nLeft   := 220
+   ::nTop    := 130
+   ::nWidth  := 620
+   ::nHeight := 500
 
    COMPONENT ::oNode TYPE CT_NODE OF Self
    ::oNode:cRuntimePath := ""
@@ -51,7 +51,7 @@ METHOD CreateForm() CLASS TForm1
    @ 282, 16 SAY ::oLblOutput PROMPT "Output:" OF Self SIZE 200
    @ 302, 16 MEMO ::oOutput OF Self SIZE 588, 160
 
-   ::oScriptEdit:Text := "console.log('Hello, world from Node!');" + Chr(10)
+   ::oScriptEdit:cText := "console.log('Hello, world from Node!');" + Chr(10)
 
 return nil
 //--------------------------------------------------------------------
@@ -71,7 +71,7 @@ METHOD LoadSample( nIdx ) CLASS TForm1
    case nIdx == 5
       cCode := "console.log('greeting:', greeting + ' ' + name);" + e
    endcase
-   ::oScriptEdit:Text := cCode
+   ::oScriptEdit:cText := cCode
 return nil
 //--------------------------------------------------------------------
 
@@ -79,11 +79,11 @@ METHOD DoRun() CLASS TForm1
    ::oNode:SetVar( "greeting", "Hello" )
    ::oNode:SetVar( "name",     "Antonio" )
    ::Log( "=== Run ===" )
-   ::oNode:Exec( ::oScriptEdit:Text )
+   ::oNode:Exec( ::oScriptEdit:cText )
 return nil
 
 METHOD DoEval() CLASS TForm1
-   local cExpr := AllTrim( ::oScriptEdit:Text ), cValue
+   local cExpr := AllTrim( ::oScriptEdit:cText ), cValue
    if Empty( cExpr ); ::Log( "(empty)" ); return nil; endif
    cValue := ::oNode:Eval( cExpr )
    ::Log( "=== Eval: " + cExpr + " ===" )
@@ -91,10 +91,10 @@ METHOD DoEval() CLASS TForm1
 return nil
 
 METHOD DoClear() CLASS TForm1
-   ::oOutput:Text := ""
+   ::oOutput:cText := ""
 return nil
 
 METHOD Log( cMsg ) CLASS TForm1
-   ::oOutput:Text := ::oOutput:Text + cMsg + Chr(10)
+   ::oOutput:cText := ::oOutput:cText + cMsg + Chr(10)
 return nil
 //--------------------------------------------------------------------

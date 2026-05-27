@@ -20,14 +20,14 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "TListView Sample"
-   ::Left   := 1430
-   ::Top    := 445
-   ::Width  := 540
-   ::Height := 420
-   ::FontName := "Segoe UI"
-   ::FontSize := 9
-   ::Color  := 2960685
+   ::cTitle  := "TListView Sample"
+   ::nLeft   := 1430
+   ::nTop    := 445
+   ::nWidth  := 540
+   ::nHeight := 420
+   ::cFontName := "Segoe UI"
+   ::nFontSize := 9
+   ::nClrPane  := 2960685
 
    @ 20, 20 SAY ::oLblInfo PROMPT "Employees:" OF Self SIZE 200, 24
    ::oLblInfo:oFont := "Segoe UI,12"

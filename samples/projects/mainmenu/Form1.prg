@@ -17,11 +17,11 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "TMainMenu Sample"
-   ::Left   := 1094
-   ::Top    := 249
-   ::Width  := 640
-   ::Height := 448
+   ::cTitle  := "TMainMenu Sample"
+   ::nLeft   := 1094
+   ::nTop    := 249
+   ::nWidth  := 640
+   ::nHeight := 448
 
    COMPONENT ::oMenu1 TYPE CT_MAINMENU OF Self  // TMainMenu @ 8,400
    DEFINE MENUBAR ::oMenu1
@@ -53,7 +53,7 @@ return nil
 // Menu handlers — each updates the status line so the click is visible
 //--------------------------------------------------------------------
 static function FileNew( oForm )
-   oForm:oMemo1:Text := ""
+   oForm:oMemo1:cText := ""
    SetStatus( oForm, "File > New" )
 return nil
 
@@ -79,7 +79,7 @@ return nil
 
 static function SetStatus( oForm, cMsg )
    if oForm:oStatus1 != nil
-      oForm:oStatus1:Text := cMsg
+      oForm:oStatus1:cText := cMsg
    endif
 return nil
 

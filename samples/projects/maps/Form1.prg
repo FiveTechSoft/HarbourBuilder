@@ -30,11 +30,11 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "Maps Demo (MapKit)"
-   ::Left   := 250
-   ::Top    := 100
-   ::Width  := 720
-   ::Height := 560
+   ::cTitle  := "Maps Demo (MapKit)"
+   ::nLeft   := 250
+   ::nTop    := 100
+   ::nWidth  := 720
+   ::nHeight := 560
 
    @ 16, 16 SAY ::oLabel1 PROMPT "Drag to pan, scroll to zoom. Click a button to jump." ;
       OF Self SIZE 680
@@ -79,8 +79,8 @@ METHOD GoTokyo() CLASS TForm1
 return nil
 
 METHOD ToggleType() CLASS TForm1
-   local n := ::oMap1:MapType
-   ::oMap1:MapType := IIf( n >= 3, 0, n + 1 )    // mtStandard..mtMutedStandard cycle
+   local n := ::oMap1:nMapType
+   ::oMap1:nMapType := IIf( n >= 3, 0, n + 1 )    // mtStandard..mtMutedStandard cycle
 return nil
 
 METHOD ClearPins() CLASS TForm1

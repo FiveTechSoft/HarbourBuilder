@@ -22,11 +22,11 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "TRust — Getting started"
-   ::Left   := 200
-   ::Top    := 120
-   ::Width  := 660
-   ::Height := 540
+   ::cTitle  := "TRust — Getting started"
+   ::nLeft   := 200
+   ::nTop    := 120
+   ::nWidth  := 660
+   ::nHeight := 540
 
    COMPONENT ::oRust TYPE CT_RUST OF Self
    ::oRust:cRuntimePath := ""
@@ -58,7 +58,7 @@ METHOD CreateForm() CLASS TForm1
    @ 320, 16 SAY ::oLblOutput PROMPT "Output:" OF Self SIZE 200
    @ 340, 16 MEMO ::oOutput OF Self SIZE 624, 160
 
-   ::oScriptEdit:Text := ;
+   ::oScriptEdit:cText := ;
       "fn main() {" + Chr(10) + ;
       "    println!(\"Hello, world from Rust!\");" + Chr(10) + ;
       "}" + Chr(10)
@@ -90,17 +90,17 @@ METHOD LoadSample( nIdx ) CLASS TForm1
                "    // Vars injected by SetVar will appear here at top of main()." + e + ;
                "    println!(\"see Eval log\");" + e + "}" + e
    endcase
-   ::oScriptEdit:Text := cCode
+   ::oScriptEdit:cText := cCode
 return nil
 //--------------------------------------------------------------------
 
 METHOD DoRun() CLASS TForm1
    ::Log( "=== Run ===" )
-   ::oRust:Exec( ::oScriptEdit:Text )
+   ::oRust:Exec( ::oScriptEdit:cText )
 return nil
 
 METHOD DoEval() CLASS TForm1
-   local cExpr := AllTrim( ::oScriptEdit:Text ), cValue
+   local cExpr := AllTrim( ::oScriptEdit:cText ), cValue
    if Empty( cExpr ); ::Log( "(empty)" ); return nil; endif
    ::oRust:SetVar( "name", "World" )    // demo SetVar
    cValue := ::oRust:Eval( cExpr )
@@ -110,14 +110,14 @@ return nil
 
 METHOD DoBuild() CLASS TForm1
    ::Log( "=== Build ===" )
-   ::oRust:Build( ::oScriptEdit:Text )
+   ::oRust:Build( ::oScriptEdit:cText )
 return nil
 
 METHOD DoClear() CLASS TForm1
-   ::oOutput:Text := ""
+   ::oOutput:cText := ""
 return nil
 
 METHOD Log( cMsg ) CLASS TForm1
-   ::oOutput:Text := ::oOutput:Text + cMsg + Chr(10)
+   ::oOutput:cText := ::oOutput:cText + cMsg + Chr(10)
 return nil
 //--------------------------------------------------------------------

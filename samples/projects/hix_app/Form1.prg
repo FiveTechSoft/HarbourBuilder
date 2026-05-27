@@ -25,11 +25,11 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "HIX App Demo"
-   ::Left   := 976
-   ::Top    := 251
-   ::Width  := 900
-   ::Height := 650
+   ::cTitle  := "HIX App Demo"
+   ::nLeft   := 976
+   ::nTop    := 251
+   ::nWidth  := 900
+   ::nHeight := 650
 
    COMPONENT ::oWebServer1 TYPE CT_WEBSERVER OF Self  // TWebServer @ 808,8
    ::oWebServer1:nPort := 8081
@@ -46,9 +46,9 @@ METHOD CreateForm() CLASS TForm1
 
    // Event wiring
    ::oBtnStart:OnClick   := { || ::OnStartClick() }
-   ::oBtnStop:Enabled    := .F.
+   ::oBtnStop:lEnabled    := .F.
    ::oBtnStop:OnClick    := { || ::OnStopClick() }
-   ::oBtnBrowser:Enabled := .F.
+   ::oBtnBrowser:lEnabled := .F.
    ::oBtnBrowser:OnClick := { || ::OnBrowserClick() }
 
 return nil
@@ -60,21 +60,21 @@ METHOD OnStartClick() CLASS TForm1
    ::oWebServer1:AddRoute( "GET", "/api/info", { || ::RouteApiInfo() } )
    ::oWebServer1:Start()
    if ::oWebServer1:lRunning
-      ::oLabel:Text := "Running: http://localhost:" + hb_ntos( ::oWebServer1:nPort ) + "/"
+      ::oLabel:cText := "Running: http://localhost:" + hb_ntos( ::oWebServer1:nPort ) + "/"
       ::oWebView1:Navigate( "http://localhost:" + hb_ntos( ::oWebServer1:nPort ) + "/" )
-      ::oBtnStart:Enabled   := .F.
-      ::oBtnStop:Enabled    := .T.
-      ::oBtnBrowser:Enabled := .T.
+      ::oBtnStart:lEnabled   := .F.
+      ::oBtnStop:lEnabled    := .T.
+      ::oBtnBrowser:lEnabled := .T.
    endif
 return nil
 
 METHOD OnStopClick() CLASS TForm1
    ::oWebServer1:Stop()
-   ::oLabel:Text := "Server stopped"
+   ::oLabel:cText := "Server stopped"
    ::oWebView1:Navigate( "about:blank" )
-   ::oBtnStart:Enabled   := .T.
-   ::oBtnStop:Enabled    := .F.
-   ::oBtnBrowser:Enabled := .F.
+   ::oBtnStart:lEnabled   := .T.
+   ::oBtnStop:lEnabled    := .F.
+   ::oBtnBrowser:lEnabled := .F.
 return nil
 
 METHOD OnBrowserClick() CLASS TForm1

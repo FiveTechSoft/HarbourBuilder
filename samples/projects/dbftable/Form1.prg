@@ -18,15 +18,15 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "DBF Table Demo"
-   ::Left   := 1175
-   ::Top    := 568
-   ::Width  := 420
-   ::Height := 240
-   ::FontName := "Segoe UI"
-   ::FontSize := 9
-   ::Color  := 14147434
-   ::AppTitle := "DbfTableDemo"
+   ::cTitle  := "DBF Table Demo"
+   ::nLeft   := 1175
+   ::nTop    := 568
+   ::nWidth  := 420
+   ::nHeight := 240
+   ::cFontName := "Segoe UI"
+   ::nFontSize := 9
+   ::nClrPane  := 14147434
+   ::cAppTitle := "DbfTableDemo"
 
    @ 12, 64 SAY ::oLabel1 PROMPT "Customer name:" OF Self SIZE 200, 24
    ::oLabel1:nClrPane := 14147190
@@ -50,15 +50,15 @@ METHOD Button1Click() CLASS TForm1
    // Edit, and put a status line in the Label. Keeps the file open
    // for as little as possible (close right after read).
    if ! ::oDbfTable1:Open()
-      ::oLabel1:Text := "Could not open " + ::oDbfTable1:cFileName + ;
+      ::oLabel1:cText := "Could not open " + ::oDbfTable1:cFileName + ;
                         " (" + ::oDbfTable1:cLastError + ")"
-      ::oEdit1:Text  := ""
+      ::oEdit1:cText  := ""
       return nil
    endif
 
    ::oDbfTable1:GoTop()
-   ::oEdit1:Text  := hb_CStr( ::oDbfTable1:FieldGet( 1 ) )
-   ::oLabel1:Text := ::oDbfTable1:FieldName( 1 ) + " (rec 1 of " + ;
+   ::oEdit1:cText  := hb_CStr( ::oDbfTable1:FieldGet( 1 ) )
+   ::oLabel1:cText := ::oDbfTable1:FieldName( 1 ) + " (rec 1 of " + ;
                      LTrim( Str( ::oDbfTable1:RecCount() ) ) + ")"
 
    ::oDbfTable1:Close()

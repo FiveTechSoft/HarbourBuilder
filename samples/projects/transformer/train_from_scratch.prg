@@ -85,7 +85,7 @@ static function TrainModel()
    cLog += "    7. Update: Adam optimizer step" + e
    cLog += e
 
-   oLog:Text := cLog
+   oLog:cText := cLog
 
    // Simulate training epochs
    for nEpoch := 1 to nEpochs
@@ -96,19 +96,19 @@ static function TrainModel()
       nLoss := Max( nLoss, 0.01 )
       AAdd( aLosses, nLoss )
 
-      oLblEpoch:Text := "Epoch: " + LTrim(Str(nEpoch)) + " / " + LTrim(Str(nEpochs))
-      oLblLoss:Text := "Loss: " + LTrim(Str(nLoss, 8, 4))
+      oLblEpoch:cText := "Epoch: " + LTrim(Str(nEpoch)) + " / " + LTrim(Str(nEpochs))
+      oLblLoss:cText := "Loss: " + LTrim(Str(nLoss, 8, 4))
 
       // Update text-based loss chart
       cChart := DrawLossChart( aLosses )
-      oLossChart:Text := cChart
+      oLossChart:cText := cChart
 
       // Log every 10 epochs
       if nEpoch % 10 == 0
          cLog += "Epoch " + PadL(LTrim(Str(nEpoch)),3) + ;
                  "  Loss: " + Str(nLoss, 8, 4) + ;
                  "  LR: " + Str( GetLR(nEpoch), 10, 6 ) + e
-         oLog:Text := cLog
+         oLog:cText := cLog
       endif
    next
 
@@ -121,7 +121,7 @@ static function TrainModel()
    cLog += "  where head_i = Attention(Q*W_Qi, K*W_Ki, V*W_Vi)" + e
    cLog += "FFN(x) = max(0, x*W_1 + b_1) * W_2 + b_2" + e
    cLog += "LayerNorm(x) = (x - mean) / sqrt(var + eps) * gamma + beta" + e
-   oLog:Text := cLog
+   oLog:cText := cLog
    lTraining := .F.
 
 return nil

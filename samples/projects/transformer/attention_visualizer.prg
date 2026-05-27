@@ -63,7 +63,7 @@ static function RunAttention()
    local aRow, nVal
 
    e := Chr(13) + Chr(10)
-   cText := oInput:Text
+   cText := oInput:cText
    aTokens := HB_ATokens( cText, " " )
    nLen := Len( aTokens )
 
@@ -95,7 +95,7 @@ static function RunAttention()
    cMatrix += "'sat' strongly attends to 'cat' (subject-verb)" + e
    cMatrix += "'mat' attends to 'the' and 'on' (determiner + preposition)"
 
-   oGrid:Text := cMatrix
+   oGrid:cText := cMatrix
 
 return nil
 

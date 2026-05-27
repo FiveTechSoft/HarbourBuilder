@@ -51,7 +51,7 @@ static function Tokenize()
    local aTokens, aIds
 
    e := Chr(13) + Chr(10)
-   cText := oInput:Text
+   cText := oInput:cText
 
    // Step 1: Show individual characters
    cChars := ""
@@ -59,7 +59,7 @@ static function Tokenize()
       cChars += "[" + SubStr( cText, i, 1 ) + "] "
    next
    cChars += e + "Total characters: " + LTrim(Str(Len(cText)))
-   oCharView:Text := cChars
+   oCharView:cText := cChars
 
    // Step 2: Simulate BPE tokenization
    // In production, TTransformer:Tokenize() would use a real BPE vocabulary
@@ -69,7 +69,7 @@ static function Tokenize()
       cTokens += "[" + aTokens[i] + "] "
    next
    cTokens += e + "Total tokens: " + LTrim(Str(Len(aTokens)))
-   oTokenView:Text := cTokens
+   oTokenView:cText := cTokens
 
    // Step 3: Map to token IDs
    aIds := TokensToIds( aTokens )
@@ -78,7 +78,7 @@ static function Tokenize()
       cIds += LTrim(Str(aIds[i])) + " "
    next
    cIds += e + "Vocabulary size: 50257 (GPT-2)"
-   oIdView:Text := cIds
+   oIdView:cText := cIds
 
    // Details
    cDetails := "BPE Merge Rules Applied:" + e
@@ -91,7 +91,7 @@ static function Tokenize()
                " chars -> " + LTrim(Str(Len(aTokens))) + ;
                " tokens (" + LTrim(Str(Round(Len(cText)/Max(Len(aTokens),1), 1), 4, 1)) + ;
                " chars/token)"
-   oOutput:Text := cDetails
+   oOutput:cText := cDetails
 
 return nil
 

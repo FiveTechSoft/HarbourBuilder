@@ -17,14 +17,14 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   ::Title  := "Hello Android"
-   ::Left   := 1153
-   ::Top    := 505
-   ::Width  := 513
-   ::Height := 600
-   ::FontName := "Segoe UI"
-   ::FontSize := 9
-   ::Color  := 14715828
+   ::cTitle  := "Hello Android"
+   ::nLeft   := 1153
+   ::nTop    := 505
+   ::nWidth  := 513
+   ::nHeight := 600
+   ::cFontName := "Segoe UI"
+   ::nFontSize := 9
+   ::nClrPane  := 14715828
 
    @ 20, 20 SAY ::oLabel1 PROMPT "Type your name:" OF Self SIZE 300, 30
    ::oLabel1:nClrPane := 11397477
@@ -48,7 +48,7 @@ METHOD Button1Click() CLASS TForm1
    //
    // Keep handler bodies Android-compatible for now: prefer UI_SetText
    // over MsgInfo, no desktop classes until iteration 2 adds dialogs.
-   ::oLabel1:Text := "Hello, " + ::oEdit1:Text + " !"
+   ::oLabel1:cText := "Hello, " + ::oEdit1:cText + " !"
 
 return nil
 

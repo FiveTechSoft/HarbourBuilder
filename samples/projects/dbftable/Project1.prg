@@ -19,7 +19,7 @@ PROCEDURE Main()
    local oApp
 
    oApp := TApplication():New()
-   oApp:Title := "DBF Table dropdown demo"
+   oApp:cTitle := "DBF Table dropdown demo"
    oApp:CreateForm( TForm1():New() )
    oApp:Run()
 
