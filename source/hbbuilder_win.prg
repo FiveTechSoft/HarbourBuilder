@@ -3328,7 +3328,7 @@ static function OpenProjectFile( cFile )
          { |hForm, nType, nL, nT, nW, nH| OnComponentDrop( hForm, nType, nL, nT, nW, nH ) } )
       // Two-way: sync code + inspector when form is moved/resized.
       // Was wired in TBNew but missing here - that's why dragging the
-      // design form after Open never updated ::Left / ::Top before save.
+      // design form after Open never updated ::nLeft / ::nTop before save.
       oDesignForm:OnResize := { || SyncDesignerToCode(), ;
          InspectorRefresh( oDesignForm:hCpp ) }
    next
@@ -3868,7 +3868,7 @@ static function TBRun()
 
    cBuildDir := "c:\hbbuilder_build"
 
-   // Honour ::AppTitle from the main form: user's chosen app name
+   // Honour ::cAppTitle from the main form: user's chosen app name
    // becomes the .exe name so what they ship matches the inspector.
    cAppTitle := ""
    if Len( aForms ) > 0 .and. aForms[1][2] != nil .and. aForms[1][2]:hCpp != 0
@@ -4754,7 +4754,7 @@ return AllTrim( StrTran( StrTran( cOut, Chr(13), "" ), Chr(10), "" ) )
 // control types emit a comment line (rendered as no-op on Android).
 //
 // Event handlers written as METHODs on the form class are translated into
-// plain FUNCTIONs and appended, with ::oXxx:Text accesses rewritten into
+// plain FUNCTIONs and appended, with ::oXxx:cText accesses rewritten into
 // UI_GetText / UI_SetText calls against the control handles.
 static function GenerateAndroidPRG()
 
@@ -4906,7 +4906,7 @@ static function GenerateAndroidPRG()
 return cPRG
 
 // Translate METHOD handlers referenced by the emitted UI_OnClick bindings
-// into plain FUNCTIONs usable by the generated PRG. Rewrites ::oXxx:Text
+// into plain FUNCTIONs usable by the generated PRG. Rewrites ::oXxx:cText
 // access so it hits UI_GetText/UI_SetText against the backend handles.
 // Any handler we can't find is emitted as an empty stub (so the link
 // succeeds and the button is simply inert until the user fills it in).
@@ -4941,7 +4941,7 @@ static function TranslateHandlers( aBind, cEventTab, aCtrlNames )
          cBody := SubStr( cEventTab, nPos + 1, nEnd - nPos - 1 )
       endif
 
-      // Rewrite ::oXxx:Text references. Works line by line so we can
+      // Rewrite ::oXxx:cText references. Works line by line so we can
       // balance parentheses on setter assignments.
       aLines := hb_ATokens( cBody, e )
       for k := 1 to Len( aLines )
