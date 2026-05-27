@@ -4291,13 +4291,17 @@ static function TBRun()
       elseif hb_DirExists( "/opt/homebrew/opt/mysql-client" )
          cMysqlPfx := "/opt/homebrew/opt/mysql-client"
       endif
-      if ! Empty( cMysqlPfx )
-         if File( cBackends + "/cocoa_mysql.c" )
+      if File( cBackends + "/cocoa_mysql.c" )
+         if ! Empty( cMysqlPfx )
             cCmd := "clang -c -O2" + cArchFlags + " -I" + cHbInc + " -I" + cMysqlPfx + "/include/mysql" + ;
                     " " + cBackends + "/cocoa_mysql.c" + ;
                     " -o " + cBuildDir + "/cocoa_mysql.o 2>&1"
-            MAC_ShellExec( cCmd )
+         else
+            cCmd := "clang -c -O2" + cArchFlags + " -DHB_NO_MYSQL -I" + cHbInc + ;
+                    " " + cBackends + "/cocoa_mysql.c" + ;
+                    " -o " + cBuildDir + "/cocoa_mysql.o 2>&1"
          endif
+         MAC_ShellExec( cCmd )
       endif
       // PostgreSQL bindings
       cPgsqlPfx := ""
@@ -4306,13 +4310,17 @@ static function TBRun()
       elseif hb_DirExists( "/opt/homebrew/opt/libpq" )
          cPgsqlPfx := "/opt/homebrew/opt/libpq"
       endif
-      if ! Empty( cPgsqlPfx )
-         if File( cBackends + "/cocoa_pgsql.c" )
+      if File( cBackends + "/cocoa_pgsql.c" )
+         if ! Empty( cPgsqlPfx )
             cCmd := "clang -c -O2" + cArchFlags + " -I" + cHbInc + " -I" + cPgsqlPfx + "/include" + ;
                     " " + cBackends + "/cocoa_pgsql.c" + ;
                     " -o " + cBuildDir + "/cocoa_pgsql.o 2>&1"
-            MAC_ShellExec( cCmd )
+         else
+            cCmd := "clang -c -O2" + cArchFlags + " -DHB_NO_PGSQL -I" + cHbInc + ;
+                    " " + cBackends + "/cocoa_pgsql.c" + ;
+                    " -o " + cBuildDir + "/cocoa_pgsql.o 2>&1"
          endif
+         MAC_ShellExec( cCmd )
       endif
       cLog += "    OK" + Chr(10)
    endif
