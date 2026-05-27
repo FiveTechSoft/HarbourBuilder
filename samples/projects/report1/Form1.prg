@@ -1,6 +1,8 @@
 // Form1.prg
 //--------------------------------------------------------------------
 
+#include "hbbuilder.ch"
+
 CLASS TForm1 FROM TForm
 
    // IDE-managed Components
@@ -115,5 +117,3 @@ FUNCTION Form1()
    oForm:Activate()
 RETURN oForm
 //--------------------------------------------------------------------
-
-----

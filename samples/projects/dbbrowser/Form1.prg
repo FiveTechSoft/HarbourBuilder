@@ -10,6 +10,8 @@
 
 #include "hbbuilder.ch"
 
+#include "hbbuilder.ch"
+
 // ---------------------------------------------------------------------------
 // Static variables - shared across all functions in this module
 // ---------------------------------------------------------------------------

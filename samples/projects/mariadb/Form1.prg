@@ -1,6 +1,8 @@
 // Form1.prg
 //--------------------------------------------------------------------
 
+#include "hbbuilder.ch"
+
 CLASS TForm1 FROM TForm
 
    DATA oDb1

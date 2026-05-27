@@ -1,6 +1,8 @@
 // Form1.prg — TRust getting started
 //--------------------------------------------------------------------
 
+#include "hbbuilder.ch"
+
 CLASS TForm1 FROM TForm
 
    DATA oRust
@@ -60,7 +62,7 @@ METHOD CreateForm() CLASS TForm1
 
    ::oScriptEdit:cText := ;
       "fn main() {" + Chr(10) + ;
-      "    println!(\"Hello, world from Rust!\");" + Chr(10) + ;
+      e"    println!(\"Hello, world from Rust!\");" + Chr(10) + ;
       "}" + Chr(10)
 
 return nil
@@ -70,16 +72,16 @@ METHOD LoadSample( nIdx ) CLASS TForm1
    local cCode := "", e := Chr(10)
    do case
    case nIdx == 1
-      cCode := "fn main() {" + e + "    println!(\"Hello, world from Rust!\");" + e + "}" + e
+      cCode := "fn main() {" + e + e"    println!(\"Hello, world from Rust!\");" + e + "}" + e
    case nIdx == 2
       cCode := "fn main() {" + e + ;
                "    let s: i64 = (1..=100).sum();" + e + ;
-               "    println!(\"sum(1..100) = {}\", s);" + e + "}" + e
+               e"    println!(\"sum(1..100) = {}\", s);" + e + "}" + e
    case nIdx == 3
       cCode := "fn main() {" + e + ;
                "    let (mut a, mut b) = (0i64, 1i64);" + e + ;
                "    for i in 0..10 {" + e + ;
-               "        println!(\"{} {}\", i, a);" + e + ;
+               e"        println!(\"{} {}\", i, a);" + e + ;
                "        let t = a + b; a = b; b = t;" + e + ;
                "    }" + e + "}" + e
    case nIdx == 4
@@ -88,7 +90,7 @@ METHOD LoadSample( nIdx ) CLASS TForm1
    case nIdx == 5
       cCode := "fn main() {" + e + ;
                "    // Vars injected by SetVar will appear here at top of main()." + e + ;
-               "    println!(\"see Eval log\");" + e + "}" + e
+               e"    println!(\"see Eval log\");" + e + "}" + e
    endcase
    ::oScriptEdit:cText := cCode
 return nil

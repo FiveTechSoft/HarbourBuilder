@@ -1,6 +1,8 @@
 // Form1.prg — TNode getting started
 //--------------------------------------------------------------------
 
+#include "hbbuilder.ch"
+
 CLASS TForm1 FROM TForm
 
    DATA oNode

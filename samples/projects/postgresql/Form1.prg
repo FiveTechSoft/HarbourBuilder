@@ -1,6 +1,8 @@
 // Form1.prg — TPostgreSQL demo: properties + events + cursor nav
 //--------------------------------------------------------------------
 
+#include "hbbuilder.ch"
+
 CLASS TForm1 FROM TForm
 
    DATA oDb1

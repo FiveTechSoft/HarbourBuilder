@@ -1,6 +1,8 @@
 // Form1.prg — TDotNet getting started
 //--------------------------------------------------------------------
 
+#include "hbbuilder.ch"
+
 CLASS TForm1 FROM TForm
 
    DATA oDotNet
@@ -59,7 +61,7 @@ METHOD CreateForm() CLASS TForm1
 
    ::oScriptEdit:cText := ;
       "using System;" + Chr(10) + ;
-      "Console.WriteLine(\"Hello, world from .NET!\");" + Chr(10)
+      e"Console.WriteLine(\"Hello, world from .NET!\");" + Chr(10)
 
 return nil
 //--------------------------------------------------------------------
@@ -69,14 +71,14 @@ METHOD LoadSample( nIdx ) CLASS TForm1
    do case
    case nIdx == 1
       cCode := "using System;" + e + ;
-               "Console.WriteLine(\"Hello, world from .NET!\");" + e
+               e"Console.WriteLine(\"Hello, world from .NET!\");" + e
    case nIdx == 2
       cCode := "using System;" + e + ;
                "long s = 0; for (int i=1;i<=100;i++) s+=i;" + e + ;
-               "Console.WriteLine($\"sum(1..100) = {s}\");" + e
+               e"Console.WriteLine($\"sum(1..100) = {s}\");" + e
    case nIdx == 3
       cCode := "using System;" + e + ;
-               "Console.WriteLine(DateTime.Now.ToString(\"O\"));" + e
+               e"Console.WriteLine(DateTime.Now.ToString(\"O\"));" + e
    case nIdx == 4
       cCode := "Math.Sqrt(144) + 1"
    endcase

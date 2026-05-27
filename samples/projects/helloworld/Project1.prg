@@ -16,23 +16,5 @@ function Main()
 
 return nil
 
-// ---------------------------------------------------------------------------
-// MsgInfo() - Displays an information message box
-// ---------------------------------------------------------------------------
-function MsgInfo( cMsg )
-
-   W32_MsgBox( cMsg, "Info" )
-
-return nil
-
 // Framework classes
 #include "classes.prg"
-
-#pragma BEGINDUMP
-#include <hbapi.h>
-#include <windows.h>
-HB_FUNC( W32_MSGBOX )
-{
-   MessageBoxA( GetActiveWindow(), hb_parc(1), hb_parc(2), MB_OK | MB_ICONINFORMATION );
-}
-#pragma ENDDUMP

@@ -1,6 +1,8 @@
 // Form1.prg — WebView Demo
 //--------------------------------------------------------------------
 
+#include "hbbuilder.ch"
+
 CLASS TForm1 FROM TForm
 
    // IDE-managed Components

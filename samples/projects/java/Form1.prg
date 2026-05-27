@@ -1,6 +1,8 @@
 // Form1.prg — TJava getting started
 //--------------------------------------------------------------------
 
+#include "hbbuilder.ch"
+
 CLASS TForm1 FROM TForm
 
    DATA oJava
@@ -61,7 +63,7 @@ METHOD CreateForm() CLASS TForm1
    ::oScriptEdit:cText := ;
       "public class Main {" + Chr(10) + ;
       "    public static void main(String[] a) {" + Chr(10) + ;
-      "        System.out.println(\"Hello, world from Java!\");" + Chr(10) + ;
+      e"        System.out.println(\"Hello, world from Java!\");" + Chr(10) + ;
       "    }" + Chr(10) + ;
       "}" + Chr(10)
 
@@ -74,19 +76,19 @@ METHOD LoadSample( nIdx ) CLASS TForm1
    case nIdx == 1
       cCode := "public class Main {" + e + ;
                "    public static void main(String[] a) {" + e + ;
-               "        System.out.println(\"Hello, world from Java!\");" + e + ;
+               e"        System.out.println(\"Hello, world from Java!\");" + e + ;
                "    }" + e + "}" + e
    case nIdx == 2
       cCode := "public class Main {" + e + ;
                "    public static void main(String[] a) {" + e + ;
                "        long s = 0; for (int i=1;i<=100;i++) s+=i;" + e + ;
-               "        System.out.println(\"sum(1..100) = \" + s);" + e + ;
+               e"        System.out.println(\"sum(1..100) = \" + s);" + e + ;
                "    }" + e + "}" + e
    case nIdx == 3
       cCode := "public class Main {" + e + ;
                "    public static void main(String[] a) {" + e + ;
                "        long x=0,y=1;" + e + ;
-               "        for(int i=0;i<10;i++){ System.out.println(i+\" \"+x); long t=x+y; x=y; y=t; }" + e + ;
+               e"        for(int i=0;i<10;i++){ System.out.println(i+\" \"+x); long t=x+y; x=y; y=t; }" + e + ;
                "    }" + e + "}" + e
    case nIdx == 4
       cCode := "Math.sqrt(144) + 1"

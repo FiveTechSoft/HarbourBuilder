@@ -1,6 +1,8 @@
 // Form1.prg — TRuby getting started
 //--------------------------------------------------------------------
 
+#include "hbbuilder.ch"
+
 CLASS TForm1 FROM TForm
 
    DATA oRuby
@@ -62,13 +64,13 @@ METHOD LoadSample( nIdx ) CLASS TForm1
    case nIdx == 1
       cCode := "puts 'Hello, world from Ruby!'" + e
    case nIdx == 2
-      cCode := "puts \"sum(1..100) = #{(1..100).sum}\"" + e
+      cCode := e"puts \"sum(1..100) = #{(1..100).sum}\"" + e
    case nIdx == 3
       cCode := "puts Time.now.to_s" + e
    case nIdx == 4
       cCode := "2 + 2"
    case nIdx == 5
-      cCode := "puts \"#{greeting}, #{name}!\"" + e
+      cCode := e"puts \"#{greeting}, #{name}!\"" + e
    endcase
    ::oScriptEdit:cText := cCode
 return nil

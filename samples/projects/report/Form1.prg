@@ -110,8 +110,8 @@ METHOD CreateForm() CLASS TForm1
       OF ::oBand5 AT 10, 220 SIZE 200, 16 BOLD
 
    // Buttons and log
-   @ 480, 10  BUTTON ::oBtnPrint OF Self PROMPT "Print"         SIZE 100, 30
-   @ 480, 120 BUTTON ::oBtnSetup OF Self PROMPT "Printer Setup" SIZE 120, 30
+   @ 480, 10  BUTTON ::oBtnPrint PROMPT "Print"         OF Self SIZE 100, 30
+   @ 480, 120 BUTTON ::oBtnSetup PROMPT "Printer Setup" OF Self SIZE 120, 30
    @ 520, 10  MEMO   ::oLog      OF Self SIZE 610, 50
 
    ::oLog:cText := "Press Print to send to printer, or Printer Setup to configure." + Chr(13) + Chr(10)

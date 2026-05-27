@@ -1,5 +1,6 @@
 // FormReport.prg
 //------------------------------------------------------------------------
+#include "hbbuilder.ch"
 
 CLASS TFormReport FROM TForm
 
