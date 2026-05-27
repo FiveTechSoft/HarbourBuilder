@@ -14,9 +14,22 @@
 
 #include <hbapi.h>
 #include <hbapiitm.h>
-#include <mysql.h>
 #include <string.h>
 #include <stdlib.h>
+
+#ifdef HB_NO_MYSQL
+/* No-op stubs when mysql-client headers/libs are unavailable. classes.prg
+   declares EXTERNAL HBMYSQL_* on macOS, so every entry point must link. */
+HB_FUNC( HBMYSQL_OPEN )   { hb_retnint( 0 ); }
+HB_FUNC( HBMYSQL_CLOSE )  { }
+HB_FUNC( HBMYSQL_EXEC )   { hb_retl( 0 ); }
+HB_FUNC( HBMYSQL_QUERY )  { hb_reta( 0 ); }
+HB_FUNC( HBMYSQL_FIELDS ) { hb_reta( 0 ); }
+HB_FUNC( HBMYSQL_ERROR )  { hb_retc( "mysql disabled at build (HB_NO_MYSQL)" ); }
+HB_FUNC( HBMYSQL_LASTID ) { hb_retnint( 0 ); }
+HB_FUNC( HBMYSQL_TABLES ) { hb_reta( 0 ); }
+#else
+#include <mysql.h>
 
 static const char * mysql_safe_err( MYSQL * h )
 {
@@ -152,3 +165,4 @@ HB_FUNC( HBMYSQL_TABLES )
    }
    hb_itemReturnRelease( aRet );
 }
+#endif /* HB_NO_MYSQL */

@@ -13,10 +13,23 @@
 
 #include <hbapi.h>
 #include <hbapiitm.h>
-#include <libpq-fe.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+
+#ifdef HB_NO_PGSQL
+/* No-op stubs when libpq headers/libs are unavailable. classes.prg declares
+   EXTERNAL HBPGSQL_* on macOS, so every entry point must link. */
+HB_FUNC( HBPGSQL_OPEN )   { hb_retnint( 0 ); }
+HB_FUNC( HBPGSQL_CLOSE )  { }
+HB_FUNC( HBPGSQL_EXEC )   { hb_retl( 0 ); }
+HB_FUNC( HBPGSQL_QUERY )  { hb_reta( 0 ); }
+HB_FUNC( HBPGSQL_FIELDS ) { hb_reta( 0 ); }
+HB_FUNC( HBPGSQL_ERROR )  { hb_retc( "pgsql disabled at build (HB_NO_PGSQL)" ); }
+HB_FUNC( HBPGSQL_LASTID ) { hb_retnint( 0 ); }
+HB_FUNC( HBPGSQL_TABLES ) { hb_reta( 0 ); }
+#else
+#include <libpq-fe.h>
 
 HB_FUNC( HBPGSQL_OPEN )
 {
@@ -160,3 +173,4 @@ HB_FUNC( HBPGSQL_TABLES )
    }
    hb_itemReturnRelease( aRet );
 }
+#endif /* HB_NO_PGSQL */
