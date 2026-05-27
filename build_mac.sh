@@ -234,15 +234,23 @@ fi
 # install Homebrew package regardless of arch (/opt/homebrew on arm64,
 # /usr/local on x86_64).
 detect_brew_prefix() {
-   # $1 = formula name; echoes prefix or empty
+   # $1 = formula name; echoes prefix or empty. Always returns 0 (so callers
+   # using `set -e` don't abort when no install is found).
    local pkg="$1" pfx=""
    if command -v brew >/dev/null 2>&1; then
       pfx=$(brew --prefix "$pkg" 2>/dev/null || true)
-      [ -n "$pfx" ] && [ -d "$pfx" ] && { echo "$pfx"; return; }
+      if [ -n "$pfx" ] && [ -d "$pfx" ]; then
+         echo "$pfx"
+         return 0
+      fi
    fi
    for cand in "/opt/homebrew/opt/$pkg" "/usr/local/opt/$pkg"; do
-      [ -d "$cand" ] && { echo "$cand"; return; }
+      if [ -d "$cand" ]; then
+         echo "$cand"
+         return 0
+      fi
    done
+   return 0
 }
 
 MYSQL_PREFIX=$(detect_brew_prefix mysql-client)
