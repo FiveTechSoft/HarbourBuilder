@@ -55,7 +55,7 @@ function Main()
    nInsW    := Int( nScreenW * 0.18 ) + 20    // ~18% of screen width + 20px
 
    // === Window 1: Main Bar (full screen width) ===
-   DEFINE FORM oIDE TITLE "HbBuilder 1.0 - Visual IDE for Harbour" ;
+   DEFINE FORM oIDE TITLE "HbBuilder 1.4.2 - Visual IDE for Harbour" ;
       SIZE nScreenW, nBarH FONT "Sans", 11 APPBAR
 
    UI_FormSetPos( oIDE:hCpp, 0, 0 )
