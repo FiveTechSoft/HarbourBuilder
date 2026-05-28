@@ -108,8 +108,8 @@ function Main()
    nEditorH := nBottomY - nEditorTop
 
    // Form Designer: fixed position
-   nFormX := 883
-   nFormY := 361
+   nFormX := 815
+   nFormY := 357
 
    // Menu bar
    DEFINE MENUBAR OF oIDE
@@ -860,8 +860,8 @@ static function RegenerateFormCode( cName, hForm )
       cAppTitle := UI_GetProp( hForm, "cAppTitle" )
    else
       cTitle := cName
-      nFL    := 0
-      nFT    := 0
+      nFL    := 815
+      nFT    := 357
       nW     := 572
       nH     := 333
       nClr   := 15790320  // 0x00F0F0F0
@@ -3794,8 +3794,8 @@ static function TBNew()
    nEditorX := nInsW
    nEditorW := nScreenW - nEditorX
    nEditorH := nScreenH - nEditorTop
-   nFormX := nEditorX + Int( ( nEditorW - 400 ) / 2 )
-   nFormY := nEditorTop + Int( ( nEditorH - 300 ) * 0.35 )
+   nFormX := 815
+   nFormY := 357
 
    // Create first form
    CreateDesignForm( nFormX, nFormY )
