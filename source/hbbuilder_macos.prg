@@ -87,7 +87,7 @@ function Main()
    // C++Builder classic proportions scaled to current screen
    // Reference: 1024x768 -> Inspector 250px (24.4%), Bar 100px (13%)
    nBarH    := 100                           // two toolbar rows(28+28) + tabs(24) + 48x48 palette buttons
-   nInsW    := Int( nScreenW * 0.18 )        // ~18% of screen width
+   nInsW    := Int( nScreenW * 0.19 )        // ~19% of screen width
 
    // === Window 1: Main Bar (full screen width) ===
    DEFINE FORM oIDE TITLE "HbBuilder 1.0 - Visual IDE for Harbour" ;
@@ -3580,7 +3580,7 @@ static function MenuNewForm()
    endif
 
    // Calculate position (same as initial form, offset a bit)
-   nInsW := Int( nScreenW * 0.18 )
+   nInsW := Int( nScreenW * 0.19 )
    nInsTop := MAC_GetWindowBottom( oIDE:hCpp )
    nEditorTop := nInsTop + 80
    nEditorX := nInsW
@@ -3788,7 +3788,7 @@ static function TBNew()
    aOpenFiles := {}
 
    // Calculate position for Form1
-   nInsW := Int( nScreenW * 0.18 )
+   nInsW := Int( nScreenW * 0.19 )
    nInsTop := MAC_GetWindowBottom( oIDE:hCpp )
    nEditorTop := nInsTop + 80
    nEditorX := nInsW
@@ -5934,7 +5934,7 @@ static function OpenProjectFile( cFile )
    CodeEditorClearTabs( hCodeEditor )
 
    // Calculate form positions
-   nInsW := Int( nScreenW * 0.18 )
+   nInsW := Int( nScreenW * 0.19 )
    nInsTop := MAC_GetWindowBottom( oIDE:hCpp )
    nEditorTop := nInsTop + 80
    nEditorX := nInsW
