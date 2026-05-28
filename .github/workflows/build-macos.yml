@@ -21,10 +21,10 @@ jobs:
         include:
           - runner: macos-14
             arch: arm64
-            asset: HbBuilder-1.0.0-macos-arm64.zip
+            asset: HbBuilder-macos-arm64.zip
           - runner: macos-13
             arch: x86_64
-            asset: HbBuilder-1.0.0-macos-x86_64.tar.gz
+            asset: HbBuilder-macos-x86_64.zip
     runs-on: ${{ matrix.runner }}
     name: Build (${{ matrix.arch }})
     steps:
@@ -69,16 +69,79 @@ jobs:
           echo "Built arch: $ARCH (expected ${{ matrix.arch }})"
           echo "$ARCH" | grep -qw "${{ matrix.arch }}"
 
+      # --- Signing & Notarization ---
+      # Requires these GitHub repository secrets:
+      #   APPLE_CERTIFICATE_BASE64   — Developer ID Application cert (.p12 → base64)
+      #   APPLE_CERTIFICATE_PASSWORD — .p12 export password
+      #   APPLE_ID                   — your Apple ID email
+      #   APPLE_APP_PASSWORD         — app-specific password (appleid.apple.com)
+      #   APPLE_TEAM_ID              — 10-char team ID (developer.apple.com)
+      - name: Import signing certificate
+        if: env.APPLE_CERTIFICATE_BASE64 != ''
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 16)"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" \
+            -k "$KEYCHAIN_PATH" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+      - name: Sign app
+        if: env.APPLE_CERTIFICATE_BASE64 != ''
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          IDENTITY=$(security find-identity -v -p codesigning \
+            | grep "Developer ID Application" \
+            | head -1 | sed 's/.*"\(.*\)"/\1/')
+          echo "Signing with: $IDENTITY"
+          codesign --deep --force --options runtime \
+            --entitlements resources/HbBuilder.entitlements \
+            --sign "$IDENTITY" \
+            --timestamp \
+            bin/HbBuilder.app
+          codesign --verify --deep --strict bin/HbBuilder.app
+          echo "Signature OK"
+
+      - name: Notarize app
+        if: env.APPLE_CERTIFICATE_BASE64 != ''
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          ditto -c -k --keepParent bin/HbBuilder.app /tmp/HbBuilder-notarize.zip
+          xcrun notarytool submit /tmp/HbBuilder-notarize.zip \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple bin/HbBuilder.app
+          xcrun stapler validate bin/HbBuilder.app
+          rm -f /tmp/HbBuilder-notarize.zip
+          echo "Notarization and stapling complete"
+
+      # --- Package ---
       - name: Package
         run: |
           cd bin
           rm -f HbBuilder.app/Contents/hbbuilder.ini
           rm -rf HbBuilder.app/Contents/.git
-          if [ "${{ matrix.arch }}" = "arm64" ]; then
-            ditto -c -k --keepParent HbBuilder.app "../${{ matrix.asset }}"
-          else
-            tar czf "../${{ matrix.asset }}" HbBuilder.app
-          fi
+          ditto -c -k --keepParent HbBuilder.app "../${{ matrix.asset }}"
 
       - uses: actions/upload-artifact@v4
         with:
