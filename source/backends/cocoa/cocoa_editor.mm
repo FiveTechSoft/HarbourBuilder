@@ -2873,81 +2873,28 @@ static void s_aiPullModel( NSString * model )
 
 static void s_aiInitOllamaAsync( void )
 {
-   /* If DeepSeek is configured, prefer it and skip the Ollama probe entirely. */
-   if( s_aiDeepseekKey ) {
-      dispatch_async( dispatch_get_main_queue(), ^{
-         [s_aiModelBtn removeAllItems];
-         [s_aiModelBtn addItemWithTitle:@"deepseek-v4-flash"];
-         [s_aiModelBtn addItemWithTitle:@"deepseek-chat"];
-         [s_aiModelBtn selectItemAtIndex:0];
-      });
-      return;
-   }
-   dispatch_async( dispatch_get_global_queue( QOS_CLASS_USER_INITIATED, 0 ), ^{
-      BOOL up = s_aiOllamaUp();
-      if( !up ) {
-         if( !s_aiOllamaInstalled() ) {
-            dispatch_async( dispatch_get_main_queue(), ^{
-               s_aiAppend( @"\nOllama is not installed on this system.\n" );
-               NSAlert * a = [[NSAlert alloc] init];
-               [a setMessageText:@"Ollama is not installed"];
-               [a setInformativeText:@"Ollama runs local LLMs (codellama, llama3, etc.) on your Mac.\n\nDo you want to open the download page to install it?"];
-               [a addButtonWithTitle:@"Open Download Page"];
-               [a addButtonWithTitle:@"Cancel"];
-               [a setAlertStyle:NSAlertStyleInformational];
-               NSModalResponse r = [a runModal];
-               if( r == NSAlertFirstButtonReturn ) {
-                  [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:@"https://ollama.com/download"]];
-                  s_aiAppend( @"Opened https://ollama.com/download in your browser. Reopen this panel after installing.\n" );
-               } else {
-                  s_aiAppend( @"Install cancelled. AI Assistant unavailable until Ollama is installed.\n" );
-               }
-            });
-            return;
-         }
-         dispatch_async( dispatch_get_main_queue(), ^{
-            s_aiAppend( @"\nOllama not running — attempting to start...\n" );
-         });
-         BOOL started = s_aiTryStartOllama();
-         if( started ) {
-            for( int i = 0; i < 24; i++ ) {
-               [NSThread sleepForTimeInterval:0.25];
-               if( s_aiOllamaUp() ) { up = YES; break; }
-            }
-         }
-         if( !up ) {
-            dispatch_async( dispatch_get_main_queue(), ^{
-               s_aiAppend( started ? @"Started Ollama, but API still unreachable on localhost:11434\n"
-                                   : @"Could not start Ollama daemon. Run `ollama serve` manually.\n" );
-            });
-            return;
-         }
-      }
+   /* Always seed the combo with DeepSeek models first (default).
+      Then silently probe Ollama and append any installed models.
+      No install dialog here — that only fires when user tries to send
+      with a non-DeepSeek model and Ollama isn't installed. */
+   dispatch_async( dispatch_get_main_queue(), ^{
+      [s_aiModelBtn removeAllItems];
+      [s_aiModelBtn addItemWithTitle:@"deepseek-v4-flash"];
+      [s_aiModelBtn addItemWithTitle:@"deepseek-chat"];
+      [s_aiModelBtn selectItemAtIndex:0];
+      if( !s_aiDeepseekKey )
+         s_aiAppend( @"Ready. Type `/key sk-...` to configure DeepSeek.\n" );
+   });
+
+   /* Silent Ollama probe — append models only if daemon is already running */
+   dispatch_async( dispatch_get_global_queue( QOS_CLASS_BACKGROUND, 0 ), ^{
+      if( !s_aiOllamaUp() ) return;
       NSArray * names = s_aiFetchModels();
-      if( names && [names count] > 0 ) {
-         dispatch_async( dispatch_get_main_queue(), ^{
-            [s_aiModelBtn removeAllItems];
-            if( s_aiDeepseekKey ) {
-               [s_aiModelBtn addItemWithTitle:@"deepseek-v4-flash"];
-               [s_aiModelBtn addItemWithTitle:@"deepseek-chat"];
-               [[s_aiModelBtn menu] addItem:[NSMenuItem separatorItem]];
-            }
-            for( NSString * n in names ) [s_aiModelBtn addItemWithTitle:n];
-            s_aiAppend( [NSString stringWithFormat:@"Loaded %lu model(s) from Ollama%@.\n",
-                                                  (unsigned long)[names count],
-                                                  s_aiDeepseekKey ? @" (+ DeepSeek)" : @""] );
-            if( !s_aiDeepseekKey ) {
-               s_aiAppend( @"DeepSeek not configured. Type `/key sk-...` to enable deepseek-v4-flash.\n" );
-            }
-         });
-      } else {
-         dispatch_async( dispatch_get_main_queue(), ^{
-            [s_aiModelBtn removeAllItems];
-            [s_aiModelBtn addItemWithTitle:@"(installing default model...)"];
-            s_aiAppend( @"No models installed. Pulling default model gemma3...\n" );
-         });
-         s_aiPullModel( @"gemma3" );
-      }
+      if( !names || [names count] == 0 ) return;
+      dispatch_async( dispatch_get_main_queue(), ^{
+         [[s_aiModelBtn menu] addItem:[NSMenuItem separatorItem]];
+         for( NSString * n in names ) [s_aiModelBtn addItemWithTitle:n];
+      });
    });
 }
 
@@ -3311,6 +3258,23 @@ static void s_aiSetSuggestions( NSArray<NSString*> * items, id target )
    if( useDeepseek && (!s_aiDeepseekKey || [s_aiDeepseekKey length] == 0) ) {
       [s_aiSpinner stopAnimation:nil];
       s_aiAppend( @"\nDeepSeek API key not set. Type `/key sk-...` first.\n" );
+      return;
+   }
+   /* Ollama-backed model selected but Ollama isn't installed: tell the user
+      now (only when they actually try to use it), not on panel open. */
+   if( !useDeepseek && !s_aiOllamaInstalled() ) {
+      [s_aiSpinner stopAnimation:nil];
+      s_aiAppend( @"\nOllama is not installed.\n" );
+      NSAlert * a = [[NSAlert alloc] init];
+      [a setMessageText:@"Ollama is not installed"];
+      [a setInformativeText:@"This model needs Ollama (local LLMs). You can also pick a DeepSeek model and set an API key with `/key sk-...`.\n\nOpen the Ollama download page now?"];
+      [a addButtonWithTitle:@"Open Download Page"];
+      [a addButtonWithTitle:@"Cancel"];
+      [a setAlertStyle:NSAlertStyleInformational];
+      if( [a runModal] == NSAlertFirstButtonReturn ) {
+         [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:@"https://ollama.com/download"]];
+         s_aiAppend( @"Opened https://ollama.com/download. Reopen this panel after installing.\n" );
+      }
       return;
    }
 

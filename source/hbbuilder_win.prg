@@ -8505,12 +8505,9 @@ HB_FUNC( W32_AIASSISTANTPANEL )
                            "Run `ollama serve` in a terminal.\r\n" );
             }
          } else if( !s_aiDeepseekKey ) {
-            /* Neither backend available -- don't nag with a modal on open.
-               Just leave a hint; s_aiOnSend() prompts to install Ollama only
-               if/when the user actually tries to use a local model. */
-            s_aiAppend( "No local Ollama detected. Pick a DeepSeek model and set "
-                        "`/key sk-...`, or install Ollama from "
-                        "https://ollama.com/download\r\n" );
+            /* DeepSeek is the default backend. Ollama install prompt deferred
+               until the user selects a local model and actually tries to send. */
+            s_aiAppend( "Ready. Type `/key sk-...` to configure DeepSeek.\r\n" );
          }
       }
    }

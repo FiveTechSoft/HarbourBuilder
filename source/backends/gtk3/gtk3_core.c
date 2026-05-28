@@ -9541,12 +9541,26 @@ static void on_ai_send( GtkButton * btn, gpointer data )
    }
 
    gchar * model = gtk_combo_box_text_get_active_text( GTK_COMBO_BOX_TEXT(s_aiCombo) );
-   if( !model ) model = g_strdup( "codellama" );
+   if( !model ) model = g_strdup( "deepseek-v4-flash" );
    gboolean useDeep = s_aiIsDeepseek( model );
    if( useDeep && (!s_aiDeepseekKey || !*s_aiDeepseekKey) ) {
       s_aiAppend( "\nDeepSeek API key not set. Type `/key sk-...` first.\n" );
       g_free( model ); g_free( userPrompt );
       return;
+   }
+   /* Ollama-backed model selected but Ollama isn't installed: tell the user
+      now (only when they actually try to use it), not on panel open. */
+   if( !useDeep ) {
+      gchar * ollamaPath = g_find_program_in_path( "ollama" );
+      if( !ollamaPath ) {
+         s_aiAppend( "\nOllama is not installed.\n"
+                     "This model needs Ollama (local LLMs). Pick a DeepSeek model "
+                     "and set `/key sk-...`, or install Ollama from "
+                     "https://ollama.com/download\n" );
+         g_free( model ); g_free( userPrompt );
+         return;
+      }
+      g_free( ollamaPath );
    }
 
    gtk_label_set_text( GTK_LABEL(s_aiStatus), "Status: Sending..." );
@@ -9814,11 +9828,6 @@ HB_FUNC( GTK_AIASSISTANTPANEL )
          if( mlines[i][0] )
             gtk_combo_box_text_append_text( GTK_COMBO_BOX_TEXT(s_aiCombo), mlines[i] );
       g_strfreev( mlines );
-   } else {
-      const char * fallback[] = { "codellama", "llama3", "deepseek-coder",
-                                  "mistral", "phi3", "gemma3", "gemma2", NULL };
-      for( int m = 0; fallback[m]; m++ )
-         gtk_combo_box_text_append_text( GTK_COMBO_BOX_TEXT(s_aiCombo), fallback[m] );
    }
    if( ollamaModels ) g_free( ollamaModels );
    gtk_combo_box_set_active( GTK_COMBO_BOX(s_aiCombo), 0 );
@@ -9880,7 +9889,7 @@ HB_FUNC( GTK_AIASSISTANTPANEL )
    /* Status bar */
    s_aiStatus = gtk_label_new( s_aiDeepseekKey
       ? "Status: Ready | DeepSeek configured"
-      : "Status: Ready | Ollama localhost:11434" );
+      : "Status: Ready | Type /key sk-... to use DeepSeek" );
    gtk_label_set_xalign( GTK_LABEL(s_aiStatus), 0.0 );
    gtk_box_pack_start( GTK_BOX(vbox), s_aiStatus, FALSE, FALSE, 0 );
 
