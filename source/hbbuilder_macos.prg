@@ -5510,7 +5510,7 @@ static function ShowAbout()
 
    local cMsg := ""
 
-   cMsg += "Harbour Builder 1.0" + Chr(10)
+   cMsg += "Harbour Builder 1.4.2" + Chr(10)
    cMsg += "Visual development environment for Harbour" + Chr(10)
    cMsg += Chr(10)
    cMsg += "(c) 2025-2026 The Harbour Project" + Chr(10)
