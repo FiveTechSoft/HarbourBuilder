@@ -135,7 +135,7 @@ function Main()
    // === Window 1: Main Bar (full screen width) ===
    cCompLabel := "Visual IDE for Harbour"
 
-   DEFINE FORM oIDE TITLE "HbBuilder 1.4.2 - " + cCompLabel ;
+   DEFINE FORM oIDE TITLE "HbBuilder 1.4.4 - " + cCompLabel ;
       SIZE nScreenW, nBarH FONT "Segoe UI", nUIFont APPBAR
 
    UI_FormSetPos( oIDE:hCpp, 0, 0 )
@@ -3733,11 +3733,11 @@ static function SelectCompiler()
          cSelectedCompiler := aCompilers[nSel][1]
          nSelectedCompIdx  := nSel
          // Update IDE title bar
-         UI_SetProp( oIDE:hCpp, "cText", "HbBuilder 1.4.2 - [" + aCompilers[nSel][2] + "]" )
+         UI_SetProp( oIDE:hCpp, "cText", "HbBuilder 1.4.4 - [" + aCompilers[nSel][2] + "]" )
       else
          cSelectedCompiler := ""
          nSelectedCompIdx  := 0
-         UI_SetProp( oIDE:hCpp, "cText", "HbBuilder 1.4.2 - [Auto]" )
+         UI_SetProp( oIDE:hCpp, "cText", "HbBuilder 1.4.4 - [Auto]" )
       endif
    endif
 
@@ -3767,7 +3767,7 @@ static function SelectFlavor()
       IniWrite( "IDE", "Flavor", cSelectedFlavor )
       // Force rescan so titles/labels refresh on next build
       aCompilers := nil
-      UI_SetProp( oIDE:hCpp, "cText", "HbBuilder 1.4.2 - [" + cSelectedFlavor + "]" )
+      UI_SetProp( oIDE:hCpp, "cText", "HbBuilder 1.4.4 - [" + cSelectedFlavor + "]" )
       MsgInfo( "Flavor set to: " + cSelectedFlavor + Chr(10) + Chr(10) + ;
                "Active on next build (F9).", "Harbour Flavor" )
    endif
@@ -3910,7 +3910,7 @@ static function TBRun()
    aCI := GetCompilerInfo()
    // Update title with compiler info on first build
    if aCI != nil
-      UI_SetProp( oIDE:hCpp, "cText", "HbBuilder 1.4.2 - [" + aCI[2] + "]" )
+      UI_SetProp( oIDE:hCpp, "cText", "HbBuilder 1.4.4 - [" + aCI[2] + "]" )
    endif
    if aCI == nil
       ShowNoCompilerDialog()
@@ -3931,7 +3931,7 @@ static function TBRun()
          if aCompilers[i][1] == "bcc"
             aCI       := aCompilers[i]
             cCompiler := "bcc"
-            UI_SetProp( oIDE:hCpp, "cText", "HbBuilder 1.4.2 - [" + aCI[2] + "]" )
+            UI_SetProp( oIDE:hCpp, "cText", "HbBuilder 1.4.4 - [" + aCI[2] + "]" )
             exit
          endif
       next
@@ -6938,7 +6938,7 @@ static function ShowAbout()
 
    local cMsg := ""
 
-   cMsg += "Harbour Builder 1.4.2" + Chr(10)
+   cMsg += "Harbour Builder 1.4.4" + Chr(10)
    cMsg += "Visual development environment for Harbour" + Chr(10)
    cMsg += Chr(10)
    cMsg += "(c) 2025-2026 The Harbour Project" + Chr(10)
