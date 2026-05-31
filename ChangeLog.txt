@@ -3,6 +3,19 @@ HarbourBuilder - Cross-platform visual IDE for Harbour
 
 2026-05-31
 
+  - feat(win): native UTF-8 / Unicode emoji rendering support. Added helper
+    functions SetWindowTextDetectUTF8, DrawTextDetectUTF8, and
+    CreateWindowExDetectUTF8 to detect valid UTF-8 sequences (such as color
+    emojis) and translate them to UTF-16 wide-character strings, invoking the
+    Unicode versions of the Win32 API (SetWindowTextW, DrawTextW,
+    CreateWindowExW) with fallback to ANSI/ACP.
+  - feat(win): added cPicture property support for TBitBtn, TButton,
+    TSpeedButton, and TImage, allowing loading of PNG images using GDI+ flat
+    API (LoadPngAsBitmap) and applying them via BM_SETIMAGE and STM_SETIMAGE,
+    supporting relative paths with ".." via GetFullPathNameA resolution.
+  - feat(win): added form resizing layout responsiveness. Implemented
+    OnResize block in the accounting RAD sample to dynamically adjust control
+    bounds (Sidebar, TListView, KPI cards) when the main form is resized.
   - fix(win): TMemo code generation. RegenerateFormCode matched
     nType == 9 for TMemo, but the palette registers it as type 24
     (CT_MEMO in hbide.h). Controls of type 24 fell through to the

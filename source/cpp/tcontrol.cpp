@@ -60,6 +60,7 @@ TControl::TControl()
    FInterval = 1000;
    FBkBrush = NULL;
    FFileName[0] = '\0';
+   FBitmap = NULL;
    lstrcpyA( FRDD, "DBFCDX" );
    FActive = FALSE;
    FTransparent = FALSE;
@@ -82,6 +83,7 @@ TControl::TControl()
 TControl::~TControl()
 {
    if( FBkBrush ) DeleteObject( FBkBrush );
+   if( FBitmap ) DeleteObject( FBitmap );
    ReleaseEvents();
    DestroyHandle();
 }
@@ -105,7 +107,7 @@ void TControl::CreateHandle( HWND hParent )
 
    CreateParams( &dwStyle, &dwExStyle, &szClass );
 
-   FHandle = CreateWindowExA( dwExStyle, szClass, FText, dwStyle,
+   FHandle = CreateWindowExDetectUTF8( dwExStyle, szClass, FText, dwStyle,
       FLeft, FTop, FWidth, FHeight,
       hParent, NULL, GetModuleHandle(NULL), NULL );
 
@@ -125,6 +127,24 @@ void TControl::CreateHandle( HWND hParent )
       if( FClrPane != CLR_INVALID )
       {
          if( !FBkBrush ) FBkBrush = CreateSolidBrush( FClrPane );
+      }
+
+      /* Apply stored bitmap if set */
+      if( FBitmap )
+      {
+         if( FControlType == CT_BUTTON || FControlType == CT_BITBTN || FControlType == CT_SPEEDBTN )
+         {
+            LONG_PTR style = GetWindowLongPtr( FHandle, GWL_STYLE );
+            if( ( style & BS_OWNERDRAW ) != BS_OWNERDRAW ) {
+               style |= BS_BITMAP;
+               SetWindowLongPtr( FHandle, GWL_STYLE, style );
+               SendMessage( FHandle, BM_SETIMAGE, IMAGE_BITMAP, (LPARAM) FBitmap );
+            }
+         }
+         else if( FControlType == CT_IMAGE )
+         {
+            SendMessage( FHandle, STM_SETIMAGE, IMAGE_BITMAP, (LPARAM) FBitmap );
+         }
       }
 
       /* Replay any per-class state that was set BEFORE the HWND existed.
@@ -173,7 +193,7 @@ void TControl::SetText( const char * szText )
    lstrcpynA( FText, szText, sizeof(FText) );
    if( FHandle )
    {
-      SetWindowTextA( FHandle, FText );
+      SetWindowTextDetectUTF8( FHandle, FText );
       /* Transparent statics (TLabel) draw with SetBkMode(TRANSPARENT)
          so without forcing the PARENT to erase its background first the
          old text bleeds through the new one. The cleanest cure: hide

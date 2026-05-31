@@ -236,7 +236,7 @@ void TForm::CreateHandle( HWND hParent )
          }
       }
 
-      FHandle = CreateWindowExA( dwExStyle, szClass, FText,
+      FHandle = CreateWindowExDetectUTF8( dwExStyle, szClass, FText,
          dwStyle,
          FCenter ? CW_USEDEFAULT : FLeft,
          FCenter ? CW_USEDEFAULT : FTop,
@@ -760,8 +760,8 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
                   if( pDIS->itemState & ODS_SELECTED ) { rc.left += 1; rc.top += 1; }
                   if( FChildren[i]->FFont )
                      SelectObject( pDIS->hDC, FChildren[i]->FFont );
-                  DrawTextA( pDIS->hDC, FChildren[i]->FText, -1, &rc,
-                     DT_CENTER | DT_VCENTER | DT_SINGLELINE );
+                   DrawTextDetectUTF8( pDIS->hDC, FChildren[i]->FText, -1, &rc,
+                      DT_CENTER | DT_VCENTER | DT_SINGLELINE );
 
                   /* Focus rect */
                   if( pDIS->itemState & ODS_FOCUS )

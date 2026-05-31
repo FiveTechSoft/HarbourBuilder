@@ -256,6 +256,7 @@ public:
 
    /* Non-visual database components (CT_DBFTABLE etc.) */
    char         FFileName[260];
+   HBITMAP      FBitmap;
    char         FRDD[16];
    BOOL         FActive;
    BOOL         FTransparent;
@@ -1034,5 +1035,103 @@ public:
  * Factory function
  */
 TControl * CreateControlByType( BYTE bType );
+
+/* Unicode / UTF-8 helper functions for native Emoji rendering */
+#include <malloc.h>
+#include <windows.h>
+
+inline void SetWindowTextDetectUTF8( HWND hWnd, const char * szText )
+{
+   if( !hWnd || !szText ) return;
+   int nLen = (int) strlen( szText );
+   int nWideLen = MultiByteToWideChar( CP_UTF8, MB_ERR_INVALID_CHARS, szText, nLen, NULL, 0 );
+   if( nWideLen > 0 )
+   {
+      WCHAR * wbuf = (WCHAR *) malloc( (nWideLen + 1) * sizeof(WCHAR) );
+      MultiByteToWideChar( CP_UTF8, 0, szText, nLen, wbuf, nWideLen );
+      wbuf[nWideLen] = 0;
+      SetWindowTextW( hWnd, wbuf );
+      free( wbuf );
+   }
+   else
+   {
+      nWideLen = MultiByteToWideChar( CP_ACP, 0, szText, nLen, NULL, 0 );
+      if( nWideLen > 0 )
+      {
+         WCHAR * wbuf = (WCHAR *) malloc( (nWideLen + 1) * sizeof(WCHAR) );
+         MultiByteToWideChar( CP_ACP, 0, szText, nLen, wbuf, nWideLen );
+         wbuf[nWideLen] = 0;
+         SetWindowTextW( hWnd, wbuf );
+         free( wbuf );
+      }
+      else
+      {
+         SetWindowTextA( hWnd, szText );
+      }
+   }
+}
+
+inline void DrawTextDetectUTF8( HDC hDC, const char * szText, int nCount, RECT * lpRect, UINT uFormat )
+{
+   if( !szText ) return;
+   int nLen = (nCount < 0) ? (int) strlen( szText ) : nCount;
+   int nWideLen = MultiByteToWideChar( CP_UTF8, MB_ERR_INVALID_CHARS, szText, nLen, NULL, 0 );
+   if( nWideLen > 0 )
+   {
+      WCHAR * wbuf = (WCHAR *) malloc( (nWideLen + 1) * sizeof(WCHAR) );
+      MultiByteToWideChar( CP_UTF8, 0, szText, nLen, wbuf, nWideLen );
+      wbuf[nWideLen] = 0;
+      DrawTextW( hDC, wbuf, nWideLen, lpRect, uFormat );
+      free( wbuf );
+   }
+   else
+   {
+      nWideLen = MultiByteToWideChar( CP_ACP, 0, szText, nLen, NULL, 0 );
+      if( nWideLen > 0 )
+      {
+         WCHAR * wbuf = (WCHAR *) malloc( (nWideLen + 1) * sizeof(WCHAR) );
+         MultiByteToWideChar( CP_ACP, 0, szText, nLen, wbuf, nWideLen );
+         wbuf[nWideLen] = 0;
+         DrawTextW( hDC, wbuf, nWideLen, lpRect, uFormat );
+         free( wbuf );
+      }
+      else
+      {
+         DrawTextA( hDC, szText, nCount, lpRect, uFormat );
+      }
+   }
+}
+
+inline HWND CreateWindowExDetectUTF8( DWORD dwExStyle, const char * szClass, const char * szText, DWORD dwStyle,
+                                      int x, int y, int nWidth, int nHeight, HWND hParent, HMENU hMenu, HINSTANCE hInst, LPVOID lpParam )
+{
+   WCHAR wClass[128] = {0};
+   MultiByteToWideChar( CP_ACP, 0, szClass, -1, wClass, 128 );
+   WCHAR * wText = NULL;
+   if( szText )
+   {
+      int nLen = (int) strlen( szText );
+      int nWideLen = MultiByteToWideChar( CP_UTF8, MB_ERR_INVALID_CHARS, szText, nLen, NULL, 0 );
+      if( nWideLen > 0 )
+      {
+         wText = (WCHAR *) malloc( (nWideLen + 1) * sizeof(WCHAR) );
+         MultiByteToWideChar( CP_UTF8, 0, szText, nLen, wText, nWideLen );
+         wText[nWideLen] = 0;
+      }
+      else
+      {
+         nWideLen = MultiByteToWideChar( CP_ACP, 0, szText, nLen, NULL, 0 );
+         if( nWideLen > 0 )
+         {
+            wText = (WCHAR *) malloc( (nWideLen + 1) * sizeof(WCHAR) );
+            MultiByteToWideChar( CP_ACP, 0, szText, nLen, wText, nWideLen );
+            wText[nWideLen] = 0;
+         }
+      }
+   }
+   HWND hWnd = CreateWindowExW( dwExStyle, wClass, wText, dwStyle, x, y, nWidth, nHeight, hParent, hMenu, hInst, lpParam );
+   if( wText ) free( wText );
+   return hWnd;
+}
 
 #endif /* _HBIDE_H_ */

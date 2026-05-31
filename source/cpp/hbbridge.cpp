@@ -18,6 +18,7 @@
 
 /* Forward declaration — defined in tform.cpp */
 void ApplyDockAlign( TForm * form );
+static HBITMAP LoadPngAsBitmap( const char * szPath );
 
 extern "C" int g_bDarkIDE;
 
@@ -1858,6 +1859,30 @@ HB_FUNC( UI_SETPROP )
       lstrcpynA( ((TForm*)p)->FAppTitle, hb_parc(3), sizeof( ((TForm*)p)->FAppTitle ) );
    else if( lstrcmpi( szProp, "cFileName" ) == 0 && HB_ISCHAR(3) )
       lstrcpynA( p->FFileName, hb_parc(3), sizeof( p->FFileName ) );
+   else if( lstrcmpi( szProp, "cPicture" ) == 0 )
+   {
+      if( p->FBitmap ) { DeleteObject( p->FBitmap ); p->FBitmap = NULL; }
+      if( HB_ISCHAR(3) && hb_parc(3)[0] ) {
+         lstrcpynA( p->FFileName, hb_parc(3), sizeof( p->FFileName ) );
+         p->FBitmap = LoadPngAsBitmap( p->FFileName );
+      } else {
+         p->FFileName[0] = '\0';
+      }
+      if( p->FHandle ) {
+         if( p->FControlType == CT_BUTTON || p->FControlType == CT_BITBTN || p->FControlType == CT_SPEEDBTN ) {
+            LONG_PTR style = GetWindowLongPtr( p->FHandle, GWL_STYLE );
+            if( ( style & BS_OWNERDRAW ) != BS_OWNERDRAW ) {
+               if( p->FBitmap ) style |= BS_BITMAP;
+               else style &= ~BS_BITMAP;
+               SetWindowLongPtr( p->FHandle, GWL_STYLE, style );
+               SendMessage( p->FHandle, BM_SETIMAGE, IMAGE_BITMAP, (LPARAM) p->FBitmap );
+            }
+         } else if( p->FControlType == CT_IMAGE ) {
+            SendMessage( p->FHandle, STM_SETIMAGE, IMAGE_BITMAP, (LPARAM) p->FBitmap );
+         }
+         InvalidateRect( p->FHandle, NULL, TRUE );
+      }
+   }
    else if( lstrcmpi( szProp, "cRDD" ) == 0 && HB_ISCHAR(3) )
       lstrcpynA( p->FRDD, hb_parc(3), sizeof( p->FRDD ) );
    else if( lstrcmpi( szProp, "lActive" ) == 0 )
@@ -2213,6 +2238,8 @@ HB_FUNC( UI_GETPROP )
    else if( lstrcmpi( szProp, "cAppTitle" ) == 0 && p->FControlType == CT_FORM )
       hb_retc( ((TForm*)p)->FAppTitle );
    else if( lstrcmpi( szProp, "cFileName" ) == 0 )
+      hb_retc( p->FFileName );
+   else if( lstrcmpi( szProp, "cPicture" ) == 0 )
       hb_retc( p->FFileName );
    else if( lstrcmpi( szProp, "cRDD" ) == 0 )
       hb_retc( p->FRDD );
@@ -3366,9 +3393,14 @@ static ULONG_PTR  s_gdipToken = 0;
 
 static HBITMAP LoadPngAsBitmap( const char * szPath )
 {
+   char szFullPath[MAX_PATH];
    WCHAR wPath[MAX_PATH];
    void * pBitmap = NULL;
    HBITMAP hBmp = NULL;
+
+   if( !szPath || !*szPath ) return NULL;
+
+   GetFullPathNameA( szPath, MAX_PATH, szFullPath, NULL );
 
    if( !s_hGdiPlus )
    {
@@ -3395,7 +3427,7 @@ static HBITMAP LoadPngAsBitmap( const char * szPath )
 
    if( !pFromFile || !pToHBmp || !pDispose ) return NULL;
 
-   MultiByteToWideChar( CP_ACP, 0, szPath, -1, wPath, MAX_PATH );
+   MultiByteToWideChar( CP_ACP, 0, szFullPath, -1, wPath, MAX_PATH );
 
    if( pFromFile( wPath, &pBitmap ) != 0 || !pBitmap ) return NULL;
 

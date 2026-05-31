@@ -103,6 +103,8 @@ void TButton::CreateParams( DWORD * pdwStyle, DWORD * pdwExStyle, const char ** 
 
    if( FDefault )
       *pdwStyle |= BS_DEFPUSHBUTTON;
+   if( FBitmap )
+      *pdwStyle |= BS_BITMAP;
 }
 
 void TButton::CreateHandle( HWND hParent )
@@ -117,7 +119,7 @@ void TButton::CreateHandle( HWND hParent )
    if( FDefault ) nId = 1;   /* IDOK */
    if( FCancel )  nId = 2;   /* IDCANCEL */
 
-   FHandle = CreateWindowExA( dwExStyle, szClass, FText, dwStyle,
+   FHandle = CreateWindowExDetectUTF8( dwExStyle, szClass, FText, dwStyle,
       FLeft, FTop, FWidth, FHeight,
       hParent, (HMENU)(LONG_PTR) nId, GetModuleHandle(NULL), NULL );
 
