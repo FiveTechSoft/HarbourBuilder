@@ -1178,7 +1178,7 @@ static function RegenerateFormCode( cName, hForm )
                cCreate += '   // ::o' + cCtrlName + ' (TRichEdit) at ' + ;
                   LTrim(Str(nL)) + ',' + LTrim(Str(nT)) + ' SIZE ' + ;
                   LTrim(Str(nCW)) + ',' + LTrim(Str(nCH)) + e
-            case nType == 9   // Memo
+            case nType == 24  // Memo
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' MEMO ::o' + cCtrlName + ' VAR "' + cText + '" OF Self SIZE ' + ;
                   LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
@@ -4072,7 +4072,6 @@ static function TBRun()
    cAllPrg += '#pragma BEGINDUMP' + Chr(10)
    cAllPrg += '#include <hbapi.h>' + Chr(10)
    cAllPrg += '#include <windows.h>' + Chr(10)
-   cAllPrg += 'HB_FUNC( UI_MEMONEW )        { hb_retnint( 0 ); }' + Chr(10)
    cAllPrg += 'HB_FUNC( UI_MSGBOX )         { MessageBoxA( GetActiveWindow(), hb_parc(1), hb_parc(2) ? hb_parc(2) : "App", 0x40 ); }' + Chr(10)
    cAllPrg += 'HB_FUNC( UI_MSGYESNO )      { hb_retl( MessageBoxA( GetActiveWindow(), hb_parc(1), hb_parc(2) ? hb_parc(2) : "Confirm", 0x24 ) == 6 ); }' + Chr(10)
    cAllPrg += 'HB_FUNC( MAC_RUNTIMEERRORDIALOG ) { hb_retni( 0 ); }' + Chr(10)
@@ -5295,7 +5294,6 @@ static function TBDebugRun( lRunToBreak )
    cAllPrg += '#pragma BEGINDUMP' + Chr(10)
    cAllPrg += '#include <hbapi.h>' + Chr(10)
    cAllPrg += '#include <windows.h>' + Chr(10)
-   cAllPrg += 'HB_FUNC( UI_MEMONEW )        { hb_retnint( 0 ); }' + Chr(10)
    cAllPrg += 'HB_FUNC( UI_MSGBOX )         { MessageBoxA( GetActiveWindow(), hb_parc(1), hb_parc(2) ? hb_parc(2) : "App", 0x40 ); }' + Chr(10)
    cAllPrg += 'HB_FUNC( UI_MSGYESNO )      { hb_retl( MessageBoxA( GetActiveWindow(), hb_parc(1), hb_parc(2) ? hb_parc(2) : "Confirm", 0x24 ) == 6 ); }' + Chr(10)
    cAllPrg += 'HB_FUNC( MAC_RUNTIMEERRORDIALOG ) { hb_retni( 0 ); }' + Chr(10)
@@ -12929,7 +12927,6 @@ HB_FUNC( CODEEDITORREFRESHTHEME )
 }
 
 /* Stubs for macOS/Linux functions referenced from classes.prg */
-HB_FUNC( UI_MEMONEW )        { hb_retnint( 0 ); }
 HB_FUNC( MAC_RUNTIMEERRORDIALOG ) { hb_retni( 0 ); }
 HB_FUNC( MAC_APPTERMINATE )  { }
 HB_FUNC( W32_ERRORDIALOG ) { /* IDE shows errors via its own dialog */ }

@@ -1,6 +1,25 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-05-31
+
+  - fix(win): TMemo code generation. RegenerateFormCode matched
+    nType == 9 for TMemo, but the palette registers it as type 24
+    (CT_MEMO in hbide.h). Controls of type 24 fell through to the
+    default otherwise branch, which emits a // comment placeholder
+    instead of real @ ... MEMO code. Changed to case nType == 24,
+    matching the macOS backend (hbbuilder_macos.prg:975) which
+    already used the correct type.
+  - feat(win,all): UI_MemoNew bridge function. Added HB_FUNC(
+    UI_MEMONEW ) to hbbridge.cpp — it creates a TMemo C++ object
+    (ES_MULTILINE | ES_AUTOVSCROLL | WS_VSCROLL | ES_WANTRETURN).
+    The Harbour-side stub { hb_retnint(0); } was removed from both
+    the IDE's own C code (hbbuilder_win.prg:12935) and the standalone
+    project #pragma BEGINDUMP stubs. Since F9 builds already compile
+    and link hbbridge.cpp, there is no duplicate symbol. macOS and
+    Linux already had platform-specific implementations; this brings
+    Windows to parity.
+
 2026-05-16
 
   - feat(win): xHarbour compiler support. Projects can now be built
