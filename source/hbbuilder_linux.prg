@@ -2890,16 +2890,17 @@ static function TBRun()
    // Step 2: Assemble main.prg
    GTK_ProgressStep( "Assembling main.prg..." )
    cLog += "[2] Building main.prg..." + Chr(10)
+   // classes.prg is compiled as its OWN object (step 4) and linked separately.
+   // Strip BOTH #includes from EVERY piece (Project1, forms, modules) so the
+   // framework is never compiled into main.c too — duplicate inclusion is what
+   // caused "multiple definition of HB_FUN_TCONTROL" on Linux (issues #16/#13).
    cAllPrg := '#include "hbbuilder.ch"' + Chr(10) + Chr(10)
-   cAllPrg += StrTran( MemoRead( cBuildDir + "/Project1.prg" ), ;
-                       '#include "hbbuilder.ch"', "" ) + Chr(10)
+   cAllPrg += _StripFwkIncludes( MemoRead( cBuildDir + "/Project1.prg" ) ) + Chr(10)
    for i := 1 to Len( aForms )
-      cAllPrg += MemoRead( cBuildDir + "/" + aForms[i][1] + ".prg" ) + Chr(10)
+      cAllPrg += _StripFwkIncludes( MemoRead( cBuildDir + "/" + aForms[i][1] + ".prg" ) ) + Chr(10)
    next
    for i := 1 to Len( aModules )
-      cAllPrg += StrTran( StrTran( MemoRead( cBuildDir + "/" + aModules[i][1] + ".prg" ), ;
-                          '#include "classes.prg"', "" ), ;
-                          '#include "hbbuilder.ch"', "" ) + Chr(10)
+      cAllPrg += _StripFwkIncludes( MemoRead( cBuildDir + "/" + aModules[i][1] + ".prg" ) ) + Chr(10)
    next
    MemoWrit( cBuildDir + "/main.prg", cAllPrg )
    MemoWrit( "/tmp/hbbuilder_debug_main.prg", cAllPrg )
@@ -2989,6 +2990,7 @@ static function TBRun()
               " -lhbhsx -lhbsix -lhbusrrdd" + ;
               " -lhbsqlit3 -lsddsqlt3 -lrddsql" + ;
               " -lgttrm -lhbpcre" + ;
+              " $(for d in /usr/lib /usr/lib64 /lib /usr/lib/x86_64-linux-gnu /lib/x86_64-linux-gnu; do ls $d/libgpm.so* >/dev/null 2>&1 && { echo -lgpm; break; }; done)" + ;
               " -Wl,--end-group" + ;
               " $(pkg-config --libs gtk+-3.0)" + ;
               " $(pkg-config --exists webkit2gtk-4.1 2>/dev/null && pkg-config --libs webkit2gtk-4.1 || " + ;
@@ -3195,6 +3197,7 @@ static function TBDebugRun( lRunToBreak )
               " -lhbhsx -lhbsix -lhbusrrdd" + ;
               " -lhbsqlit3 -lsddsqlt3 -lrddsql" + ;
               " -lgttrm -lhbpcre" + ;
+              " $(for d in /usr/lib /usr/lib64 /lib /usr/lib/x86_64-linux-gnu /lib/x86_64-linux-gnu; do ls $d/libgpm.so* >/dev/null 2>&1 && { echo -lgpm; break; }; done)" + ;
               " -Wl,--end-group" + ;
               " $(pkg-config --libs gtk+-3.0)" + ;
               " " + cWebKitLibs + ;
@@ -4203,6 +4206,21 @@ static function ComponentTypeFromName( cName )
       case cName == "CT_POPUPMENU";     return 136
    endcase
 return 0
+
+// Strip framework #includes from a project source piece before it is
+// concatenated into main.prg. classes.prg is compiled as its own object and
+// linked separately, so leaving the #include in would compile the framework
+// twice -> "multiple definition of HB_FUN_*" at link time (issues #16/#13).
+// hbbuilder.ch is prepended once at the top of main.prg, so strip it too.
+static function _StripFwkIncludes( cSrc )
+   if cSrc == nil
+      return ""
+   endif
+   cSrc := StrTran( cSrc, '#include "classes.prg"', "" )
+   cSrc := StrTran( cSrc, "#include 'classes.prg'", "" )
+   cSrc := StrTran( cSrc, '#include "hbbuilder.ch"', "" )
+   cSrc := StrTran( cSrc, "#include 'hbbuilder.ch'", "" )
+return cSrc
 
 // Framework
 #include "core/classes.prg"

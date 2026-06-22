@@ -161,6 +161,27 @@ if needs_rebuild hbdb_real.o "$PROJDIR/source/backends/gtk3/gtk3_db_real.c"; the
    NEED_LINK=1
 fi
 
+# Detect distro-portable terminal libs (CI runs on stock Ubuntu, so these
+# fixes only surface on other distros — see issues #11 (gpm) and #5 (ncurses)).
+#
+# ncurses: Debian/Ubuntu ship libncurses.so.6 (no bare .so without -dev),
+# Arch/Manjaro ship libncurses.so / libncursesw.so. Pick whatever exists.
+LIBDIRS="/usr/lib /usr/lib64 /lib /usr/lib/x86_64-linux-gnu /lib/x86_64-linux-gnu /usr/lib/aarch64-linux-gnu /usr/lib/arm-linux-gnueabihf"
+NCURSES_LIB="-lncurses"
+for cand in libncursesw.so libncurses.so libncursesw.so.6 libncurses.so.6 libncursesw.so.5 libncurses.so.5; do
+   for d in $LIBDIRS; do
+      if [ -e "$d/$cand" ]; then NCURSES_LIB="-l:$cand"; break 2; fi
+   done
+done
+
+# gpm: Harbour's libgttrm.a references gpm_fd on builds compiled with GPM
+# support; libgpm is absent on many desktops, so only add -lgpm if present.
+GPM_LIB=""
+for d in $LIBDIRS; do
+   if ls "$d"/libgpm.so* >/dev/null 2>&1; then GPM_LIB="-lgpm"; break; fi
+done
+echo "  Terminal libs: ncurses='$NCURSES_LIB' gpm='${GPM_LIB:-<none>}'"
+
 # Skip link if nothing changed
 if [ "$NEED_LINK" -eq 0 ] && [ -f "${PROG}" ]; then
    echo "[5/6] ${PROG} — up to date (nothing changed)"
@@ -181,11 +202,11 @@ gcc ${PROG}.o gtk3_core.o gtk3_inspector.o $EXTRA_OBJS -g -o ${PROG} \
    -lhbcommon -lhbvm -lhbrtl -lhbrdd -lhbmacro -lhblang -lhbcpage -lhbpp \
    -lhbcplr -lrddntx -lrddcdx -lrddfpt -lhbsix -lhbusrrdd -lhbct \
    -lhbsqlit3 -lsddsqlt3 -lrddsql \
-   -lgttrm -lhbdebug -lhbpcre \
+   -lgttrm -lhbdebug -lhbpcre $GPM_LIB \
    $(pkg-config --libs gtk+-3.0) \
    $WEBKIT_LIBS \
    -lm -lpthread -ldl -lrt -lsqlite3 \
-   -L/usr/lib/x86_64-linux-gnu -l:libncurses.so.6 \
+   $NCURSES_LIB \
    -Wl,--end-group
 
 # [6/6] Install to bin/

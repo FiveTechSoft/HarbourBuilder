@@ -5067,7 +5067,31 @@ static function ShowProjectOptions()
    static lDebugInfo    := .F.
    static lWarnings     := .T.
    static lOptimize     := .T.
-   local aCI
+   static lLoaded       := .F.
+   local aCI, hCfg
+
+   // Load persisted options once per session (issue #15: settings must
+   // survive a restart). Stored next to the IDE exe via hb_DirBase() so it
+   // is portable and avoids non-writable hardcoded paths.
+   if ! lLoaded
+      hCfg := LoadProjOptions()
+      if hCfg != nil
+         cHarbourDir   := hb_HGetDef( hCfg, "HarbourDir",   cHarbourDir   )
+         cCompilerDir  := hb_HGetDef( hCfg, "CompilerDir",  cCompilerDir  )
+         cProjectDir   := hb_HGetDef( hCfg, "ProjectDir",   cProjectDir   )
+         cOutputDir    := hb_HGetDef( hCfg, "OutputDir",    cOutputDir    )
+         cHbFlags      := hb_HGetDef( hCfg, "HbFlags",      cHbFlags      )
+         cCFlags       := hb_HGetDef( hCfg, "CFlags",       cCFlags       )
+         cLinkFlags    := hb_HGetDef( hCfg, "LinkFlags",    cLinkFlags    )
+         cIncludePaths := hb_HGetDef( hCfg, "IncludePaths", cIncludePaths )
+         cLibPaths     := hb_HGetDef( hCfg, "LibPaths",     cLibPaths     )
+         cLibraries    := hb_HGetDef( hCfg, "Libraries",    cLibraries    )
+         lDebugInfo    := hb_HGetDef( hCfg, "DebugInfo",    lDebugInfo    )
+         lWarnings     := hb_HGetDef( hCfg, "Warnings",     lWarnings     )
+         lOptimize     := hb_HGetDef( hCfg, "Optimize",     lOptimize     )
+      endif
+      lLoaded := .T.
+   endif
 
    // Auto-detect paths from current compiler on first open
    if Empty( cHarbourDir )
@@ -5086,13 +5110,48 @@ static function ShowProjectOptions()
       if Empty( cHarbourDir ); cHarbourDir := "c:\harbour"; endif
    endif
 
-   W32_ProjectOptionsDialog( ;
-      cHarbourDir, cCompilerDir, cProjectDir, cOutputDir, ;
-      cHbFlags, cCFlags, cLinkFlags, ;
-      cIncludePaths, cLibPaths, cLibraries, ;
-      lDebugInfo, lWarnings, lOptimize )
+   // Pass by reference so the dialog can hand edited values back; it returns
+   // .T. only when the user clicked OK (Save). Then persist (issue #15).
+   if W32_ProjectOptionsDialog( ;
+         @cHarbourDir, @cCompilerDir, @cProjectDir, @cOutputDir, ;
+         @cHbFlags, @cCFlags, @cLinkFlags, ;
+         @cIncludePaths, @cLibPaths, @cLibraries, ;
+         @lDebugInfo, @lWarnings, @lOptimize )
+
+      if ! SaveProjOptions( { ;
+            "HarbourDir"   => cHarbourDir,   "CompilerDir"  => cCompilerDir, ;
+            "ProjectDir"   => cProjectDir,   "OutputDir"    => cOutputDir, ;
+            "HbFlags"      => cHbFlags,      "CFlags"       => cCFlags, ;
+            "LinkFlags"    => cLinkFlags,    "IncludePaths" => cIncludePaths, ;
+            "LibPaths"     => cLibPaths,     "Libraries"    => cLibraries, ;
+            "DebugInfo"    => lDebugInfo,    "Warnings"     => lWarnings, ;
+            "Optimize"     => lOptimize } )
+         MsgInfo( "Could not save project options to:" + Chr(13) + Chr(10) + ProjOptCfgPath() )
+      endif
+   endif
 
 return nil
+
+// --- Project Options persistence (issue #15) ----------------------------
+// Stored as JSON next to the IDE executable (portable; no hardcoded path).
+
+static function ProjOptCfgPath()
+return hb_DirBase() + "projoptions.json"
+
+static function SaveProjOptions( hVals )
+return hb_MemoWrit( ProjOptCfgPath(), hb_jsonEncode( hVals, .T. ) )
+
+static function LoadProjOptions()
+   local cPath := ProjOptCfgPath(), cJson, xRet
+   if ! File( cPath )
+      return nil
+   endif
+   cJson := hb_MemoRead( cPath )
+   if Empty( cJson )
+      return nil
+   endif
+   hb_jsonDecode( cJson, @xRet )
+return iif( HB_ISHASH( xRet ), xRet, nil )
 
 // === Debugger ===
 
@@ -9580,6 +9639,13 @@ static void PO_ShowTab( PROJOPTDATA * d, int nTab )
 static HBRUSH s_hPODlgBrush  = NULL;
 static HBRUSH s_hPOEditBrush = NULL;
 
+/* Project Options dialog result (issue #15: Save did nothing — IDOK was a
+   no-op identical to Cancel, and nothing was ever read back or persisted).
+   On OK we harvest the edits here, then the HB_FUNC returns them by-ref. */
+static char s_poBuf[10][4096];   /* params 1..10: HbDir,CDir,ProjDir,OutDir,HbFlags,CFlags,LinkFlags,IncPaths,LibPaths,Libs */
+static BOOL s_poChk[3];          /* params 11..13: Debug, Warnings, Optimize */
+static BOOL s_poOK = FALSE;      /* TRUE only when the user clicked OK (Save) */
+
 static LRESULT CALLBACK ProjOptProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 {
    PROJOPTDATA * d = (PROJOPTDATA*) GetWindowLongPtr(hWnd, GWLP_USERDATA);
@@ -9618,7 +9684,28 @@ static LRESULT CALLBACK ProjOptProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM 
          break;
       }
       case WM_COMMAND:
-         if(LOWORD(wParam)==IDOK || LOWORD(wParam)==IDCANCEL) {
+         if(LOWORD(wParam)==IDOK) {
+            if(d) {  /* harvest edits so they can be saved (issue #15) */
+               GetWindowTextA(d->hHbDir,    s_poBuf[0], sizeof(s_poBuf[0]));
+               GetWindowTextA(d->hCDir,     s_poBuf[1], sizeof(s_poBuf[1]));
+               GetWindowTextA(d->hProjDir,  s_poBuf[2], sizeof(s_poBuf[2]));
+               GetWindowTextA(d->hOutDir,   s_poBuf[3], sizeof(s_poBuf[3]));
+               GetWindowTextA(d->hHbFlags,  s_poBuf[4], sizeof(s_poBuf[4]));
+               GetWindowTextA(d->hCFlags,   s_poBuf[5], sizeof(s_poBuf[5]));
+               GetWindowTextA(d->hLinkFlags,s_poBuf[6], sizeof(s_poBuf[6]));
+               GetWindowTextA(d->hIncPaths, s_poBuf[7], sizeof(s_poBuf[7]));
+               GetWindowTextA(d->hLibPaths, s_poBuf[8], sizeof(s_poBuf[8]));
+               GetWindowTextA(d->hLibs,     s_poBuf[9], sizeof(s_poBuf[9]));
+               s_poChk[0] = (BOOL)(SendMessage(d->hChkDebug,BM_GETCHECK,0,0)==BST_CHECKED);
+               s_poChk[1] = (BOOL)(SendMessage(d->hChkWarn, BM_GETCHECK,0,0)==BST_CHECKED);
+               s_poChk[2] = (BOOL)(SendMessage(d->hChkOpt,  BM_GETCHECK,0,0)==BST_CHECKED);
+               s_poOK = TRUE;
+            }
+            EnableWindow(GetParent(hWnd)?GetParent(hWnd):GetDesktopWindow(),TRUE);
+            DestroyWindow(hWnd);
+            return 0;
+         }
+         if(LOWORD(wParam)==IDCANCEL) {
             EnableWindow(GetParent(hWnd)?GetParent(hWnd):GetDesktopWindow(),TRUE);
             DestroyWindow(hWnd);
             return 0;
@@ -9644,6 +9731,8 @@ HB_FUNC( W32_PROJECTOPTIONSDIALOG )
    HFONT hFont;
    MSG msg;
    int baseY = PO_TAB_HEIGHT + 48;
+
+   s_poOK = FALSE;   /* reset: stays FALSE if user cancels / closes (issue #15) */
 
    if(!bReg) {
       wc.lpfnWndProc=ProjOptProc; wc.hInstance=GetModuleHandle(NULL);
@@ -9732,6 +9821,18 @@ HB_FUNC( W32_PROJECTOPTIONSDIALOG )
          SendMessage(d.hDlg,WM_CLOSE,0,0); break; }
       TranslateMessage(&msg); DispatchMessage(&msg);
    }
+
+   /* Hand the edited values back to ShowProjectOptions() via by-ref params,
+      and return .T. only when the user clicked OK so the caller knows to
+      persist them. Before this fix the dialog returned nothing (issue #15). */
+   if( s_poOK ) {
+      hb_storc(s_poBuf[0],  1); hb_storc(s_poBuf[1],  2); hb_storc(s_poBuf[2], 3);
+      hb_storc(s_poBuf[3],  4); hb_storc(s_poBuf[4],  5); hb_storc(s_poBuf[5], 6);
+      hb_storc(s_poBuf[6],  7); hb_storc(s_poBuf[7],  8); hb_storc(s_poBuf[8], 9);
+      hb_storc(s_poBuf[9], 10);
+      hb_storl(s_poChk[0], 11); hb_storl(s_poChk[1], 12); hb_storl(s_poChk[2], 13);
+   }
+   hb_retl( s_poOK );
 }
 
 /* ======================================================================
