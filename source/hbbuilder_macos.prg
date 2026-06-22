@@ -4139,22 +4139,22 @@ static function TBRun()
    // Step 2: Assemble main.prg
    MAC_ProgressStep( 2, "Assembling main.prg..." )
    cLog += "[2] Building main.prg..." + Chr(10)
+   // classes.prg is compiled as its OWN object (step 4) and linked separately.
+   // Strip BOTH #includes (single- AND double-quoted) from EVERY piece so the
+   // framework is never compiled into main.c too — duplicate inclusion is what
+   // caused "multiple definition of HB_FUN_*" (issues #16/#13). The old inline
+   // StrTran only caught double-quoted includes, letting AI-generated forms
+   // (which emit single-quoted '#include' lines) slip the framework in twice.
    cAllPrg := '#include "hbbuilder.ch"' + Chr(10)
    cAllPrg += "REQUEST HB_GT_NUL_DEFAULT" + Chr(10)
    cAllPrg += "REQUEST DBFCDX, DBFNTX, DBFFPT" + Chr(10) + Chr(10)
-   cAllPrg += StrTran( StrTran( StrTran( MemoRead( cBuildDir + "/Project1.prg" ), ;
-                       '#include "hbbuilder.ch"', "" ), ;
-                       '#include "classes.prg"', "" ), ;
+   cAllPrg += StrTran( _StripFwkIncludes( MemoRead( cBuildDir + "/Project1.prg" ) ), ;
                        "REQUEST HB_GT_GUI_DEFAULT", "" ) + Chr(10)
    for i := 1 to Len( aForms )
-      cAllPrg += StrTran( StrTran( MemoRead( cBuildDir + "/" + aForms[i][1] + ".prg" ), ;
-                          '#include "classes.prg"', "" ), ;
-                          '#include "hbbuilder.ch"', "" ) + Chr(10)
+      cAllPrg += _StripFwkIncludes( MemoRead( cBuildDir + "/" + aForms[i][1] + ".prg" ) ) + Chr(10)
    next
    for i := 1 to Len( aModules )
-      cAllPrg += StrTran( StrTran( MemoRead( cBuildDir + "/" + aModules[i][1] + ".prg" ), ;
-                          '#include "classes.prg"', "" ), ;
-                          '#include "hbbuilder.ch"', "" ) + Chr(10)
+      cAllPrg += _StripFwkIncludes( MemoRead( cBuildDir + "/" + aModules[i][1] + ".prg" ) ) + Chr(10)
    next
    MemoWrit( cBuildDir + "/main.prg", cAllPrg )
 
@@ -6460,6 +6460,22 @@ static function GitBlameShow()
    cOut := GIT_Exec( "blame " + hb_FNameNameExt( cFile ), hb_FNameDir( cFile ) )
    MsgInfo( iif( Empty(cOut), "No blame data", Left(cOut, 3000) ), "Git Blame" )
 return nil
+
+// Strip framework #includes from a project source piece before it is
+// concatenated into main.prg. classes.prg is compiled as its own object and
+// linked separately, so leaving the #include in would compile the framework
+// twice -> "multiple definition of HB_FUN_*" at link time (issues #16/#13).
+// hbbuilder.ch is prepended once at the top of main.prg, so strip it too.
+// Both quote styles are handled (AI-generated forms emit single-quoted includes).
+static function _StripFwkIncludes( cSrc )
+   if cSrc == nil
+      return ""
+   endif
+   cSrc := StrTran( cSrc, '#include "classes.prg"', "" )
+   cSrc := StrTran( cSrc, "#include 'classes.prg'", "" )
+   cSrc := StrTran( cSrc, '#include "hbbuilder.ch"', "" )
+   cSrc := StrTran( cSrc, "#include 'hbbuilder.ch'", "" )
+return cSrc
 
 // Framework
 #include "classes.prg"
