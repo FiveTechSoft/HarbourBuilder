@@ -27,6 +27,11 @@ EXTERNAL HBPGSQL_QUERY, HBPGSQL_FIELDS, HBPGSQL_ERROR
 EXTERNAL HBPGSQL_LASTID, HBPGSQL_TABLES
 #endif
 
+// Database base class (TDatabase) + universal ODBC backend (TODBCDatabase).
+// TDatabase lives here now (defined once, early) so every DB subclass below
+// inherits it; the new ODBC engine fills the Firebird/SQLServer/Oracle stubs.
+#include "db_odbc.prg"
+
 //----------------------------------------------------------------------------//
 // TControl - Base class
 //----------------------------------------------------------------------------//
@@ -2154,68 +2159,8 @@ return hb_ValToStr( xVal )
 
 //----------------------------------------------------------------------------//
 // TDatabase - Abstract base class for all database connections
-//----------------------------------------------------------------------------//
-
-CLASS TDatabase
-
-   DATA cServer     INIT ""        // Host/server name
-   DATA nPort       INIT 0         // Port number
-   DATA cDatabase   INIT ""        // Database name or file path
-   DATA cUser       INIT ""        // Username
-   DATA cPassword   INIT ""        // Password
-   DATA cCharSet    INIT "UTF8"    // Character set
-   DATA lConnected  INIT .F.       // Connection status
-   DATA cLastError  INIT ""        // Last error message
-   DATA pHandle     INIT nil       // Native connection handle
-   DATA cDriver     INIT ""        // Driver name (for identification)
-
-   METHOD New() CONSTRUCTOR
-   METHOD Open()
-   METHOD Close()
-   METHOD Execute( cSQL )
-   METHOD Query( cSQL )
-   METHOD TableExists( cTable )
-   METHOD Tables()
-   METHOD LastError()
-   METHOD IsConnected()
-
-ENDCLASS
-
-METHOD New() CLASS TDatabase
-return Self
-
-METHOD Open() CLASS TDatabase
-   ::cLastError := "Abstract: override Open() in subclass"
-return .F.
-
-METHOD Close() CLASS TDatabase
-   ::lConnected := .F.
-   ::pHandle := nil
-return nil
-
-METHOD Execute( cSQL ) CLASS TDatabase
-   HB_SYMBOL_UNUSED( cSQL )
-   ::cLastError := "Abstract: override Execute() in subclass"
-return .F.
-
-METHOD Query( cSQL ) CLASS TDatabase
-   HB_SYMBOL_UNUSED( cSQL )
-   ::cLastError := "Abstract: override Query() in subclass"
-return {}
-
-METHOD TableExists( cTable ) CLASS TDatabase
-   HB_SYMBOL_UNUSED( cTable )
-return .F.
-
-METHOD Tables() CLASS TDatabase
-return {}
-
-METHOD LastError() CLASS TDatabase
-return ::cLastError
-
-METHOD IsConnected() CLASS TDatabase
-return ::lConnected
-
+//   Moved to source/core/db_odbc.prg (with the new TODBCDatabase backend),
+//   which is #included near the top of this file. See that file.
 //----------------------------------------------------------------------------//
 // TDBFTable - Native DBF/NTX/CDX table access via Harbour RDD
 //----------------------------------------------------------------------------//
