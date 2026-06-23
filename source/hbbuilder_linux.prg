@@ -2884,6 +2884,7 @@ static function TBRun()
       cLog += "    " + aModules[i][1] + ".prg (module)" + Chr(10)
    next
    GTK_ShellExec( "cp " + cProjDir + "/source/core/classes.prg " + cBuildDir + "/" )
+   GTK_ShellExec( "cp " + cProjDir + "/source/core/db_odbc.prg " + cBuildDir + "/" )
    GTK_ShellExec( "cp " + cProjDir + "/include/hbbuilder.ch " + cBuildDir + "/" )
    GTK_ShellExec( "cp " + cProjDir + "/include/hbide.ch " + cBuildDir + "/" )
 
@@ -2989,6 +2990,7 @@ static function TBRun()
               " -lrddntx -lrddnsx -lrddcdx -lrddfpt" + ;
               " -lhbhsx -lhbsix -lhbusrrdd" + ;
               " -lhbsqlit3 -lsddsqlt3 -lrddsql" + ;
+              " -lhbodbc -lodbc" + ;
               " -lgttrm -lhbpcre" + ;
               " $(for d in /usr/lib /usr/lib64 /lib /usr/lib/x86_64-linux-gnu /lib/x86_64-linux-gnu; do ls $d/libgpm.so* >/dev/null 2>&1 && { echo -lgpm; break; }; done)" + ;
               " -Wl,--end-group" + ;
@@ -3082,6 +3084,7 @@ static function TBDebugRun( lRunToBreak )
          CodeEditorGetTabText( hCodeEditor, i + 1 ) )
    next
    GTK_ShellExec( "cp " + cProjDir + "/source/core/classes.prg " + cBuildDir + "/" )
+   GTK_ShellExec( "cp " + cProjDir + "/source/core/db_odbc.prg " + cBuildDir + "/" )
    GTK_ShellExec( "cp " + cProjDir + "/include/hbbuilder.ch " + cBuildDir + "/" )
    GTK_ShellExec( "cp " + cProjDir + "/include/hbide.ch " + cBuildDir + "/" )
    GTK_ShellExec( "cp " + cProjDir + "/source/debugger/dbgclient.prg " + cBuildDir + "/" )
@@ -3196,6 +3199,7 @@ static function TBDebugRun( lRunToBreak )
               " -lrddntx -lrddnsx -lrddcdx -lrddfpt" + ;
               " -lhbhsx -lhbsix -lhbusrrdd" + ;
               " -lhbsqlit3 -lsddsqlt3 -lrddsql" + ;
+              " -lhbodbc -lodbc" + ;
               " -lgttrm -lhbpcre" + ;
               " $(for d in /usr/lib /usr/lib64 /lib /usr/lib/x86_64-linux-gnu /lib/x86_64-linux-gnu; do ls $d/libgpm.so* >/dev/null 2>&1 && { echo -lgpm; break; }; done)" + ;
               " -Wl,--end-group" + ;

@@ -4122,6 +4122,7 @@ static function TBRun()
    // Copy framework files (bundle Resources/ or source tree harbour/)
    if File( HB_DirBase() + "../Resources/classes.prg" )
       MAC_ShellExec( "cp " + HB_DirBase() + "../Resources/classes.prg " + cBuildDir + "/" )
+      MAC_ShellExec( "cp " + HB_DirBase() + "../Resources/db_odbc.prg " + cBuildDir + "/" )
       MAC_ShellExec( "cp " + HB_DirBase() + "../Resources/hbbuilder.ch " + cBuildDir + "/" )
       MAC_ShellExec( "cp " + HB_DirBase() + "../Resources/hbide.ch " + cBuildDir + "/" )
       MAC_ShellExec( "cp " + HB_DirBase() + "../Resources/stddlgs_mac.mm " + cBuildDir + "/ 2>/dev/null" )
@@ -4129,6 +4130,7 @@ static function TBRun()
       MAC_ShellExec( "cp " + HB_DirBase() + "../Resources/hix_template.prg " + cBuildDir + "/ 2>/dev/null" )
    else
       MAC_ShellExec( "cp " + cProjDir + "/source/core/classes.prg " + cBuildDir + "/" )
+      MAC_ShellExec( "cp " + cProjDir + "/source/core/db_odbc.prg " + cBuildDir + "/" )
       MAC_ShellExec( "cp " + cProjDir + "/include/hbbuilder.ch " + cBuildDir + "/" )
       MAC_ShellExec( "cp " + cProjDir + "/include/hbide.ch " + cBuildDir + "/" )
       MAC_ShellExec( "cp " + cProjDir + "/resources/stddlgs_mac.mm " + cBuildDir + "/ 2>/dev/null" )
@@ -4347,6 +4349,7 @@ static function TBRun()
               " -lhbvm -lhbrtl -lhbcommon -lhbcpage -lhblang" + ;
               " -lhbmacro -lhbpp -lhbrdd -lhbcplr -lhbdebug" + ;
               " -lhbct -lhbextern -lhbsqlit3" + ;
+              " -lhbodbc -liodbc" + ;
               " -lrddntx -lrddnsx -lrddcdx -lrddfpt" + ;
               " -lhbhsx -lhbsix -lhbusrrdd" + ;
               " -lgtcgi -lgtstd" + ;
@@ -4494,6 +4497,7 @@ static function TBDebugRun( lRunToBreakpoint )
    next
    if File( cResDir + "/classes.prg" )
       MAC_ShellExec( "cp " + cResDir + "/classes.prg " + cBuildDir + "/" )
+      MAC_ShellExec( "cp " + cResDir + "/db_odbc.prg " + cBuildDir + "/" )
       MAC_ShellExec( "cp " + cResDir + "/hbbuilder.ch " + cBuildDir + "/" )
       MAC_ShellExec( "cp " + cResDir + "/hbide.ch " + cBuildDir + "/" )
       MAC_ShellExec( "cp " + cResDir + "/dbgclient.prg " + cBuildDir + "/" )
@@ -4502,6 +4506,7 @@ static function TBDebugRun( lRunToBreakpoint )
       MAC_ShellExec( "cp " + cResDir + "/hix_template.prg " + cBuildDir + "/ 2>/dev/null" )
    else
       MAC_ShellExec( "cp " + cProjDir + "/source/core/classes.prg " + cBuildDir + "/" )
+      MAC_ShellExec( "cp " + cProjDir + "/source/core/db_odbc.prg " + cBuildDir + "/" )
       MAC_ShellExec( "cp " + cProjDir + "/include/hbbuilder.ch " + cBuildDir + "/" )
       MAC_ShellExec( "cp " + cProjDir + "/include/hbide.ch " + cBuildDir + "/" )
       MAC_ShellExec( "cp " + cProjDir + "/source/debugger/dbgclient.prg " + cBuildDir + "/" )
@@ -4651,6 +4656,7 @@ static function TBDebugRun( lRunToBreakpoint )
               " -lhbvm -lhbrtl -lhbcommon -lhbcpage -lhblang" + ;
               " -lhbmacro -lhbpp -lhbrdd -lhbcplr -lhbdebug" + ;
               " -lhbct -lhbextern -lhbsqlit3" + ;
+              " -lhbodbc -liodbc" + ;
               " -lrddntx -lrddnsx -lrddcdx -lrddfpt" + ;
               " -lhbhsx -lhbsix -lhbusrrdd" + ;
               " -lgtcgi -lgtstd" + ;

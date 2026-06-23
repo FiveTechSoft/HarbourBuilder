@@ -4035,6 +4035,7 @@ static function TBRun()
       cLog += "    " + aForms[i][1] + ".prg" + Chr(10)
    next
    W32_ShellExec( 'cmd /c copy "' + cProjDir + '\source\core\classes.prg" "' + cBuildDir + '\" >nul 2>&1' )
+   W32_ShellExec( 'cmd /c copy "' + cProjDir + '\source\core\db_odbc.prg" "' + cBuildDir + '\" >nul 2>&1' )
    W32_ShellExec( 'cmd /c copy "' + cProjDir + '\include\hbbuilder.ch" "' + cBuildDir + '\" >nul 2>&1' )
    W32_ShellExec( 'cmd /c copy "' + cProjDir + '\include\hbide.ch" "' + cBuildDir + '\" >nul 2>&1' )
    W32_ShellExec( 'cmd /c copy "' + cProjDir + '\resources\stddlgs.c" "' + cBuildDir + '\" >nul 2>&1' )
@@ -4385,6 +4386,7 @@ static function TBRun()
             cRspContent += "rddntx.lib rddnsx.lib rddcdx.lib rddfpt.lib" + Chr(10)
             cRspContent += "hbdebug.lib hbpcre.lib hbzlib.lib" + Chr(10)
             cRspContent += "hbsqlit3.lib sqlite3.lib" + Chr(10)
+            cRspContent += "hbodbc.lib odbc32.lib" + Chr(10)
             cRspContent += "gtwin.lib gtwvt.lib gtgui.lib" + Chr(10)
          endif
          cRspContent += "user32.lib gdi32.lib comctl32.lib comdlg32.lib shell32.lib" + Chr(10)
@@ -4408,6 +4410,7 @@ static function TBRun()
                     " -lrddntx -lrddnsx -lrddcdx -lrddfpt" + ;
                     " -lhbdebug -lhbpcre -lhbzlib" + ;
                     " -lhbsqlit3 -lsqlite3" + ;
+                    " -lhbodbc -lodbc32" + ;
                     " -lgtgui -lgtwin -lgtwvt" ) + ;
                  " -Wl,--end-group" + ;
                  " -luser32 -lgdi32 -lcomctl32 -lcomdlg32 -lshell32" + ;
@@ -4434,6 +4437,7 @@ static function TBRun()
                     " rddntx.lib rddnsx.lib rddcdx.lib rddfpt.lib" + ;
                     " hbdebug.lib hbpcre.lib hbzlib.lib" + ;
                     " hbsqlit3.lib sqlite3.lib" + ;
+                    " hbodbc.lib odbc32.lib" + ;
                     " gtwin.lib gtwvt.lib gtgui.lib" ) + ;
                  " cw32mt.lib import32.lib ws2_32.lib winmm.lib iphlpapi.lib" + ;
                  " user32.lib gdi32.lib comctl32.lib comdlg32.lib shell32.lib" + ;
@@ -5298,6 +5302,7 @@ static function TBDebugRun( lRunToBreak )
          CodeEditorGetTabText( hCodeEditor, i + 1 ) )
    next
    W32_ShellExec( 'cmd /c copy "' + cProjDir + '\source\core\classes.prg" "' + cBuildDir + '\" >nul 2>&1' )
+   W32_ShellExec( 'cmd /c copy "' + cProjDir + '\source\core\db_odbc.prg" "' + cBuildDir + '\" >nul 2>&1' )
    W32_ShellExec( 'cmd /c copy "' + cProjDir + '\include\hbbuilder.ch" "' + cBuildDir + '\" >nul 2>&1' )
    W32_ShellExec( 'cmd /c copy "' + cProjDir + '\include\hbide.ch" "' + cBuildDir + '\" >nul 2>&1' )
    W32_ShellExec( 'cmd /c copy "' + cProjDir + '\source\debugger\dbgclient.prg" "' + cBuildDir + '\" >nul 2>&1' )
@@ -5631,6 +5636,7 @@ static function TBDebugRun( lRunToBreak )
             cRspContent += "rddntx.lib rddnsx.lib rddcdx.lib rddfpt.lib" + Chr(10)
             cRspContent += "hbdebug.lib hbpcre.lib hbzlib.lib" + Chr(10)
             cRspContent += "hbsqlit3.lib sqlite3.lib" + Chr(10)
+            cRspContent += "hbodbc.lib odbc32.lib" + Chr(10)
             cRspContent += "gtwin.lib gtwvt.lib gtgui.lib" + Chr(10)
          endif
          cRspContent += "user32.lib gdi32.lib comctl32.lib comdlg32.lib shell32.lib" + Chr(10)
@@ -5654,6 +5660,7 @@ static function TBDebugRun( lRunToBreak )
                     " -lrddntx -lrddnsx -lrddcdx -lrddfpt" + ;
                     " -lhbdebug -lhbpcre -lhbzlib" + ;
                     " -lhbsqlit3 -lsqlite3" + ;
+                    " -lhbodbc -lodbc32" + ;
                     " -lgtgui -lgtwin -lgtwvt" ) + ;
                  " -Wl,--end-group" + ;
                  " -luser32 -lgdi32 -lcomctl32 -lcomdlg32 -lshell32" + ;
@@ -5680,6 +5687,7 @@ static function TBDebugRun( lRunToBreak )
                     " rddntx.lib rddnsx.lib rddcdx.lib rddfpt.lib" + ;
                     " hbdebug.lib hbpcre.lib hbzlib.lib" + ;
                     " hbsqlit3.lib sqlite3.lib" + ;
+                    " hbodbc.lib odbc32.lib" + ;
                     " gtwin.lib gtwvt.lib gtgui.lib" ) + ;
                  " cw32mt.lib import32.lib ws2_32.lib winmm.lib iphlpapi.lib" + ;
                  " user32.lib gdi32.lib comctl32.lib comdlg32.lib shell32.lib" + ;
