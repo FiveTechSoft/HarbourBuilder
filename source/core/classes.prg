@@ -2921,58 +2921,10 @@ METHOD LastInsertId( cSeq ) CLASS TPostgreSQL
 return HBPGSQL_LASTID( ::pHandle, cSeq )
 
 //----------------------------------------------------------------------------//
-// TFirebird - Firebird connection (requires libfbclient)
+// TFirebird / TSQLServer / TOracle - now real ODBC-backed classes, defined in
+// db_odbc.prg as TODBCDatabase subclasses (included near the top of this file).
+// The former libfbclient/FreeTDS/OCI stubs were removed.
 //----------------------------------------------------------------------------//
-
-CLASS TFirebird INHERIT TDatabase
-   METHOD New() CONSTRUCTOR
-   METHOD Open()
-ENDCLASS
-
-METHOD New() CLASS TFirebird
-   ::cDriver := "Firebird"
-   ::nPort   := 3050
-return Self
-
-METHOD Open() CLASS TFirebird
-   ::cLastError := "Firebird support requires libfbclient. Install with: apt install firebird-dev"
-return .F.
-
-//----------------------------------------------------------------------------//
-// TSQLServer - SQL Server connection (requires FreeTDS/ODBC)
-//----------------------------------------------------------------------------//
-
-CLASS TSQLServer INHERIT TDatabase
-   METHOD New() CONSTRUCTOR
-   METHOD Open()
-ENDCLASS
-
-METHOD New() CLASS TSQLServer
-   ::cDriver := "SQLServer"
-   ::nPort   := 1433
-return Self
-
-METHOD Open() CLASS TSQLServer
-   ::cLastError := "SQL Server support requires FreeTDS. Install with: apt install freetds-dev"
-return .F.
-
-//----------------------------------------------------------------------------//
-// TOracle - Oracle connection (requires OCI)
-//----------------------------------------------------------------------------//
-
-CLASS TOracle INHERIT TDatabase
-   METHOD New() CONSTRUCTOR
-   METHOD Open()
-ENDCLASS
-
-METHOD New() CLASS TOracle
-   ::cDriver := "Oracle"
-   ::nPort   := 1521
-return Self
-
-METHOD Open() CLASS TOracle
-   ::cLastError := "Oracle support requires Oracle Instant Client"
-return .F.
 
 //----------------------------------------------------------------------------//
 // TMongoDB - MongoDB connection (requires mongoc driver)

@@ -135,8 +135,32 @@ METHOD LastDiag() CLASS TODBCDatabase
    return AllTrim( cState ) + ": " + AllTrim( cText )
 
 METHOD BuildConnString() CLASS TODBCDatabase
-   // Task 2 fills the per-dialect templates; base returns cConnString as-is.
-   return ::cConnString
+   // An explicit cConnString always wins; otherwise template per dialect from
+   // the connection DATA. Subclasses set ::cDriver so the do-case picks a shape.
+   local cD, c
+   if ! Empty( ::cConnString )
+      return ::cConnString
+   endif
+   cD := Upper( ::cDriver )
+   do case
+   case "FIREBIRD" $ cD .or. "INTERBASE" $ cD
+      c := "Driver={" + ::cDriver + "};" + ;
+           "Dbname=" + ::cServer + "/" + LTrim( Str( ::nPort ) ) + ":" + ::cDatabase + ";" + ;
+           "Uid=" + ::cUser + ";Pwd=" + ::cPassword + ";"
+   case "SQL SERVER" $ cD
+      c := "Driver={" + ::cDriver + "};" + ;
+           "Server=" + ::cServer + "," + LTrim( Str( ::nPort ) ) + ";" + ;
+           "Database=" + ::cDatabase + ";" + ;
+           "Uid=" + ::cUser + ";Pwd=" + ::cPassword + ";TrustServerCertificate=yes;"
+   case "ORACLE" $ cD
+      c := "Driver={" + ::cDriver + "};" + ;
+           "Dbq=" + ::cServer + ":" + LTrim( Str( ::nPort ) ) + "/" + ::cDatabase + ";" + ;
+           "Uid=" + ::cUser + ";Pwd=" + ::cPassword + ";"
+   otherwise
+      c := "Driver={" + ::cDriver + "};DBQ=" + ::cDatabase + ";" + ;
+           "Uid=" + ::cUser + ";Pwd=" + ::cPassword + ";"
+   endcase
+   return c
 
 METHOD Open() CLASS TODBCDatabase
    local hEnv := nil, hDbc := nil, nRet, cOut := Space( 1024 )
@@ -288,3 +312,35 @@ STATIC FUNCTION _OdbcIsNumeric( nType )
    return nType == 2 .or. nType == 3 .or. nType == 4 .or. nType == 5 .or. ;
           nType == 6 .or. nType == 7 .or. nType == 8 .or. ;
           nType == -5 .or. nType == -6 .or. nType == -7
+
+//----------------------------------------------------------------------------//
+// TFirebird / TSQLServer / TOracle - friendly, IDE-facing names; the real
+// engine is TODBCDatabase. Each just sets the default ODBC driver name + port;
+// the user may override ::cDriver / ::cConnString to match a local install.
+//----------------------------------------------------------------------------//
+CLASS TFirebird INHERIT TODBCDatabase
+   METHOD New() CONSTRUCTOR
+ENDCLASS
+METHOD New() CLASS TFirebird
+   ::Super:New()
+   ::cDriver := "Firebird/InterBase(r) driver"
+   ::nPort   := 3050
+   return Self
+
+CLASS TSQLServer INHERIT TODBCDatabase
+   METHOD New() CONSTRUCTOR
+ENDCLASS
+METHOD New() CLASS TSQLServer
+   ::Super:New()
+   ::cDriver := "ODBC Driver 18 for SQL Server"
+   ::nPort   := 1433
+   return Self
+
+CLASS TOracle INHERIT TODBCDatabase
+   METHOD New() CONSTRUCTOR
+ENDCLASS
+METHOD New() CLASS TOracle
+   ::Super:New()
+   ::cDriver := "Microsoft ODBC for Oracle"
+   ::nPort   := 1521
+   return Self
