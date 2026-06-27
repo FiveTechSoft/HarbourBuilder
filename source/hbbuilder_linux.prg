@@ -17,6 +17,7 @@
 // +--------------------------------------------------------------+ 768
 
 #include "../include/hbbuilder.ch"
+#include "../include/hbide.ch"
 
 static oIDE          // Main IDE bar (top strip)
 static oDesignForm   // Design form (active, floats on top of editor)
@@ -340,8 +341,8 @@ static function CreatePalette()
    oPal:AddComp( nTab, "Grp",  "GroupBox",    6 )
    oPal:AddComp( nTab, "Pnl",  "Panel",      25 )
    oPal:AddComp( nTab, "SB",   "ScrollBar",  26 )
-   oPal:AddComp( nTab, "Mnu", "MainMenu",  132 )
-   oPal:AddComp( nTab, "Pop", "PopupMenu", 136 )
+   oPal:AddComp( nTab, "Mnu", "MainMenu",  CT_MAINMENU )
+   oPal:AddComp( nTab, "Pop", "PopupMenu", CT_POPUPMENU )
 
    // Additional tab (C++Builder)
    nTab := oPal:AddTab( "Additional" )
@@ -806,7 +807,7 @@ static function RegenerateFormCode( cName, hForm )
 
          cCtrlName  := UI_GetProp( hCtrl, "cName" )
          cCtrlClass := UI_GetProp( hCtrl, "cClassName" )
-         nType      := UI_GetType( hCtrl )
+         nType      := HB_NormalizeCtrlType( UI_GetType( hCtrl ) )
          if Empty( cCtrlName ); cCtrlName := "ctrl" + LTrim(Str(i)); endif
 
          // OF clause: "Self" or "::oFolder:aPages[N]" for paged children
@@ -851,7 +852,7 @@ static function RegenerateFormCode( cName, hForm )
                cCreate += e
             case nType == 1
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
-                  ' SAY ::o' + cCtrlName + ' PROMPT "' + cText + '" OF Self SIZE ' + ;
+                  ' SAY ::o' + cCtrlName + ' PROMPT ' + HB_QHarbourStr( cText ) + ' OF Self SIZE ' + ;
                   LTrim(Str(nCW)) + e
             case nType == 2
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
@@ -859,11 +860,11 @@ static function RegenerateFormCode( cName, hForm )
                   LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
             case nType == 3
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
-                  ' BUTTON ::o' + cCtrlName + ' PROMPT "' + cText + '" OF Self SIZE ' + ;
+                  ' BUTTON ::o' + cCtrlName + ' PROMPT ' + HB_QHarbourStr( cText ) + ' OF Self SIZE ' + ;
                   LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
             case nType == 4
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
-                  ' CHECKBOX ::o' + cCtrlName + ' PROMPT "' + cText + '" OF Self SIZE ' + ;
+                  ' CHECKBOX ::o' + cCtrlName + ' PROMPT ' + HB_QHarbourStr( cText ) + ' OF Self SIZE ' + ;
                   LTrim(Str(nCW)) + e
             case nType == 5  // ComboBox
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
@@ -924,7 +925,7 @@ static function RegenerateFormCode( cName, hForm )
                endif
             case nType == 6
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
-                  ' GROUPBOX ::o' + cCtrlName + ' PROMPT "' + cText + '" OF Self SIZE ' + ;
+                  ' GROUPBOX ::o' + cCtrlName + ' PROMPT ' + HB_QHarbourStr( cText ) + ' OF Self SIZE ' + ;
                   LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
             case nType == 79  // Browse
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
@@ -983,7 +984,7 @@ static function RegenerateFormCode( cName, hForm )
                   cCreate += ' URL "' + cVal + '"'
                endif
                cCreate += e
-            case nType == 132  // CT_MAINMENU
+            case nType == CT_MAINMENU
                cCreate += '   COMPONENT ::o' + cCtrlName + ' TYPE CT_MAINMENU OF Self  // TMainMenu' + e
                cVal := UI_GetProp( hCtrl, "aMenuItems" )
                if ValType( cVal ) == "C" .and. ! Empty( cVal )
@@ -1018,10 +1019,10 @@ static function RegenerateFormCode( cName, hForm )
                            endif
                         endif
                         if nLv == 0 .or. bIsPopup
-                           cCreate += cInd + 'DEFINE POPUP "' + cCap + '"' + e
+                           cCreate += cInd + 'DEFINE POPUP ' + HB_QHarbourStr( cCap ) + e
                            AAdd( nPendingLevels, nLv )
                         else
-                           cCreate += cInd + 'MENUITEM "' + cCap + '"'
+                           cCreate += cInd + 'MENUITEM ' + HB_QHarbourStr( cCap )
                            if ! Empty( cHndl )
                               if ":" $ cHndl .or. "(" $ cHndl
                                  cCreate += ' ACTION ' + cHndl
@@ -1034,7 +1035,7 @@ static function RegenerateFormCode( cName, hForm )
                               endif
                            endif
                            if ! Empty( cScut )
-                              cCreate += ' ACCEL "' + cScut + '"'
+                              cCreate += ' ACCEL ' + HB_QHarbourStr( cScut )
                            endif
                            cCreate += e
                         endif
@@ -1048,7 +1049,7 @@ static function RegenerateFormCode( cName, hForm )
                   enddo
                   cCreate += '   END MENUBAR' + e
                endif
-            case nType == 136  // CT_POPUPMENU
+            case nType == CT_POPUPMENU
                cCreate += '   COMPONENT ::o' + cCtrlName + ' TYPE CT_POPUPMENU OF Self  // TPopupMenu' + e
                cVal := UI_GetProp( hCtrl, "aMenuItems" )
                if ValType( cVal ) == "C" .and. ! Empty( cVal )
@@ -1081,10 +1082,10 @@ static function RegenerateFormCode( cName, hForm )
                            endif
                         endif
                         if bIsPopup
-                           cCreate += cInd + 'DEFINE POPUP "' + cCap + '"' + e
+                           cCreate += cInd + 'DEFINE POPUP ' + HB_QHarbourStr( cCap ) + e
                            AAdd( nPendingLevels, nLv )
                         else
-                           cCreate += cInd + 'MENUITEM "' + cCap + '"'
+                           cCreate += cInd + 'MENUITEM ' + HB_QHarbourStr( cCap )
                            if ! Empty( cHndl )
                               if ":" $ cHndl .or. "(" $ cHndl
                                  cCreate += ' ACTION ' + cHndl
@@ -1097,7 +1098,7 @@ static function RegenerateFormCode( cName, hForm )
                               endif
                            endif
                            if ! Empty( cScut )
-                              cCreate += ' ACCEL "' + cScut + '"'
+                              cCreate += ' ACCEL ' + HB_QHarbourStr( cScut )
                            endif
                            cCreate += e
                         endif
@@ -1164,7 +1165,7 @@ static function RegenerateFormCode( cName, hForm )
          cVal := UI_GetProp( hCtrl, "oFont" )
          if ! Empty( cVal ) .and. cVal != "System,12" .and. ;
             cVal != "Segoe UI,12" .and. cVal != "Segoe UI,9" .and. cVal != "Sans,12"
-            cCreate += '   ::o' + cCtrlName + ':oFont := "' + cVal + '"' + e
+            cCreate += '   ::o' + cCtrlName + ':oFont := ' + HB_QHarbourStr( cVal ) + e
          endif
 
          // Scan for event handlers matching this control
@@ -1393,19 +1394,7 @@ return cAll
 
 // Determine what kind of tab is at position nTab
 static function TabInfo( nTab )
-
-   local nF := Len( aForms )
-   local nM := Len( aModules )
-
-   if nTab == 1
-      return { "project", 0 }
-   elseif nTab <= nF + 1
-      return { "form", nTab - 1 }
-   elseif nTab <= nF + nM + 1
-      return { "module", nTab - nF - 1 }
-   endif
-
-return { "openfile", nTab - nF - nM - 1 }
+return HB_ProjectTabInfo( nTab, Len( aForms ), Len( aModules ) )
 
 static function OnEventDblClick( hCtrl, cEvent )
 
@@ -2175,7 +2164,7 @@ static function RestoreFormFromCode( hForm, cCode )
             nCC := UI_GetChildCount( hForm )
             for jjC := nCC to 1 step -1
                hC := UI_GetChild( hForm, jjC )
-               if UI_GetType(hC) == 132  // CT_MAINMENU
+               if HB_NormalizeCtrlType( UI_GetType(hC) ) == CT_MAINMENU
                   UI_SetProp( hC, "aMenuItems", cMenuSerial )
                   exit
                endif
@@ -2254,7 +2243,7 @@ static function RestoreFormFromCode( hForm, cCode )
             nCC := UI_GetChildCount( hForm )
             for jjC := nCC to 1 step -1
                hC := UI_GetChild( hForm, jjC )
-               if UI_GetType(hC) == 136  // CT_POPUPMENU
+               if HB_NormalizeCtrlType( UI_GetType(hC) ) == CT_POPUPMENU
                   UI_SetProp( hC, "aMenuItems", cMenuSerial )
                   exit
                endif
@@ -4174,35 +4163,6 @@ function _InsGetEditorCode()
    endif
 
 return ""
-
-static function ComponentTypeFromName( cName )
-   do case
-      case cName == "CT_TIMER";         return 38
-      case cName == "CT_PAINTBOX";      return 39
-      case cName == "CT_OPENDIALOG";    return 40
-      case cName == "CT_SAVEDIALOG";    return 41
-      case cName == "CT_FONTDIALOG";    return 42
-      case cName == "CT_COLORDIALOG";   return 43
-      case cName == "CT_FINDDIALOG";    return 44
-      case cName == "CT_REPLACEDIALOG"; return 45
-      case cName == "CT_DBFTABLE";      return 53
-      case cName == "CT_MYSQL";         return 54
-      case cName == "CT_MARIADB";       return 55
-      case cName == "CT_POSTGRESQL";    return 56
-      case cName == "CT_SQLITE";        return 57
-      case cName == "CT_FIREBIRD";      return 58
-      case cName == "CT_SQLSERVER";     return 59
-      case cName == "CT_ORACLE";        return 60
-      case cName == "CT_MONGODB";       return 61
-      case cName == "CT_WEBVIEW";       return 62
-      case cName == "CT_WEBSERVER";     return 63
-      case cName == "CT_WEBSOCKET";     return 64
-      case cName == "CT_HTTPCLIENT";    return 65
-      case cName == "CT_COMPARRAY";     return 131
-      case cName == "CT_MAINMENU";      return 132
-      case cName == "CT_POPUPMENU";     return 136
-   endcase
-return 0
 
 // Framework
 #include "core/classes.prg"

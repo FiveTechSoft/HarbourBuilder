@@ -91,10 +91,12 @@ NEED_LINK=0
 
 # [1/4] Harbour → C (only if .prg changed)
 if needs_rebuild "${SRC}.prg" "${SRC}.c" || \
+   needs_rebuild "$PROJDIR/source/hbbuilder_common.prg" "${SRC}.c" || \
    needs_rebuild "$PROJDIR/source/core/classes.prg" "${SRC}.c" || \
-   needs_rebuild "$PROJDIR/include/hbbuilder.ch" "${SRC}.c"; then
+   needs_rebuild "$PROJDIR/include/hbbuilder.ch" "${SRC}.c" || \
+   needs_rebuild "$PROJDIR/include/hbide.ch" "${SRC}.c"; then
    echo "[1/4] Compiling ${SRC}.prg..."
-   "$HBBIN/harbour" ${SRC}.prg -n -w -q \
+   "$HBBIN/harbour" "$PROJDIR/source/hbbuilder_common.prg" ${SRC}.prg -n -w -q \
       -I"$HBINC" \
       -I"$PROJDIR/include" \
       -I"$PROJDIR/source/core" \
@@ -155,6 +157,7 @@ if needs_rebuild "$PROJDIR/source/backends/cocoa/cocoa_core.m" cocoa_core.o; the
    echo "[3/4] Compiling cocoa_core.m..."
    clang -c -O2 -mmacosx-version-min=10.15 -fobjc-arc \
       -I"$HBINC" \
+      -I"$PROJDIR/include" \
       "$PROJDIR/source/backends/cocoa/cocoa_core.m" -o cocoa_core.o
    NEED_LINK=1
 else

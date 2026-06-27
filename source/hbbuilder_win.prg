@@ -17,6 +17,7 @@
 // +--------------------------------------------------------------+ 768
 
 #include "../include/hbbuilder.ch"
+#include "../include/hbide.ch"
 
 REQUEST HB_GT_GUI_DEFAULT
 
@@ -35,6 +36,8 @@ static lSyncingFromCode := .f.  // Guard: true while syncing code editor -> form
 // Each entry: { cName, oForm, cCode, nFormX, nFormY }
 static aForms        // Array of form entries
 static nActiveForm   // Index of active form (1-based)
+static aModules      // Array of project modules: { { cName, cCode, cFilePath }, ... }
+static aOpenFiles    // Array of open files (not in project): { { cName, cCode, cFilePath }, ... }
 static lDarkMode := .T.   // Dark mode state for toggle
 static cSelectedCompiler := ""  // "", "msvc", "bcc" (empty = auto-detect)
 static nSelectedCompIdx := 0    // index into aCompilers (0 = auto)
@@ -105,6 +108,8 @@ function Main()
    cCurrentFile := ""
    aForms := {}
    nActiveForm := 0
+   aModules := {}
+   aOpenFiles := {}
 
    // Proportional scale: reference 1920x1080 physical. Clamp + dampen so
    // high-DPI screens don't blow widgets up to absurd sizes.
@@ -173,9 +178,12 @@ function Main()
    DEFINE POPUP oFile PROMPT "&File" OF oIDE
    MENUITEM "&New Application"       OF oFile ACTION TBNew()
    MENUITEM "New &Form"              OF oFile ACTION MenuNewForm()
+   MENUITEM "Add &Module..."         OF oFile ACTION MenuAddModule()
    MENUSEPARATOR OF oFile
    MENUITEM "&Open..."               OF oFile ACTION TBOpen()
    MENUITEM "Reopen &Last Project"   OF oFile ACTION ReopenLastProject()
+   MENUITEM "Open &File..."          OF oFile ACTION MenuOpenFile()
+   MENUITEM "&Close File"            OF oFile ACTION MenuCloseFile()
    MENUITEM "&Save"                  OF oFile ACTION TBSave()
    MENUITEM "Save &As..."            OF oFile ACTION TBSaveAs()
    MENUSEPARATOR OF oFile
@@ -1001,7 +1009,7 @@ static function RegenerateFormCode( cName, hForm )
 
          cCtrlName  := AllTrim( UI_GetProp( hCtrl, "cName" ) )
          cCtrlClass := AllTrim( UI_GetProp( hCtrl, "cClassName" ) )
-         nType      := UI_GetType( hCtrl )
+         nType      := HB_NormalizeCtrlType( UI_GetType( hCtrl ) )
          if Empty( cCtrlName ); cCtrlName := "ctrl" + LTrim(Str(i)); endif
 
          // Report controls (label/field/image inside a band) are serialized
@@ -1044,19 +1052,19 @@ static function RegenerateFormCode( cName, hForm )
          do case
             case nType == 1  // Label
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
-                  ' SAY ::o' + cCtrlName + ' PROMPT "' + cText + '" OF Self SIZE ' + ;
+                  ' SAY ::o' + cCtrlName + ' PROMPT ' + HB_QHarbourStr( cText ) + ' OF Self SIZE ' + ;
                   LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
             case nType == 2  // Edit
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
-                  ' GET ::o' + cCtrlName + ' VAR "' + cText + '" OF Self SIZE ' + ;
+                  ' GET ::o' + cCtrlName + ' VAR ' + HB_QHarbourStr( cText ) + ' OF Self SIZE ' + ;
                   LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
             case nType == 3  // Button
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
-                  ' BUTTON ::o' + cCtrlName + ' PROMPT "' + cText + '" OF Self SIZE ' + ;
+                  ' BUTTON ::o' + cCtrlName + ' PROMPT ' + HB_QHarbourStr( cText ) + ' OF Self SIZE ' + ;
                   LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
             case nType == 4  // CheckBox
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
-                  ' CHECKBOX ::o' + cCtrlName + ' PROMPT "' + cText + '" OF Self SIZE ' + ;
+                  ' CHECKBOX ::o' + cCtrlName + ' PROMPT ' + HB_QHarbourStr( cText ) + ' OF Self SIZE ' + ;
                   LTrim(Str(nCW))
                if ValType( UI_GetProp( hCtrl, "lChecked" ) ) == "L" .and. UI_GetProp( hCtrl, "lChecked" )
                   cCreate += ' CHECKED'
@@ -1071,7 +1079,7 @@ static function RegenerateFormCode( cName, hForm )
                   cCreate += ' ITEMS '
                   for kk := 1 to Len( hb_ATokens( cVal, "|" ) )
                      if kk > 1; cCreate += ', '; endif
-                     cCreate += '"' + hb_ATokens( cVal, "|" )[ kk ] + '"'
+                     cCreate += HB_QHarbourStr( hb_ATokens( cVal, "|" )[ kk ] )
                   next
                endif
                cCreate += e
@@ -1081,7 +1089,7 @@ static function RegenerateFormCode( cName, hForm )
                endif
             case nType == 6  // GroupBox
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
-                  ' GROUPBOX ::o' + cCtrlName + ' PROMPT "' + cText + '" OF Self SIZE ' + ;
+                  ' GROUPBOX ::o' + cCtrlName + ' PROMPT ' + HB_QHarbourStr( cText ) + ' OF Self SIZE ' + ;
                   LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
             case nType == 33  // Folder / TPageControl (CT_TABCONTROL2)
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
@@ -1092,7 +1100,7 @@ static function RegenerateFormCode( cName, hForm )
                   cCreate += ' PROMPTS '
                   for kk := 1 to Len( hb_ATokens( cVal, "|" ) )
                      if kk > 1; cCreate += ', '; endif
-                     cCreate += '"' + hb_ATokens( cVal, "|" )[ kk ] + '"'
+                     cCreate += HB_QHarbourStr( hb_ATokens( cVal, "|" )[ kk ] )
                   next
                endif
                cCreate += e
@@ -1105,7 +1113,7 @@ static function RegenerateFormCode( cName, hForm )
                   cCreate += ' ITEMS '
                   for kk := 1 to Len( hb_ATokens( cVal, "|" ) )
                      if kk > 1; cCreate += ', '; endif
-                     cCreate += '"' + hb_ATokens( cVal, "|" )[ kk ] + '"'
+                     cCreate += HB_QHarbourStr( hb_ATokens( cVal, "|" )[ kk ] )
                   next
                endif
                cCreate += e
@@ -1115,7 +1123,7 @@ static function RegenerateFormCode( cName, hForm )
                endif
             case nType == 8  // RadioButton
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
-                  ' RADIOBUTTON ::o' + cCtrlName + ' PROMPT "' + cText + '" OF Self SIZE ' + ;
+                  ' RADIOBUTTON ::o' + cCtrlName + ' PROMPT ' + HB_QHarbourStr( cText ) + ' OF Self SIZE ' + ;
                   LTrim(Str(nCW))
                if ValType( UI_GetProp( hCtrl, "lChecked" ) ) == "L" .and. UI_GetProp( hCtrl, "lChecked" )
                   cCreate += ' CHECKED'
@@ -1123,7 +1131,7 @@ static function RegenerateFormCode( cName, hForm )
                cCreate += e
             case nType == 12  // BitBtn
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
-                  ' BITBTN ::o' + cCtrlName + ' PROMPT "' + cText + '" OF Self SIZE ' + ;
+                  ' BITBTN ::o' + cCtrlName + ' PROMPT ' + HB_QHarbourStr( cText ) + ' OF Self SIZE ' + ;
                   LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
             case nType == 14  // Image
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
@@ -1150,7 +1158,7 @@ static function RegenerateFormCode( cName, hForm )
                   cCreate += ' COLUMNS '
                   for kk := 1 to Len( hb_ATokens( cVal, "|" ) )
                      if kk > 1; cCreate += ', '; endif
-                     cCreate += '"' + hb_ATokens( cVal, "|" )[ kk ] + '"'
+                     cCreate += HB_QHarbourStr( hb_ATokens( cVal, "|" )[ kk ] )
                   next
                endif
                cVal := UI_GetProp( hCtrl, "aItems" )
@@ -1158,7 +1166,7 @@ static function RegenerateFormCode( cName, hForm )
                   cCreate += ' ITEMS '
                   for kk := 1 to Len( hb_ATokens( cVal, "|" ) )
                      if kk > 1; cCreate += ', '; endif
-                     cCreate += '"' + hb_ATokens( cVal, "|" )[ kk ] + '"'
+                     cCreate += HB_QHarbourStr( hb_ATokens( cVal, "|" )[ kk ] )
                   next
                endif
                cVal := UI_GetProp( hCtrl, "aImages" )
@@ -1166,7 +1174,7 @@ static function RegenerateFormCode( cName, hForm )
                   cCreate += ' IMAGES '
                   for kk := 1 to Len( hb_ATokens( cVal, "|" ) )
                      if kk > 1; cCreate += ', '; endif
-                     cCreate += '"' + hb_ATokens( cVal, "|" )[ kk ] + '"'
+                     cCreate += HB_QHarbourStr( hb_ATokens( cVal, "|" )[ kk ] )
                   next
                endif
                cCreate += e
@@ -1180,7 +1188,7 @@ static function RegenerateFormCode( cName, hForm )
                   LTrim(Str(nCW)) + ',' + LTrim(Str(nCH)) + e
             case nType == 24  // Memo
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
-                  ' MEMO ::o' + cCtrlName + ' VAR "' + cText + '" OF Self SIZE ' + ;
+                  ' MEMO ::o' + cCtrlName + ' VAR ' + HB_QHarbourStr( cText ) + ' OF Self SIZE ' + ;
                   LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
             case nType == 79  // Browse
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
@@ -1192,7 +1200,7 @@ static function RegenerateFormCode( cName, hForm )
                   cCreate += ' HEADERS '
                   for kk := 1 to Len( aHdrs )
                      if kk > 1; cCreate += ', '; endif
-                     cCreate += '"' + AllTrim( aHdrs[kk] ) + '"'
+                     cCreate += HB_QHarbourStr( AllTrim( aHdrs[kk] ) )
                   next
                endif
                nColCount := UI_BrowseColCount( hCtrl )
@@ -1209,7 +1217,7 @@ static function RegenerateFormCode( cName, hForm )
                cCreate += e
                cVal := UI_GetProp( hCtrl, "cDataSource" )
                if ! Empty( cVal )
-                  cCreate += '   ::o' + cCtrlName + ':cDataSource := "' + cVal + '"' + e
+                  cCreate += '   ::o' + cCtrlName + ':cDataSource := ' + HB_QHarbourStr( cVal ) + e
                endif
             case nType == 200  // CT_MAINMENU (same as macOS — DEFINE MENUBAR DSL)
                cVal := UI_GetProp( hCtrl, "aMenuItems" )
@@ -1245,10 +1253,10 @@ static function RegenerateFormCode( cName, hForm )
                            endif
                         endif
                         if nLv == 0 .or. bIsPopup
-                           cCreate += cInd + 'DEFINE POPUP "' + cCap + '"' + e
+                           cCreate += cInd + 'DEFINE POPUP ' + HB_QHarbourStr( cCap ) + e
                            AAdd( nPendingLevels, nLv )
                         else
-                           cCreate += cInd + 'MENUITEM "' + cCap + '"'
+                           cCreate += cInd + 'MENUITEM ' + HB_QHarbourStr( cCap )
                            if ! Empty( cHndl )
                               if ":" $ cHndl .or. "(" $ cHndl
                                  cCreate += ' ACTION ' + cHndl
@@ -1261,7 +1269,7 @@ static function RegenerateFormCode( cName, hForm )
                               endif
                            endif
                            if ! Empty( cScut )
-                              cCreate += ' ACCEL "' + cScut + '"'
+                              cCreate += ' ACCEL ' + HB_QHarbourStr( cScut )
                            endif
                            cCreate += e
                         endif
@@ -1307,10 +1315,10 @@ static function RegenerateFormCode( cName, hForm )
                            endif
                         endif
                         if bIsPopup
-                           cCreate += cInd + 'DEFINE POPUP "' + cCap + '"' + e
+                           cCreate += cInd + 'DEFINE POPUP ' + HB_QHarbourStr( cCap ) + e
                            AAdd( nPendingLevels, nLv )
                         else
-                           cCreate += cInd + 'MENUITEM "' + cCap + '"'
+                           cCreate += cInd + 'MENUITEM ' + HB_QHarbourStr( cCap )
                            if ! Empty( cHndl )
                               if ":" $ cHndl .or. "(" $ cHndl
                                  cCreate += ' ACTION ' + cHndl
@@ -1323,7 +1331,7 @@ static function RegenerateFormCode( cName, hForm )
                               endif
                            endif
                            if ! Empty( cScut )
-                              cCreate += ' ACCEL "' + cScut + '"'
+                              cCreate += ' ACCEL ' + HB_QHarbourStr( cScut )
                            endif
                            cCreate += e
                         endif
@@ -1341,8 +1349,8 @@ static function RegenerateFormCode( cName, hForm )
                if ValType( cVal ) == "C"  // TMainMenu — discriminate by aMenuItems property
                   cCreate += '   COMPONENT ::o' + cCtrlName + ' TYPE CT_MAINMENU OF Self  // TMainMenu' + e
                   if ! Empty( cVal )
-                     cCreate += '   ::o' + cCtrlName + ':aMenuItems := "' + ;
-                                StrTran( cVal, Chr(1), '"+Chr(1)+"' ) + '"' + e
+                     cCreate += '   ::o' + cCtrlName + ':aMenuItems := ' + ;
+                                HB_QHarbourStr( cVal ) + e
                      // aOnClick auto-built by _HBMenuEnd from per-item bAction
                      // (this legacy string-assign path skips DEFINE MENUBAR — no auto-build)
                   endif
@@ -1352,7 +1360,7 @@ static function RegenerateFormCode( cName, hForm )
                      LTrim(Str(nCW)) + ", " + LTrim(Str(nCH))
                   cVal := UI_GetProp( hCtrl, "cBandType" )
                   if ! Empty( cVal ) .and. cVal != "Detail"
-                     cCreate += ' TYPE "' + cVal + '"'
+                     cCreate += ' TYPE ' + HB_QHarbourStr( cVal )
                   endif
                   cCreate += e
                   cBandFields := UI_GetProp( hCtrl, "aData" )
@@ -1364,15 +1372,15 @@ static function RegenerateFormCode( cName, hForm )
                         aBandRec := hb_ATokens( cBandFldLine, "|" )
                         if Len( aBandRec ) >= 14
                            cCreate += '   REPORTFIELD ::o' + aBandRec[1] + ;
-                              ' TYPE "' + aBandRec[2] + '"'
+                              ' TYPE ' + HB_QHarbourStr( aBandRec[2] )
                            if ! Empty( aBandRec[3] )
-                              cCreate += ' PROMPT "' + aBandRec[3] + '"'
+                              cCreate += ' PROMPT ' + HB_QHarbourStr( aBandRec[3] )
                            endif
                            if ! Empty( aBandRec[4] )
-                              cCreate += ' FIELD "' + aBandRec[4] + '"'
+                              cCreate += ' FIELD ' + HB_QHarbourStr( aBandRec[4] )
                            endif
                            if ! Empty( aBandRec[5] )
-                              cCreate += ' FORMAT "' + aBandRec[5] + '"'
+                              cCreate += ' FORMAT ' + HB_QHarbourStr( aBandRec[5] )
                            endif
                            cCreate += ' OF ::o' + cCtrlName + ;
                               ' AT ' + aBandRec[6] + ',' + aBandRec[7] + ;
@@ -1452,7 +1460,7 @@ static function RegenerateFormCode( cName, hForm )
             // Emit oFont if non-default
             cVal := UI_GetProp( hCtrl, "oFont" )
             if ! Empty( cVal ) .and. cVal != "System,12" .and. cVal != "Segoe UI,9"
-               cCreate += '   ::o' + cCtrlName + ':oFont := "' + cVal + '"' + e
+               cCreate += '   ::o' + cCtrlName + ':oFont := ' + HB_QHarbourStr( cVal ) + e
             endif
 
             // Emit lTransparent for labels
@@ -1679,6 +1687,11 @@ function INS_DeleteHandler( cHandler )
 
 return nil
 
+// Determine what type of tab nTab refers to: { cType, nIndex }
+// cType: "project", "form", "module", "openfile"
+static function TabInfo( nTab )
+return HB_ProjectTabInfo( nTab, Len( aForms ), Len( aModules ) )
+
 // Return all editor code for inspector event handler checking
 function INS_GetAllCode()
 
@@ -1688,6 +1701,9 @@ function INS_GetAllCode()
    for i := 1 to Len( aForms )
       cAll += aForms[i][3]  // Form code from memory
       cAll += CodeEditorGetTabText( hCodeEditor, i + 1 )  // Editor tab
+   next
+   for i := 1 to Len( aModules )
+      cAll += CodeEditorGetTabText( hCodeEditor, 1 + Len(aForms) + i )
    next
 
 return cAll
@@ -2180,19 +2196,19 @@ static function OnEditorTextChange( hEd, nTab )
 
 return nil
 
-// Editor tab changed: switch to the corresponding form
+// Editor tab changed: route to form, module, or open file
 static function OnEditorTabChange( hEd, nTab )
 
-   local nFormIdx
+   local aInfo := TabInfo( nTab )
 
-   // Tab 1 = Project1.prg (no form switch needed)
-   // Tab 2+ = Form1.prg, Form2.prg...
-   if nTab > 1
-      nFormIdx := nTab - 1
-      if nFormIdx != nActiveForm .and. nFormIdx <= Len( aForms )
-         SwitchToForm( nFormIdx )
+   do case
+   case aInfo[1] == "form"
+      if aInfo[2] != nActiveForm .and. aInfo[2] <= Len( aForms )
+         SwitchToForm( aInfo[2] )
       endif
-   endif
+   case aInfo[1] == "module" .or. aInfo[1] == "openfile"
+      SaveActiveFormCode()
+   endcase
 
 return nil
 
@@ -2348,6 +2364,8 @@ static function TBNew()
    next
    aForms := {}
    nActiveForm := 0
+   aModules := {}
+   aOpenFiles := {}
 
    // Calculate position for Form1
    nInsW := Int( nScreenW * 0.18 )
@@ -3244,6 +3262,7 @@ static function OpenProjectFile( cFile )
    local cContent, cDir, aLines, i
    local cFormName, cFormCode, nFormX, nFormY
    local nInsW, nInsTop, nEditorTop, nEditorX, nEditorW, nEditorH
+   local lInModules
 
    if Empty( cFile ) .or. ! File( cFile )
       MsgInfo( "Project file not found: " + Chr(10) + cFile, "HbBuilder" )
@@ -3264,6 +3283,8 @@ static function OpenProjectFile( cFile )
    next
    aForms := {}
    nActiveForm := 0
+   aModules := {}
+   aOpenFiles := {}
 
    // Clear editor tabs
    CodeEditorClearTabs( hCodeEditor )
@@ -3276,7 +3297,7 @@ static function OpenProjectFile( cFile )
    nEditorW := nScreenW - nEditorX
    nEditorH := nScreenH - nEditorTop
 
-   // Read project file: each line is a form name (Form1, Form2...)
+   // Read project file: forms then optional [modules] section
    aLines := HB_ATokens( cContent, Chr(10) )
 
    // Load Project1.prg
@@ -3289,6 +3310,7 @@ static function OpenProjectFile( cFile )
    for i := 2 to Len( aLines )
       cFormName := AllTrim( StrTran( aLines[i], Chr(13), "" ) )
       if Empty( cFormName ); loop; endif
+      if Lower( cFormName ) == "[modules]"; exit; endif
 
       // Read form code
       cFormCode := MemoRead( cDir + cFormName + ".prg" )
@@ -3331,6 +3353,25 @@ static function OpenProjectFile( cFile )
       // design form after Open never updated ::nLeft / ::nTop before save.
       oDesignForm:OnResize := { || SyncDesignerToCode(), ;
          InspectorRefresh( oDesignForm:hCpp ) }
+   next
+
+   // Load modules
+   aModules := {}
+   lInModules := .F.
+   for i := 2 to Len( aLines )
+      cFormName := AllTrim( StrTran( aLines[i], Chr(13), "" ) )
+      if Empty( cFormName ); loop; endif
+      if Lower( cFormName ) == "[modules]"
+         lInModules := .T.
+         loop
+      endif
+      if lInModules
+         cFormCode := MemoRead( cDir + cFormName + ".prg" )
+         if Empty( cFormCode ); loop; endif
+         AAdd( aModules, { cFormName, cFormCode, cDir + cFormName + ".prg" } )
+         CodeEditorAddTab( hCodeEditor, cFormName + ".prg" )
+         CodeEditorSetTabText( hCodeEditor, 1 + Len(aForms) + Len(aModules), cFormCode )
+      endif
    next
 
    // Activate first form
@@ -3513,7 +3554,7 @@ static function AppendErrorLog( cMsg )
 return nil
 static function TBSave()
 
-   local cDir, cFile, cHbp, i
+   local cDir, cFile, cHbp, i, aFormNames := {}, aModNames := {}
 
    // Sync current form code. SyncDesignerToCode first so the live
    // designer state (including any post-Open form drag) is captured,
@@ -3534,10 +3575,13 @@ static function TBSave()
    LogTrace( "TBSave: file=[" + cCurrentFile + "] dir=[" + cDir + "]" )
 
    // Write .hbp file (project index)
-   cHbp := "Project1" + Chr(10)
    for i := 1 to Len( aForms )
-      cHbp += aForms[i][1] + Chr(10)
+      AAdd( aFormNames, aForms[i][1] )
    next
+   for i := 1 to Len( aModules )
+      AAdd( aModNames, aModules[i][1] )
+   next
+   cHbp := HB_BuildHbpIndex( aFormNames, aModNames )
    MemoWrit( cCurrentFile, cHbp )
    LogTrace( "  .hbp written" )
 
@@ -3549,6 +3593,13 @@ static function TBSave()
    for i := 1 to Len( aForms )
       MemoWrit( cDir + aForms[i][1] + ".prg", aForms[i][3] )
       LogTrace( "  " + aForms[i][1] + ".prg written" )
+   next
+
+   // Write each module .prg
+   for i := 1 to Len( aModules )
+      aModules[i][2] := CodeEditorGetTabText( hCodeEditor, 1 + Len(aForms) + i )
+      MemoWrit( cDir + aModules[i][1] + ".prg", aModules[i][2] )
+      LogTrace( "  " + aModules[i][1] + ".prg (module) written" )
    next
 
    LogTrace( "  Save complete." )
@@ -3882,6 +3933,9 @@ static function TBRun()
    for i := 1 to Len( aForms )
       cAllCode += aForms[i][3]
    next
+   for i := 1 to Len( aModules )
+      cAllCode += CodeEditorGetTabText( hCodeEditor, 1 + Len(aForms) + i )
+   next
    // Include compiler and framework in hash so changes force rebuild
    cAllCode += DetectCompiler() + LTrim( Str( nSelectedCompIdx ) )
    cAllCode += MemoRead( "c:\HarbourBuilder\source\core\classes.prg" )
@@ -4034,6 +4088,11 @@ static function TBRun()
       MemoWrit( cBuildDir + "\" + aForms[i][1] + ".prg", aForms[i][3] )
       cLog += "    " + aForms[i][1] + ".prg" + Chr(10)
    next
+   for i := 1 to Len( aModules )
+      aModules[i][2] := CodeEditorGetTabText( hCodeEditor, 1 + Len(aForms) + i )
+      MemoWrit( cBuildDir + "\" + aModules[i][1] + ".prg", aModules[i][2] )
+      cLog += "    " + aModules[i][1] + ".prg (module)" + Chr(10)
+   next
    W32_ShellExec( 'cmd /c copy "' + cProjDir + '\source\core\classes.prg" "' + cBuildDir + '\" >nul 2>&1' )
    W32_ShellExec( 'cmd /c copy "' + cProjDir + '\include\hbbuilder.ch" "' + cBuildDir + '\" >nul 2>&1' )
    W32_ShellExec( 'cmd /c copy "' + cProjDir + '\include\hbide.ch" "' + cBuildDir + '\" >nul 2>&1' )
@@ -4057,6 +4116,14 @@ static function TBRun()
    for i := 1 to Len( aForms )
       cFormCode := MemoRead( cBuildDir + "\" + aForms[i][1] + ".prg" )
       // Strip ---- separators and re-included headers (already in main.prg header)
+      cFormCode := StrTran( cFormCode, Chr(13) + Chr(10) + "----", "" )
+      cFormCode := StrTran( cFormCode, Chr(10) + "----", "" )
+      cFormCode := StrTran( cFormCode, '#include "hbbuilder.ch"', "" )
+      cFormCode := StrTran( cFormCode, '#include "classes.prg"', "" )
+      cAllPrg += cFormCode + Chr(10)
+   next
+   for i := 1 to Len( aModules )
+      cFormCode := MemoRead( cBuildDir + "\" + aModules[i][1] + ".prg" )
       cFormCode := StrTran( cFormCode, Chr(13) + Chr(10) + "----", "" )
       cFormCode := StrTran( cFormCode, Chr(10) + "----", "" )
       cFormCode := StrTran( cFormCode, '#include "hbbuilder.ch"', "" )
@@ -5021,6 +5088,9 @@ static function ShowProjectInspector()
    for i := 1 to Len( aForms )
       AAdd( aItems, "  " + aForms[i][1] + ".prg" )
    next
+   for i := 1 to Len( aModules )
+      AAdd( aItems, "  " + aModules[i][1] + ".prg (Module)" )
+   next
 
    W32_ProjectInspector( aItems )
 
@@ -5238,6 +5308,10 @@ static function TBDebugRun( lRunToBreak )
       MemoWrit( cBuildDir + "\" + aForms[i][1] + ".prg", ;
          CodeEditorGetTabText( hCodeEditor, i + 1 ) )
    next
+   for i := 1 to Len( aModules )
+      MemoWrit( cBuildDir + "\" + aModules[i][1] + ".prg", ;
+         CodeEditorGetTabText( hCodeEditor, 1 + Len(aForms) + i ) )
+   next
    W32_ShellExec( 'cmd /c copy "' + cProjDir + '\source\core\classes.prg" "' + cBuildDir + '\" >nul 2>&1' )
    W32_ShellExec( 'cmd /c copy "' + cProjDir + '\include\hbbuilder.ch" "' + cBuildDir + '\" >nul 2>&1' )
    W32_ShellExec( 'cmd /c copy "' + cProjDir + '\include\hbide.ch" "' + cBuildDir + '\" >nul 2>&1' )
@@ -5272,6 +5346,18 @@ static function TBDebugRun( lRunToBreak )
       AAdd( aDbgOffsets, { nCurLine, aForms[i][1] + ".prg", i + 1, 2 } )
       cSection := MemoRead( cBuildDir + "\" + aForms[i][1] + ".prg" )
       // Strip ---- separators and re-included headers
+      cSection := StrTran( cSection, Chr(13) + Chr(10) + "----", "" )
+      cSection := StrTran( cSection, Chr(10) + "----", "" )
+      cSection := StrTran( cSection, '#include "hbbuilder.ch"', "" )
+      cSection := StrTran( cSection, '#include "classes.prg"', "" )
+      cAllPrg += cSection + Chr(10)
+      nCurLine += NumLines( cSection ) + 1
+   next
+
+   // Module files
+   for i := 1 to Len( aModules )
+      AAdd( aDbgOffsets, { nCurLine, aModules[i][1] + ".prg", 1 + Len(aForms) + i, 2 } )
+      cSection := MemoRead( cBuildDir + "\" + aModules[i][1] + ".prg" )
       cSection := StrTran( cSection, Chr(13) + Chr(10) + "----", "" )
       cSection := StrTran( cSection, Chr(10) + "----", "" )
       cSection := StrTran( cSection, '#include "hbbuilder.ch"', "" )
@@ -7020,57 +7106,149 @@ static function TBSaveAs()
    TBSave()
 return nil
 
-// === Add/Remove from Project ===
+// Add a standalone .prg module to the project
+static function MenuAddModule()
 
-static function AddToProject()
-   local cFile := W32_OpenFileDialog( "Add File to Project", "Project1.prg", "prg" )
-   local cName, cCode, i
+   local cFile, cName, cCode, i, nTabPos
+
+   cFile := W32_OpenFileDialog( "Add Module to Project", "prg" )
    if Empty( cFile ); return nil; endif
-   cName := SubStr( cFile, RAt( "\", cFile ) + 1 )
-   if "." $ cName
-      cName := Left( cName, At( ".", cName ) - 1 )
-   endif
+
+   cName := HB_PrgBaseName( cFile )
+
    for i := 1 to Len( aForms )
       if Lower( aForms[i][1] ) == Lower( cName )
-         MsgInfo( cName + " is already in the project" )
+         MsgInfo( cName + " is already in the project (as a form)" )
          return nil
       endif
    next
+   for i := 1 to Len( aModules )
+      if Lower( aModules[i][1] ) == Lower( cName )
+         MsgInfo( cName + " is already in the project (as a module)" )
+         return nil
+      endif
+   next
+
    cCode := MemoRead( cFile )
    if Empty( cCode )
       cCode := "// " + cName + ".prg" + Chr(10)
    endif
+
+   AAdd( aModules, { cName, cCode, cFile } )
+
+   nTabPos := 1 + Len( aForms ) + Len( aModules )
    CodeEditorAddTab( hCodeEditor, cName + ".prg" )
-   CodeEditorSetTabText( hCodeEditor, Len(aForms) + 2, cCode )
-   CodeEditorSelectTab( hCodeEditor, Len(aForms) + 2 )
-   CodeEditorSetTabText( hCodeEditor, 1, GenerateProjectCode() )
+   CodeEditorSetTabText( hCodeEditor, nTabPos, cCode )
+   CodeEditorSelectTab( hCodeEditor, nTabPos )
+
+return nil
+
+// Open a .prg file for viewing/editing (not added to project)
+static function MenuOpenFile()
+
+   local cFile, cName, cCode, i, nTabPos
+
+   cFile := W32_OpenFileDialog( "Open File", "prg" )
+   if Empty( cFile ); return nil; endif
+
+   cName := HB_PrgBaseName( cFile )
+
+   for i := 1 to Len( aOpenFiles )
+      if Lower( aOpenFiles[i][3] ) == Lower( cFile )
+         CodeEditorSelectTab( hCodeEditor, 1 + Len(aForms) + Len(aModules) + i )
+         return nil
+      endif
+   next
+
+   cCode := MemoRead( cFile )
+   if Empty( cCode )
+      MsgInfo( "Could not read file: " + cFile )
+      return nil
+   endif
+
+   AAdd( aOpenFiles, { cName, cCode, cFile } )
+
+   nTabPos := 1 + Len( aForms ) + Len( aModules ) + Len( aOpenFiles )
+   CodeEditorAddTab( hCodeEditor, cName + ".prg" )
+   CodeEditorSetTabText( hCodeEditor, nTabPos, cCode )
+   CodeEditorSelectTab( hCodeEditor, nTabPos )
+
+return nil
+
+// Close the current open-file tab (only for open files, not forms/modules)
+static function MenuCloseFile()
+
+   local nTab, aInfo, nIdx
+
+   nTab := CodeEditorGetActiveTab( hCodeEditor )
+   aInfo := TabInfo( nTab )
+
+   if aInfo[1] != "openfile"
+      MsgInfo( "Only open files can be closed. Use 'Remove from Project' for forms and modules." )
+      return nil
+   endif
+
+   nIdx := aInfo[2]
+   if nIdx < 1 .or. nIdx > Len( aOpenFiles )
+      return nil
+   endif
+
+   CodeEditorRemoveTab( hCodeEditor, nTab )
+
+   ADel( aOpenFiles, nIdx )
+   ASize( aOpenFiles, Len(aOpenFiles) - 1 )
+
+return nil
+
+// === Add/Remove from Project ===
+
+static function AddToProject()
+   MenuAddModule()
 return nil
 
 static function RemoveFromProject()
+
    local aNames := {}, i, nSel
-   if Len( aForms ) <= 1
-      MsgInfo( "Cannot remove the last form" )
+
+   for i := 1 to Len( aForms )
+      AAdd( aNames, aForms[i][1] + ".prg (Form)" )
+   next
+   for i := 1 to Len( aModules )
+      AAdd( aNames, aModules[i][1] + ".prg (Module)" )
+   next
+
+   if Len( aNames ) == 0
+      MsgInfo( "No items to remove" )
       return nil
    endif
-   for i := 1 to Len( aForms )
-      AAdd( aNames, aForms[i][1] + ".prg" )
-   next
+
    nSel := W32_SelectFromList( "Remove from Project", aNames )
-   if nSel > 0 .and. nSel <= Len( aForms )
+   if nSel < 1; return nil; endif
+
+   if nSel <= Len( aForms )
+      if Len( aForms ) <= 1 .and. Len( aModules ) == 0
+         MsgInfo( "Cannot remove the last item from the project" )
+         return nil
+      endif
       aForms[nSel][2]:Destroy()
+      CodeEditorRemoveTab( hCodeEditor, nSel + 1 )
       ADel( aForms, nSel )
       ASize( aForms, Len(aForms) - 1 )
       if nActiveForm > Len( aForms )
-         nActiveForm := Len( aForms )
+         nActiveForm := Max( Len( aForms ), 1 )
       endif
-      CodeEditorClearTabs( hCodeEditor )
-      CodeEditorSetTabText( hCodeEditor, 1, GenerateProjectCode() )
-      for i := 1 to Len( aForms )
-         CodeEditorAddTab( hCodeEditor, aForms[i][1] + ".prg" )
-         CodeEditorSetTabText( hCodeEditor, i + 1, aForms[i][3] )
-      next
-      SwitchToForm( nActiveForm )
+      if nActiveForm > 0 .and. Len( aForms ) > 0
+         SwitchToForm( nActiveForm )
+      endif
+   else
+      i := nSel - Len( aForms )
+      CodeEditorRemoveTab( hCodeEditor, 1 + Len(aForms) + i )
+      ADel( aModules, i )
+      ASize( aModules, Len(aModules) - 1 )
    endif
+
+   CodeEditorSetTabText( hCodeEditor, 1, GenerateProjectCode() )
+
 return nil
 
 // === Components ===
@@ -7116,101 +7294,6 @@ function _InsGetEditorCode()
    endif
 
 return ""
-
-static function IsNonVisual( nType )
-   // Visual controls that have high CT_* numbers
-   // CT_BROWSE=79, CT_DBGRID=80, CT_DBNAVIGATOR=81, CT_DBTEXT=82,
-   // CT_DBEDIT=83, CT_DBCOMBOBOX=84, CT_DBCHECKBOX=85, CT_DBIMAGE=86,
-   // CT_WEBVIEW=62
-   if nType == 62 .or. ( nType >= 79 .and. nType <= 86 ) .or. nType == 132
-      return .F.
-   endif
-return nType >= 38
-
-static function ComponentTypeName( nType )
-   do case
-      case nType == 38;  return "CT_TIMER"
-      case nType == 39;  return "CT_PAINTBOX"
-      case nType == 40;  return "CT_OPENDIALOG"
-      case nType == 41;  return "CT_SAVEDIALOG"
-      case nType == 42;  return "CT_FONTDIALOG"
-      case nType == 43;  return "CT_COLORDIALOG"
-      case nType == 44;  return "CT_FINDDIALOG"
-      case nType == 45;  return "CT_REPLACEDIALOG"
-      case nType == 53;  return "CT_DBFTABLE"
-      case nType == 54;  return "CT_MYSQL"
-      case nType == 55;  return "CT_MARIADB"
-      case nType == 56;  return "CT_POSTGRESQL"
-      case nType == 57;  return "CT_SQLITE"
-      case nType == 58;  return "CT_FIREBIRD"
-      case nType == 59;  return "CT_SQLSERVER"
-      case nType == 60;  return "CT_ORACLE"
-      case nType == 61;  return "CT_MONGODB"
-      case nType == 62;  return "CT_WEBVIEW"
-      case nType == 63;  return "CT_WEBSERVER"
-      case nType == 64;  return "CT_WEBSOCKET"
-      case nType == 65;  return "CT_HTTPCLIENT"
-      case nType == 131; return "CT_COMPARRAY"
-      case nType == 132; return "CT_BAND"
-      case nType == 200; return "CT_MAINMENU"
-      case nType == 201; return "CT_POPUPMENU"
-   endcase
-return "CT_UNKNOWN_" + LTrim( Str( nType ) )
-
-// Reverse map: CT_* define name -> numeric type. Used when parsing saved
-// form code that emitted symbolic CT_ names instead of literal numbers.
-static function ComponentTypeFromName( cName )
-   local i, aMap := { ;
-      { "CT_TIMER", 38 }, { "CT_PAINTBOX", 39 }, ;
-      { "CT_OPENDIALOG", 40 }, { "CT_SAVEDIALOG", 41 }, ;
-      { "CT_FONTDIALOG", 42 }, { "CT_COLORDIALOG", 43 }, ;
-      { "CT_FINDDIALOG", 44 }, { "CT_REPLACEDIALOG", 45 }, ;
-      { "CT_OPENAI", 46 }, { "CT_GEMINI", 47 }, { "CT_CLAUDE", 48 }, ;
-      { "CT_DEEPSEEK", 49 }, { "CT_GROK", 50 }, { "CT_OLLAMA", 51 }, ;
-      { "CT_TRANSFORMER", 52 }, ;
-      { "CT_DBFTABLE", 53 }, { "CT_MYSQL", 54 }, { "CT_MARIADB", 55 }, ;
-      { "CT_POSTGRESQL", 56 }, { "CT_SQLITE", 57 }, { "CT_FIREBIRD", 58 }, ;
-      { "CT_SQLSERVER", 59 }, { "CT_ORACLE", 60 }, { "CT_MONGODB", 61 }, ;
-      { "CT_WEBVIEW", 62 }, { "CT_THREAD", 63 }, { "CT_MUTEX", 64 }, ;
-      { "CT_SEMAPHORE", 65 }, { "CT_CRITICALSECTION", 66 }, ;
-      { "CT_THREADPOOL", 67 }, { "CT_ATOMICINT", 68 }, ;
-      { "CT_CONDVAR", 69 }, { "CT_CHANNEL", 70 }, ;
-      { "CT_WEBSERVER", 71 }, { "CT_WEBSOCKET", 72 }, ;
-      { "CT_HTTPCLIENT", 73 }, { "CT_FTPCLIENT", 74 }, ;
-      { "CT_SMTPCLIENT", 75 }, { "CT_TCPSERVER", 76 }, ;
-      { "CT_TCPCLIENT", 77 }, { "CT_UDPSOCKET", 78 }, ;
-      { "CT_BROWSE", 79 }, { "CT_DBGRID", 80 }, { "CT_DBNAVIGATOR", 81 }, ;
-      { "CT_DBTEXT", 82 }, { "CT_DBEDIT", 83 }, { "CT_DBCOMBOBOX", 84 }, ;
-      { "CT_DBCHECKBOX", 85 }, { "CT_DBIMAGE", 86 }, ;
-      { "CT_PREPROCESSOR", 90 }, { "CT_SCRIPTENGINE", 91 }, ;
-      { "CT_REPORTDESIGNER", 92 }, { "CT_BARCODE", 93 }, ;
-      { "CT_PDFGENERATOR", 94 }, { "CT_EXCELEXPORT", 95 }, ;
-      { "CT_AUDITLOG", 96 }, { "CT_PERMISSIONS", 97 }, ;
-      { "CT_CURRENCY", 98 }, { "CT_TAXENGINE", 99 }, ;
-      { "CT_DASHBOARD", 100 }, { "CT_SCHEDULER", 101 }, ;
-      { "CT_PRINTER", 102 }, { "CT_REPORT", 103 }, { "CT_LABELS", 104 }, ;
-      { "CT_PRINTPREVIEW", 105 }, { "CT_PAGESETUP", 106 }, ;
-      { "CT_PRINTDIALOG", 107 }, { "CT_REPORTVIEWER", 108 }, ;
-      { "CT_BARCODEPRINTER", 109 }, ;
-      { "CT_WHISPER", 110 }, { "CT_EMBEDDINGS", 111 }, ;
-      { "CT_PYTHON", 112 }, { "CT_SWIFT", 113 }, { "CT_GO", 114 }, ;
-      { "CT_NODE", 115 }, { "CT_RUST", 116 }, { "CT_JAVA", 117 }, ;
-      { "CT_DOTNET", 118 }, { "CT_LUA", 119 }, { "CT_RUBY", 120 }, ;
-      { "CT_GITREPO", 121 }, { "CT_GITCOMMIT", 122 }, ;
-      { "CT_GITBRANCH", 123 }, { "CT_GITLOG", 124 }, ;
-      { "CT_GITDIFF", 125 }, { "CT_GITREMOTE", 126 }, ;
-      { "CT_GITSTASH", 127 }, { "CT_GITTAG", 128 }, ;
-      { "CT_GITBLAME", 129 }, { "CT_GITMERGE", 130 }, ;
-      { "CT_COMPARRAY", 131 }, ;
-      { "CT_BAND", 132 }, ;
-      { "CT_MAINMENU", 200 }, ;
-      { "CT_POPUPMENU", 201 } }
-   for i := 1 to Len( aMap )
-      if Upper( cName ) == aMap[i][1]
-         return aMap[i][2]
-      endif
-   next
-return 0
 
 // Framework
 #include "core/classes.prg"
@@ -12505,6 +12588,54 @@ HB_FUNC( CODEEDITORCLEARTABS )
    ed->bSettingText = 1;
    SciMsg( ed->hEdit, SCI_SETTEXT, 0, (LPARAM) "" );
    ed->bSettingText = 0;
+}
+
+/* CodeEditorRemoveTab( hEditor, nTab ) - remove a tab (1-based); tab 1 is protected */
+HB_FUNC( CODEEDITORREMOVETAB )
+{
+   CODEEDITOR * ed = (CODEEDITOR *) (HB_PTRUINT) hb_parnint(1);
+   int nTab = hb_parni(2) - 1;
+   int i;
+   int wasActive;
+
+   if( !ed || nTab < 1 || nTab >= ed->nTabs || ed->nTabs <= 1 )
+      return;
+
+   wasActive = ( ed->nActiveTab == nTab );
+   SaveCurrentTabText( ed );
+
+   if( ed->aTexts[nTab] ) { free( ed->aTexts[nTab] ); ed->aTexts[nTab] = NULL; }
+
+   for( i = nTab; i < ed->nTabs - 1; i++ )
+   {
+      strncpy( ed->aTabNames[i], ed->aTabNames[i+1], 63 );
+      ed->aTabNames[i][63] = 0;
+      ed->aTexts[i] = ed->aTexts[i+1];
+   }
+   ed->aTexts[ed->nTabs - 1] = NULL;
+   ed->aTabNames[ed->nTabs - 1][0] = 0;
+   ed->nTabs--;
+
+   SendMessage( ed->hTab, TCM_DELETEITEM, nTab, 0 );
+
+   if( ed->nActiveTab > nTab )
+      ed->nActiveTab--;
+   else if( wasActive && ed->nActiveTab >= ed->nTabs )
+      ed->nActiveTab = ed->nTabs - 1;
+
+   if( ed->hEdit && ed->nActiveTab >= 0 )
+   {
+      ed->bSettingText = 1;
+      SciMsg( ed->hEdit, SCI_SETTEXT, 0,
+         (LPARAM)( ed->aTexts[ed->nActiveTab] ? ed->aTexts[ed->nActiveTab] : "" ) );
+      SciMsg( ed->hEdit, SCI_EMPTYUNDOBUFFER, 0, 0 );
+      UpdateHarbourFolding( ed->hEdit );
+      if( ed->aTabNames[ed->nActiveTab][0] )
+         CE_RestoreBreakpointMarkers( ed, ed->aTabNames[ed->nActiveTab] );
+      ed->bSettingText = 0;
+   }
+
+   SendMessage( ed->hTab, TCM_SETCURSEL, ed->nActiveTab, 0 );
 }
 
 /* CodeEditorOnTabChange( hEditor, bBlock ) - set tab change callback */

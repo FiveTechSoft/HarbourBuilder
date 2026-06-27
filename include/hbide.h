@@ -25,159 +25,7 @@ class TForm;
 class TToolBar;
 class TComponentPalette;
 
-/* Control types */
-#define CT_FORM       0
-#define CT_LABEL      1
-#define CT_EDIT       2
-#define CT_BUTTON     3
-#define CT_CHECKBOX   4
-#define CT_COMBOBOX   5
-#define CT_GROUPBOX   6
-#define CT_LISTBOX    7
-#define CT_RADIO      8
-#define CT_TOOLBAR    9
-#define CT_TABCONTROL 10
-#define CT_STATUSBAR  11
-#define CT_BITBTN     12
-#define CT_SPEEDBTN   13
-#define CT_IMAGE      14
-#define CT_SHAPE      15
-#define CT_BEVEL      16
-#define CT_SCROLLBOX  17
-#define CT_MASKEDIT   18
-#define CT_STRINGGRID 19
-#define CT_TREEVIEW   20
-#define CT_LISTVIEW   21
-#define CT_PROGRESSBAR 22
-#define CT_RICHEDIT   23
-/* Standard extras */
-#define CT_MEMO       24
-#define CT_PANEL      25
-#define CT_SCROLLBAR  26
-/* Additional extras */
-#define CT_MASKEDIT2  28
-#define CT_STATICTEXT 31
-#define CT_LABELEDEDIT 32
-/* Win32 extras */
-#define CT_TABCONTROL2 33
-#define CT_TRACKBAR   34
-#define CT_UPDOWN     35
-#define CT_DATETIMEPICKER 36
-#define CT_MONTHCALENDAR  37
-/* System */
-#define CT_TIMER      38
-#define CT_PAINTBOX   39
-/* Dialogs (non-visual) */
-#define CT_OPENDIALOG  40
-#define CT_SAVEDIALOG  41
-#define CT_FONTDIALOG  42
-#define CT_COLORDIALOG 43
-#define CT_FINDDIALOG  44
-#define CT_REPLACEDIALOG 45
-/* AI components */
-#define CT_OPENAI     46
-#define CT_GEMINI     47
-#define CT_CLAUDE     48
-#define CT_DEEPSEEK   49
-#define CT_GROK       50
-#define CT_OLLAMA     51
-#define CT_TRANSFORMER 52
-#define CT_WHISPER    110
-#define CT_EMBEDDINGS 111
-/* Source Control (Git) */
-#define CT_GITREPO    121
-#define CT_GITCOMMIT  122
-#define CT_GITBRANCH  123
-#define CT_GITLOG     124
-#define CT_GITDIFF    125
-#define CT_GITREMOTE  126
-#define CT_GITSTASH   127
-#define CT_GITTAG     128
-#define CT_GITBLAME   129
-#define CT_GITMERGE   130
-/* Connectivity (language/runtime interop) */
-#define CT_PYTHON     112
-#define CT_SWIFT      113
-#define CT_GO         114
-#define CT_NODE       115
-#define CT_RUST       116
-#define CT_JAVA       117
-#define CT_DOTNET     118
-#define CT_LUA        119
-#define CT_RUBY       120
-/* Database components */
-#define CT_DBFTABLE   53
-#define CT_MYSQL      54
-#define CT_MARIADB    55
-#define CT_POSTGRESQL 56
-#define CT_SQLITE     57
-#define CT_FIREBIRD   58
-#define CT_SQLSERVER  59
-#define CT_ORACLE     60
-#define CT_MONGODB    61
-/* Internet */
-#define CT_WEBVIEW    62
-#define CT_WEBSERVER  71
-#define CT_WEBSOCKET  72
-#define CT_HTTPCLIENT 73
-#define CT_FTPCLIENT  74
-#define CT_SMTPCLIENT 75
-#define CT_TCPSERVER  76
-#define CT_TCPCLIENT  77
-#define CT_UDPSOCKET  78
-/* Data Controls */
-#define CT_BROWSE     79
-#define CT_DBGRID     80
-#define CT_DBNAVIGATOR 81
-#define CT_DBTEXT     82
-#define CT_DBEDIT     83
-#define CT_DBCOMBOBOX 84
-#define CT_DBCHECKBOX 85
-#define CT_DBIMAGE    86
-/* ERP / Business components */
-#define CT_PREPROCESSOR 90
-#define CT_SCRIPTENGINE 91
-#define CT_REPORTDESIGNER 92
-#define CT_BARCODE    93
-#define CT_PDFGENERATOR 94
-#define CT_EXCELEXPORT 95
-#define CT_AUDITLOG   96
-#define CT_PERMISSIONS 97
-#define CT_CURRENCY   98
-#define CT_TAXENGINE  99
-#define CT_DASHBOARD  100
-#define CT_SCHEDULER  101
-/* Printing components */
-#define CT_PRINTER    102
-#define CT_REPORT     103
-#define CT_LABELS     104
-#define CT_PRINTPREVIEW 105
-#define CT_PAGESETUP  106
-#define CT_PRINTDIALOG 107
-#define CT_REPORTVIEWER 108
-#define CT_BARCODEPRINTER 109
-/* Data components */
-#define CT_COMPARRAY  131
-
-/* Report designer band */
-#define CT_BAND       132
-/* Main menu bar (non-visual; same value as macOS CT_MAINMENU) */
-#define CT_MAINMENU   200
-/* Popup (context) menu (non-visual; macOS CT_POPUPMENU) */
-#define CT_POPUPMENU  201
-#define CT_REPORTLABEL  133
-#define CT_REPORTFIELD  134
-#define CT_REPORTIMAGE  135
-
-/* Threading components */
-#define CT_THREAD     63
-#define CT_MUTEX      64
-#define CT_SEMAPHORE  65
-#define CT_CRITICALSECTION 66
-#define CT_THREADPOOL 67
-#define CT_ATOMICINT  68
-#define CT_CONDVAR    69
-#define CT_CHANNEL    70
+#include "hbide_ct.h"
 
 /* ControlAlign constants (used by FDockAlign: 0=alNone..5=alClient) */
 #define ALIGN_NONE    0
@@ -295,6 +143,7 @@ public:
    virtual void CreateHandle( HWND hParent );
    virtual void DestroyHandle();
    void         AddChild( TControl * pChild );
+   BOOL         RemoveChild( TControl * pChild );
    void         SetText( const char * szText );
    void         SetBounds( int nLeft, int nTop, int nWidth, int nHeight );
    void         SetFont( HFONT hFont );
@@ -438,6 +287,7 @@ public:
    int          HitTestHandle( int x, int y );  /* returns 0-7 handle index or -1 */
    void         SelectControl( TControl * pCtrl, BOOL bAdd );
    void         ClearSelection();
+   void         FreeChildren();
    BOOL         IsSelected( TControl * pCtrl );
    void         PaintSelectionHandles( HDC hDC );
    void         UpdateOverlay();

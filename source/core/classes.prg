@@ -3484,7 +3484,7 @@ METHOD Dispatch( cMethod, cPath, cQuery, cBody, cIP ) CLASS TWebServer
    HIX_SetRoot( ::cRoot )
 
    // Guard against path traversal
-   if ".." $ cPath
+   if ".." $ StrTran( cPath, "\", "/" )
       UI_HIX_SETSTATUS( 400 )
       UI_HIX_WRITE( "<h1>400 Bad Request</h1>" )
       return nil
@@ -3498,23 +3498,35 @@ METHOD Dispatch( cMethod, cPath, cQuery, cBody, cIP ) CLASS TWebServer
          if ValType( xHandler ) == "B"
             Eval( xHandler )
          elseif ValType( xHandler ) == "C"
-            HIX_ExecPrg( ::cRoot + "/" + xHandler )
+            cFilePath := HIX_ResolvePath( ::cRoot, xHandler )
+            if ! Empty( cFilePath )
+               HIX_ExecPrg( cFilePath )
+            else
+               UI_HIX_SETSTATUS( 403 )
+               UI_HIX_WRITE( "<h1>403 Forbidden</h1>" )
+            endif
          endif
          return nil
       endif
    next
 
    // Fall back to static file
-   cFilePath := ::cRoot + cPath
    if cPath == "/"
-      cFilePath := ::cRoot + "/index.html"
+      cFilePath := HIX_ResolvePath( ::cRoot, "index.html" )
+   else
+      cFilePath := HIX_ResolvePath( ::cRoot, cPath )
    endif
-   if File( cFilePath )
+   if ! Empty( cFilePath ) .and. File( cFilePath )
       HIX_ServeStatic( cFilePath )
    else
       UI_HIX_SETSTATUS( 404 )
-      if hb_hHasKey( ::hErrorPages, 404 ) .and. File( ::hErrorPages[ 404 ] )
-         HIX_ServeStatic( ::hErrorPages[ 404 ] )
+      if hb_hHasKey( ::hErrorPages, 404 )
+         cFilePath := HIX_ResolvePath( ::cRoot, ::hErrorPages[ 404 ] )
+         if ! Empty( cFilePath ) .and. File( cFilePath )
+            HIX_ServeStatic( cFilePath )
+         else
+            UI_HIX_WRITE( "<h1>404 Not Found</h1><p>" + cPath + "</p>" )
+         endif
       else
          UI_HIX_WRITE( "<h1>404 Not Found</h1><p>" + cPath + "</p>" )
       endif

@@ -111,11 +111,8 @@ FUNCTION UView( cTpl, ... )
       aArgs[i] := hb_pValue( i + 1 )
    next
    cRoot := HIX_GetRoot()
-   cFile := cRoot + "/" + cTpl
-   if ! File( cFile )
-      cFile := cTpl
-   endif
-   if ! File( cFile )
+   cFile := HIX_ResolvePath( cRoot, cTpl )
+   if Empty( cFile ) .or. ! File( cFile )
       UWrite( "<!-- UView: template not found: " + cTpl + " -->" )
       return nil
    endif
@@ -167,26 +164,27 @@ FUNCTION UUrlDecode( c )
 return cOut
 
 FUNCTION ULink( cText, cUrl )
-return "<a href='" + cUrl + "'>" + cText + "</a>"
+return '<a href="' + UHtmlEncode( cUrl ) + '">' + UHtmlEncode( cText ) + '</a>'
 
 FUNCTION ULoadHtml( cFile )
-   local cRoot := HIX_GetRoot()
-   local cPath := cRoot + "/" + cFile
-   if File( cPath )
+   local cPath := HIX_ResolvePath( HIX_GetRoot(), cFile )
+   if ! Empty( cPath ) .and. File( cPath )
       UWrite( MemoRead( cPath ) )
    endif
 return nil
 
 FUNCTION UExecuteHtml( cFile )
-   if File( cFile )
-      UWrite( MemoRead( cFile ) )
+   local cPath := HIX_ResolvePath( HIX_GetRoot(), cFile )
+   if ! Empty( cPath ) .and. File( cPath )
+      UWrite( MemoRead( cPath ) )
    endif
 return nil
 
 FUNCTION UExecutePrg( cFile )
-   local cRoot := HIX_GetRoot()
-   local cPath := iif( File(cFile), cFile, cRoot + "/" + cFile )
-   HIX_ExecPrg( cPath )
+   local cPath := HIX_ResolvePath( HIX_GetRoot(), cFile )
+   if ! Empty( cPath )
+      HIX_ExecPrg( cPath )
+   endif
 return nil
 
 FUNCTION _d( ... )
@@ -208,6 +206,68 @@ return nil
 FUNCTION HIX_GetRoot()
 return HIX_StaticStorage()["root"]
 
+// Resolve cRel under cRoot; reject ".." and paths outside the root.
+FUNCTION HIX_ResolvePath( cRoot, cRel )
+   local cFull, cNorm, cRootNorm
+
+   if cRel == NIL .or. Empty( cRel )
+      return ""
+   endif
+
+   cRel := StrTran( cRel, "\", "/" )
+   if ".." $ cRel
+      return ""
+   endif
+
+   if Empty( cRoot )
+      cRoot := "."
+   endif
+   cRoot := StrTran( cRoot, "\", "/" )
+   while Right( cRoot, 1 ) == "/"
+      cRoot := Left( cRoot, Len( cRoot ) - 1 )
+   end
+
+   if Left( cRel, 1 ) == "/"
+      cFull := cRoot + cRel
+   elseif Len( cRel ) >= 2 .and. SubStr( cRel, 2, 1 ) == ":"
+      cFull := cRel
+   else
+      cFull := cRoot + "/" + cRel
+   endif
+
+   cNorm := StrTran( StrTran( cFull, "\", "/" ), "//", "/" )
+   cRootNorm := Lower( cRoot )
+   if ! ( Lower( cNorm ) == cRootNorm .or. ;
+         Left( Lower( cNorm ), Len( cRootNorm ) + 1 ) == cRootNorm + "/" )
+      return ""
+   endif
+
+return cNorm
+
+FUNCTION HIX_IsPathAllowed( cFile )
+   local cNorm, cRoot, cRootNorm
+
+   if Empty( cFile )
+      return .F.
+   endif
+
+   cNorm := Lower( StrTran( cFile, "\", "/" ) )
+   if ".." $ cNorm
+      return .F.
+   endif
+
+   cRoot := HIX_GetRoot()
+   if Empty( cRoot )
+      cRoot := "."
+   endif
+   cRootNorm := Lower( StrTran( cRoot, "\", "/" ) )
+   while Right( cRootNorm, 1 ) == "/"
+      cRootNorm := Left( cRootNorm, Len( cRootNorm ) - 1 )
+   end
+
+return ( cNorm == cRootNorm .or. ;
+         Left( cNorm, Len( cRootNorm ) + 1 ) == cRootNorm + "/" )
+
 FUNCTION HIX_ServeStatic( cFilePath )
    local cExt := Lower( hb_FNameExt( cFilePath ) )
    local cMime
@@ -225,6 +285,12 @@ FUNCTION HIX_ServeStatic( cFilePath )
       ".ico"  => "image/x-icon", ;
       ".txt"  => "text/plain" ;
    }
+   if ! HIX_IsPathAllowed( cFilePath )
+      UI_HIX_SETSTATUS( 403 )
+      UI_HIX_WRITE( "<h1>403 Forbidden</h1>" )
+      return nil
+   endif
+
    cMime := iif( hb_hHasKey(hMime, cExt), hMime[cExt], "application/octet-stream" )
    UI_HIX_SETCONTENTTYPE( cMime )
    UI_HIX_WRITE( MemoRead( cFilePath ) )
@@ -232,6 +298,12 @@ return nil
 
 FUNCTION HIX_ExecPrg( cFile )
    local cCode, pHrb
+
+   if ! HIX_IsPathAllowed( cFile )
+      UWrite( "<!-- HIX_ExecPrg: forbidden path: " + cFile + " -->" )
+      return nil
+   endif
+
    if ! File( cFile )
       UWrite( "<!-- HIX_ExecPrg: file not found: " + cFile + " -->" )
       return nil

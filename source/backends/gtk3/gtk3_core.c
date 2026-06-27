@@ -37,115 +37,7 @@
 #include <errno.h>
 #include <fcntl.h>
 
-/* Control types - must match all platforms */
-#define CT_FORM       0
-#define CT_LABEL      1
-#define CT_EDIT       2
-#define CT_BUTTON     3
-#define CT_CHECKBOX   4
-#define CT_COMBOBOX   5
-#define CT_GROUPBOX   6
-#define CT_LISTBOX    7
-#define CT_RADIO      8
-#define CT_TOOLBAR    9
-#define CT_TABCONTROL 10
-#define CT_STATUSBAR  11
-#define CT_BITBTN     12
-#define CT_SPEEDBTN   13
-#define CT_IMAGE      14
-#define CT_SHAPE      15
-#define CT_BEVEL      16
-#define CT_TREEVIEW   20
-#define CT_LISTVIEW   21
-#define CT_PROGRESSBAR 22
-#define CT_RICHEDIT   23
-#define CT_MEMO       24
-#define CT_PANEL      25
-#define CT_SCROLLBAR  26
-#define CT_MASKEDIT2  28
-#define CT_STRINGGRID 29
-#define CT_SCROLLBOX  30
-#define CT_STATICTEXT 31
-#define CT_LABELEDEDIT 32
-#define CT_TABCONTROL2 33
-#define CT_TRACKBAR   34
-#define CT_UPDOWN     35
-#define CT_DATETIMEPICKER 36
-#define CT_MONTHCALENDAR  37
-#define CT_TIMER      38
-#define CT_PAINTBOX   39
-#define CT_OPENDIALOG  40
-#define CT_SAVEDIALOG  41
-#define CT_FONTDIALOG  42
-#define CT_COLORDIALOG 43
-#define CT_FINDDIALOG  44
-#define CT_REPLACEDIALOG 45
-#define CT_OPENAI     46
-#define CT_GEMINI     47
-#define CT_CLAUDE     48
-#define CT_DEEPSEEK   49
-#define CT_GROK       50
-#define CT_OLLAMA     51
-#define CT_TRANSFORMER 52
-#define CT_DBFTABLE   53
-#define CT_MYSQL      54
-#define CT_MARIADB    55
-#define CT_POSTGRESQL 56
-#define CT_SQLITE     57
-#define CT_FIREBIRD   58
-#define CT_SQLSERVER  59
-#define CT_ORACLE     60
-#define CT_MONGODB    61
-#define CT_WEBVIEW    62
-#define CT_WEBSERVER  71
-#define CT_WEBSOCKET  72
-#define CT_HTTPCLIENT 73
-#define CT_FTPCLIENT  74
-#define CT_SMTPCLIENT 75
-#define CT_TCPSERVER  76
-#define CT_TCPCLIENT  77
-#define CT_UDPSOCKET  78
-#define CT_BROWSE     79
-#define CT_DBGRID     80
-#define CT_DBNAVIGATOR 81
-#define CT_DBTEXT     82
-#define CT_DBEDIT     83
-#define CT_DBCOMBOBOX 84
-#define CT_DBCHECKBOX 85
-#define CT_DBIMAGE    86
-#define CT_PREPROCESSOR 90
-#define CT_SCRIPTENGINE 91
-#define CT_REPORTDESIGNER 92
-#define CT_BARCODE    93
-#define CT_PDFGENERATOR 94
-#define CT_EXCELEXPORT 95
-#define CT_AUDITLOG   96
-#define CT_PERMISSIONS 97
-#define CT_CURRENCY   98
-#define CT_TAXENGINE  99
-#define CT_DASHBOARD  100
-#define CT_SCHEDULER  101
-#define CT_PRINTER    102
-#define CT_REPORT     103
-#define CT_LABELS     104
-#define CT_PRINTPREVIEW 105
-#define CT_PAGESETUP  106
-#define CT_PRINTDIALOG 107
-#define CT_REPORTVIEWER 108
-#define CT_BARCODEPRINTER 109
-#define CT_THREAD     63
-#define CT_MUTEX      64
-#define CT_SEMAPHORE  65
-#define CT_CRITICALSECTION 66
-#define CT_THREADPOOL 67
-#define CT_ATOMICINT  68
-#define CT_CONDVAR    69
-#define CT_CHANNEL    70
-#define CT_SCENE3D    110
-#define CT_EARTHVIEW  111
-#define CT_MAP        112
-#define CT_MAINMENU   132
-#define CT_POPUPMENU  136
+#include "hbide_ct.h"
 
 #define MAX_CHILDREN  256
 
@@ -2498,7 +2390,7 @@ static void HBForm_CreateAllChildren( HBForm * form )
       if( child->FControlType == CT_GROUPBOX ) continue;
       if( child->FControlType == CT_TABCONTROL2 ) continue;
       if( IsNonVisualControl( child->FControlType ) && !form->FDesignMode ) {
-         if( child->FControlType == CT_MAINMENU )
+         if( HB_IS_MAINMENU_TYPE( child->FControlType ) )
             HBMainMenu_Attach( child, form );
          continue;
       }
@@ -3926,7 +3818,7 @@ HB_FUNC( UI_SETPROP )
       }
    }
    else if( strcasecmp(szProp,"aMenuItems")==0 && HB_ISCHAR(3) &&
-            (p->FControlType == CT_MAINMENU || p->FControlType == CT_POPUPMENU) )
+            (HB_IS_MAINMENU_TYPE(p->FControlType) || HB_IS_POPUPMENU_TYPE(p->FControlType)) )
    {
       HBMainMenu * m = (HBMainMenu *)p;
       const char * raw = hb_parc(3);
@@ -3959,7 +3851,7 @@ HB_FUNC( UI_SETPROP )
       }
    }
    else if( strcasecmp(szProp,"aOnClick")==0 &&
-            (p->FControlType == CT_MAINMENU || p->FControlType == CT_POPUPMENU) )
+            (HB_IS_MAINMENU_TYPE(p->FControlType) || HB_IS_POPUPMENU_TYPE(p->FControlType)) )
    {
       HBMainMenu * m = (HBMainMenu *)p;
       PHB_ITEM pArr = hb_param(3, HB_IT_ARRAY);
@@ -4121,7 +4013,7 @@ HB_FUNC( UI_GETPROP )
       hb_retc( szAll );
    }
    else if( strcasecmp(szProp,"aMenuItems")==0 &&
-            (p->FControlType==CT_MAINMENU || p->FControlType==CT_POPUPMENU) )
+            (HB_IS_MAINMENU_TYPE(p->FControlType) || HB_IS_POPUPMENU_TYPE(p->FControlType)) )
    {
       HBMainMenu * m = (HBMainMenu *)p;
       char szSerial[4096] = "";
@@ -4911,7 +4803,7 @@ HB_FUNC( UI_POPUPMENUNEW )
 HB_FUNC( UI_POPUPMENUSHOW )
 {
    HBControl * c = GetCtrl(1);
-   if( !c || c->FControlType != CT_POPUPMENU ) return;
+   if( !c || !HB_IS_POPUPMENU_TYPE( c->FControlType ) ) return;
    EnsureGTK();
    GtkWidget * menu = HBPopupMenu_Build( (HBMainMenu *)c );
    if( !menu ) return;
@@ -7796,7 +7688,7 @@ HB_FUNC( UI_FORMCLEARCHILDREN )
    for( int i = 0; i < pForm->base.FChildCount; i++ )
    {
       HBControl * c = pForm->base.FChildren[i];
-      if( c->FControlType == CT_MAINMENU || c->FControlType == CT_POPUPMENU ) {
+      if( HB_IS_MAINMENU_TYPE( c->FControlType ) || HB_IS_POPUPMENU_TYPE( c->FControlType ) ) {
          HBMainMenu * m = (HBMainMenu *)c;
          if( m->FOnClickArray ) { hb_itemRelease( m->FOnClickArray ); m->FOnClickArray = NULL; }
       }
@@ -12262,8 +12154,8 @@ HB_FUNC( UI_FORMPASTECONTROLS )
       else if( t == CT_COMBOBOX || t == CT_LISTBOX ) sz = sizeof(HBComboBox);
       else if( t == CT_GROUPBOX ) sz = sizeof(HBGroupBox);
       else if( t == CT_TIMER )    sz = sizeof(HBTimer);
-      else if( t == CT_MAINMENU ) sz = sizeof(HBMainMenu);
-      else if( t == CT_POPUPMENU ) sz = sizeof(HBMainMenu);
+      else if( HB_IS_MAINMENU_TYPE( t ) ) sz = sizeof(HBMainMenu);
+      else if( HB_IS_POPUPMENU_TYPE( t ) ) sz = sizeof(HBMainMenu);
 
       c = (HBControl *) calloc( 1, sz );
       if( !c ) continue;

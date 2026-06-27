@@ -4064,6 +4064,7 @@ static HWND   s_errEdit     = NULL;
 static HWND   s_errCopyBtn  = NULL;
 static HBRUSH s_hBEBrush    = NULL;
 static HBRUSH s_hBEEditBrush = NULL;
+static BOOL   s_errModal    = FALSE;
 
 static LRESULT CALLBACK BuildErrProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 {
@@ -4110,7 +4111,8 @@ static LRESULT CALLBACK BuildErrProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM
          }
          if( id == 1002 || id == IDCANCEL )
          {
-            PostQuitMessage( 0 );
+            s_errModal = FALSE;
+            DestroyWindow( hWnd );
             return 0;
          }
          break;
@@ -4127,7 +4129,11 @@ static LRESULT CALLBACK BuildErrProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM
          return 0;
       }
       case WM_CLOSE:
-         PostQuitMessage( 0 );
+         s_errModal = FALSE;
+         DestroyWindow( hWnd );
+         return 0;
+      case WM_DESTROY:
+         s_errModal = FALSE;
          return 0;
    }
    return DefWindowProc( hWnd, msg, wParam, lParam );
@@ -4211,12 +4217,23 @@ HB_FUNC( W32_BUILDERRORDIALOG )
       GetModuleHandle(NULL), NULL );
    SendMessageA( hClose, WM_SETFONT, (WPARAM) hGui, TRUE );
 
-   /* Modal loop */
+   /* Modal loop — PeekMessage avoids posting WM_QUIT to the IDE main loop */
+   s_errModal = TRUE;
    { MSG msg;
-     while( GetMessage( &msg, NULL, 0, 0 ) > 0 )
+     while( s_errModal )
      {
-        TranslateMessage( &msg );
-        DispatchMessage( &msg );
+        if( PeekMessage( &msg, NULL, 0, 0, PM_REMOVE ) )
+        {
+           if( msg.message == WM_QUIT )
+           {
+              PostQuitMessage( (int) msg.wParam );
+              break;
+           }
+           TranslateMessage( &msg );
+           DispatchMessage( &msg );
+        }
+        else
+           WaitMessage();
      }
    }
 
@@ -6344,18 +6361,7 @@ HB_FUNC( UI_FORMCLEARCHILDREN )
    TForm * form = GetForm(1);
    if( !form ) return;
 
-   form->ClearSelection();
-
-   for( int i = form->FChildCount - 1; i >= 0; i-- )
-   {
-      TControl * c = form->FChildren[i];
-      if( c->FHandle ) DestroyWindow( c->FHandle );
-      delete c;
-   }
-   form->FChildCount = 0;
-
-   if( form->FHandle ) InvalidateRect( form->FHandle, NULL, TRUE );
-   form->UpdateOverlay();
+   form->FreeChildren();
 }
 
 /* UI_FormTabOrderDialog( hForm ) - show tab order dialog */

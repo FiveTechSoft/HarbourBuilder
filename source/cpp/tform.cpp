@@ -147,6 +147,7 @@ TForm::~TForm()
    for( i = 0; i < FMenuItemCount; i++ )
       if( FMenuActions[i] ) hb_itemRelease( FMenuActions[i] );
    if( FMenuBar ) DestroyMenu( FMenuBar );
+   FreeChildren();
    /* FBkBrush cleaned up by ~TControl() */
 }
 
@@ -1581,13 +1582,22 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
             if( wParam == VK_DELETE && FSelCount > 0 )
             {
                int i;
-               for( i = 0; i < FSelCount; i++ )
-               {
-                  if( FSelected[i]->FHandle )
-                     DestroyWindow( FSelected[i]->FHandle );
-                  FSelected[i]->FHandle = NULL;
-               }
+               TControl * aDelete[MAX_CHILDREN];
+               int nDelete = FSelCount;
+
+               for( i = 0; i < nDelete; i++ )
+                  aDelete[i] = FSelected[i];
+
                ClearSelection();
+
+               for( i = 0; i < nDelete; i++ )
+               {
+                  RemoveChild( aDelete[i] );
+                  delete aDelete[i];
+               }
+
+               if( FHandle ) InvalidateRect( FHandle, NULL, TRUE );
+               UpdateOverlay();
                /* Sync code after delete */
                FireEvent( FOnResize );
                return 0;
@@ -2145,6 +2155,24 @@ void TForm::SelectControl( TControl * pCtrl, BOOL bAdd )
       hb_vmPushNumInt( FSelCount > 0 ? (HB_PTRUINT) FSelected[0] : 0 );
       hb_vmSend( 1 );
    }
+}
+
+void TForm::FreeChildren()
+{
+   int i;
+
+   FSelCount = 0;
+   memset( FSelected, 0, sizeof(FSelected) );
+
+   for( i = FChildCount - 1; i >= 0; i-- )
+   {
+      delete FChildren[i];
+      FChildren[i] = NULL;
+   }
+   FChildCount = 0;
+
+   if( FHandle ) InvalidateRect( FHandle, NULL, TRUE );
+   UpdateOverlay();
 }
 
 void TForm::ClearSelection()

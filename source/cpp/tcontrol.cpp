@@ -188,6 +188,29 @@ void TControl::AddChild( TControl * pChild )
    }
 }
 
+BOOL TControl::RemoveChild( TControl * pChild )
+{
+   int i;
+
+   if( !pChild ) return FALSE;
+
+   for( i = 0; i < FChildCount; i++ )
+   {
+      if( FChildren[i] == pChild )
+      {
+         int j;
+         for( j = i; j < FChildCount - 1; j++ )
+            FChildren[j] = FChildren[j + 1];
+         FChildCount--;
+         FChildren[FChildCount] = NULL;
+         pChild->FCtrlParent = NULL;
+         pChild->FParent = NULL;
+         return TRUE;
+      }
+   }
+   return FALSE;
+}
+
 void TControl::SetText( const char * szText )
 {
    lstrcpynA( FText, szText, sizeof(FText) );
@@ -249,6 +272,7 @@ void TControl::Hide()
 
 LRESULT TControl::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
 {
+   if( !FHandle ) return 0;
    return DefWindowProc( FHandle, msg, wParam, lParam );
 }
 
@@ -309,7 +333,13 @@ void TControl::ReleaseEvents()
    if( FOnInit )   { hb_itemRelease( FOnInit );   FOnInit = NULL; }
    if( FOnClose )  { hb_itemRelease( FOnClose );  FOnClose = NULL; }
    if( FOnTimer )  { hb_itemRelease( FOnTimer );  FOnTimer = NULL; }
-   if( FTimerID )  { KillTimer( NULL, FTimerID );  FTimerID = 0; }
+   if( FTimerID )
+   {
+      HWND hTimerWnd = ( FCtrlParent && FCtrlParent->FHandle ) ? FCtrlParent->FHandle : NULL;
+      if( hTimerWnd )
+         KillTimer( hTimerWnd, FTimerID );
+      FTimerID = 0;
+   }
 }
 
 const PROPDESC * TControl::GetPropDescs( int * pnCount )

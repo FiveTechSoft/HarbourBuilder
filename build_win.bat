@@ -60,7 +60,7 @@ REM   Build Process
 REM ============================================================
 echo === Step 1: Compile Harbour PRG ===
 cd /d "%SRCDIR%"
-"%HBBIN%\harbour.exe" hbbuilder_win.prg -n -w -es2 -q -I%HBINC% -I%INCDIR%
+"%HBBIN%\harbour.exe" hbbuilder_common.prg hbbuilder_win.prg -n -w -es2 -q -I%HBINC% -I%INCDIR%
 if errorlevel 1 (echo HARBOUR FAILED & pause & exit /b 1)
 
 echo === Step 2: Compile C/CPP sources ===
@@ -73,6 +73,8 @@ set CL_BASE=/nologo /c /O2 /EHsc /MD /D_CRT_SECURE_NO_WARNINGS /I"%HBINC%" /I"%I
 
 REM /wd4101 solo en el .c generado por harbour.exe (unreferenced locals
 REM intrinsecos a la generacion PRG -> C, no corregibles aqui).
+cl.exe %CL_BASE% /W3 /wd4101 hbbuilder_common.c /Fohbbuilder_common.obj
+if errorlevel 1 (echo CL FAILED on hbbuilder_common.c & pause & exit /b 1)
 cl.exe %CL_BASE% /W3 /wd4101 hbbuilder_win.c /Fohbbuilder_win.obj
 if errorlevel 1 (echo CL FAILED on hbbuilder_win.c & pause & exit /b 1)
 
@@ -84,7 +86,7 @@ for %%f in (tform hbbridge tcontrol tcontrols hb_db_real) do (
 )
 
 echo === Step 3: Link ===
-set OBJS=hbbuilder_win.obj tform.obj hbbridge.obj tcontrol.obj tcontrols.obj hb_db_real.obj
+set OBJS=hbbuilder_common.obj hbbuilder_win.obj tform.obj hbbridge.obj tcontrol.obj tcontrols.obj hb_db_real.obj
 set HBLIBS=hbvm.lib hbrtl.lib hbcommon.lib hblang.lib hbrdd.lib hbmacro.lib hbpp.lib ^
  hbcplr.lib hbct.lib hbhsx.lib hbsix.lib hbusrrdd.lib ^
  rddntx.lib rddnsx.lib rddcdx.lib rddfpt.lib ^

@@ -82,9 +82,11 @@ if needs_rebuild "${PROG}.c" \
       "${PROG}.prg" \
       "$PROJDIR/source/core/classes.prg" \
       "$PROJDIR/source/inspector/inspector_gtk.prg" \
-      "$PROJDIR/include/hbbuilder.ch"; then
+      "$PROJDIR/source/hbbuilder_common.prg" \
+      "$PROJDIR/include/hbbuilder.ch" \
+      "$PROJDIR/include/hbide.ch"; then
    echo "[1/6] Compiling ${PROG}.prg..."
-   "$HBBIN/harbour" ${PROG}.prg -n -w -q \
+   "$HBBIN/harbour" hbbuilder_common.prg ${PROG}.prg -n -w -q \
       -I"$HBINC" \
       -I"$PROJDIR/include" \
       -I"$PROJDIR/source" \
@@ -130,6 +132,7 @@ if needs_rebuild gtk3_core.o "$PROJDIR/source/backends/gtk3/gtk3_core.c"; then
    echo "[3/6] Compiling GTK3 core..."
    gcc -c -g \
       -I"$HBINC" \
+      -I"$PROJDIR/include" \
       $(pkg-config --cflags gtk+-3.0) \
       $WEBKIT_CFLAGS $WEBKIT_DEFINE \
       "$PROJDIR/source/backends/gtk3/gtk3_core.c" -o gtk3_core.o

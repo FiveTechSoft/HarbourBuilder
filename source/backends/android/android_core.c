@@ -52,9 +52,10 @@ static int bgr_to_argb( int bgr )
 }
 
 /* ------------ Control id table ------------ */
-#define MAX_CTRLS 256
+#define MAX_CTRLS     256
+#define ANDROID_FORM_ID 1   /* reserved — widgets start at id 2 */
 static PHB_ITEM g_click_handlers[MAX_CTRLS] = { 0 };  /* codeblocks */
-static int      g_next_id = 1;
+static int      g_next_id = 2;  /* id 1 is the form handle */
 
 JNIEXPORT jint JNICALL JNI_OnLoad( JavaVM * vm, void * reserved )
 {
@@ -66,7 +67,14 @@ JNIEXPORT jint JNICALL JNI_OnLoad( JavaVM * vm, void * reserved )
 static JNIEnv * get_env( void )
 {
     JNIEnv * env = NULL;
-    (*g_jvm)->GetEnv( g_jvm, (void **) &env, JNI_VERSION_1_6 );
+    jint rc;
+
+    if( ! g_jvm )
+        return NULL;
+
+    rc = (*g_jvm)->GetEnv( g_jvm, (void **) &env, JNI_VERSION_1_6 );
+    if( rc == JNI_EDETACHED )
+        (*g_jvm)->AttachCurrentThread( g_jvm, (void **) &env, NULL );
     return env;
 }
 
@@ -90,11 +98,21 @@ HB_FUNC( UI_FORMNEW )
     int w = HB_ISNUM(2) ? hb_parni(2) : 0;
     int h = HB_ISNUM(3) ? hb_parni(3) : 0;
 
+    if( ! env || ! g_activity )
+    {
+        hb_retni( ANDROID_FORM_ID );
+        return;
+    }
+
     jstring js = to_jstr( env, title );
     (*env)->CallVoidMethod( env, g_activity, m_createForm, js, w, h );
     (*env)->DeleteLocalRef( env, js );
 
-    hb_retni( 1 );   /* the one and only form id in iter 1 */
+    /* Reserve id 1 for the form; first widget must be id 2+. */
+    if( g_next_id < 2 )
+        g_next_id = 2;
+
+    hb_retni( ANDROID_FORM_ID );
 }
 
 HB_FUNC( UI_FORMSHOW )  { /* already visible */ }
@@ -109,7 +127,12 @@ HB_FUNC( UI_FORMRUN )   { LOGI( "UI_FormRun (no-op on Android)" ); }
 static int create_widget( jmethodID m, const char * text, int x, int y, int w, int h )
 {
     JNIEnv * env = get_env();
-    int id = g_next_id++;
+    int id;
+
+    if( ! env || ! g_activity )
+        return 0;
+
+    id = g_next_id++;
     if( id >= MAX_CTRLS ) { LOGE( "too many controls" ); return 0; }
 
     jstring js = to_jstr( env, text );

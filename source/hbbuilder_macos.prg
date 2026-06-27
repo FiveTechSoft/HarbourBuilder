@@ -17,6 +17,7 @@
 // └─────────────────────────────────────────────────────────────┘ 768
 
 #include "../include/hbbuilder.ch"
+#include "../include/hbide.ch"
 
 // Force symbol registration for C functions called via hb_dynsymFindName
 EXTERNAL CODEEDITORRESTOREBREAKPOINTS
@@ -879,7 +880,7 @@ static function RegenerateFormCode( cName, hForm )
 
          cCtrlName  := UI_GetProp( hCtrl, "cName" )
          cCtrlClass := UI_GetProp( hCtrl, "cClassName" )
-         nType      := UI_GetType( hCtrl )
+         nType      := HB_NormalizeCtrlType( UI_GetType( hCtrl ) )
          if Empty( cCtrlName ); cCtrlName := "ctrl" + LTrim(Str(i)); endif
 
          // Report controls (133-135) are serialized in their band's aData — skip here
@@ -915,7 +916,7 @@ static function RegenerateFormCode( cName, hForm )
          do case
             case nType == 1  // Label
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
-                  ' SAY ::o' + cCtrlName + ' PROMPT "' + cText + '" OF ' + cParent + ' SIZE ' + ;
+                  ' SAY ::o' + cCtrlName + ' PROMPT ' + HB_QHarbourStr( cText ) + ' OF ' + cParent + ' SIZE ' + ;
                   LTrim(Str(nCW)) + e
             case nType == 2  // Edit
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
@@ -923,11 +924,11 @@ static function RegenerateFormCode( cName, hForm )
                   LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
             case nType == 3  // Button
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
-                  ' BUTTON ::o' + cCtrlName + ' PROMPT "' + cText + '" OF ' + cParent + ' SIZE ' + ;
+                  ' BUTTON ::o' + cCtrlName + ' PROMPT ' + HB_QHarbourStr( cText ) + ' OF ' + cParent + ' SIZE ' + ;
                   LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
             case nType == 4  // CheckBox
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
-                  ' CHECKBOX ::o' + cCtrlName + ' PROMPT "' + cText + '" OF ' + cParent + ' SIZE ' + ;
+                  ' CHECKBOX ::o' + cCtrlName + ' PROMPT ' + HB_QHarbourStr( cText ) + ' OF ' + cParent + ' SIZE ' + ;
                   LTrim(Str(nCW))
                if UI_GetProp( hCtrl, "lChecked" )
                   cCreate += ' CHECKED'
@@ -948,7 +949,7 @@ static function RegenerateFormCode( cName, hForm )
                cCreate += ' SIZE ' + LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
             case nType == 6  // GroupBox
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
-                  ' GROUPBOX ::o' + cCtrlName + ' PROMPT "' + cText + '" OF ' + cParent + ' SIZE ' + ;
+                  ' GROUPBOX ::o' + cCtrlName + ' PROMPT ' + HB_QHarbourStr( cText ) + ' OF ' + cParent + ' SIZE ' + ;
                   LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
             case nType == 7  // ListBox
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
@@ -966,7 +967,7 @@ static function RegenerateFormCode( cName, hForm )
                cCreate += e
             case nType == 8  // RadioButton
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
-                  ' RADIOBUTTON ::o' + cCtrlName + ' PROMPT "' + cText + '" OF ' + cParent + ' SIZE ' + ;
+                  ' RADIOBUTTON ::o' + cCtrlName + ' PROMPT ' + HB_QHarbourStr( cText ) + ' OF ' + cParent + ' SIZE ' + ;
                   LTrim(Str(nCW))
                if UI_GetProp( hCtrl, "lChecked" )
                   cCreate += ' CHECKED'
@@ -1117,7 +1118,7 @@ static function RegenerateFormCode( cName, hForm )
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   If( nType == 12, ' BITBTN ', ' SPEEDBUTTON ' ) + '::o' + cCtrlName
                if ! Empty( cText )
-                  cCreate += ' PROMPT "' + cText + '"'
+                  cCreate += ' PROMPT ' + HB_QHarbourStr( cText ) + ''
                endif
                cCreate += ' OF ' + cParent + ' SIZE ' + ;
                   LTrim(Str(nCW)) + ", " + LTrim(Str(nCH))
@@ -1274,7 +1275,7 @@ static function RegenerateFormCode( cName, hForm )
                cCreate += e
                cVal := UI_GetProp( hCtrl, "oDataSource" )
                if ! Empty( cVal )
-                  cCreate += '   ::o' + cCtrlName + ':oDataSource := "' + cVal + '"' + e
+                  cCreate += '   ::o' + cCtrlName + ':oDataSource := ' + HB_QHarbourStr( cVal ) + e
                   // Deferred: run after all components are created so datasource exists
                   cDeferredDS += '   ::o' + cCtrlName + ':LoadFromDataSource( Self )' + e
                endif
@@ -1287,11 +1288,11 @@ static function RegenerateFormCode( cName, hForm )
                   if nType == 53  // DBFTable
                      cVal := UI_GetProp( hCtrl, "cFileName" )
                      if ! Empty( cVal )
-                        cCreate += '   ::o' + cCtrlName + ':cFileName := "' + cVal + '"' + e
+                        cCreate += '   ::o' + cCtrlName + ':cFileName := ' + HB_QHarbourStr( cVal ) + e
                      endif
                      cVal := UI_GetProp( hCtrl, "cRDD" )
                      if ! Empty( cVal ) .and. Upper( cVal ) != "DBFCDX"
-                        cCreate += '   ::o' + cCtrlName + ':cRDD := "' + cVal + '"' + e
+                        cCreate += '   ::o' + cCtrlName + ':cRDD := ' + HB_QHarbourStr( cVal ) + e
                      endif
                      if UI_GetProp( hCtrl, "lActive" )
                         cCreate += '   ::o' + cCtrlName + ':Open()' + e
@@ -1299,15 +1300,15 @@ static function RegenerateFormCode( cName, hForm )
                   elseif nType == 57  // SQLite
                      cVal := UI_GetProp( hCtrl, "cFileName" )
                      if ! Empty( cVal )
-                        cCreate += '   ::o' + cCtrlName + ':cFileName := "' + cVal + '"' + e
+                        cCreate += '   ::o' + cCtrlName + ':cFileName := ' + HB_QHarbourStr( cVal ) + e
                      endif
                      cVal := UI_GetProp( hCtrl, "cTable" )
                      if ! Empty( cVal )
-                        cCreate += '   ::o' + cCtrlName + ':cTable := "' + cVal + '"' + e
+                        cCreate += '   ::o' + cCtrlName + ':cTable := ' + HB_QHarbourStr( cVal ) + e
                      endif
                      cVal := UI_GetProp( hCtrl, "cSQL" )
                      if ! Empty( cVal )
-                        cCreate += '   ::o' + cCtrlName + ':cSQL := "' + cVal + '"' + e
+                        cCreate += '   ::o' + cCtrlName + ':cSQL := ' + HB_QHarbourStr( cVal ) + e
                      endif
                      if UI_GetProp( hCtrl, "lActive" )
                         cCreate += '   ::o' + cCtrlName + ':Open()' + e
@@ -1315,11 +1316,11 @@ static function RegenerateFormCode( cName, hForm )
                   elseif nType == 131  // CompArray
                      cVal := UI_GetProp( hCtrl, "aHeaders" )
                      if ! Empty( cVal )
-                        cCreate += '   ::o' + cCtrlName + ':aHeaders := "' + cVal + '"' + e
+                        cCreate += '   ::o' + cCtrlName + ':aHeaders := ' + HB_QHarbourStr( cVal ) + e
                      endif
                      cVal := UI_GetProp( hCtrl, "aData" )
                      if ! Empty( cVal )
-                        cCreate += '   ::o' + cCtrlName + ':aData := "' + cVal + '"' + e
+                        cCreate += '   ::o' + cCtrlName + ':aData := ' + HB_QHarbourStr( cVal ) + e
                      endif
                   elseif nType == CT_TIMER
                      nInterval := UI_GetProp( hCtrl, "nInterval" )
@@ -1358,10 +1359,10 @@ static function RegenerateFormCode( cName, hForm )
                                  endif
                               endif
                               if bIsPopup
-                                 cCreate += cInd + 'DEFINE POPUP "' + cCap + '"' + e
+                                 cCreate += cInd + 'DEFINE POPUP ' + HB_QHarbourStr( cCap ) + e
                                  AAdd( nPendingLevels, nLv )
                               else
-                                 cCreate += cInd + 'MENUITEM "' + cCap + '"'
+                                 cCreate += cInd + 'MENUITEM ' + HB_QHarbourStr( cCap )
                                  if ! Empty( cHndl )
                                     if ":" $ cHndl .or. "(" $ cHndl
                                        cCreate += ' ACTION ' + cHndl
@@ -1374,7 +1375,7 @@ static function RegenerateFormCode( cName, hForm )
                                     endif
                                  endif
                                  if ! Empty( cScut )
-                                    cCreate += ' ACCEL "' + cScut + '"'
+                                    cCreate += ' ACCEL ' + HB_QHarbourStr( cScut )
                                  endif
                                  cCreate += e
                               endif
@@ -1420,10 +1421,10 @@ static function RegenerateFormCode( cName, hForm )
                                  endif
                               endif
                               if nLv == 0 .or. bIsPopup
-                                 cCreate += cInd + 'DEFINE POPUP "' + cCap + '"' + e
+                                 cCreate += cInd + 'DEFINE POPUP ' + HB_QHarbourStr( cCap ) + e
                                  AAdd( nPendingLevels, nLv )
                               else
-                                 cCreate += cInd + 'MENUITEM "' + cCap + '"'
+                                 cCreate += cInd + 'MENUITEM ' + HB_QHarbourStr( cCap )
                                  if ! Empty( cHndl )
                                     if ":" $ cHndl .or. "(" $ cHndl
                                        cCreate += ' ACTION ' + cHndl
@@ -1436,7 +1437,7 @@ static function RegenerateFormCode( cName, hForm )
                                     endif
                                  endif
                                  if ! Empty( cScut )
-                                    cCreate += ' ACCEL "' + cScut + '"'
+                                    cCreate += ' ACCEL ' + HB_QHarbourStr( cScut )
                                  endif
                                  cCreate += e
                               endif
@@ -1531,7 +1532,7 @@ static function RegenerateFormCode( cName, hForm )
             // Emit oFont if non-default
             cVal := UI_GetProp( hCtrl, "oFont" )
             if ! Empty( cVal ) .and. cVal != "System,12" .and. cVal != ".LucidaGrande,13"
-               cCreate += '   ::o' + cCtrlName + ':oFont := "' + cVal + '"' + e
+               cCreate += '   ::o' + cCtrlName + ':oFont := ' + HB_QHarbourStr( cVal ) + e
             endif
          endif
 
@@ -2951,19 +2952,7 @@ return nil
 // Determine what type of tab nTab refers to: { cType, nIndex }
 // cType: "project", "form", "module", "openfile"
 static function TabInfo( nTab )
-
-   local nF := Len( aForms )
-   local nM := Len( aModules )
-
-   if nTab == 1
-      return { "project", 0 }
-   elseif nTab <= nF + 1
-      return { "form", nTab - 1 }
-   elseif nTab <= nF + nM + 1
-      return { "module", nTab - nF - 1 }
-   endif
-
-return { "openfile", nTab - nF - nM - 1 }
+return HB_ProjectTabInfo( nTab, Len( aForms ), Len( aModules ) )
 
 // Get all code from editor (called from C inspector to check handler existence)
 function INS_GetAllCode()
@@ -5545,178 +5534,6 @@ static function ResPath( cFile )
       return cBundle
    endif
 return "../resources/" + cFile
-
-// Map component type number to CT_* define name for code generation
-static function IsNonVisual( nType )
-   // Visual controls that have high CT_* numbers (>= 38)
-   // CT_BROWSE=79, CT_DBGRID=80, CT_DBNAVIGATOR=81, CT_DBTEXT=82,
-   // CT_DBEDIT=83, CT_DBCOMBOBOX=84, CT_DBCHECKBOX=85, CT_DBIMAGE=86,
-   // CT_WEBVIEW=62
-   if nType == 62 .or. ( nType >= 79 .and. nType <= 86 ) .or. ;
-      ( nType >= 132 .and. nType <= 135 ) .or. ;
-      nType == 140 .or. nType == 141 .or. nType == 142
-      return .F.
-   endif
-   if nType == 200 .or. nType == 201  // CT_MAINMENU / CT_POPUPMENU
-      return .T.
-   endif
-return nType >= 38
-
-static function ComponentTypeName( nType )
-   do case
-      case nType == 38;  return "CT_TIMER"
-      case nType == 39;  return "CT_PAINTBOX"
-      case nType == 40;  return "CT_OPENDIALOG"
-      case nType == 41;  return "CT_SAVEDIALOG"
-      case nType == 42;  return "CT_FONTDIALOG"
-      case nType == 43;  return "CT_COLORDIALOG"
-      case nType == 44;  return "CT_FINDDIALOG"
-      case nType == 45;  return "CT_REPLACEDIALOG"
-      case nType == 46;  return "CT_OPENAI"
-      case nType == 47;  return "CT_GEMINI"
-      case nType == 48;  return "CT_CLAUDE"
-      case nType == 49;  return "CT_DEEPSEEK"
-      case nType == 50;  return "CT_GROK"
-      case nType == 51;  return "CT_OLLAMA"
-      case nType == 52;  return "CT_TRANSFORMER"
-      case nType == 53;  return "CT_DBFTABLE"
-      case nType == 54;  return "CT_MYSQL"
-      case nType == 55;  return "CT_MARIADB"
-      case nType == 56;  return "CT_POSTGRESQL"
-      case nType == 57;  return "CT_SQLITE"
-      case nType == 58;  return "CT_FIREBIRD"
-      case nType == 59;  return "CT_SQLSERVER"
-      case nType == 60;  return "CT_ORACLE"
-      case nType == 61;  return "CT_MONGODB"
-      case nType == 62;  return "CT_WEBVIEW"
-      case nType == 63;  return "CT_THREAD"
-      case nType == 64;  return "CT_MUTEX"
-      case nType == 65;  return "CT_SEMAPHORE"
-      case nType == 66;  return "CT_CRITICALSECTION"
-      case nType == 67;  return "CT_THREADPOOL"
-      case nType == 68;  return "CT_ATOMICINT"
-      case nType == 69;  return "CT_CONDVAR"
-      case nType == 70;  return "CT_CHANNEL"
-      case nType == 71;  return "CT_WEBSERVER"
-      case nType == 72;  return "CT_WEBSOCKET"
-      case nType == 73;  return "CT_HTTPCLIENT"
-      case nType == 74;  return "CT_FTPCLIENT"
-      case nType == 75;  return "CT_SMTPCLIENT"
-      case nType == 76;  return "CT_TCPSERVER"
-      case nType == 77;  return "CT_TCPCLIENT"
-      case nType == 78;  return "CT_UDPSOCKET"
-      case nType == 79;  return "CT_BROWSE"
-      case nType == 80;  return "CT_DBGRID"
-      case nType == 81;  return "CT_DBNAVIGATOR"
-      case nType == 82;  return "CT_DBTEXT"
-      case nType == 83;  return "CT_DBEDIT"
-      case nType == 84;  return "CT_DBCOMBOBOX"
-      case nType == 85;  return "CT_DBCHECKBOX"
-      case nType == 86;  return "CT_DBIMAGE"
-      case nType == 90;  return "CT_PREPROCESSOR"
-      case nType == 91;  return "CT_SCRIPTENGINE"
-      case nType == 92;  return "CT_REPORTDESIGNER"
-      case nType == 93;  return "CT_BARCODE"
-      case nType == 94;  return "CT_PDFGENERATOR"
-      case nType == 95;  return "CT_EXCELEXPORT"
-      case nType == 96;  return "CT_AUDITLOG"
-      case nType == 97;  return "CT_PERMISSIONS"
-      case nType == 98;  return "CT_CURRENCY"
-      case nType == 99;  return "CT_TAXENGINE"
-      case nType == 100; return "CT_DASHBOARD"
-      case nType == 101; return "CT_SCHEDULER"
-      case nType == 102; return "CT_PRINTER"
-      case nType == 103; return "CT_REPORT"
-      case nType == 104; return "CT_LABELS"
-      case nType == 105; return "CT_PRINTPREVIEW"
-      case nType == 106; return "CT_PAGESETUP"
-      case nType == 107; return "CT_PRINTDIALOG"
-      case nType == 108; return "CT_REPORTVIEWER"
-      case nType == 109; return "CT_BARCODEPRINTER"
-      case nType == 110; return "CT_WHISPER"
-      case nType == 111; return "CT_EMBEDDINGS"
-      case nType == 112; return "CT_PYTHON"
-      case nType == 113; return "CT_SWIFT"
-      case nType == 114; return "CT_GO"
-      case nType == 115; return "CT_NODE"
-      case nType == 116; return "CT_RUST"
-      case nType == 117; return "CT_JAVA"
-      case nType == 118; return "CT_DOTNET"
-      case nType == 119; return "CT_LUA"
-      case nType == 120; return "CT_RUBY"
-      case nType == 121; return "CT_GITREPO"
-      case nType == 122; return "CT_GITCOMMIT"
-      case nType == 123; return "CT_GITBRANCH"
-      case nType == 124; return "CT_GITLOG"
-      case nType == 125; return "CT_GITDIFF"
-      case nType == 126; return "CT_GITREMOTE"
-      case nType == 127; return "CT_GITSTASH"
-      case nType == 128; return "CT_GITTAG"
-      case nType == 129; return "CT_GITBLAME"
-      case nType == 130; return "CT_GITMERGE"
-      case nType == 131; return "CT_COMPARRAY"
-      case nType == 132; return "CT_BAND"
-      case nType == 200; return "CT_MAINMENU"
-      case nType == 201; return "CT_POPUPMENU"
-      case nType == 133; return "CT_REPORTLABEL"
-      case nType == 134; return "CT_REPORTFIELD"
-      case nType == 135; return "CT_REPORTIMAGE"
-   endcase
-return LTrim(Str(nType))
-
-// Reverse map: CT_* define name to type number (for parsing saved code)
-static function ResolveComponentType( cName )
-   local i, aMap := { ;
-      { "CT_TIMER", 38 }, { "CT_PAINTBOX", 39 }, ;
-      { "CT_OPENDIALOG", 40 }, { "CT_SAVEDIALOG", 41 }, ;
-      { "CT_FONTDIALOG", 42 }, { "CT_COLORDIALOG", 43 }, ;
-      { "CT_FINDDIALOG", 44 }, { "CT_REPLACEDIALOG", 45 }, ;
-      { "CT_OPENAI", 46 }, { "CT_GEMINI", 47 }, { "CT_CLAUDE", 48 }, ;
-      { "CT_DEEPSEEK", 49 }, { "CT_GROK", 50 }, { "CT_OLLAMA", 51 }, ;
-      { "CT_TRANSFORMER", 52 }, ;
-      { "CT_DBFTABLE", 53 }, { "CT_MYSQL", 54 }, { "CT_MARIADB", 55 }, ;
-      { "CT_POSTGRESQL", 56 }, { "CT_SQLITE", 57 }, { "CT_FIREBIRD", 58 }, ;
-      { "CT_SQLSERVER", 59 }, { "CT_ORACLE", 60 }, { "CT_MONGODB", 61 }, ;
-      { "CT_WEBVIEW", 62 }, { "CT_THREAD", 63 }, { "CT_MUTEX", 64 }, ;
-      { "CT_SEMAPHORE", 65 }, { "CT_CRITICALSECTION", 66 }, ;
-      { "CT_THREADPOOL", 67 }, { "CT_ATOMICINT", 68 }, ;
-      { "CT_CONDVAR", 69 }, { "CT_CHANNEL", 70 }, ;
-      { "CT_WEBSERVER", 71 }, { "CT_WEBSOCKET", 72 }, ;
-      { "CT_HTTPCLIENT", 73 }, { "CT_FTPCLIENT", 74 }, ;
-      { "CT_SMTPCLIENT", 75 }, { "CT_TCPSERVER", 76 }, ;
-      { "CT_TCPCLIENT", 77 }, { "CT_UDPSOCKET", 78 }, ;
-      { "CT_BROWSE", 79 }, { "CT_DBGRID", 80 }, { "CT_DBNAVIGATOR", 81 }, ;
-      { "CT_DBTEXT", 82 }, { "CT_DBEDIT", 83 }, { "CT_DBCOMBOBOX", 84 }, ;
-      { "CT_DBCHECKBOX", 85 }, { "CT_DBIMAGE", 86 }, ;
-      { "CT_PREPROCESSOR", 90 }, { "CT_SCRIPTENGINE", 91 }, ;
-      { "CT_REPORTDESIGNER", 92 }, { "CT_BARCODE", 93 }, ;
-      { "CT_PDFGENERATOR", 94 }, { "CT_EXCELEXPORT", 95 }, ;
-      { "CT_AUDITLOG", 96 }, { "CT_PERMISSIONS", 97 }, ;
-      { "CT_CURRENCY", 98 }, { "CT_TAXENGINE", 99 }, ;
-      { "CT_DASHBOARD", 100 }, { "CT_SCHEDULER", 101 }, ;
-      { "CT_PRINTER", 102 }, { "CT_REPORT", 103 }, { "CT_LABELS", 104 }, ;
-      { "CT_PRINTPREVIEW", 105 }, { "CT_PAGESETUP", 106 }, ;
-      { "CT_PRINTDIALOG", 107 }, { "CT_REPORTVIEWER", 108 }, ;
-      { "CT_BARCODEPRINTER", 109 }, ;
-      { "CT_WHISPER", 110 }, { "CT_EMBEDDINGS", 111 }, ;
-      { "CT_PYTHON", 112 }, { "CT_SWIFT", 113 }, { "CT_GO", 114 }, ;
-      { "CT_NODE", 115 }, { "CT_RUST", 116 }, { "CT_JAVA", 117 }, ;
-      { "CT_DOTNET", 118 }, { "CT_LUA", 119 }, { "CT_RUBY", 120 }, ;
-      { "CT_GITREPO", 121 }, { "CT_GITCOMMIT", 122 }, ;
-      { "CT_GITBRANCH", 123 }, { "CT_GITLOG", 124 }, ;
-      { "CT_GITDIFF", 125 }, { "CT_GITREMOTE", 126 }, ;
-      { "CT_GITSTASH", 127 }, { "CT_GITTAG", 128 }, ;
-      { "CT_GITBLAME", 129 }, { "CT_GITMERGE", 130 }, ;
-      { "CT_COMPARRAY", 131 }, ;
-      { "CT_BAND", 132 }, ;
-      { "CT_REPORTLABEL", 133 }, { "CT_REPORTFIELD", 134 }, { "CT_REPORTIMAGE", 135 }, ;
-      { "CT_MAINMENU", 200 }, { "CT_POPUPMENU", 201 } }
-   for i := 1 to Len( aMap )
-      if Upper( cName ) == aMap[i][1]
-         return aMap[i][2]
-      endif
-   next
-return 0
 
 // --- ScanMethodDeclarations ---
 // Extract every "METHOD <Name>() CLASS <cClass>" implementation from

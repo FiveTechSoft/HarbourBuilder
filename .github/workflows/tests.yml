@@ -1,0 +1,66 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  test-linux:
+    name: Unit tests (Linux)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential curl ca-certificates
+
+      - name: Cache Harbour
+        id: cache-harbour
+        uses: actions/cache@v4
+        with:
+          path: ~/harbour
+          key: harbour-linux-x86_64-v1
+
+      - name: Build Harbour (if cache miss)
+        if: steps.cache-harbour.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 https://github.com/harbour/core /tmp/harbour-src
+          cd /tmp/harbour-src
+          HB_INSTALL_PREFIX="$HOME/harbour" make -j$(nproc) install
+
+      - name: Run tests
+        run: |
+          export HBDIR="$HOME/harbour"
+          chmod +x run_tests.sh
+          ./run_tests.sh
+
+  test-windows:
+    name: Unit tests (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Harbour
+        id: cache-harbour
+        uses: actions/cache@v4
+        with:
+          path: C:\harbour
+          key: harbour-win-x64-v1
+
+      - name: Build Harbour (if cache miss)
+        if: steps.cache-harbour.outputs.cache-hit != 'true'
+        shell: cmd
+        run: |
+          git clone --depth 1 https://github.com/harbour/core C:\harbour-src
+          cd C:\harbour-src
+          set HB_INSTALL_PREFIX=C:\harbour
+          nmake /f "C:\harbour-src\win\msvc64\makefile.vc" install
+
+      - name: Run tests
+        shell: cmd
+        run: run_tests.bat
