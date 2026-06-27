@@ -13885,7 +13885,34 @@ HB_FUNC( CODEEDITORCLEARMARKS )
 typedef struct _MESSAGESPANEL {
    GtkWidget * window;
    GtkWidget * textView;
+   GtkCssProvider * cssProvider;
 } MESSAGESPANEL;
+
+static void MsgPanel_ApplyGtkTheme( MESSAGESPANEL * mp )
+{
+   const char * css;
+   GtkStyleContext * ctx;
+
+   if( !mp || !mp->textView ) return;
+
+   if( mp->cssProvider )
+   {
+      ctx = gtk_widget_get_style_context( mp->textView );
+      gtk_style_context_remove_provider( ctx, GTK_STYLE_PROVIDER( mp->cssProvider ) );
+      g_object_unref( mp->cssProvider );
+      mp->cssProvider = NULL;
+   }
+
+   css = GTK_IsDark()
+      ? "textview { background-color: rgb(30,30,30); color: rgb(212,212,212); }"
+      : "textview { background-color: rgb(255,255,255); color: rgb(30,30,30); }";
+   mp->cssProvider = gtk_css_provider_new();
+   gtk_css_provider_load_from_data( mp->cssProvider, css, -1, NULL );
+   gtk_style_context_add_provider(
+      gtk_widget_get_style_context( mp->textView ),
+      GTK_STYLE_PROVIDER( mp->cssProvider ),
+      GTK_STYLE_PROVIDER_PRIORITY_APPLICATION );
+}
 
 HB_FUNC( MESSAGESPANELCREATE )
 {
@@ -13910,10 +13937,17 @@ HB_FUNC( MESSAGESPANELCREATE )
    gtk_text_view_set_editable( GTK_TEXT_VIEW(mp->textView), FALSE );
    gtk_text_view_set_monospace( GTK_TEXT_VIEW(mp->textView), TRUE );
    gtk_text_view_set_wrap_mode( GTK_TEXT_VIEW(mp->textView), GTK_WRAP_WORD_CHAR );
+   MsgPanel_ApplyGtkTheme( mp );
    gtk_container_add( GTK_CONTAINER(scroll), mp->textView );
    gtk_container_add( GTK_CONTAINER(mp->window), scroll );
    gtk_widget_show_all( mp->window );
    hb_retnint( (HB_PTRUINT) mp );
+}
+
+HB_FUNC( MESSAGESPANELREFRESHTHEME )
+{
+   MESSAGESPANEL * mp = (MESSAGESPANEL *)(HB_PTRUINT) hb_parnint(1);
+   MsgPanel_ApplyGtkTheme( mp );
 }
 
 HB_FUNC( MESSAGESPANELSETTEXT )
@@ -13952,6 +13986,14 @@ HB_FUNC( MESSAGESPANELDESTROY )
    MESSAGESPANEL * mp = (MESSAGESPANEL *)(HB_PTRUINT) hb_parnint(1);
    if( mp )
    {
+      if( mp->cssProvider )
+      {
+         if( mp->textView )
+            gtk_style_context_remove_provider(
+               gtk_widget_get_style_context( mp->textView ),
+               GTK_STYLE_PROVIDER( mp->cssProvider ) );
+         g_object_unref( mp->cssProvider );
+      }
       if( mp->window ) gtk_widget_destroy( mp->window );
       free( mp );
    }

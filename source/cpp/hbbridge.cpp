@@ -8591,10 +8591,69 @@ typedef struct _MESSAGESPANEL {
    HWND hEdit;
 } MESSAGESPANEL;
 
+static HBRUSH s_hMsgBgBrush    = NULL;
+static HBRUSH s_hMsgEditBrush = NULL;
+
+static void MsgPanel_ApplyDwm( HWND hWnd )
+{
+   typedef HRESULT (WINAPI *PFN_DwmSetWindowAttribute)( HWND, DWORD, LPCVOID, DWORD );
+   HMODULE hDwm;
+   PFN_DwmSetWindowAttribute pFn;
+   BOOL val;
+
+   if( !hWnd ) return;
+   hDwm = LoadLibraryA( "dwmapi.dll" );
+   if( !hDwm ) return;
+   pFn = (PFN_DwmSetWindowAttribute) GetProcAddress( hDwm, "DwmSetWindowAttribute" );
+   if( pFn )
+   {
+      val = g_bDarkIDE ? TRUE : FALSE;
+      pFn( hWnd, 20, &val, sizeof( val ) );
+      SetWindowPos( hWnd, NULL, 0, 0, 0, 0,
+         SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED );
+   }
+   FreeLibrary( hDwm );
+}
+
 static LRESULT CALLBACK MsgPanelWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 {
+   MESSAGESPANEL * mp = (MESSAGESPANEL *) GetWindowLongPtrA( hWnd, GWLP_USERDATA );
+
    switch( msg )
    {
+      case WM_ERASEBKGND:
+      {
+         RECT rc;
+         HBRUSH hBr;
+
+         GetClientRect( hWnd, &rc );
+         if( g_bDarkIDE )
+         {
+            if( !s_hMsgBgBrush ) s_hMsgBgBrush = CreateSolidBrush( RGB( 37, 37, 38 ) );
+            hBr = s_hMsgBgBrush;
+         }
+         else
+            hBr = (HBRUSH)( COLOR_BTNFACE + 1 );
+         FillRect( (HDC) wParam, &rc, hBr );
+         return 1;
+      }
+      case WM_CTLCOLOREDIT:
+         if( g_bDarkIDE )
+         {
+            if( !s_hMsgEditBrush ) s_hMsgEditBrush = CreateSolidBrush( RGB( 30, 30, 30 ) );
+            SetTextColor( (HDC) wParam, RGB( 212, 212, 212 ) );
+            SetBkColor( (HDC) wParam, RGB( 30, 30, 30 ) );
+            return (LRESULT) s_hMsgEditBrush;
+         }
+         break;
+      case WM_SIZE:
+         if( mp && mp->hEdit )
+         {
+            int w = LOWORD( lParam ), h = HIWORD( lParam );
+            MoveWindow( mp->hEdit, 4, 4, w - 12, h - 32, TRUE );
+            return 0;
+         }
+         break;
       case WM_CLOSE:
          ShowWindow( hWnd, SW_HIDE );
          return 0;
@@ -8615,6 +8674,7 @@ HB_FUNC( MESSAGESPANELCREATE )
    static BOOL bReg = FALSE;
    int nLeft = hb_parni(1), nTop = hb_parni(2);
    int nWidth = hb_parni(3), nHeight = hb_parni(4);
+   DWORD dwEditEx = g_bDarkIDE ? 0 : WS_EX_CLIENTEDGE;
 
    mp = (MESSAGESPANEL *) HeapAlloc( GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(MESSAGESPANEL) );
    if( !mp ) { hb_retnint( 0 ); return; }
@@ -8624,7 +8684,7 @@ HB_FUNC( MESSAGESPANELCREATE )
       wc.lpfnWndProc   = MsgPanelWndProc;
       wc.hInstance     = GetModuleHandle( NULL );
       wc.hCursor       = LoadCursor( NULL, IDC_ARROW );
-      wc.hbrBackground = (HBRUSH)( COLOR_WINDOW + 1 );
+      wc.hbrBackground = NULL;
       wc.lpszClassName = "HbIdeMessagesPanel";
       RegisterClassA( &wc );
       bReg = TRUE;
@@ -8634,8 +8694,9 @@ HB_FUNC( MESSAGESPANELCREATE )
       WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME,
       nLeft, nTop, nWidth, nHeight,
       NULL, NULL, GetModuleHandle( NULL ), NULL );
+   SetWindowLongPtrA( mp->hWnd, GWLP_USERDATA, (LONG_PTR) mp );
 
-   mp->hEdit = CreateWindowExA( WS_EX_CLIENTEDGE, "EDIT", "",
+   mp->hEdit = CreateWindowExA( dwEditEx, "EDIT", "",
       WS_CHILD | WS_VISIBLE | ES_MULTILINE | ES_AUTOVSCROLL | WS_VSCROLL |
       ES_READONLY | ES_NOHIDESEL,
       4, 4, nWidth - 12, nHeight - 32,
@@ -8647,8 +8708,22 @@ HB_FUNC( MESSAGESPANELCREATE )
       if( hFont ) SendMessage( mp->hEdit, WM_SETFONT, (WPARAM) hFont, TRUE );
    }
 
+   MsgPanel_ApplyDwm( mp->hWnd );
    ShowWindow( mp->hWnd, SW_SHOW );
    hb_retnint( (HB_PTRUINT) mp );
+}
+
+HB_FUNC( MESSAGESPANELREFRESHTHEME )
+{
+   MESSAGESPANEL * mp = (MESSAGESPANEL *)(HB_PTRUINT) hb_parnint(1);
+
+   if( mp && mp->hWnd )
+   {
+      MsgPanel_ApplyDwm( mp->hWnd );
+      InvalidateRect( mp->hWnd, NULL, TRUE );
+      if( mp->hEdit )
+         InvalidateRect( mp->hEdit, NULL, TRUE );
+   }
 }
 
 HB_FUNC( MESSAGESPANELSETTEXT )

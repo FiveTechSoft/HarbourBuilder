@@ -417,6 +417,7 @@ function Main()
    hCodeEditor := CodeEditorCreate( nEditorX, nEditorTop, nEditorW, nEditorH )
    hMessagesPanel := MessagesPanelCreate( nEditorX, nBottomY - nMsgH, nEditorW, nMsgH )
    IDE_RegisterMessagesPanel( hMessagesPanel )
+   MessagesPanelRefreshTheme( hMessagesPanel )
    IDE_SetMessages( "Ready." + Chr(10) )
    StTime( "code editor created" )
 
@@ -6694,6 +6695,11 @@ static function ToggleDarkMode()
 
    // Refresh AI Assistant panel
    W32_AIRefreshTheme()
+
+   // Refresh Messages panel (build output)
+   if hMessagesPanel != nil .and. hMessagesPanel != 0
+      MessagesPanelRefreshTheme( hMessagesPanel )
+   endif
 
 return nil
 

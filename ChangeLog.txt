@@ -3,6 +3,10 @@ HarbourBuilder - Cross-platform visual IDE for Harbour
 
 2026-06-27
 
+  - fix(all): Messages panel respects IDE dark theme. Win32: WM_ERASEBKGND /
+    WM_CTLCOLOREDIT (RGB 37,37,38 / 30,30,30 / 212,212,212), DWM dark title
+    bar via g_bDarkIDE, MessagesPanelRefreshTheme on create and Dark Mode
+    toggle. GTK: CSS on textview via GTK_IsDark(). Cocoa: refresh hook added.
   - feat(all): Phase 2 — unified build/debug messages panel. Native
     MessagesPanelCreate/SetText/Clear/BringToFront/Destroy in hbbridge.cpp
     (Win32), gtk3_core.c (GTK3), and cocoa_editor.mm (macOS). Bottom panel

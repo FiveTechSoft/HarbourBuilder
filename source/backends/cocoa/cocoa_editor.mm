@@ -6719,6 +6719,13 @@ HB_FUNC( MESSAGESPANELBRINGTOFRONT )
       [mp->window makeKeyAndOrderFront:nil];
 }
 
+HB_FUNC( MESSAGESPANELREFRESHTHEME )
+{
+   MESSAGESPANEL * mp = (MESSAGESPANEL *)(HB_PTRUINT) hb_parnint(1);
+   if( mp && mp->window )
+      [mp->window setAppearance:[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua]];
+}
+
 HB_FUNC( MESSAGESPANELDESTROY )
 {
    MESSAGESPANEL * mp = (MESSAGESPANEL *)(HB_PTRUINT) hb_parnint(1);

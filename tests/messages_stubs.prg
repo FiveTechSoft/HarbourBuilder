@@ -19,3 +19,7 @@ RETURN NIL
 FUNCTION MessagesPanelBringToFront( hPanel )
    HB_SYMBOL_UNUSED( hPanel )
 RETURN NIL
+
+FUNCTION MessagesPanelRefreshTheme( hPanel )
+   HB_SYMBOL_UNUSED( hPanel )
+RETURN NIL

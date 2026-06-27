@@ -275,6 +275,7 @@ function Main()
    hCodeEditor := CodeEditorCreate( nEditorX, nEditorTop, nEditorW, nEditorH )
    hMessagesPanel := MessagesPanelCreate( nEditorX, nBottomY - nMsgH, nEditorW, nMsgH )
    IDE_RegisterMessagesPanel( hMessagesPanel )
+   MessagesPanelRefreshTheme( hMessagesPanel )
    IDE_SetMessages( "Ready." + Chr(10) )
 
    // Apply saved dark/light theme to editor
@@ -4063,6 +4064,10 @@ static function ToggleDarkMode()
          UI_SetProp( oDesignForm:hCpp, "nClrPane", 15790320 ) // RGB(240,240,240)
       endif
       InspectorRefresh( oDesignForm:hCpp )
+   endif
+
+   if hMessagesPanel != nil .and. hMessagesPanel != 0
+      MessagesPanelRefreshTheme( hMessagesPanel )
    endif
 return nil
 

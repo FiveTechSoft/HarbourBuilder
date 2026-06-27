@@ -321,6 +321,7 @@ function Main()
    hCodeEditor := CodeEditorCreate( nEditorX, nEditorTop, nEditorW, nEditorH )
    hMessagesPanel := MessagesPanelCreate( nEditorX, nBottomY - nMsgH, nEditorW, nMsgH )
    IDE_RegisterMessagesPanel( hMessagesPanel )
+   MessagesPanelRefreshTheme( hMessagesPanel )
    IDE_SetMessages( "Ready." + Chr(10) )
 
    // === Window 3: Form Designer (floating on top of editor) ===
