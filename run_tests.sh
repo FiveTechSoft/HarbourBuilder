@@ -25,9 +25,16 @@ HB_LIB="$HBDIR/lib"
 mkdir -p "$BINDIR"
 cd "$TESTDIR"
 
+echo "=== messages_stubs ==="
+rm -f messages_stubs.c messages_stubs.o
+"$HB_BIN" messages_stubs.prg -n -w -es2 -q -I"$HB_INC" -omessages_stubs
+gcc -c -o messages_stubs.o messages_stubs.c -I"$HB_INC" -Wno-unused-variable
+
 TESTS=(
    test_codegen
    test_hbp_index
+   test_hbp_parse
+   test_messages
    test_project_tab
    test_hix_path
    test_component_types
@@ -48,7 +55,7 @@ for name in "${TESTS[@]}"; do
       FAIL=$((FAIL + 1))
       continue
    fi
-   gcc -o "$BINDIR/${name}" "${name}.c" \
+   gcc -o "$BINDIR/${name}" "${name}.c" messages_stubs.o \
       -I"$HB_INC" -L"$HB_LIB" $HBLINK -Wno-unused-variable
    if "$BINDIR/${name}"; then
       PASS=$((PASS + 1))
@@ -61,10 +68,12 @@ done
 echo ""
 echo "=== compile-only: IDE sources ==="
 cd "$ROOT/source"
-"$HB_BIN" hbbuilder_common.prg hbbuilder_linux.prg \
-   -n -w -es2 -q -I"$HB_INC" -I"$INCDIR" -ohbbuilder_linux_syntax
-rm -f hbbuilder_linux_syntax.c hbbuilder_common.c
-echo "OK: hbbuilder_linux.prg syntax"
+for ide in hbbuilder_linux hbbuilder_macos; do
+   "$HB_BIN" hbbuilder_common.prg "${ide}.prg" \
+      -n -w -es2 -q -I"$HB_INC" -I"$INCDIR" -I"$ROOT/source" -o"${ide}_syntax"
+   rm -f "${ide}_syntax.c" hbbuilder_common.c
+   echo "OK: ${ide}.prg syntax"
+done
 
 echo ""
 if [ "$FAIL" -eq 0 ]; then

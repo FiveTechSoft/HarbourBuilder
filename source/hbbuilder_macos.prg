@@ -13,7 +13,7 @@
 // │ grid     │                                                  │
 // │          │                                                  │
 // ├──────────┴──────────────────────────────────────────────────┤ ~650
-// │  Messages / Compiler output (future)                        │
+// │  Messages / Compiler output (bottom panel)                  │
 // └─────────────────────────────────────────────────────────────┘ 768
 
 #include "../include/hbbuilder.ch"
@@ -52,6 +52,7 @@ EXTERNAL IDE_DBGRUNLOOPENDED
 static oIDE          // Main IDE bar (top strip)
 static oDesignForm   // Design form (active, floats on top of editor)
 static hCodeEditor   // Code editor (background, right of inspector)
+static hMessagesPanel // Build / debug output panel
 static nScreenW      // Screen width
 static nScreenH      // Screen height
 static cCurrentFile  // Current file path (empty = untitled)
@@ -70,7 +71,7 @@ static lSyncingFromCode := .f.  // Guard: true while syncing code -> designer
 function Main()
 
    local oTB, oFile, oEdit, oSearch, oView, oProject, oRun, oFormat, oComp, oTools, oGit, oHelp
-   local nBarH, nInsW, nEditorX, nEditorW, nEditorH
+   local nBarH, nInsW, nEditorX, nEditorW, nEditorH, nMsgH
    local nFormX, nFormY, nInsTop, nEditorTop, nBottomY
    local cIcoDir
 
@@ -106,7 +107,8 @@ function Main()
    nEditorW := nScreenW - nEditorX
    // Both inspector and editor end at same bottom position
    nBottomY := nScreenH                        // no bottom margin
-   nEditorH := nBottomY - nEditorTop
+   nMsgH    := IDE_MessagesHeight( nScreenH )
+   nEditorH := nBottomY - nEditorTop - nMsgH
 
    // Form Designer: fixed position
    nFormX := 815
@@ -152,6 +154,7 @@ function Main()
    MENUITEM "Inspector"        OF oView ACTION InspectorOpen()
    MENUITEM "Project Inspector" OF oView ACTION ShowProjectInspector()
    MENUITEM "Debugger"          OF oView ACTION ShowDebugger()
+   MENUITEM "Messages"          OF oView ACTION IDE_ShowMessages()
 
    DEFINE POPUP oProject PROMPT "Project" OF oIDE
    MENUITEM "Add to Project..."    OF oProject ACTION AddToProject()
@@ -316,6 +319,9 @@ function Main()
    // === Window 4: Code Editor (background, right of inspector, full area) ===
    // Created FIRST so it appears BEHIND the form
    hCodeEditor := CodeEditorCreate( nEditorX, nEditorTop, nEditorW, nEditorH )
+   hMessagesPanel := MessagesPanelCreate( nEditorX, nBottomY - nMsgH, nEditorW, nMsgH )
+   IDE_RegisterMessagesPanel( hMessagesPanel )
+   IDE_SetMessages( "Ready." + Chr(10) )
 
    // === Window 3: Form Designer (floating on top of editor) ===
    CreateDesignForm( nFormX, nFormY )
@@ -3837,19 +3843,10 @@ static function TBSave()
    endif
 
    // Project directory = same as .hbp file
-   cDir := Left( cCurrentFile, RAt( "/", cCurrentFile ) )
+   cDir := HB_ProjectDirFromFile( cCurrentFile )
 
    // Write .hbp file (project index)
-   cHbp := "Project1" + Chr(10)
-   for i := 1 to Len( aForms )
-      cHbp += aForms[i][1] + Chr(10)
-   next
-   if Len( aModules ) > 0
-      cHbp += "[modules]" + Chr(10)
-      for i := 1 to Len( aModules )
-         cHbp += aModules[i][1] + Chr(10)
-      next
-   endif
+   cHbp := HB_BuildHbpFromProject( aForms, aModules )
    MemoWrit( cCurrentFile, cHbp )
 
    // Write Project1.prg
@@ -4032,6 +4029,8 @@ static function TBRun()
    cProjDir := HB_DirBase() + ".."
    cLog     := ""
    lError   := .F.
+   IDE_ClearMessages()
+   IDE_AppendMessage( "=== Build started ===" + Chr(10) )
 
    // Resolve paths for bundle vs source tree
    cResDir := HB_DirBase() + "../Resources"
@@ -4360,12 +4359,13 @@ static function TBRun()
 
    // Result
    if lError
-      MAC_BuildErrorDialog( "Build Failed", cLog )
+      IDE_ShowBuildResult( "Build Failed", cLog, lError )
    elseif ! File( cBuildDir + "/" + cAppName )
       cLog += Chr(10) + "ERROR: " + cAppName + " was not created." + Chr(10)
-      MAC_BuildErrorDialog( "Build Failed", cLog )
+      IDE_ShowBuildResult( "Build Failed", cLog, .T. )
    else
       nLastHash := nHash
+      IDE_AppendMessage( Chr(10) + "Build succeeded. Running..." + Chr(10) )
       // Create .app bundle and launch (macOS needs bundle for GUI app)
       MAC_ShellExec( "mkdir -p " + cBuildDir + "/" + cAppName + ".app/Contents/MacOS" )
       MAC_ShellExec( "cp " + cBuildDir + "/" + cAppName + " " + cBuildDir + "/" + cAppName + ".app/Contents/MacOS/" )
@@ -4655,13 +4655,13 @@ static function TBDebugRun( lRunToBreakpoint )
    endif
 
    if lError
-      MAC_BuildErrorDialog( "Debug Build Failed", cLog )
+      IDE_ShowBuildResult( "Debug Build Failed", cLog, .T. )
       return nil
    endif
 
    if ! File( cBuildDir + "/DebugApp" )
       cLog += "ERROR: DebugApp not created" + Chr(10)
-      MAC_BuildErrorDialog( "Debug Build Failed", cLog )
+      IDE_ShowBuildResult( "Debug Build Failed", cLog, .T. )
       return nil
    endif
 
@@ -5712,10 +5712,10 @@ return nil
 // Shared helper: open a project file by path (used by TBOpen and ReopenLastProject)
 static function OpenProjectFile( cFile )
 
-   local cContent, cDir, aLines, i
+   local cContent, cDir, i, aParsed, aFormNames, aModuleNames
    local cFormName, cFormCode, nFormX, nFormY
    local nInsW, nInsTop, nEditorTop, nEditorX, nEditorW, nEditorH
-   local lInModules, nAns
+   local nAns
 
    // Ask to save current work if there are forms open
    if Len( aForms ) > 0
@@ -5734,7 +5734,7 @@ static function OpenProjectFile( cFile )
    endif
 
    // Project dir
-   cDir := Left( cFile, RAt( "/", cFile ) )
+   cDir := HB_ProjectDirFromFile( cFile )
 
    // Destroy current forms
    for i := 1 to Len( aForms )
@@ -5759,7 +5759,9 @@ static function OpenProjectFile( cFile )
    nEditorH := nScreenH - nEditorTop
 
    // Read project file
-   aLines := HB_ATokens( cContent, Chr(10) )
+   aParsed := HB_ParseHbpIndex( cContent )
+   aFormNames := aParsed[1]
+   aModuleNames := aParsed[2]
 
    // Load Project1.prg
    cFormCode := MemoRead( cDir + "Project1.prg" )
@@ -5768,10 +5770,8 @@ static function OpenProjectFile( cFile )
    endif
 
    // Load each form
-   for i := 2 to Len( aLines )
-      cFormName := AllTrim( aLines[i] )
-      if Empty( cFormName ); loop; endif
-      if Lower( cFormName ) == "[modules]"; exit; endif
+   for i := 1 to Len( aFormNames )
+      cFormName := aFormNames[i]
 
       cFormCode := MemoRead( cDir + cFormName + ".prg" )
       if Empty( cFormCode ); loop; endif
@@ -5794,21 +5794,13 @@ static function OpenProjectFile( cFile )
 
    // Load modules
    aModules := {}
-   lInModules := .F.
-   for i := 2 to Len( aLines )
-      cFormName := AllTrim( aLines[i] )
-      if Empty( cFormName ); loop; endif
-      if Lower( cFormName ) == "[modules]"
-         lInModules := .T.
-         loop
-      endif
-      if lInModules
-         cFormCode := MemoRead( cDir + cFormName + ".prg" )
-         if Empty( cFormCode ); loop; endif
-         AAdd( aModules, { cFormName, cFormCode, cDir + cFormName + ".prg" } )
-         CodeEditorAddTab( hCodeEditor, cFormName + ".prg" )
-         CodeEditorSetTabText( hCodeEditor, 1 + Len(aForms) + Len(aModules), cFormCode )
-      endif
+   for i := 1 to Len( aModuleNames )
+      cFormName := aModuleNames[i]
+      cFormCode := MemoRead( cDir + cFormName + ".prg" )
+      if Empty( cFormCode ); loop; endif
+      AAdd( aModules, { cFormName, cFormCode, cDir + cFormName + ".prg" } )
+      CodeEditorAddTab( hCodeEditor, cFormName + ".prg" )
+      CodeEditorSetTabText( hCodeEditor, HB_ModuleEditorTab( Len( aForms ), Len( aModules ) ), cFormCode )
    next
 
    // Activate first form
@@ -6279,5 +6271,5 @@ static function GitBlameShow()
 return nil
 
 // Framework
-#include "classes.prg"
-#include "inspector_mac.prg"
+#include "core/classes.prg"
+#include "inspector/inspector_mac.prg"

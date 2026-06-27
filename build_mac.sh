@@ -99,8 +99,7 @@ if needs_rebuild "${SRC}.prg" "${SRC}.c" || \
    "$HBBIN/harbour" "$PROJDIR/source/hbbuilder_common.prg" ${SRC}.prg -n -w -q \
       -I"$HBINC" \
       -I"$PROJDIR/include" \
-      -I"$PROJDIR/source/core" \
-      -I"$PROJDIR/source/inspector" \
+      -I"$PROJDIR/source" \
       -o${SRC}.c
    NEED_LINK=1
 else

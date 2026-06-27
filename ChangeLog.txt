@@ -1,6 +1,25 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-06-27
+
+  - feat(all): Phase 2 — unified build/debug messages panel. Native
+    MessagesPanelCreate/SetText/Clear/BringToFront/Destroy in hbbridge.cpp
+    (Win32), gtk3_core.c (GTK3), and cocoa_editor.mm (macOS). Bottom panel
+    docked below the editor; editor height reduced via IDE_MessagesHeight().
+  - feat(common): IDE_RegisterMessagesPanel, IDE_ClearMessages,
+    IDE_AppendMessage, IDE_SetMessages, IDE_ShowMessages, IDE_LogLine,
+    IDE_ShowBuildResult in hbbuilder_common.prg — shared build output
+    helpers for all platform IDEs.
+  - feat(win,linux,macos): View → Messages menu; TBRun clears panel and
+    appends "=== Build started ==="; build/debug failures use
+    IDE_ShowBuildResult instead of modal BuildErrorDialog (runtime errors
+    and download failures still use modal dialogs).
+  - test: test_messages.prg (messages helpers); messages_stubs.prg for
+    link-time MessagesPanel stubs. run_tests.bat/.sh compile stubs as a
+    separate object (Harbour -o merge emits HB_FUNC_EXTERN only).
+  - test: test_hbp_parse.prg added to the CI suite (8 headless tests).
+
 2026-05-31
 
   - feat(win): native UTF-8 / Unicode emoji rendering support. Added helper

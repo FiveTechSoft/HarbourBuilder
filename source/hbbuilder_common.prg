@@ -2,6 +2,9 @@
 
 #include "../include/hbide.ch"
 
+STATIC s_hMessages := 0
+STATIC s_cMessages := ""
+
 /* --- Code generation string helpers (Phase 2) --- */
 
 FUNCTION HB_EscapeHarbourStr( cText )
@@ -69,6 +72,122 @@ FUNCTION HB_BuildHbpIndex( aFormNames, aModuleNames )
       NEXT
    ENDIF
 RETURN cHbp
+
+FUNCTION HB_BuildHbpFromProject( aForms, aModules )
+   LOCAL aFormNames := {}, aModNames := {}, i
+
+   FOR i := 1 TO Len( aForms )
+      AAdd( aFormNames, aForms[i][1] )
+   NEXT
+   FOR i := 1 TO Len( aModules )
+      AAdd( aModNames, aModules[i][1] )
+   NEXT
+RETURN HB_BuildHbpIndex( aFormNames, aModNames )
+
+FUNCTION HB_ParseHbpIndex( cContent )
+   LOCAL aLines, aForms := {}, aModules := {}, i, cLine, lInModules := .F.
+
+   IF Empty( cContent )
+      RETURN { aForms, aModules }
+   ENDIF
+
+   aLines := hb_ATokens( cContent, Chr(10) )
+   FOR i := 2 TO Len( aLines )
+      cLine := AllTrim( StrTran( aLines[i], Chr(13), "" ) )
+      IF Empty( cLine )
+         LOOP
+      ENDIF
+      IF Lower( cLine ) == "[modules]"
+         lInModules := .T.
+         LOOP
+      ENDIF
+      IF lInModules
+         AAdd( aModules, cLine )
+      ELSE
+         AAdd( aForms, cLine )
+      ENDIF
+   NEXT
+RETURN { aForms, aModules }
+
+FUNCTION HB_ProjectDirFromFile( cFile )
+   LOCAL nPos
+
+   IF Empty( cFile )
+      RETURN ""
+   ENDIF
+   nPos := Max( RAt( "\", cFile ), RAt( "/", cFile ) )
+   IF nPos <= 0
+      RETURN ""
+   ENDIF
+RETURN Left( cFile, nPos )
+
+/* Editor tab indices: tab 1 = Project1.prg, then forms, modules, open files */
+FUNCTION HB_FormEditorTab( nFormIdx )
+RETURN nFormIdx + 1
+
+FUNCTION HB_ModuleEditorTab( nForms, nModuleIdx )
+RETURN 1 + nForms + nModuleIdx
+
+FUNCTION HB_OpenFileEditorTab( nForms, nModules, nOpenIdx )
+RETURN 1 + nForms + nModules + nOpenIdx
+
+/* --- Messages panel (build / debug output) --- */
+
+PROCEDURE IDE_RegisterMessagesPanel( hPanel )
+   s_hMessages := hPanel
+RETURN
+
+FUNCTION IDE_MessagesHeight( nScreenH )
+   IF nScreenH == NIL .OR. nScreenH <= 0
+      RETURN 120
+   ENDIF
+RETURN Max( 96, Int( nScreenH * 0.11 ) )
+
+PROCEDURE IDE_ClearMessages()
+   s_cMessages := ""
+   IF s_hMessages != 0
+      MessagesPanelClear( s_hMessages )
+   ENDIF
+RETURN
+
+PROCEDURE IDE_AppendMessage( cLine )
+   LOCAL c := cLine
+
+   IF Empty( c )
+      RETURN
+   ENDIF
+   IF Right( c, 1 ) != Chr(10) .AND. Right( c, 1 ) != Chr(13)
+      c += Chr(10)
+   ENDIF
+   s_cMessages += c
+   IF s_hMessages != 0
+      MessagesPanelSetText( s_hMessages, s_cMessages )
+   ENDIF
+RETURN
+
+PROCEDURE IDE_SetMessages( cText )
+   s_cMessages := iif( cText == NIL, "", cText )
+   IF s_hMessages != 0
+      MessagesPanelSetText( s_hMessages, s_cMessages )
+   ENDIF
+RETURN
+
+PROCEDURE IDE_ShowMessages()
+   IF s_hMessages != 0
+      MessagesPanelBringToFront( s_hMessages )
+   ENDIF
+RETURN
+
+FUNCTION IDE_LogLine( cLog, cLine )
+   IDE_AppendMessage( cLine )
+RETURN cLog + cLine
+
+PROCEDURE IDE_ShowBuildResult( cTitle, cLog, lError )
+   HB_SYMBOL_UNUSED( cTitle )
+   HB_SYMBOL_UNUSED( lError )
+   IDE_SetMessages( cLog )
+   IDE_ShowMessages()
+RETURN
 
 /* --- HIX path security (Phase 4) --- */
 

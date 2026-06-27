@@ -35,11 +35,20 @@ set CL_FLAGS=/nologo /c /O2 /MD /D_CRT_SECURE_NO_WARNINGS /I"%HBINC%" /I"%INCDIR
 
 cd /d "%TESTDIR%"
 
+echo === messages_stubs ===
+del /q messages_stubs.c messages_stubs.obj 2>nul
+"%HBBIN%\harbour.exe" messages_stubs.prg -n -w -es2 -q -I"%HBINC%" -omessages_stubs
+if errorlevel 1 ( echo HARBOUR FAILED: messages_stubs & exit /b 1 )
+cl.exe %CL_FLAGS% messages_stubs.c /Fomessages_stubs.obj
+if errorlevel 1 ( echo CL FAILED: messages_stubs & exit /b 1 )
+
 call :run_test test_codegen
 call :run_test test_hbp_index
 call :run_test test_project_tab
 call :run_test test_hix_path
 call :run_test test_component_types
+call :run_test test_hbp_parse
+call :run_test test_messages
 call :run_test test_ct_constants
 
 echo.
@@ -47,7 +56,11 @@ echo === compile-only: IDE sources ===
 cd /d "%ROOT%source"
 "%HBBIN%\harbour.exe" hbbuilder_common.prg hbbuilder_win.prg -n -w -es2 -q -I"%HBINC%" -I"%INCDIR%" -ohbbuilder_win_syntax
 if errorlevel 1 ( echo SYNTAX CHECK FAILED: hbbuilder_win.prg & set /a FAIL+=1 ) else ( echo OK: hbbuilder_win.prg syntax )
-del /q hbbuilder_win_syntax.c hbbuilder_common.c 2>nul
+"%HBBIN%\harbour.exe" hbbuilder_common.prg hbbuilder_linux.prg -n -w -es2 -q -I"%HBINC%" -I"%INCDIR%" -I"%ROOT%source" -ohbbuilder_linux_syntax
+if errorlevel 1 ( echo SYNTAX CHECK FAILED: hbbuilder_linux.prg & set /a FAIL+=1 ) else ( echo OK: hbbuilder_linux.prg syntax )
+"%HBBIN%\harbour.exe" hbbuilder_common.prg hbbuilder_macos.prg -n -w -es2 -q -I"%HBINC%" -I"%INCDIR%" -I"%ROOT%source" -ohbbuilder_macos_syntax
+if errorlevel 1 ( echo SYNTAX CHECK FAILED: hbbuilder_macos.prg & set /a FAIL+=1 ) else ( echo OK: hbbuilder_macos.prg syntax )
+del /q hbbuilder_win_syntax.c hbbuilder_linux_syntax.c hbbuilder_macos_syntax.c hbbuilder_common.c 2>nul
 
 echo.
 if %FAIL%==0 (
@@ -62,12 +75,12 @@ if %FAIL%==0 (
 set TNAME=%~1
 echo === %TNAME% ===
 del /q "%TNAME%.c" "%TNAME%.obj" 2>nul
-"%HBBIN%\harbour.exe" "%TNAME%.prg" "%RUNNER%" "%COMMON%" -n -w -es2 -q -I"%HBINC%" -I"%INCDIR%" -o"%TNAME%"
+   "%HBBIN%\harbour.exe" "%TNAME%.prg" "%RUNNER%" "%COMMON%" -n -w -es2 -q -I"%HBINC%" -I"%INCDIR%" -o"%TNAME%"
 if errorlevel 1 ( echo HARBOUR FAILED: %TNAME% & set /a FAIL+=1 & goto :eof )
 if not exist "%TNAME%.c" ( echo NO C OUTPUT: %TNAME% & set /a FAIL+=1 & goto :eof )
 cl.exe %CL_FLAGS% "%TNAME%.c" /Fo"%TNAME%.obj"
 if errorlevel 1 ( echo CL FAILED: %TNAME% & set /a FAIL+=1 & goto :eof )
-link.exe /NOLOGO /OUT:"%BINDIR%\%TNAME%.exe" /SUBSYSTEM:CONSOLE /NODEFAULTLIB:LIBCMT /LIBPATH:"%HBLIB%" %TNAME%.obj %HBLIBS% %SYSLIBS%
+link.exe /NOLOGO /OUT:"%BINDIR%\%TNAME%.exe" /SUBSYSTEM:CONSOLE /NODEFAULTLIB:LIBCMT /LIBPATH:"%HBLIB%" %TNAME%.obj messages_stubs.obj %HBLIBS% %SYSLIBS%
 if errorlevel 1 ( echo LINK FAILED: %TNAME% & set /a FAIL+=1 & goto :eof )
 "%BINDIR%\%TNAME%.exe"
 if errorlevel 1 ( echo FAILED: %TNAME% & set /a FAIL+=1 ) else ( set /a PASS+=1 )

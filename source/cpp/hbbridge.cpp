@@ -8583,3 +8583,102 @@ HB_FUNC( RPT_EXPORTPDF )
    pdf_reset();
    hb_retl( 1 );
 }
+
+/* ---- Messages panel (build / debug output) -------------------------------- */
+
+typedef struct _MESSAGESPANEL {
+   HWND hWnd;
+   HWND hEdit;
+} MESSAGESPANEL;
+
+static LRESULT CALLBACK MsgPanelWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
+{
+   switch( msg )
+   {
+      case WM_CLOSE:
+         ShowWindow( hWnd, SW_HIDE );
+         return 0;
+   }
+   return DefWindowProcA( hWnd, msg, wParam, lParam );
+}
+
+static void MsgPanel_SetEditText( MESSAGESPANEL * mp, const char * pszText )
+{
+   if( mp && mp->hEdit )
+      SetWindowTextA( mp->hEdit, pszText ? pszText : "" );
+}
+
+HB_FUNC( MESSAGESPANELCREATE )
+{
+   MESSAGESPANEL * mp;
+   WNDCLASSA wc = {0};
+   static BOOL bReg = FALSE;
+   int nLeft = hb_parni(1), nTop = hb_parni(2);
+   int nWidth = hb_parni(3), nHeight = hb_parni(4);
+
+   mp = (MESSAGESPANEL *) HeapAlloc( GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(MESSAGESPANEL) );
+   if( !mp ) { hb_retnint( 0 ); return; }
+
+   if( !bReg )
+   {
+      wc.lpfnWndProc   = MsgPanelWndProc;
+      wc.hInstance     = GetModuleHandle( NULL );
+      wc.hCursor       = LoadCursor( NULL, IDC_ARROW );
+      wc.hbrBackground = (HBRUSH)( COLOR_WINDOW + 1 );
+      wc.lpszClassName = "HbIdeMessagesPanel";
+      RegisterClassA( &wc );
+      bReg = TRUE;
+   }
+
+   mp->hWnd = CreateWindowExA( WS_EX_TOOLWINDOW, "HbIdeMessagesPanel", "Messages",
+      WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME,
+      nLeft, nTop, nWidth, nHeight,
+      NULL, NULL, GetModuleHandle( NULL ), NULL );
+
+   mp->hEdit = CreateWindowExA( WS_EX_CLIENTEDGE, "EDIT", "",
+      WS_CHILD | WS_VISIBLE | ES_MULTILINE | ES_AUTOVSCROLL | WS_VSCROLL |
+      ES_READONLY | ES_NOHIDESEL,
+      4, 4, nWidth - 12, nHeight - 32,
+      mp->hWnd, NULL, GetModuleHandle( NULL ), NULL );
+   {
+      HFONT hFont = CreateFontA( -14, 0, 0, 0, FW_NORMAL, 0, 0, 0,
+         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+         DEFAULT_QUALITY, FIXED_PITCH | FF_MODERN, "Consolas" );
+      if( hFont ) SendMessage( mp->hEdit, WM_SETFONT, (WPARAM) hFont, TRUE );
+   }
+
+   ShowWindow( mp->hWnd, SW_SHOW );
+   hb_retnint( (HB_PTRUINT) mp );
+}
+
+HB_FUNC( MESSAGESPANELSETTEXT )
+{
+   MESSAGESPANEL * mp = (MESSAGESPANEL *)(HB_PTRUINT) hb_parnint(1);
+   MsgPanel_SetEditText( mp, HB_ISCHAR(2) ? hb_parc(2) : "" );
+}
+
+HB_FUNC( MESSAGESPANELCLEAR )
+{
+   MESSAGESPANEL * mp = (MESSAGESPANEL *)(HB_PTRUINT) hb_parnint(1);
+   MsgPanel_SetEditText( mp, "" );
+}
+
+HB_FUNC( MESSAGESPANELBRINGTOFRONT )
+{
+   MESSAGESPANEL * mp = (MESSAGESPANEL *)(HB_PTRUINT) hb_parnint(1);
+   if( mp && mp->hWnd )
+   {
+      ShowWindow( mp->hWnd, SW_SHOW );
+      SetWindowPos( mp->hWnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE );
+   }
+}
+
+HB_FUNC( MESSAGESPANELDESTROY )
+{
+   MESSAGESPANEL * mp = (MESSAGESPANEL *)(HB_PTRUINT) hb_parnint(1);
+   if( mp )
+   {
+      if( mp->hWnd ) DestroyWindow( mp->hWnd );
+      HeapFree( GetProcessHeap(), 0, mp );
+   }
+}

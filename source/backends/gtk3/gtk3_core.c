@@ -13879,3 +13879,80 @@ HB_FUNC( CODEEDITORCLEARMARKS )
    const int MARKER_AI = 5;
    SciMsg( ed->sciWidget, SCI_MARKERDELETEALL, MARKER_AI, 0 );
 }
+
+/* ---- Messages panel (build output) ------------------------------------- */
+
+typedef struct _MESSAGESPANEL {
+   GtkWidget * window;
+   GtkWidget * textView;
+} MESSAGESPANEL;
+
+HB_FUNC( MESSAGESPANELCREATE )
+{
+   int nLeft = hb_parni(1), nTop = hb_parni(2);
+   int nWidth = hb_parni(3), nHeight = hb_parni(4);
+   MESSAGESPANEL * mp;
+
+   EnsureGTK();
+   mp = (MESSAGESPANEL *) calloc( 1, sizeof(MESSAGESPANEL) );
+   if( !mp ) { hb_retnint( 0 ); return; }
+
+   mp->window = gtk_window_new( GTK_WINDOW_TOPLEVEL );
+   gtk_window_set_title( GTK_WINDOW(mp->window), "Messages" );
+   gtk_window_set_default_size( GTK_WINDOW(mp->window), nWidth, nHeight );
+   gtk_window_move( GTK_WINDOW(mp->window), nLeft, nTop );
+   g_signal_connect( mp->window, "delete-event", G_CALLBACK(gtk_widget_hide_on_delete), NULL );
+
+   GtkWidget * scroll = gtk_scrolled_window_new( NULL, NULL );
+   gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(scroll),
+      GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC );
+   mp->textView = gtk_text_view_new();
+   gtk_text_view_set_editable( GTK_TEXT_VIEW(mp->textView), FALSE );
+   gtk_text_view_set_monospace( GTK_TEXT_VIEW(mp->textView), TRUE );
+   gtk_text_view_set_wrap_mode( GTK_TEXT_VIEW(mp->textView), GTK_WRAP_WORD_CHAR );
+   gtk_container_add( GTK_CONTAINER(scroll), mp->textView );
+   gtk_container_add( GTK_CONTAINER(mp->window), scroll );
+   gtk_widget_show_all( mp->window );
+   hb_retnint( (HB_PTRUINT) mp );
+}
+
+HB_FUNC( MESSAGESPANELSETTEXT )
+{
+   MESSAGESPANEL * mp = (MESSAGESPANEL *)(HB_PTRUINT) hb_parnint(1);
+   const char * psz = HB_ISCHAR(2) ? hb_parc(2) : "";
+   if( mp && mp->textView )
+   {
+      GtkTextBuffer * buf = gtk_text_view_get_buffer( GTK_TEXT_VIEW(mp->textView) );
+      gtk_text_buffer_set_text( buf, psz, -1 );
+   }
+}
+
+HB_FUNC( MESSAGESPANELCLEAR )
+{
+   MESSAGESPANEL * mp = (MESSAGESPANEL *)(HB_PTRUINT) hb_parnint(1);
+   if( mp && mp->textView )
+   {
+      GtkTextBuffer * buf = gtk_text_view_get_buffer( GTK_TEXT_VIEW(mp->textView) );
+      gtk_text_buffer_set_text( buf, "", -1 );
+   }
+}
+
+HB_FUNC( MESSAGESPANELBRINGTOFRONT )
+{
+   MESSAGESPANEL * mp = (MESSAGESPANEL *)(HB_PTRUINT) hb_parnint(1);
+   if( mp && mp->window )
+   {
+      gtk_widget_show( mp->window );
+      gtk_window_present( GTK_WINDOW(mp->window) );
+   }
+}
+
+HB_FUNC( MESSAGESPANELDESTROY )
+{
+   MESSAGESPANEL * mp = (MESSAGESPANEL *)(HB_PTRUINT) hb_parnint(1);
+   if( mp )
+   {
+      if( mp->window ) gtk_widget_destroy( mp->window );
+      free( mp );
+   }
+}

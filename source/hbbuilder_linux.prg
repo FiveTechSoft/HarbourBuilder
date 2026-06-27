@@ -13,7 +13,7 @@
 // | grid     |                                                   |
 // |          |                                                   |
 // +----------+---------------------------------------------------+ ~650
-// |  Messages / Compiler output (future)                         |
+// |  Messages / Compiler output (bottom panel)                   |
 // +--------------------------------------------------------------+ 768
 
 #include "../include/hbbuilder.ch"
@@ -22,6 +22,7 @@
 static oIDE          // Main IDE bar (top strip)
 static oDesignForm   // Design form (active, floats on top of editor)
 static hCodeEditor   // Code editor (background, right of inspector)
+static hMessagesPanel // Build / debug output panel
 static nScreenW      // Screen width
 static nScreenH      // Screen height
 static cCurrentFile  // Current file path (empty = untitled)
@@ -39,7 +40,7 @@ static lSyncingFromCode := .f.  // Guard: prevents re-entrant loop when syncing 
 function Main()
 
    local oTB, oFile, oEdit, oSearch, oView, oProject, oRun, oFormat, oComp, oTools, oHelp
-   local nBarH, nInsW, nEditorX, nEditorW, nEditorH
+   local nBarH, nInsW, nEditorX, nEditorW, nEditorH, nMsgH
    local nFormX, nFormY, nInsTop, nEditorTop, nBottomY
    local cIcoDir
 
@@ -71,7 +72,8 @@ function Main()
    nEditorX := nInsW
    nEditorW := nScreenW - nEditorX
    nBottomY := nScreenH
-   nEditorH := nBottomY - nEditorTop
+   nMsgH    := IDE_MessagesHeight( nScreenH )
+   nEditorH := nBottomY - nEditorTop - nMsgH
 
    // Form Designer: default position/size
    nFormX := 823
@@ -121,6 +123,7 @@ function Main()
    MENUITEM "Inspector"        OF oView ACTION InspectorOpen()
    MENUITEM "Project Inspector" OF oView ACTION ShowProjectInspector()
    MENUITEM "Debugger"          OF oView ACTION TBDebugRun()
+   MENUITEM "Messages"          OF oView ACTION IDE_ShowMessages()
 
    DEFINE POPUP oProject PROMPT "Project" OF oIDE
    MENUITEM "Add to Project..."    OF oProject ACTION AddToProject()
@@ -270,6 +273,9 @@ function Main()
 
    // === Window 4: Code Editor ===
    hCodeEditor := CodeEditorCreate( nEditorX, nEditorTop, nEditorW, nEditorH )
+   hMessagesPanel := MessagesPanelCreate( nEditorX, nBottomY - nMsgH, nEditorW, nMsgH )
+   IDE_RegisterMessagesPanel( hMessagesPanel )
+   IDE_SetMessages( "Ready." + Chr(10) )
 
    // Apply saved dark/light theme to editor
    if ! GTK_IsDarkMode()
@@ -2569,7 +2575,7 @@ return nil
 
 static function OpenProjectFile( cFile )
 
-   local cContent, cDir, aLines, i, lInModules
+   local cContent, cDir, i, aParsed, aFormNames, aModuleNames
    local cFormName, cFormCode, nFormX, nFormY
    local nInsW, nInsTop, nEditorTop, nEditorX, nEditorW, nEditorH
 
@@ -2579,7 +2585,7 @@ static function OpenProjectFile( cFile )
       return nil
    endif
 
-   cDir := Left( cFile, RAt( "/", cFile ) )
+   cDir := HB_ProjectDirFromFile( cFile )
 
    for i := 1 to Len( aForms )
       aForms[i][2]:Destroy()
@@ -2598,7 +2604,9 @@ static function OpenProjectFile( cFile )
    nEditorW := nScreenW - nEditorX
    nEditorH := nScreenH - nEditorTop
 
-   aLines := HB_ATokens( cContent, Chr(10) )
+   aParsed := HB_ParseHbpIndex( cContent )
+   aFormNames := aParsed[1]
+   aModuleNames := aParsed[2]
 
    // Suppress editor→designer sync while we populate tabs; we restore from the
    // source on disk directly, and the change callback would otherwise tear down
@@ -2610,10 +2618,8 @@ static function OpenProjectFile( cFile )
       CodeEditorSetTabText( hCodeEditor, 1, cFormCode )
    endif
 
-   for i := 2 to Len( aLines )
-      cFormName := AllTrim( aLines[i] )
-      if Empty( cFormName ); loop; endif
-      if Lower( cFormName ) == "[modules]"; exit; endif
+   for i := 1 to Len( aFormNames )
+      cFormName := aFormNames[i]
 
       cFormCode := MemoRead( cDir + cFormName + ".prg" )
       if Empty( cFormCode ); loop; endif
@@ -2639,21 +2645,13 @@ static function OpenProjectFile( cFile )
 
    // Load modules
    aModules := {}
-   lInModules := .F.
-   for i := 2 to Len( aLines )
-      cFormName := AllTrim( aLines[i] )
-      if Empty( cFormName ); loop; endif
-      if Lower( cFormName ) == "[modules]"
-         lInModules := .T.
-         loop
-      endif
-      if lInModules
-         cFormCode := MemoRead( cDir + cFormName + ".prg" )
-         if Empty( cFormCode ); loop; endif
-         AAdd( aModules, { cFormName, cFormCode, cDir + cFormName + ".prg" } )
-         CodeEditorAddTab( hCodeEditor, cFormName + ".prg" )
-         CodeEditorSetTabText( hCodeEditor, 1 + Len(aForms) + Len(aModules), cFormCode )
-      endif
+   for i := 1 to Len( aModuleNames )
+      cFormName := aModuleNames[i]
+      cFormCode := MemoRead( cDir + cFormName + ".prg" )
+      if Empty( cFormCode ); loop; endif
+      AAdd( aModules, { cFormName, cFormCode, cDir + cFormName + ".prg" } )
+      CodeEditorAddTab( hCodeEditor, cFormName + ".prg" )
+      CodeEditorSetTabText( hCodeEditor, HB_ModuleEditorTab( Len( aForms ), Len( aModules ) ), cFormCode )
    next
 
    lSyncingFromCode := .f.
@@ -2689,18 +2687,9 @@ static function TBSave()
       cCurrentFile := cFile
    endif
 
-   cDir := Left( cCurrentFile, RAt( "/", cCurrentFile ) )
+   cDir := HB_ProjectDirFromFile( cCurrentFile )
 
-   cHbp := "Project1" + Chr(10)
-   for i := 1 to Len( aForms )
-      cHbp += aForms[i][1] + Chr(10)
-   next
-   if Len( aModules ) > 0
-      cHbp += "[modules]" + Chr(10)
-      for i := 1 to Len( aModules )
-         cHbp += aModules[i][1] + Chr(10)
-      next
-   endif
+   cHbp := HB_BuildHbpFromProject( aForms, aModules )
    MemoWrit( cCurrentFile, cHbp )
 
    MemoWrit( cDir + "Project1.prg", CodeEditorGetTabText( hCodeEditor, 1 ) )
@@ -2837,6 +2826,8 @@ static function TBRun()
    cProjDir := HB_DirBase() + ".."
    cLog     := ""
    lError   := .F.
+   IDE_ClearMessages()
+   IDE_AppendMessage( "=== Build started ===" + Chr(10) )
 
    // Auto-download and build Harbour if not installed
    if ! File( cHbDir + "/bin/harbour" ) .and. ! File( cHbDir + "/bin/linux/gcc/harbour" )
@@ -2995,10 +2986,11 @@ static function TBRun()
    GTK_ProgressClose()
 
    if lError
-      GTK_BuildErrorDialog( "Build Failed", cLog )
+      IDE_ShowBuildResult( "Build Failed", cLog, lError )
    else
       nLastHash := nHash
       cLog += Chr(10) + "Build succeeded. Running..." + Chr(10)
+      IDE_SetMessages( cLog )
       if ! Empty( cCurrentFile )
          cDestDir := Left( cCurrentFile, RAt( "/", cCurrentFile ) )
          cAppTitle := ""
@@ -3199,12 +3191,12 @@ static function TBDebugRun( lRunToBreak )
 
 
    if lError
-      GTK_BuildErrorDialog( "Debug Build Failed", cLog )
+      IDE_ShowBuildResult( "Debug Build Failed", cLog, .T. )
       return nil
    endif
 
    if ! File( cBuildDir + "/DebugApp" )
-      GTK_BuildErrorDialog( "Debug Build Failed", cLog + "ERROR: DebugApp not created" + Chr(10) )
+      IDE_ShowBuildResult( "Debug Build Failed", cLog + "ERROR: DebugApp not created" + Chr(10), .T. )
       return nil
    endif
 

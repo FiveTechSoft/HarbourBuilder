@@ -6658,4 +6658,75 @@ HB_FUNC( RPT_SETFIELDPROP )
    hb_retl(1);
 }
 
+/* ---- Messages panel (build output) ------------------------------------- */
+
+typedef struct _MESSAGESPANEL {
+   NSWindow * window;
+   NSTextView * textView;
+} MESSAGESPANEL;
+
+HB_FUNC( MESSAGESPANELCREATE )
+{
+   EnsureNSApp();
+   int nLeft = hb_parni(1), nTop = hb_parni(2);
+   int nWidth = hb_parni(3), nHeight = hb_parni(4);
+   MESSAGESPANEL * mp = (MESSAGESPANEL *) calloc( 1, sizeof(MESSAGESPANEL) );
+   if( !mp ) { hb_retnint( 0 ); return; }
+
+   NSRect screenFrame = [[NSScreen mainScreen] frame];
+   NSRect frame = NSMakeRect( nLeft, screenFrame.size.height - nTop - nHeight, nWidth, nHeight );
+   mp->window = [[NSWindow alloc] initWithContentRect:frame
+      styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable
+      backing:NSBackingStoreBuffered defer:NO];
+   [mp->window setTitle:@"Messages"];
+   [mp->window setReleasedWhenClosed:NO];
+   [mp->window setAppearance:[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua]];
+
+   NSScrollView * sv = [[NSScrollView alloc] initWithFrame:[[mp->window contentView] bounds]];
+   [sv setHasVerticalScroller:YES];
+   [sv setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
+   mp->textView = [[NSTextView alloc] initWithFrame:[sv bounds]];
+   [mp->textView setEditable:NO];
+   [mp->textView setSelectable:YES];
+   [mp->textView setFont:[NSFont monospacedSystemFontOfSize:12 weight:NSFontWeightRegular]];
+   [mp->textView setBackgroundColor:[NSColor colorWithCalibratedRed:0.12 green:0.12 blue:0.12 alpha:1]];
+   [mp->textView setTextColor:[NSColor colorWithCalibratedRed:0.83 green:0.83 blue:0.83 alpha:1]];
+   [sv setDocumentView:mp->textView];
+   [[mp->window contentView] addSubview:sv];
+   [mp->window makeKeyAndOrderFront:nil];
+   hb_retnint( (HB_PTRUINT) mp );
+}
+
+HB_FUNC( MESSAGESPANELSETTEXT )
+{
+   MESSAGESPANEL * mp = (MESSAGESPANEL *)(HB_PTRUINT) hb_parnint(1);
+   const char * psz = HB_ISCHAR(2) ? hb_parc(2) : "";
+   if( mp && mp->textView )
+      [mp->textView setString:[NSString stringWithUTF8String:psz]];
+}
+
+HB_FUNC( MESSAGESPANELCLEAR )
+{
+   MESSAGESPANEL * mp = (MESSAGESPANEL *)(HB_PTRUINT) hb_parnint(1);
+   if( mp && mp->textView )
+      [mp->textView setString:@""];
+}
+
+HB_FUNC( MESSAGESPANELBRINGTOFRONT )
+{
+   MESSAGESPANEL * mp = (MESSAGESPANEL *)(HB_PTRUINT) hb_parnint(1);
+   if( mp && mp->window )
+      [mp->window makeKeyAndOrderFront:nil];
+}
+
+HB_FUNC( MESSAGESPANELDESTROY )
+{
+   MESSAGESPANEL * mp = (MESSAGESPANEL *)(HB_PTRUINT) hb_parnint(1);
+   if( mp )
+   {
+      if( mp->window ) [mp->window close];
+      free( mp );
+   }
+}
+
 } /* extern "C" */

@@ -553,9 +553,24 @@ All three desktop platforms are **fully functional** with zero MsgInfo stubs —
 
 | Metric | Windows | Linux | macOS |
 |--------|:-------:|:-----:|:-----:|
-| HB_FUNC bridge functions | 135 | 132 | 158 |
-| Backend lines of code | ~7100 | ~7300 | ~3800 |
-| IDE .prg lines of code | ~4800 | ~1200 | ~1400 |
+| IDE entry `.prg` lines | ~13,000 | ~4,200 | ~6,300 |
+| Shared `hbbuilder_common.prg` | ~350 | ~350 | ~350 |
+| C++ bridge (`hbbridge.cpp`) | ~8,600 | — | — |
+| Native backend core | ~7,100 | ~7,300 | ~3,800 |
+| Headless unit tests | 7 | 7 | 7 |
+
+### Platform parity (honest)
+
+| Feature | Windows | Linux | macOS |
+|---------|:-------:|:-----:|:-----:|
+| Form designer + inspector | ✅ | ✅ | ✅ |
+| Scintilla code editor | ✅ | ✅ | ✅ |
+| Multi-form + `[modules]` projects | ✅ | ✅ | ✅ |
+| Build & Run | ✅ | ✅ | ✅ (.app) |
+| Git integration | ✅ | — | ✅ |
+| Android APK pipeline | ✅ | — | — |
+| Multi-compiler (MSVC/BCC) | ✅ | — | — |
+| AI form assistant (Ollama) | partial | — | ✅ |
 
 ---
 
@@ -563,45 +578,34 @@ All three desktop platforms are **fully functional** with zero MsgInfo stubs —
 
 ```
 HarbourBuilder/
-├── cpp/                          # Windows C++ core
-│   ├── include/hbide.h           # 109 CT_ defines + class declarations
-│   └── src/                      # tcontrol, tform, tcontrols, hbbridge
-├── backends/
-│   ├── cocoa/cocoa_core.m        # macOS Cocoa backend (Obj-C)
-│   ├── cocoa/cocoa_editor.mm     # macOS Scintilla editor (Obj-C++)
-│   ├── cocoa/cocoa_inspector.m   # macOS Object Inspector
-│   ├── gtk3/gtk3_core.c          # Linux GTK3 backend + Scintilla
-│   ├── console/backend.prg       # TUI console backend
-│   └── web/backend.prg           # HTML5 Canvas backend
-├── harbour/
-│   ├── classes.prg               # TForm, TControl OOP wrappers
-│   ├── hbbuilder.ch              # xBase #xcommand syntax
-│   └── inspector.prg             # Object Inspector (Win32)
+├── source/
+│   ├── hbbuilder_win.prg         # Windows IDE entry (~13K lines)
+│   ├── hbbuilder_linux.prg       # Linux IDE entry
+│   ├── hbbuilder_macos.prg      # macOS IDE entry
+│   ├── hbbuilder_common.prg      # Shared IDE helpers (codegen, .hbp, HIX)
+│   ├── core/                     # OOP runtime (classes.prg, controls, json…)
+│   ├── cpp/                      # Windows C++ bridge (hbbridge, tform, tcontrol)
+│   ├── backends/                 # win32, gtk3, cocoa, android, ios, web, console
+│   ├── inspector/                # Object Inspector per platform
+│   └── debugger/                 # dbgclient.prg, dbghook.c
+├── include/
+│   ├── hbide.h / hbide.ch        # Shared headers + CT_* (see hbide_ct.h)
+│   └── hbbuilder.ch              # xBase #xcommand syntax
 ├── samples/
-│   ├── hbbuilder_win.prg         # Windows IDE (full)
-│   ├── hbbuilder_macos.prg       # macOS IDE
-│   ├── hbbuilder_linux.prg       # Linux IDE
-│   └── projects/transformer/     # 7 AI examples
-├── docs/
-│   ├── assets/css/docs.css       # DeepWiki-style theme
-│   ├── assets/js/docs.js         # Search, theme, copy code
-│   └── en/                       # 20 HTML pages
-├── resources/
-│   ├── Scintilla.dll             # Scintilla 5.6.1 (Windows, 32-bit)
-│   ├── Lexilla.dll               # Lexilla 5.4.8 (Windows, 32-bit)
-│   ├── libscintilla.so           # Scintilla (Linux, x86_64)
-│   ├── liblexilla.so             # Lexilla (Linux, x86_64)
-│   ├── scintilla_src/            # Scintilla + Lexilla source (macOS build)
-│   │   ├── build/libscintilla.a  # Scintilla (macOS, static)
-│   │   └── build/liblexilla.a    # Lexilla (macOS, static)
-│   ├── lazarus_icons/            # Professional PNG icons
-│   └── harbour_logo.png          # About dialog logo
+│   ├── test_*.prg                # Quick manual tests
+│   └── projects/                 # Sample .hbp projects (database, android…)
 ├── tests/
-│   ├── test_debugger.prg         # 16 debugger unit tests
-│   └── build_test_debugger.sh    # Build & run test suite
-├── build_win.bat                 # Windows build script
-├── build_scintilla.sh            # Linux Scintilla build script
-└── ChangeLog.txt                 # Detailed changelog
+│   ├── test_*.prg                # Headless unit tests
+│   ├── test_runner.prg
+│   └── test_helpers.ch
+├── docs/en/                      # 20 HTML documentation pages
+├── resources/                    # Scintilla/Lexilla, icons, manifests
+├── .github/workflows/            # CI: tests.yml + platform builds
+├── run_tests.bat / run_tests.sh  # Run unit tests + IDE syntax checks
+├── build_win.bat                 # Windows build
+├── build_linux.sh                # Linux build
+├── build_mac.sh                  # macOS .app build
+└── ChangeLog.txt
 ```
 
 ---
@@ -618,7 +622,7 @@ HarbourBuilder is open source and welcomes contributions:
 
 ### Adding a New Control
 
-1. Add `CT_MYCONTROL` to `hbide.h` (and both backends)
+1. Add `CT_MYCONTROL` to `include/hbide_ct.h` (mirrored in `hbide.ch` and backends)
 2. Create class in `tcontrols.cpp` (constructor + `CreateParams`)
 3. Add `HB_FUNC(UI_MyControlNew)` in `hbbridge.cpp`
 4. Add widget creation in `cocoa_core.m` and `gtk3_core.c`
