@@ -6702,7 +6702,14 @@ HB_FUNC( MESSAGESPANELSETTEXT )
    MESSAGESPANEL * mp = (MESSAGESPANEL *)(HB_PTRUINT) hb_parnint(1);
    const char * psz = HB_ISCHAR(2) ? hb_parc(2) : "";
    if( mp && mp->textView )
-      [mp->textView setString:[NSString stringWithUTF8String:psz]];
+   {
+      NSFont * font = [mp->textView font];
+      NSColor * fg = [NSColor colorWithCalibratedRed:0.83 green:0.83 blue:0.83 alpha:1];
+      NSDictionary * attrs = @{ NSFontAttributeName: font,
+         NSForegroundColorAttributeName: fg };
+      NSString * s = [NSString stringWithUTF8String:psz];
+      [mp->textView setAttributedString:[[NSAttributedString alloc] initWithString:s attributes:attrs]];
+   }
 }
 
 HB_FUNC( MESSAGESPANELCLEAR )
@@ -6723,7 +6730,14 @@ HB_FUNC( MESSAGESPANELREFRESHTHEME )
 {
    MESSAGESPANEL * mp = (MESSAGESPANEL *)(HB_PTRUINT) hb_parnint(1);
    if( mp && mp->window )
+   {
       [mp->window setAppearance:[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua]];
+      if( mp->textView )
+      {
+         [mp->textView setBackgroundColor:[NSColor colorWithCalibratedRed:0.12 green:0.12 blue:0.12 alpha:1]];
+         [mp->textView setTextColor:[NSColor colorWithCalibratedRed:0.83 green:0.83 blue:0.83 alpha:1]];
+      }
+   }
 }
 
 HB_FUNC( MESSAGESPANELDESTROY )

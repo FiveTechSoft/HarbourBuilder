@@ -3,6 +3,13 @@ HarbourBuilder - Cross-platform visual IDE for Harbour
 
 2026-06-27
 
+  - fix(win,linux): user-project build links hix_runtime.prg + hix_template.prg
+    (fixes LNK unresolved HB_FUN_HIX_RESOLVEPATH from classes.obj on xHarbour/BCC).
+    Win TBRun: copy, compile, link HIX objs; debug_main embeds HIX PRGs. Linux parity.
+  - fix(all): Messages panel text area respects dark theme. Win32: readonly EDIT
+    uses WM_CTLCOLORSTATIC (not WM_CTLCOLOREDIT); SetWindowTheme strips visual
+    styles; repaint on set-text and theme toggle. GTK: CSS on textview+text nodes
+    and window chrome. Cocoa: attributed string preserves light-gray log text.
   - fix(all): Messages panel respects IDE dark theme. Win32: WM_ERASEBKGND /
     WM_CTLCOLOREDIT (RGB 37,37,38 / 30,30,30 / 212,212,212), DWM dark title
     bar via g_bDarkIDE, MessagesPanelRefreshTheme on create and Dark Mode

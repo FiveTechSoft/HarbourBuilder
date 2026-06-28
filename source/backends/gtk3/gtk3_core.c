@@ -13886,6 +13886,7 @@ typedef struct _MESSAGESPANEL {
    GtkWidget * window;
    GtkWidget * textView;
    GtkCssProvider * cssProvider;
+   GtkCssProvider * winCssProvider;
 } MESSAGESPANEL;
 
 static void MsgPanel_ApplyGtkTheme( MESSAGESPANEL * mp )
@@ -13902,16 +13903,38 @@ static void MsgPanel_ApplyGtkTheme( MESSAGESPANEL * mp )
       g_object_unref( mp->cssProvider );
       mp->cssProvider = NULL;
    }
+   if( mp->winCssProvider && mp->window )
+   {
+      ctx = gtk_widget_get_style_context( mp->window );
+      gtk_style_context_remove_provider( ctx, GTK_STYLE_PROVIDER( mp->winCssProvider ) );
+      g_object_unref( mp->winCssProvider );
+      mp->winCssProvider = NULL;
+   }
 
    css = GTK_IsDark()
-      ? "textview { background-color: rgb(30,30,30); color: rgb(212,212,212); }"
-      : "textview { background-color: rgb(255,255,255); color: rgb(30,30,30); }";
+      ? "textview, textview text { background-color: rgb(30,30,30); color: rgb(212,212,212); }"
+      : "textview, textview text { background-color: rgb(255,255,255); color: rgb(30,30,30); }";
    mp->cssProvider = gtk_css_provider_new();
    gtk_css_provider_load_from_data( mp->cssProvider, css, -1, NULL );
    gtk_style_context_add_provider(
       gtk_widget_get_style_context( mp->textView ),
       GTK_STYLE_PROVIDER( mp->cssProvider ),
       GTK_STYLE_PROVIDER_PRIORITY_APPLICATION );
+
+   if( mp->window )
+   {
+      css = GTK_IsDark()
+         ? "window { background-color: rgb(37,37,38); }"
+         : "window { background-color: rgb(240,240,240); }";
+      mp->winCssProvider = gtk_css_provider_new();
+      gtk_css_provider_load_from_data( mp->winCssProvider, css, -1, NULL );
+      gtk_style_context_add_provider(
+         gtk_widget_get_style_context( mp->window ),
+         GTK_STYLE_PROVIDER( mp->winCssProvider ),
+         GTK_STYLE_PROVIDER_PRIORITY_APPLICATION );
+   }
+
+   gtk_widget_queue_draw( mp->textView );
 }
 
 HB_FUNC( MESSAGESPANELCREATE )
@@ -13958,6 +13981,7 @@ HB_FUNC( MESSAGESPANELSETTEXT )
    {
       GtkTextBuffer * buf = gtk_text_view_get_buffer( GTK_TEXT_VIEW(mp->textView) );
       gtk_text_buffer_set_text( buf, psz, -1 );
+      gtk_widget_queue_draw( mp->textView );
    }
 }
 
@@ -13993,6 +14017,14 @@ HB_FUNC( MESSAGESPANELDESTROY )
                gtk_widget_get_style_context( mp->textView ),
                GTK_STYLE_PROVIDER( mp->cssProvider ) );
          g_object_unref( mp->cssProvider );
+      }
+      if( mp->winCssProvider )
+      {
+         if( mp->window )
+            gtk_style_context_remove_provider(
+               gtk_widget_get_style_context( mp->window ),
+               GTK_STYLE_PROVIDER( mp->winCssProvider ) );
+         g_object_unref( mp->winCssProvider );
       }
       if( mp->window ) gtk_widget_destroy( mp->window );
       free( mp );

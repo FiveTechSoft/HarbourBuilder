@@ -8594,6 +8594,40 @@ typedef struct _MESSAGESPANEL {
 static HBRUSH s_hMsgBgBrush    = NULL;
 static HBRUSH s_hMsgEditBrush = NULL;
 
+static void MsgPanel_ApplyEditTheme( HWND hEdit )
+{
+   typedef HRESULT (WINAPI *PFN_SetWindowTheme)( HWND, LPCWSTR, LPCWSTR );
+   HMODULE hUx;
+   PFN_SetWindowTheme fn;
+
+   if( !hEdit ) return;
+   hUx = LoadLibraryA( "uxtheme.dll" );
+   if( !hUx ) return;
+   fn = (PFN_SetWindowTheme) GetProcAddress( hUx, "SetWindowTheme" );
+   if( fn )
+   {
+      /* Strip visual styles so WM_CTLCOLOR* paints the client area (readonly
+         EDIT sends WM_CTLCOLORSTATIC, not WM_CTLCOLOREDIT). */
+      if( g_bDarkIDE )
+         fn( hEdit, L"", L"" );
+      else
+         fn( hEdit, L"Explorer", NULL );
+   }
+   FreeLibrary( hUx );
+}
+
+static LRESULT MsgPanel_ColorEdit( HDC hdc )
+{
+   if( g_bDarkIDE )
+   {
+      if( !s_hMsgEditBrush ) s_hMsgEditBrush = CreateSolidBrush( RGB( 30, 30, 30 ) );
+      SetTextColor( hdc, RGB( 212, 212, 212 ) );
+      SetBkColor( hdc, RGB( 30, 30, 30 ) );
+      return (LRESULT) s_hMsgEditBrush;
+   }
+   return 0;
+}
+
 static void MsgPanel_ApplyDwm( HWND hWnd )
 {
    typedef HRESULT (WINAPI *PFN_DwmSetWindowAttribute)( HWND, DWORD, LPCVOID, DWORD );
@@ -8637,13 +8671,12 @@ static LRESULT CALLBACK MsgPanelWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPA
          FillRect( (HDC) wParam, &rc, hBr );
          return 1;
       }
+      case WM_CTLCOLORSTATIC:
       case WM_CTLCOLOREDIT:
-         if( g_bDarkIDE )
+         if( mp && mp->hEdit && (HWND) lParam == mp->hEdit )
          {
-            if( !s_hMsgEditBrush ) s_hMsgEditBrush = CreateSolidBrush( RGB( 30, 30, 30 ) );
-            SetTextColor( (HDC) wParam, RGB( 212, 212, 212 ) );
-            SetBkColor( (HDC) wParam, RGB( 30, 30, 30 ) );
-            return (LRESULT) s_hMsgEditBrush;
+            LRESULT lr = MsgPanel_ColorEdit( (HDC) wParam );
+            if( lr ) return lr;
          }
          break;
       case WM_SIZE:
@@ -8664,7 +8697,10 @@ static LRESULT CALLBACK MsgPanelWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPA
 static void MsgPanel_SetEditText( MESSAGESPANEL * mp, const char * pszText )
 {
    if( mp && mp->hEdit )
+   {
       SetWindowTextA( mp->hEdit, pszText ? pszText : "" );
+      InvalidateRect( mp->hEdit, NULL, TRUE );
+   }
 }
 
 HB_FUNC( MESSAGESPANELCREATE )
@@ -8708,6 +8744,7 @@ HB_FUNC( MESSAGESPANELCREATE )
       if( hFont ) SendMessage( mp->hEdit, WM_SETFONT, (WPARAM) hFont, TRUE );
    }
 
+   MsgPanel_ApplyEditTheme( mp->hEdit );
    MsgPanel_ApplyDwm( mp->hWnd );
    ShowWindow( mp->hWnd, SW_SHOW );
    hb_retnint( (HB_PTRUINT) mp );
@@ -8719,10 +8756,14 @@ HB_FUNC( MESSAGESPANELREFRESHTHEME )
 
    if( mp && mp->hWnd )
    {
+      MsgPanel_ApplyEditTheme( mp->hEdit );
       MsgPanel_ApplyDwm( mp->hWnd );
       InvalidateRect( mp->hWnd, NULL, TRUE );
       if( mp->hEdit )
-         InvalidateRect( mp->hEdit, NULL, TRUE );
+      {
+         RedrawWindow( mp->hEdit, NULL, NULL,
+            RDW_INVALIDATE | RDW_ERASE | RDW_FRAME | RDW_ALLCHILDREN );
+      }
    }
 }
 

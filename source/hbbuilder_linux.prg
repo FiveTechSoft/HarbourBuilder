@@ -2865,6 +2865,8 @@ static function TBRun()
       cLog += "    " + aModules[i][1] + ".prg (module)" + Chr(10)
    next
    GTK_ShellExec( "cp " + cProjDir + "/source/core/classes.prg " + cBuildDir + "/" )
+   GTK_ShellExec( "cp " + cProjDir + "/source/hix_runtime.prg " + cBuildDir + "/ 2>/dev/null" )
+   GTK_ShellExec( "cp " + cProjDir + "/source/hix_template.prg " + cBuildDir + "/ 2>/dev/null" )
    GTK_ShellExec( "cp " + cProjDir + "/include/hbbuilder.ch " + cBuildDir + "/" )
    GTK_ShellExec( "cp " + cProjDir + "/include/hbide.ch " + cBuildDir + "/" )
 
@@ -2901,15 +2903,39 @@ static function TBRun()
       endif
    endif
 
-   // Step 4: Compile framework
+   // Step 4: Compile framework (+ HIX web server runtime)
    if ! lError
       GTK_ProgressStep( "Compiling framework..." )
       cLog += "[4] Compiling framework..." + Chr(10)
       cCmd := cHbBin + "/harbour " + cBuildDir + "/classes.prg -n -w -q" + ;
               " -I" + cHbInc + " -I" + cBuildDir + ;
               " -o" + cBuildDir + "/classes.c 2>&1"
-      GTK_ShellExec( cCmd )
-      cLog += "    OK" + Chr(10)
+      cOutput := GTK_ShellExec( cCmd )
+      if "Error" $ cOutput
+         cLog += "    classes FAILED:" + Chr(10) + cOutput + Chr(10)
+         lError := .T.
+      endif
+      if ! lError .and. File( cBuildDir + "/hix_runtime.prg" )
+         cCmd := cHbBin + "/harbour " + cBuildDir + "/hix_runtime.prg -n -w -q" + ;
+                 " -I" + cHbInc + " -I" + cBuildDir + ;
+                 " -o" + cBuildDir + "/hix_runtime.c 2>&1"
+         cOutput := GTK_ShellExec( cCmd )
+         if "Error" $ cOutput
+            cLog += "    hix_runtime FAILED:" + Chr(10) + cOutput + Chr(10)
+            lError := .T.
+         endif
+      endif
+      if ! lError .and. File( cBuildDir + "/hix_template.prg" )
+         cCmd := cHbBin + "/harbour " + cBuildDir + "/hix_template.prg -n -w -q" + ;
+                 " -I" + cHbInc + " -I" + cBuildDir + ;
+                 " -o" + cBuildDir + "/hix_template.c 2>&1"
+         cOutput := GTK_ShellExec( cCmd )
+         if "Error" $ cOutput
+            cLog += "    hix_template FAILED:" + Chr(10) + cOutput + Chr(10)
+            lError := .T.
+         endif
+      endif
+      if ! lError; cLog += "    OK" + Chr(10); endif
    endif
 
    // Step 5: Compile C sources
@@ -2926,6 +2952,16 @@ static function TBRun()
       cCmd := "gcc -c -O2 -Wno-unused-value -I" + cHbInc + ;
               " " + cBuildDir + "/classes.c -o " + cBuildDir + "/classes.o 2>&1"
       GTK_ShellExec( cCmd )
+      if File( cBuildDir + "/hix_runtime.c" )
+         cCmd := "gcc -c -O2 -Wno-unused-value -I" + cHbInc + ;
+                 " " + cBuildDir + "/hix_runtime.c -o " + cBuildDir + "/hix_runtime.o 2>&1"
+         GTK_ShellExec( cCmd )
+      endif
+      if File( cBuildDir + "/hix_template.c" )
+         cCmd := "gcc -c -O2 -Wno-unused-value -I" + cHbInc + ;
+                 " " + cBuildDir + "/hix_template.c -o " + cBuildDir + "/hix_template.o 2>&1"
+         GTK_ShellExec( cCmd )
+      endif
       cLog += "    OK" + Chr(10)
    endif
 
@@ -2959,6 +2995,8 @@ static function TBRun()
       cCmd := "gcc -o " + cBuildDir + "/UserApp" + ;
               " " + cBuildDir + "/main.o" + ;
               " " + cBuildDir + "/classes.o" + ;
+              If( File( cBuildDir + "/hix_runtime.o" ), " " + cBuildDir + "/hix_runtime.o", "" ) + ;
+              If( File( cBuildDir + "/hix_template.o" ), " " + cBuildDir + "/hix_template.o", "" ) + ;
               " " + cBuildDir + "/gtk3_core.o" + ;
               If( File( cBuildDir + "/hbdb_real.o" ), " " + cBuildDir + "/hbdb_real.o", "" ) + ;
               " -L" + cHbLib + ;
@@ -3062,6 +3100,8 @@ static function TBDebugRun( lRunToBreak )
          CodeEditorGetTabText( hCodeEditor, i + 1 ) )
    next
    GTK_ShellExec( "cp " + cProjDir + "/source/core/classes.prg " + cBuildDir + "/" )
+   GTK_ShellExec( "cp " + cProjDir + "/source/hix_runtime.prg " + cBuildDir + "/ 2>/dev/null" )
+   GTK_ShellExec( "cp " + cProjDir + "/source/hix_template.prg " + cBuildDir + "/ 2>/dev/null" )
    GTK_ShellExec( "cp " + cProjDir + "/include/hbbuilder.ch " + cBuildDir + "/" )
    GTK_ShellExec( "cp " + cProjDir + "/include/hbide.ch " + cBuildDir + "/" )
    GTK_ShellExec( "cp " + cProjDir + "/source/debugger/dbgclient.prg " + cBuildDir + "/" )
@@ -3103,6 +3143,13 @@ static function TBDebugRun( lRunToBreak )
    // dbgclient.prg (debug — not in editor)
    AAdd( aDbgOffsets, { nCurLine, "dbgclient.prg", 0, 0 } )
    cAllPrg += MemoRead( cBuildDir + "/dbgclient.prg" ) + Chr(10)
+
+   if File( cBuildDir + "/hix_runtime.prg" )
+      cAllPrg += MemoRead( cBuildDir + "/hix_runtime.prg" ) + Chr(10)
+   endif
+   if File( cBuildDir + "/hix_template.prg" )
+      cAllPrg += MemoRead( cBuildDir + "/hix_template.prg" ) + Chr(10)
+   endif
 
    MemoWrit( cBuildDir + "/debug_main.prg", cAllPrg )
 

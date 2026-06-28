@@ -4088,6 +4088,8 @@ static function TBRun()
       cLog += "    " + aModules[i][1] + ".prg (module)" + Chr(10)
    next
    W32_ShellExec( 'cmd /c copy "' + cProjDir + '\source\core\classes.prg" "' + cBuildDir + '\" >nul 2>&1' )
+   W32_ShellExec( 'cmd /c copy "' + cProjDir + '\source\hix_runtime.prg" "' + cBuildDir + '\" >nul 2>&1' )
+   W32_ShellExec( 'cmd /c copy "' + cProjDir + '\source\hix_template.prg" "' + cBuildDir + '\" >nul 2>&1' )
    W32_ShellExec( 'cmd /c copy "' + cProjDir + '\include\hbbuilder.ch" "' + cBuildDir + '\" >nul 2>&1' )
    W32_ShellExec( 'cmd /c copy "' + cProjDir + '\include\hbide.ch" "' + cBuildDir + '\" >nul 2>&1' )
    W32_ShellExec( 'cmd /c copy "' + cProjDir + '\resources\stddlgs.c" "' + cBuildDir + '\" >nul 2>&1' )
@@ -4238,15 +4240,39 @@ static function TBRun()
       endif
    endif
 
-   // Step 4: Compile framework
+   // Step 4: Compile framework (+ HIX web server runtime)
    if ! lError
       W32_ProgressStep( "Compiling framework..." )
       cLog += "[4] Compiling framework..." + Chr(10)
       cCmd := cHbBin + '\harbour.exe ' + cBuildDir + '\classes.prg /n /w /q' + ;
               " /i" + cHbInc + " /i" + cBuildDir + ;
               " /o" + cBuildDir + "\classes.c"
-      W32_ShellExec( cCmd )
-      cLog += "    OK" + Chr(10)
+      cOutput := W32_ShellExec( cCmd )
+      if "Error" $ cOutput
+         cLog += "    classes FAILED:" + Chr(10) + cOutput + Chr(10)
+         lError := .T.
+      endif
+      if ! lError .and. File( cBuildDir + "\hix_runtime.prg" )
+         cCmd := cHbBin + '\harbour.exe ' + cBuildDir + '\hix_runtime.prg /n /w /q' + ;
+                 " /i" + cHbInc + " /i" + cBuildDir + ;
+                 " /o" + cBuildDir + "\hix_runtime.c"
+         cOutput := W32_ShellExec( cCmd )
+         if "Error" $ cOutput
+            cLog += "    hix_runtime FAILED:" + Chr(10) + cOutput + Chr(10)
+            lError := .T.
+         endif
+      endif
+      if ! lError .and. File( cBuildDir + "\hix_template.prg" )
+         cCmd := cHbBin + '\harbour.exe ' + cBuildDir + '\hix_template.prg /n /w /q' + ;
+                 " /i" + cHbInc + " /i" + cBuildDir + ;
+                 " /o" + cBuildDir + "\hix_template.c"
+         cOutput := W32_ShellExec( cCmd )
+         if "Error" $ cOutput
+            cLog += "    hix_template FAILED:" + Chr(10) + cOutput + Chr(10)
+            lError := .T.
+         endif
+      endif
+      if ! lError; cLog += "    OK" + Chr(10); endif
    endif
 
    // Step 5: Compile C sources (compiler-specific)
@@ -4277,6 +4303,26 @@ static function TBRun()
             cCmd := 'cmd /S /c ""' + cCC + '" @"' + cRsp + '" 2>&1"'
             W32_ShellExec( cCmd )
          endif
+         if ! lError .and. File( cBuildDir + "\hix_runtime.c" )
+            cRsp := cBuildDir + "\cl_hix_runtime.rsp"
+            MemoWrit( cRsp, cRspContent + '"' + cBuildDir + '\hix_runtime.c"' + Chr(10) + '/Fo"' + cBuildDir + '\hix_runtime.obj"' )
+            cCmd := 'cmd /S /c ""' + cCC + '" @"' + cRsp + '" 2>&1"'
+            cOutput := W32_ShellExec( cCmd )
+            if "error" $ Lower( cOutput )
+               cLog += "    hix_runtime FAILED:" + Chr(10) + cOutput + Chr(10)
+               lError := .T.
+            endif
+         endif
+         if ! lError .and. File( cBuildDir + "\hix_template.c" )
+            cRsp := cBuildDir + "\cl_hix_template.rsp"
+            MemoWrit( cRsp, cRspContent + '"' + cBuildDir + '\hix_template.c"' + Chr(10) + '/Fo"' + cBuildDir + '\hix_template.obj"' )
+            cCmd := 'cmd /S /c ""' + cCC + '" @"' + cRsp + '" 2>&1"'
+            cOutput := W32_ShellExec( cCmd )
+            if "error" $ Lower( cOutput )
+               cLog += "    hix_template FAILED:" + Chr(10) + cOutput + Chr(10)
+               lError := .T.
+            endif
+         endif
          if ! lError .and. File( cBuildDir + "\stddlgs.c" )
             cRsp := cBuildDir + "\cl_stddlgs.rsp"
             MemoWrit( cRsp, cRspContent + '"' + cBuildDir + '\stddlgs.c"' + Chr(10) + '/Fo"' + cBuildDir + '\stddlgs.obj"' )
@@ -4298,6 +4344,20 @@ static function TBRun()
                     " -I" + cProjDir + "\include" + ;
                     " " + cBuildDir + "\classes.c" + ;
                     " -o " + cBuildDir + "\classes.o"
+            W32_ShellExec( cCmd )
+         endif
+         if ! lError .and. File( cBuildDir + "\hix_runtime.c" )
+            cCmd := cCC + ' -c -O2 -I' + cHbInc + ;
+                    " -I" + cProjDir + "\include" + ;
+                    " " + cBuildDir + "\hix_runtime.c" + ;
+                    " -o " + cBuildDir + "\hix_runtime.o"
+            W32_ShellExec( cCmd )
+         endif
+         if ! lError .and. File( cBuildDir + "\hix_template.c" )
+            cCmd := cCC + ' -c -O2 -I' + cHbInc + ;
+                    " -I" + cProjDir + "\include" + ;
+                    " " + cBuildDir + "\hix_template.c" + ;
+                    " -o " + cBuildDir + "\hix_template.o"
             W32_ShellExec( cCmd )
          endif
          if ! lError .and. File( cBuildDir + "\stddlgs.c" )
@@ -4326,6 +4386,30 @@ static function TBRun()
                  " -o" + cBuildDir + "\classes.obj" + ;
                  " " + cBuildDir + "\classes.c"
          W32_ShellExec( cCmd )
+         if File( cBuildDir + "\hix_runtime.c" )
+            cCmd := cCC + ' -c -O2 -tW -I' + cHbInc + ;
+                    " -I" + cCDir + "\include" + ;
+                    " -I" + cProjDir + "\include" + ;
+                    " -o" + cBuildDir + "\hix_runtime.obj" + ;
+                    " " + cBuildDir + "\hix_runtime.c"
+            cOutput := W32_ShellExec( cCmd )
+            if ! File( cBuildDir + "\hix_runtime.obj" )
+               cLog += "    hix_runtime FAILED:" + Chr(10) + cOutput + Chr(10)
+               lError := .T.
+            endif
+         endif
+         if ! lError .and. File( cBuildDir + "\hix_template.c" )
+            cCmd := cCC + ' -c -O2 -tW -I' + cHbInc + ;
+                    " -I" + cCDir + "\include" + ;
+                    " -I" + cProjDir + "\include" + ;
+                    " -o" + cBuildDir + "\hix_template.obj" + ;
+                    " " + cBuildDir + "\hix_template.c"
+            cOutput := W32_ShellExec( cCmd )
+            if ! File( cBuildDir + "\hix_template.obj" )
+               cLog += "    hix_template FAILED:" + Chr(10) + cOutput + Chr(10)
+               lError := .T.
+            endif
+         endif
          if File( cBuildDir + "\stddlgs.c" )
             cCmd := cCC + ' -c -O2 -tW -I' + cHbInc + ;
                     " -I" + cCDir + "\include" + ;
@@ -4407,6 +4491,12 @@ static function TBRun()
          if File( cBuildDir + "\stddlgs.o" )
             cObjs += " " + cBuildDir + "\stddlgs.o"
          endif
+         if File( cBuildDir + "\hix_runtime.o" )
+            cObjs += " " + cBuildDir + "\hix_runtime.o"
+         endif
+         if File( cBuildDir + "\hix_template.o" )
+            cObjs += " " + cBuildDir + "\hix_template.o"
+         endif
       else
          cObjs := cBuildDir + "\main.obj " + ;
                   cBuildDir + "\classes.obj " + ;
@@ -4417,6 +4507,12 @@ static function TBRun()
                   cBuildDir + "\hb_db_real.obj"
          if File( cBuildDir + "\stddlgs.obj" )
             cObjs += " " + cBuildDir + "\stddlgs.obj"
+         endif
+         if File( cBuildDir + "\hix_runtime.obj" )
+            cObjs += " " + cBuildDir + "\hix_runtime.obj"
+         endif
+         if File( cBuildDir + "\hix_template.obj" )
+            cObjs += " " + cBuildDir + "\hix_template.obj"
          endif
       endif
       if cCompiler == "msvc"
@@ -5308,6 +5404,8 @@ static function TBDebugRun( lRunToBreak )
          CodeEditorGetTabText( hCodeEditor, 1 + Len(aForms) + i ) )
    next
    W32_ShellExec( 'cmd /c copy "' + cProjDir + '\source\core\classes.prg" "' + cBuildDir + '\" >nul 2>&1' )
+   W32_ShellExec( 'cmd /c copy "' + cProjDir + '\source\hix_runtime.prg" "' + cBuildDir + '\" >nul 2>&1' )
+   W32_ShellExec( 'cmd /c copy "' + cProjDir + '\source\hix_template.prg" "' + cBuildDir + '\" >nul 2>&1' )
    W32_ShellExec( 'cmd /c copy "' + cProjDir + '\include\hbbuilder.ch" "' + cBuildDir + '\" >nul 2>&1' )
    W32_ShellExec( 'cmd /c copy "' + cProjDir + '\include\hbide.ch" "' + cBuildDir + '\" >nul 2>&1' )
    W32_ShellExec( 'cmd /c copy "' + cProjDir + '\source\debugger\dbgclient.prg" "' + cBuildDir + '\" >nul 2>&1' )
@@ -5370,6 +5468,14 @@ static function TBDebugRun( lRunToBreak )
    // dbgclient.prg (debug client — not in editor)
    AAdd( aDbgOffsets, { nCurLine, "dbgclient.prg", 0, 0 } )
    cAllPrg += MemoRead( cBuildDir + "\dbgclient.prg" ) + Chr(10)
+
+   // hix_runtime.prg / hix_template.prg (web server — not in editor)
+   if File( cBuildDir + "\hix_runtime.prg" )
+      cAllPrg += MemoRead( cBuildDir + "\hix_runtime.prg" ) + Chr(10)
+   endif
+   if File( cBuildDir + "\hix_template.prg" )
+      cAllPrg += MemoRead( cBuildDir + "\hix_template.prg" ) + Chr(10)
+   endif
 
    // Platform stubs for macOS/Linux functions referenced by classes.prg
    cAllPrg += '#pragma BEGINDUMP' + Chr(10)
