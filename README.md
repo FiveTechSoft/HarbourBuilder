@@ -387,6 +387,11 @@ Run > Debug:
 build_win.bat
 ```
 
+To remove build artifacts and clutter (logs, .obj, test builds, etc.):
+```bat
+clean.bat
+```
+
 ### macOS
 
 **Prerequisites:**
@@ -405,6 +410,8 @@ On first run, the build script will:
 - Build Scintilla 5.5.3 + Lexilla static libraries from source
 
 To use a custom Harbour installation: `HBDIR=/path/to/harbour ./build_mac.sh`
+
+Cross-platform cleanup: `./clean.sh` (or `clean.bat` on Windows)
 
 > **Apple Silicon (M1/M2/M3/M4):** The current build produces x86_64 binaries which run via Rosetta 2 on ARM Macs. For native ARM builds, recompile Harbour for `darwin/clang/arm64` and update `HBDIR` in `build_mac.sh`.
 
