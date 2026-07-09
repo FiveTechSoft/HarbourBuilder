@@ -3531,8 +3531,31 @@ HB_FUNC( UI_DROPNONVISUAL )
             }
             if( szIcon )
             {
-               sprintf( szDefault, "c:\\HarbourBuilder\\resources\\icons\\%s", szIcon );
-               cIconPath = szDefault;
+               /* Try several locations to find icons without hardcoding dev paths.
+                  Use static buffer so cIconPath remains valid after this block. */
+               static char sIconBuf[512];
+               const char * candidates[] = {
+                  "resources\\icons\\%s",
+                  "..\\resources\\icons\\%s",
+                  ".\\resources\\icons\\%s",
+                  NULL
+               };
+               int k;
+               cIconPath = NULL;
+               for( k = 0; candidates[k]; k++ )
+               {
+                  sprintf( sIconBuf, candidates[k], szIcon );
+                  if( LoadPngAsBitmap( sIconBuf ) )
+                  {
+                     cIconPath = sIconBuf;
+                     break;
+                  }
+               }
+               if( ! cIconPath )
+               {
+                  sprintf( sIconBuf, "%s", szIcon );
+                  cIconPath = sIconBuf;
+               }
             }
          }
 

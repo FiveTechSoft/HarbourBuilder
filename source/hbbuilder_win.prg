@@ -62,7 +62,7 @@ static function StTime( cPhase )
       PadR( cPhase, 34 ) + Str( n - s_nStT0, 8 ) + " ms" + Chr(13) + Chr(10) )
 return nil
 
-// --- Path helpers (fix for hardcoded C:\HarbourBuilder dev paths) ----------
+// --- Path helpers (avoid hardcoded dev-machine paths) ---------------------
 // Returns the HarbourBuilder source root directory, derived from exe location
 // when possible (HB_DirBase() + .. when running from bin/), with fallbacks.
 static function GetHbBuilderRoot()
@@ -4737,13 +4737,16 @@ return nil
 static function TBRunAndroid()
 
    local cRepoRoot   := GetHbBuilderRoot()
-   local cAndroidDir := "C:\HarbourAndroid"
+   local cAndroidDir := GetEnv( "TEMP" ) + "\HarbourAndroid"
+   if ! lIsDir( cAndroidDir ) .and. lIsDir( "C:\HarbourAndroid" )
+      cAndroidDir := "C:\HarbourAndroid"   // legacy dev location
+   endif
    local cBackend    := cRepoRoot + "\source\backends\android"
    local cGenPrg     := cBackend + "\_generated.prg"
    local cBuildSh    := cBackend + "\build-apk-gui.sh"
    local cApkPath    := cAndroidDir + "\apk-gui\harbour-gui.apk"
    // Build log lives OUTSIDE apk-gui because build-apk-gui.sh does
-   // rm -rf /c/HarbourAndroid/apk-gui at startup, which nuked the file.
+   // rm -rf .../apk-gui at startup, which nuked the file.
    local cLogPath    := cAndroidDir + "\build-apk-gui.log"
    local cBash       := "C:\Program Files\Git\bin\bash.exe"
    local cAdb        := "C:\Android\Sdk\platform-tools\adb.exe"
@@ -4796,8 +4799,7 @@ static function TBRunAndroid()
    // strip a "real" quote from our bash path and the command would break
    // silently (which is what made every build a no-op). Wrap everything
    // in a double-quote at each end to give cmd a pair to strip.
-   cCmd := '""' + cBash + '" -lc "bash /c/HarbourBuilder/source/backends/android/build-apk-gui.sh ' + ;
-           '/c/HarbourBuilder/source/backends/android/_generated.prg > /c/HarbourAndroid/build-apk-gui.log 2>&1""'
+   cCmd := '""' + cBash + '" -lc "bash \"' + cBuildSh + '\" \"' + cGenPrg + '\" > \"' + cLogPath + '\" 2>&1""'
    AndroidTrace( "Build cmd: " + cCmd )
    W32_ShellExec( cCmd )
    AndroidTrace( "Build cmd returned. APK exists=" + iif( File( cApkPath ), "Y", "N" ) )
@@ -4848,7 +4850,10 @@ static function AndroidSetupWizard()
 
    local cReport := "Android toolchain status:" + Chr(10) + Chr(10)
    local lNdk, lSdk, lBT, lPT, lEmu, lJdk, lBash, lHbAnd, lAvd
-   local cHbRoot := "C:\HarbourAndroid\harbour-core"
+   local cHbRoot := GetEnv( "TEMP" ) + "\HarbourAndroid\harbour-core"
+   if ! hb_DirExists( cHbRoot ) .and. hb_DirExists( "C:\HarbourAndroid\harbour-core" )
+      cHbRoot := "C:\HarbourAndroid\harbour-core"
+   endif
    local cAvdDir := GetEnv( "USERPROFILE" ) + "\.android\avd\HarbourBuilderAVD.avd"
    local cCmd
 
@@ -5947,8 +5952,8 @@ return nil
 // === Debug Pause Callback (called from socket command loop) ===
 
 static function DbgLog2( cMsg )
-   local nH := FOpen( "c:\hbbuilder_debug\pause_trace.log", 1 + 16 )
-   if nH == -1; nH := FCreate( "c:\hbbuilder_debug\pause_trace.log" ); endif
+   local nH := FOpen( "pause_trace.log", 1 + 16 )
+   if nH == -1; nH := FCreate( "pause_trace.log" ); endif
    if nH >= 0
       FSeek( nH, 0, 2 )
       FWrite( nH, cMsg + Chr(13) + Chr(10) )
@@ -10756,7 +10761,7 @@ static BOOL InitScintilla( void )
 
    if( s_hScintilla ) return TRUE;  /* already loaded */
 
-   fLog = fopen( "c:\\HarbourBuilder\\scintilla_trace.log", "a" );
+   fLog = fopen( "scintilla_trace.log", "a" );
 
    GetModuleFileNameA( NULL, szDir, MAX_PATH );
    { char * p = strrchr( szDir, '\\' ); if( p ) { *p = 0; } }
@@ -10974,7 +10979,7 @@ static void ConfigureScintilla( HWND hSci )
    /* Indentation guides */
    SciMsg( hSci, SCI_SETINDENTATIONGUIDES, SC_IV_LOOKBOTH, 0 );
 
-   { FILE * fLog = fopen( "c:\\HarbourBuilder\\scintilla_trace.log", "a" );
+   { FILE * fLog = fopen( "scintilla_trace.log", "a" );
      if( fLog ) { fprintf( fLog, "ConfigureScintilla done for hwnd=%p\n", hSci ); fclose( fLog ); }
    }
 }
@@ -12414,7 +12419,7 @@ HB_FUNC( CODEEDITORCREATE )
    int nWidth = hb_parni(3), nHeight = hb_parni(4);
    FILE * fLog;
 
-   fLog = fopen( "c:\\HarbourBuilder\\scintilla_trace.log", "a" );
+   fLog = fopen( "scintilla_trace.log", "a" );
    if( fLog ) fprintf( fLog, "CodeEditorCreate: %d,%d %dx%d\n", nLeft, nTop, nWidth, nHeight );
 
    /* Load Scintilla + Lexilla DLLs */

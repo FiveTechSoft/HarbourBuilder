@@ -26,9 +26,13 @@ on_exit() {
 trap on_exit EXIT
 
 # ---------- configurable paths ----------
-HB_REPO=/Users/usuario/HarbourBuilder
+SCRIPT_DIR="$( cd "$( dirname "$0" )" && pwd )"
+HB_REPO="${HB_REPO:-$(dirname "$(dirname "$(dirname "$SCRIPT_DIR")")")}"
+if [ ! -f "$HB_REPO/releases/harbour-ios-arm64.zip" ]; then
+  HB_REPO=/Users/usuario/HarbourBuilder
+fi
 HB_IOS_LIB_ZIP="$HB_REPO/releases/harbour-ios-arm64.zip"
-HB_IOS_ROOT=/Users/usuario/harbour-ios-src
+HB_IOS_ROOT="${HB_IOS_ROOT:-/Users/usuario/harbour-ios-src}"
 
 banner() {
   echo

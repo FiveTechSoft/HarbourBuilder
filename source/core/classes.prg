@@ -4980,8 +4980,7 @@ function CustomerDbfPath()
       hb_DirBase() + "data/customer.dbf", ;
       hb_DirBase() + "../data/customer.dbf", ;
       hb_DirBase() + "../../data/customer.dbf", ;
-      "C:\HarbourBuilder\data\customer.dbf", ;
-      "/Users/usuario/HarbourBuilder/data/customer.dbf" ;
+      GetEnv( "TEMP" ) + "\HarbourBuilder\data\customer.dbf" ;
    }
    local i, cPath
 

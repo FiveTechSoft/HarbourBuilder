@@ -12,9 +12,9 @@ set "BASH=C:\Program Files\Git\bin\bash.exe"
 set "ADB=C:\Android\Sdk\platform-tools\adb.exe"
 set "EMULATOR=C:\Android\Sdk\emulator\emulator.exe"
 set "AVD=HarbourBuilderAVD"
-set "APK=C:\HarbourAndroid\apk-gui\harbour-gui.apk"
+set "APK=%TEMP%\HarbourAndroid\apk-gui\harbour-gui.apk"
 set "PKG=com.harbour.builder"
-set "SCRIPT=/c/HarbourBuilder/source/backends/android/build-apk-gui.sh"
+set "SCRIPT=%~dp0build-apk-gui.sh"
 
 echo.
 echo ============================================================

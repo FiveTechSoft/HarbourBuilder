@@ -17,22 +17,24 @@ set -eu
 SCRIPT_DIR="$( cd "$( dirname "$0" )" && pwd )"   # source/backends/android/
 PRG_SRC="${1:-$SCRIPT_DIR/hello_gui.prg}"
 
-WORK=/c/HarbourAndroid/apk-gui
-HB_SRC=/c/HarbourAndroid/harbour-core
+# Allow override via environment (e.g. WORK=/tmp/HarbourAndroid WORK=... bash ...)
+: "${WORK:=/c/HarbourAndroid/apk-gui}"
+: "${HB_SRC:=/c/HarbourAndroid/harbour-core}"
+: "${HOST_HB:=/c/harbour/bin/win/bcc/harbour.exe}"
+: "${NDK:=/c/Android/android-ndk-r26d}"
+: "${SDK:=/c/Android/Sdk}"
+: "${JDK:=/c/JDK17/jdk-17.0.13+11}"
+: "${KEYSTORE:=/c/HarbourAndroid/apk-demo/debug.keystore}"
+
 HB_LIB=$HB_SRC/lib/android/clang-android-arm64-v8a
 HB_INC=$HB_SRC/include
-HOST_HB=/c/harbour/bin/win/bcc/harbour.exe
 
-NDK=/c/Android/android-ndk-r26d
 NDK_BIN=$NDK/toolchains/llvm/prebuilt/windows-x86_64/bin
 CLANG=$NDK_BIN/clang.exe
 TARGET=aarch64-linux-android24
 
-SDK=/c/Android/Sdk
-JDK=/c/JDK17/jdk-17.0.13+11
 BT=$SDK/build-tools/34.0.0
 ANDROID_JAR=$SDK/platforms/android-34/android.jar
-KEYSTORE=/c/HarbourAndroid/apk-demo/debug.keystore  # reuse existing debug keystore
 
 export PATH="$JDK/bin:$BT:$PATH"
 export JAVA_HOME="$JDK"

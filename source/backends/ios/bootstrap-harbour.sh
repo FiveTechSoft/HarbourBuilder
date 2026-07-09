@@ -14,7 +14,9 @@
 set -eu
 
 # ---------- configurable ----------
-: "${HARBOUR_SRC:=/Users/usuario/harbour-ios-src}"
+SCRIPT_DIR="$( cd "$( dirname "$0" )" && pwd )"
+HB_REPO_DEFAULT="$(dirname "$(dirname "$(dirname "$SCRIPT_DIR")")")"
+: "${HARBOUR_SRC:=${HARBOUR_SRC:-/Users/usuario/harbour-ios-src}}"
 : "${HARBOUR_HOST:=/Users/usuario/harbour/bin}"
 : "${TARGET:=device}"
 : "${JOBS:=8}"

@@ -17,10 +17,11 @@ PRG_SRC="${1:-$SCRIPT_DIR/hello_ios.prg}"
 TARGET="${2:-device}"
 
 WORK=/tmp/HarbouriOS/app-build
-HB_SRC=/Users/usuario/harbour-ios-src
+# Allow env overrides
+: "${HB_SRC:=/Users/usuario/harbour-ios-src}"
 HB_LIB=$HB_SRC/lib/darwin/clang-ios-arm64   # default, overridden below
 HB_INC=$HB_SRC/include
-HOST_HB=/Users/usuario/harbour/bin/harbour
+: "${HOST_HB:=/Users/usuario/harbour/bin/harbour}"
 
 SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
 CLANG=$(xcrun --sdk iphoneos --find clang)

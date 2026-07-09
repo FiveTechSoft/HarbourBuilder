@@ -46,9 +46,14 @@ CMDLINE_URL="https://dl.google.com/android/repository/commandlinetools-win-11076
 AVD_NAME=HarbourBuilderAVD
 SYSIMG="system-images;android-34;google_apis;x86_64"
 
-HB_REPO=/c/HarbourBuilder
+# Try to auto-detect the HarbourBuilder repo root from this script location
+SCRIPT_DIR="$( cd "$( dirname "$0" )" && pwd )"
+HB_REPO="${HB_REPO:-$(dirname "$(dirname "$(dirname "$SCRIPT_DIR")")")}"
+if [ ! -f "$HB_REPO/releases/harbour-android-arm64-v8a.zip" ]; then
+  HB_REPO=/c/HarbourBuilder
+fi
 HB_ANDROID_LIB_ZIP="$HB_REPO/releases/harbour-android-arm64-v8a.zip"
-HB_ANDROID_ROOT=/c/HarbourAndroid/harbour-core
+HB_ANDROID_ROOT="${HB_ANDROID_ROOT:-/c/HarbourAndroid/harbour-core}"
 
 banner() {
   echo

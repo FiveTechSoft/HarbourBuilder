@@ -504,7 +504,7 @@ static LRESULT CALLBACK InsEditProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM 
    /* Log ALL messages to trace file for debugging */
    if( msg == WM_KEYDOWN || msg == WM_KILLFOCUS || msg == WM_COMMAND || msg == WM_DESTROY )
    {
-      FILE * f = fopen("c:\\HarbourBuilder\\inspector_trace.log","a");
+      FILE * f = fopen("inspector_trace.log","a");
       if(f) { fprintf(f,"InsEditProc: msg=0x%04X wParam=%d d=%p oldProc=%p hWnd=%p hEdit=%p\n",
          msg,(int)wParam,d,d?d->oldEditProc:0,hWnd,d?d->hEdit:0); fclose(f); }
    }
@@ -2258,7 +2258,7 @@ static LRESULT CALLBACK InsWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             NMITEMACTIVATE * pa = (NMITEMACTIVATE *) lParam;
             int nLV = pa->iItem;
             int nReal;
-            { FILE*f=fopen("c:\\HarbourBuilder\\inspector_trace.log","a");
+            { FILE*f=fopen("inspector_trace.log","a");
               if(f){fprintf(f,"NM_CLICK: iItem=%d iSubItem=%d d=%p nVisible=%d\n",
                 nLV,pa->iSubItem,d,d?d->nVisible:0);fclose(f);} }
             if( !d || nLV < 0 || nLV >= d->nVisible ) return 0;
@@ -2368,7 +2368,7 @@ static LRESULT CALLBACK InsWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                lviCheck.mask = LVIF_PARAM;
                lviCheck.iItem = pe->iItem;
                SendMessageA( d->hEventList, LVM_GETITEMA, 0, (LPARAM) &lviCheck );
-               { FILE*f=fopen("c:\\HarbourBuilder\\inspector_trace.log","a");
+               { FILE*f=fopen("inspector_trace.log","a");
                  if(f){fprintf(f,"EventList NM_CLICK: iItem=%d lParam=%d\n",
                    pe->iItem,(int)lviCheck.lParam);fclose(f);} }
 
@@ -2650,7 +2650,7 @@ static void InsStartEdit( INSDATA * d, int nLVRow )
    ENUMDEF * pEnum;
    BOOL bNeedsBtn;
 
-   { FILE*f=fopen("c:\\HarbourBuilder\\inspector_trace.log","a");
+   { FILE*f=fopen("inspector_trace.log","a");
      if(f){fprintf(f,"InsStartEdit: nLVRow=%d d=%p\n",nLVRow,d);fclose(f);} }
 
    if( !d ) return;
@@ -2660,7 +2660,7 @@ static void InsStartEdit( INSDATA * d, int nLVRow )
    if( nReal < 0 || nReal >= d->nRows ) return;
    if( d->rows[nReal].bIsCat ) return;  /* don't edit category rows */
 
-   { FILE*f=fopen("c:\\HarbourBuilder\\inspector_trace.log","a");
+   { FILE*f=fopen("inspector_trace.log","a");
      if(f){fprintf(f,"  nReal=%d name='%s' type='%c'\n",nReal,d->rows[nReal].szName,d->rows[nReal].cType);fclose(f);} }
    d->nEditRow = nLVRow;
    ListView_GetSubItemRect( d->hList, nLVRow, 1, LVIR_LABEL, &rc );
@@ -2725,7 +2725,7 @@ static void InsStartEdit( INSDATA * d, int nLVRow )
                  d->rows[nReal].cType == 'M' ||
                  d->rows[nReal].cType == 'S' );
    nBtnW = bNeedsBtn ? 22 : 0;
-   { FILE*f=fopen("c:\\HarbourBuilder\\inspector_trace.log","a");
+   { FILE*f=fopen("inspector_trace.log","a");
      if(f){fprintf(f,"  bNeedsBtn=%d nBtnW=%d\n",(int)bNeedsBtn,nBtnW);fclose(f);} }
 
    d->hEdit = CreateWindowExA( 0, "EDIT", d->rows[nReal].szValue,
@@ -2752,7 +2752,7 @@ static void InsStartEdit( INSDATA * d, int nLVRow )
 
 static void InsLog( const char * msg )
 {
-   FILE * f = fopen( "c:\\HarbourBuilder\\inspector_trace.log", "a" );
+   FILE * f = fopen( "inspector_trace.log", "a" );
    if( f ) { fprintf( f, "%s\n", msg ); fclose( f ); }
 }
 
@@ -2775,7 +2775,7 @@ static void InsEndEdit( INSDATA * d, BOOL bApply )
       if( pEnum || bBoolEnum )
       {
          int nSel = (int) SendMessage( d->hEdit, CB_GETCURSEL, 0, 0 );
-         { FILE*f=fopen("c:\\HarbourBuilder\\inspector_trace.log","a");
+         { FILE*f=fopen("inspector_trace.log","a");
            if(f){fprintf(f,"  END COMBO prop='%s' bApply=1 bBool=%d bIsString=%d nSel=%d\n",
              d->rows[nReal].szName, bBoolEnum,
              pEnum ? pEnum->bIsString : -1, nSel); fclose(f);} }
@@ -2786,7 +2786,7 @@ static void InsEndEdit( INSDATA * d, BOOL bApply )
                lstrcpynA( szVal, pEnum->aValues[nSel], sizeof(szVal) );
             else
                sprintf( szVal, "%d", nSel );
-            { FILE*f=fopen("c:\\HarbourBuilder\\inspector_trace.log","a");
+            { FILE*f=fopen("inspector_trace.log","a");
               if(f){fprintf(f,"  END COMBO writing szVal='%s'\n", szVal); fclose(f);} }
             lstrcpynA( d->rows[nReal].szValue, szVal, sizeof(d->rows[0].szValue) );
             InsApplyValue( d, nReal, szVal );

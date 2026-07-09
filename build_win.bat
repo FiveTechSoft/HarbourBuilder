@@ -2,10 +2,6 @@
 REM Build HbBuilder for Windows - VS 2022/2026 Ready (MSVC x64)
 setlocal enabledelayedexpansion
 
-set HBDIR=C:\harbour
-set HBINC=%HBDIR%\include
-set HBBIN=%HBDIR%\bin
-set HBLIB=%HBDIR%\lib
 set SRCDIR=%~dp0source
 set CPPDIR=%~dp0source\cpp
 set INCDIR=%~dp0include
@@ -14,18 +10,49 @@ set RESDIR=%~dp0resources
 
 if not exist "%OUTDIR%" mkdir "%OUTDIR%"
 
-REM El install de Harbour puede ser plano (bin\ , lib\) o por-compilador
-REM (bin\win\msvc64\ , lib\win\msvc64\). Como este build es x64, si el layout
-REM plano no esta, caemos al subdir msvc64.
+REM ============================================================
+REM   Auto-detect Harbour installation (like the IDE does)
+REM ============================================================
+set HBDIR=
+for %%D in (
+   "C:\harbour"
+   "%USERPROFILE%\harbour"
+   "C:\hb"
+   "C:\hb32"
+   "%ProgramFiles%\harbour"
+   "%ProgramFiles(x86)%\harbour"
+   "%~dp0harbour"
+   "%~dp0..\harbour"
+) do (
+   if exist "%%~D\bin\harbour.exe" (
+      set HBDIR=%%~D
+      goto :found_hb
+   )
+   if exist "%%~D\bin\win\msvc64\harbour.exe" (
+      set HBDIR=%%~D
+      goto :found_hb
+   )
+)
+:found_hb
+if "%HBDIR%"=="" (
+   echo ERROR: No se encontro Harbour. Configura HBDIR manualmente o instala en una ubicacion comun.
+   pause & exit /b 1
+)
+
+set HBINC=%HBDIR%\include
+set HBBIN=%HBDIR%\bin
+set HBLIB=%HBDIR%\lib
+
+REM El install de Harbour puede ser plano o por-compilador
 if not exist "%HBBIN%\harbour.exe" if exist "%HBDIR%\bin\win\msvc64\harbour.exe" set HBBIN=%HBDIR%\bin\win\msvc64
 if not exist "%HBLIB%\hbvm.lib" if exist "%HBDIR%\lib\win\msvc64\hbvm.lib" set HBLIB=%HBDIR%\lib\win\msvc64
 
 if not exist "%HBBIN%\harbour.exe" (
-   echo ERROR: harbour.exe no encontrado ^(busque en "%HBDIR%\bin" y "%HBDIR%\bin\win\msvc64"^).
+   echo ERROR: harbour.exe no encontrado en "%HBDIR%".
    pause & exit /b 1
 )
 if not exist "%HBLIB%\hbvm.lib" (
-   echo ERROR: librerias de Harbour no encontradas ^(busque en "%HBDIR%\lib" y "%HBDIR%\lib\win\msvc64"^).
+   echo ERROR: librerias de Harbour no encontradas en "%HBDIR%".
    pause & exit /b 1
 )
 
