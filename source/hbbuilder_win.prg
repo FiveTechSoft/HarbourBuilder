@@ -49,11 +49,11 @@ static hToolsPopup := 0        // Tools menu popup handle (for Dark Mode checkma
 
 // --- Startup timing instrumentation -------------------------------------
 // Each StTime() call appends "<phase>  <ms since first call>" to
-// c:\HarbourBuilder\startup_timing.log so we can see what stalls IDE boot.
+// startup_timing.log (relative) so we can see what stalls IDE boot.
 static s_nStT0 := 0
 static function StTime( cPhase )
    local n := hb_MilliSeconds()
-   local cFile := "c:\HarbourBuilder\startup_timing.log"
+   local cFile := "startup_timing.log"
    if s_nStT0 == 0
       s_nStT0 := n
       hb_MemoWrit( cFile, "" )
@@ -61,6 +61,79 @@ static function StTime( cPhase )
    hb_MemoWrit( cFile, hb_MemoRead( cFile ) + ;
       PadR( cPhase, 34 ) + Str( n - s_nStT0, 8 ) + " ms" + Chr(13) + Chr(10) )
 return nil
+
+// --- Path helpers (fix for hardcoded C:\HarbourBuilder dev paths) ----------
+// Returns the HarbourBuilder source root directory, derived from exe location
+// when possible (HB_DirBase() + .. when running from bin/), with fallbacks.
+static function GetHbBuilderRoot()
+   local cBase := HB_DirBase()
+   local cRoot
+
+   // Normalize trailing separator
+   if Right( cBase, 1 ) $ "/\"
+      cBase := Left( cBase, Len( cBase ) - 1 )
+   endif
+
+   // If running the installed/ built exe from bin/ (or bin subdir), go up one
+   if Lower( Right( cBase, 4 ) ) == "\bin" .or. Lower( Right( cBase, 4 ) ) == "/bin"
+      cRoot := Left( cBase, Len( cBase ) - 4 )
+   elseif Lower( Right( cBase, 8 ) ) == "\bin\" .or. Lower( Right( cBase, 8 ) ) == "/bin/"
+      cRoot := Left( cBase, Len( cBase ) - 5 )
+   else
+      cRoot := cBase
+   endif
+
+   // Remove trailing sep again
+   if Right( cRoot, 1 ) $ "/\"
+      cRoot := Left( cRoot, Len( cRoot ) - 1 )
+   endif
+
+   // Dev convenience: if we landed in "source" dir, go up
+   if Lower( Right( cRoot, 7 ) ) == "\source" .or. Lower( Right( cRoot, 7 ) ) == "/source"
+      cRoot := Left( cRoot, Len( cRoot ) - 7 )
+   endif
+
+   if Empty( cRoot )
+      cRoot := "."
+   endif
+
+   return cRoot
+// Returns full path to a framework file (source/...) using detected root.
+// Falls back gracefully if file read fails (returns "").
+static function SafeMemoReadFramework( cRelPath )
+   local cRoot := GetHbBuilderRoot()
+   local cFull := cRoot
+   if ! ( Right( cFull, 1 ) $ "/\" )
+      cFull += "\"
+   endif
+   cFull += cRelPath
+   if File( cFull )
+      return MemoRead( cFull )
+   endif
+   // Fallbacks for dev runs from different CWDs
+   if File( cRelPath )
+      return MemoRead( cRelPath )
+   endif
+   if File( "..\source\" + StrTran( cRelPath, "source/", "" ) )
+      return MemoRead( "..\source\" + StrTran( cRelPath, "source/", "" ) )
+   endif
+   return ""
+// (end of SafeMemoReadFramework)
+
+// Temp build dir for user projects (avoid polluting C: or fixed paths)
+static function GetTempBuildDir()
+   local cTmp := GetEnv( "TEMP" )
+   if Empty( cTmp )
+      cTmp := GetEnv( "TMP" )
+   endif
+   if Empty( cTmp )
+      cTmp := "."
+   endif
+   if Right( cTmp, 1 ) $ "/\"
+      cTmp := Left( cTmp, Len( cTmp )-1 )
+   endif
+   return cTmp + "\hbbuilder_build"
+
 
 function Main()
 
@@ -3493,9 +3566,9 @@ return nil
 // Append position-related diagnostics to pos_trace.log. Short-lived,
 // only used while we debug form save/restore.
 static function PosTrace( cMsg )
-   local nH := FOpen( "c:\HarbourBuilder\pos_trace.log", 2 )
+   local nH := FOpen( "pos_trace.log", 2 )
    if nH == -1
-      nH := FCreate( "c:\HarbourBuilder\pos_trace.log" )
+      nH := FCreate( "pos_trace.log" )
    else
       FSeek( nH, 0, 2 )
    endif
@@ -3537,10 +3610,10 @@ static function ScanMethodDeclarations( cCode, cClass )
 return cOut
 
 static function AppendErrorLog( cMsg )
-   local nH := FOpen( "c:\HarbourBuilder\error_trace.log", 2 )
+   local nH := FOpen( "error_trace.log", 2 )
    local cStamp := DToS( Date() ) + " " + Time()
    if nH == -1
-      nH := FCreate( "c:\HarbourBuilder\error_trace.log" )
+      nH := FCreate( "error_trace.log" )
    else
       FSeek( nH, 0, 2 )
    endif
@@ -3600,10 +3673,10 @@ return nil
 
 static function LogTrace( cMsg )
 
-   local nH := FOpen( "c:\HarbourBuilder\save_trace.log", 2 )  // FO_READWRITE
+   local nH := FOpen( "save_trace.log", 2 )  // FO_READWRITE
 
    if nH == -1
-      nH := FCreate( "c:\HarbourBuilder\save_trace.log" )
+      nH := FCreate( "save_trace.log" )
    else
       FSeek( nH, 0, 2 )  // seek to end
    endif
@@ -3909,7 +3982,7 @@ static function TBRun()
       endif
    endif
 
-   cBuildDir := "c:\hbbuilder_build"
+   cBuildDir := GetTempBuildDir()
 
    // Honour ::cAppTitle from the main form: user's chosen app name
    // becomes the .exe name so what they ship matches the inspector.
@@ -3930,15 +4003,15 @@ static function TBRun()
    next
    // Include compiler and framework in hash so changes force rebuild
    cAllCode += DetectCompiler() + LTrim( Str( nSelectedCompIdx ) )
-   cAllCode += MemoRead( "c:\HarbourBuilder\source\core\classes.prg" )
+   cAllCode += SafeMemoReadFramework( "source/core/classes.prg" )
    // Include backend C++ sources so IDE-side backend updates force a rebuild
-   cAllCode += MemoRead( "c:\HarbourBuilder\source\cpp\hbbridge.cpp" )
-   cAllCode += MemoRead( "c:\HarbourBuilder\source\cpp\tform.cpp" )
-   cAllCode += MemoRead( "c:\HarbourBuilder\source\cpp\tcontrol.cpp" )
-   cAllCode += MemoRead( "c:\HarbourBuilder\source\cpp\tcontrols.cpp" )
+   cAllCode += SafeMemoReadFramework( "source/cpp/hbbridge.cpp" )
+   cAllCode += SafeMemoReadFramework( "source/cpp/tform.cpp" )
+   cAllCode += SafeMemoReadFramework( "source/cpp/tcontrol.cpp" )
+   cAllCode += SafeMemoReadFramework( "source/cpp/tcontrols.cpp" )
    // Include this file too: the W32_ErrorDialog template + main.prg
    // assembly logic live here, so changes here must invalidate the cache.
-   cAllCode += MemoRead( "c:\HarbourBuilder\source\hbbuilder_win.prg" )
+   cAllCode += SafeMemoReadFramework( "source/hbbuilder_win.prg" )
    nHash := Len( cAllCode )
    for i := 1 to Min( Len( cAllCode ), 5000 )
       nHash := nHash + Asc( SubStr( cAllCode, i, 1 ) ) * i
@@ -3948,7 +4021,7 @@ static function TBRun()
       RefreshIDEToolbars()
       return nil
    endif
-   cProjDir := "c:\HarbourBuilder"
+   cProjDir := GetHbBuilderRoot()
    cLog     := ""
    lError   := .F.
    IDE_ClearMessages()
@@ -4628,8 +4701,10 @@ static function TBRun()
       cBin64 := ( "64" $ cHbLib )
       cMyDll := iif( cBin64, "libmysql64.dll", "libmysql.dll" )
       W32_ShellExec( 'cmd /c copy /y "' + cProjDir + '\bin\' + cMyDll + '" "' + cBuildDir + '\" >nul 2>&1' )
-      // libpq.dll fallback (PostgreSQL install)
+      // libpq.dll fallback (PostgreSQL install) - try common locations
       W32_ShellExec( 'cmd /c if exist "C:\Program Files\PostgreSQL\18\bin\libpq.dll" copy /y "C:\Program Files\PostgreSQL\18\bin\libpq.dll" "' + cBuildDir + '\" >nul' )
+      W32_ShellExec( 'cmd /c if exist "C:\Program Files\PostgreSQL\17\bin\libpq.dll" copy /y "C:\Program Files\PostgreSQL\17\bin\libpq.dll" "' + cBuildDir + '\" >nul' )
+      W32_ShellExec( 'cmd /c if exist "C:\Program Files\PostgreSQL\16\bin\libpq.dll" copy /y "C:\Program Files\PostgreSQL\16\bin\libpq.dll" "' + cBuildDir + '\" >nul' )
       // Copy exe to project folder with smart name from cAppTitle or folder name
       // (mirrors Linux f821f11 + d8ce000)
       if ! Empty( cCurrentFile )
@@ -4661,7 +4736,7 @@ return nil
 // See memory/project_android_build.md and project_android_gui_validated.md.
 static function TBRunAndroid()
 
-   local cRepoRoot   := "C:\HarbourBuilder"
+   local cRepoRoot   := GetHbBuilderRoot()
    local cAndroidDir := "C:\HarbourAndroid"
    local cBackend    := cRepoRoot + "\source\backends\android"
    local cGenPrg     := cBackend + "\_generated.prg"
@@ -4825,7 +4900,7 @@ static function AndroidSetupWizard()
    cCmd := "start " + Chr(34) + "HarbourBuilder - Android setup" + Chr(34) + " " + ;
            Chr(34) + "C:\Program Files\Git\bin\bash.exe" + Chr(34) + " -lc " + ;
            Chr(34) + ;
-           "bash /c/HarbourBuilder/source/backends/android/setup-android-toolchain.sh; " + ;
+           'bash "' + GetHbBuilderRoot() + '/source/backends/android/setup-android-toolchain.sh"; ' + ;
            "exec bash" + Chr(34)
    hb_run( cCmd )
 
@@ -4837,9 +4912,9 @@ return nil
 static function AndroidTrace( cMsg )
    local nH, cLine
    cLine := DToS( Date() ) + " " + Time() + " " + cMsg + Chr(13) + Chr(10)
-   nH := FOpen( "c:\HarbourBuilder\android_trace.log", 2 )
+   nH := FOpen( "android_trace.log", 2 )
    if nH == -1
-      nH := FCreate( "c:\HarbourBuilder\android_trace.log" )
+      nH := FCreate( "android_trace.log" )
    else
       FSeek( nH, 0, 2 )
    endif
@@ -5217,7 +5292,7 @@ static function ShowProjectOptions()
    // Project settings stored as statics
    static cHarbourDir   := ""
    static cCompilerDir  := ""
-   static cProjectDir   := "c:\HarbourBuilder"
+   static cProjectDir   := GetHbBuilderRoot()
    static cOutputDir    := ""
    static cHbFlags      := "/n /w /q"
    static cCFlags       := ""
@@ -5306,8 +5381,8 @@ static function TBDebugRun( lRunToBreak )
    SyncDesignerToCode()  // Ensure event bindings are up to date
    W32_SetWaitCursor( .T. )
 
-   cBuildDir := "c:\hbbuilder_debug"
-   cProjDir  := "c:\HarbourBuilder"
+   cBuildDir := GetTempBuildDir()
+   cProjDir  := GetHbBuilderRoot()
    cLog      := ""
    lError    := .F.
 

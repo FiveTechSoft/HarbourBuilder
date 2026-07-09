@@ -403,7 +403,7 @@ void TToolBar::CreateHandle( HWND hParent )
 
 static void TBLog( const char * fmt, ... )
 {
-   FILE * f = fopen( "c:\\ide\\toolbar.log", "a" );
+   FILE * f = fopen( "toolbar.log", "a" );
    if( f ) {
       va_list ap; va_start( ap, fmt );
       vfprintf( f, fmt, ap );
@@ -1615,7 +1615,7 @@ static WNDPROC s_oldTabProc = NULL;
 
 static void PalLog( const char * fmt, ... )
 {
-   FILE * f = fopen( "c:\\HarbourBuilder\\palette_trace.log", "a" );
+   FILE * f = fopen( "palette_trace.log", "a" );
    if( f ) { va_list ap; va_start(ap,fmt); vfprintf(f,fmt,ap); va_end(ap); fprintf(f,"\n"); fclose(f); }
 }
 

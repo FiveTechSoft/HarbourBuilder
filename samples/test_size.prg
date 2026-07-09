@@ -17,7 +17,7 @@ function Main()
    oForm1:Show()
 
    // Read what Form1 actually got
-   MemoWrit( "c:\HarbourBuilder\test_size.log", ;
+   MemoWrit( "test_size.log", ;
       "Form1 requested: 400x300" + Chr(10) + ;
       "Form1 Width=" + LTrim(Str(UI_GetProp(oForm1:hCpp,"nWidth"))) + ;
       " Height=" + LTrim(Str(UI_GetProp(oForm1:hCpp,"nHeight"))) + ;
@@ -29,8 +29,8 @@ function Main()
    UI_FormSetPos( oForm2:hCpp, 520, 100 )
    oForm2:Show()
 
-   MemoWrit( "c:\HarbourBuilder\test_size.log", ;
-      MemoRead( "c:\HarbourBuilder\test_size.log" ) + ;
+   MemoWrit( "test_size.log", ;
+      MemoRead( "test_size.log" ) + ;
       "Form2 Width=" + LTrim(Str(UI_GetProp(oForm2:hCpp,"nWidth"))) + ;
       " Height=" + LTrim(Str(UI_GetProp(oForm2:hCpp,"nHeight"))) + ;
       " ClientW=" + LTrim(Str(UI_GetProp(oForm2:hCpp,"nClientWidth"))) + ;

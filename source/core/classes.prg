@@ -4971,11 +4971,32 @@ function HB_CreateComponent( nType, oParent )
 return nil
 
 //----------------------------------------------------------------------------//
+// Returns path to the sample customer.dbf used by demos.
+// Tries several locations so it works from source tree, installed IDE,
+// samples/ subdir, or after build. Avoids hardcoded dev-machine paths.
 function CustomerDbfPath()
+   local aCandidates := { ;
+      "data/customer.dbf", ;
+      hb_DirBase() + "data/customer.dbf", ;
+      hb_DirBase() + "../data/customer.dbf", ;
+      hb_DirBase() + "../../data/customer.dbf", ;
+      "C:\HarbourBuilder\data\customer.dbf", ;
+      "/Users/usuario/HarbourBuilder/data/customer.dbf" ;
+   }
+   local i, cPath
+
+   for i := 1 to Len( aCandidates )
+      cPath := aCandidates[ i ]
+      if ! Empty( cPath ) .and. File( cPath )
+         return cPath
+      endif
+   next
+
+   // Last resort: return a conventional relative (may not exist, caller handles)
 #ifdef __PLATFORM__UNIX
-return "/Users/usuario/HarbourBuilder/data/customer.dbf"
+   return "data/customer.dbf"
 #else
-return "C:\HarbourBuilder\data\customer.dbf"
+   return "data\customer.dbf"
 #endif
 
 //----------------------------------------------------------------------------//

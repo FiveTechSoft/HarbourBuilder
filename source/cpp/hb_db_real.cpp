@@ -278,6 +278,9 @@ static int pg_load( void )
    if( g_pg.h ) return 1;
    g_pg.h = LoadLibraryA( "libpq.dll" );
    if( ! g_pg.h ) g_pg.h = LoadLibraryA( "C:\\Program Files\\PostgreSQL\\18\\bin\\libpq.dll" );
+   if( ! g_pg.h ) g_pg.h = LoadLibraryA( "C:\\Program Files\\PostgreSQL\\17\\bin\\libpq.dll" );
+   if( ! g_pg.h ) g_pg.h = LoadLibraryA( "C:\\Program Files\\PostgreSQL\\16\\bin\\libpq.dll" );
+   if( ! g_pg.h ) g_pg.h = LoadLibraryA( "C:\\Program Files\\PostgreSQL\\15\\bin\\libpq.dll" );
    if( ! g_pg.h ) return 0;
 
    #define PG_GET(name) g_pg.name = (PFN_PQ##name) GetProcAddress( g_pg.h, "PQ" #name )

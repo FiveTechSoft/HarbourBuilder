@@ -84,3 +84,22 @@ samples/projects/database/classes.o
 # Worktrees
 .worktrees/
 source/HbBuilder
+
+# Dev / test leftovers and IDE run artifacts (in addition to *.log *.obj *.exe)
+test_memo/
+terminals/
+agent-tools/
+*.trace.log
+startup_timing.log
+pos_trace.log
+error_trace.log
+save_trace.log
+android_trace.log
+scintilla_trace.log
+palette*.log
+inspector_trace.log
+bp_trace.log
+
+# IDE runtime dirs
+hbbuilder_build/
+hbbuilder_debug/

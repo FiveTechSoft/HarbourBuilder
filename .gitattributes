@@ -1,0 +1,58 @@
+# HarbourBuilder .gitattributes
+# Ensure consistent line endings and mark binaries across Windows/macOS/Linux.
+
+# Text files - use LF in repo for scripts and sources (git will convert on checkout)
+*.prg           text eol=lf
+*.ch            text eol=lf
+*.c             text eol=lf
+*.cpp           text eol=lf
+*.m             text eol=lf
+*.mm            text eol=lf
+*.h             text eol=lf
+*.sh            text eol=lf
+*.bat           text eol=crlf
+*.cmd           text eol=crlf
+*.md            text eol=lf
+*.txt           text eol=lf
+*.json          text eol=lf
+*.xml           text eol=lf
+*.html          text eol=lf
+*.css           text eol=lf
+*.js            text eol=lf
+*.py            text eol=lf
+*.ini           text eol=lf
+*.hbp           text eol=lf
+*.rc            text eol=crlf
+*.manifest      text eol=lf
+
+# Binary files - never convert, never diff as text
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.gif           binary
+*.ico           binary
+*.icns          binary
+*.bmp           binary
+*.zip           binary
+*.tar           binary
+*.gz            binary
+*.dll           binary
+*.so            binary
+*.a             binary
+*.lib           binary
+*.exe           binary
+*.obj           binary
+*.o             binary
+*.res           binary
+*.mov           binary
+*.mp4           binary
+*.db?           binary
+*.dbf           binary
+*.cdx           binary
+*.ntx           binary
+*.sqlite        binary
+*.harbour       binary
+*.hrb           binary
+
+# Git LFS not used here, but document large assets if added later
+# *.zip filter=lfs diff=lfs merge=lfs -text

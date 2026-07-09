@@ -4,9 +4,12 @@ HarbourBuilder's Android target turns your `.prg` forms into signed APKs
 running on a real Android emulator or device. This page documents every
 prerequisite the toolchain needs so a fresh clone can build an APK.
 
-**Auto-installer wizard is on the roadmap (iteration 6).** Until it lands,
-follow this guide once; everything is self-contained and stays outside
-the system `PATH` / registry.
+**Android Setup Wizard** is available in the IDE (Run → Android Setup Wizard...).
+It detects missing pieces and can launch an automated installer script for the
+required toolchain on Windows (other hosts planned). The wizard and scripts
+assume conventional install locations listed below; edit the scripts if you
+use different paths. The prebuilt Harbour for Android is shipped in
+`releases/harbour-android-arm64-v8a.zip`.
 
 ---
 

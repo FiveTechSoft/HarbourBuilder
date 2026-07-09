@@ -5384,7 +5384,7 @@ HB_FUNC( IDE_DEBUGGETLOCALS )
 /* Debug trace log */
 static void DbgTrace( const char * msg )
 {
-   FILE * f = fopen( "c:\\hbbuilder_debug\\dbg_trace_c.log", "a" );
+   FILE * f = fopen( "dbg_trace_c.log", "a" );
    if( f ) { fprintf( f, "%s\n", msg ); fclose( f ); }
 }
 
@@ -5434,7 +5434,7 @@ HB_FUNC( IDE_DEBUGSTART2 )
    HB_BOOL lRunToBreak = hb_parl(3);
 
    /* Clear trace log */
-   { FILE * f = fopen("c:\\hbbuilder_debug\\dbg_trace_c.log","w"); if(f) fclose(f); }
+   { FILE * f = fopen("dbg_trace_c.log","w"); if(f) fclose(f); }
 
    { char t[512]; snprintf(t,sizeof(t),"IDE_DebugStart2: exe='%s' block=%p state=%d", cExePath?cExePath:"(null)", pOnPause, s_dbgState); DbgTrace(t); }
 

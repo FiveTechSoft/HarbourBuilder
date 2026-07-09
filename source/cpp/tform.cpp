@@ -426,7 +426,7 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
          {
             int btnIdx = wId - 200;
             int nTab = FPalette->FCurrentTab;
-            { FILE*f=fopen("c:\\HarbourBuilder\\palette_trace.log","a");
+            { FILE*f=fopen("palette_trace.log","a");
               if(f){fprintf(f,"Form WM_COMMAND: id=%d btnIdx=%d tab=%d tabCount=%d btnCount=%d g_design=%p\n",
                 wId,btnIdx,nTab,FPalette->FTabCount,
                 nTab>=0&&nTab<FPalette->FTabCount?FPalette->FTabs[nTab].nBtnCount:0,
@@ -435,7 +435,7 @@ LRESULT TForm::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
                 btnIdx >= 0 && btnIdx < FPalette->FTabs[nTab].nBtnCount )
             {
                int ctrlType = FPalette->FTabs[nTab].btns[btnIdx].nControlType;
-               { FILE*f=fopen("c:\\HarbourBuilder\\palette_trace.log","a");
+               { FILE*f=fopen("palette_trace.log","a");
                  if(f){fprintf(f,"  -> ctrlType=%d name='%s' tooltip='%s', setting PendingControlType\n",
                    ctrlType, FPalette->FTabs[nTab].btns[btnIdx].szText,
                    FPalette->FTabs[nTab].btns[btnIdx].szTooltip);fclose(f);} }
