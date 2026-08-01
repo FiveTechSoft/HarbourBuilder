@@ -43,15 +43,26 @@ fi
 
 if [ -f "$HBDIR/bin/darwin/clang/harbour" ]; then
   HBBIN="$HBDIR/bin/darwin/clang"
-  HBLIB="$HBDIR/lib/darwin/clang"
 elif [ -f "$HBDIR/bin/harbour" ]; then
   HBBIN="$HBDIR/bin"
-  HBLIB="$HBDIR/lib"
 else
   echo "ERROR: Harbour not found at $HBDIR"
   exit 1
 fi
+# Libs may be under lib/darwin/clang (in-tree) or lib/ (make install prefix)
+if [ -d "$HBDIR/lib/darwin/clang" ] && ls "$HBDIR/lib/darwin/clang"/libhbvm*.a >/dev/null 2>&1; then
+  HBLIB="$HBDIR/lib/darwin/clang"
+elif [ -d "$HBDIR/lib" ] && ls "$HBDIR/lib"/libhbvm*.a >/dev/null 2>&1; then
+  HBLIB="$HBDIR/lib"
+else
+  echo "ERROR: Harbour libs not found under $HBDIR/lib"
+  ls -la "$HBDIR/lib" 2>/dev/null || true
+  exit 1
+fi
 HBINC="$HBDIR/include"
+echo "HBBIN=$HBBIN"
+echo "HBLIB=$HBLIB"
+ls "$HBLIB"/libhb*.a 2>/dev/null | head -20 || true
 
 # Verify Harbour binary arch when forcing a target
 if [ "$ARCH" != "universal" ]; then
@@ -112,6 +123,14 @@ clang $OBJCFLAGS -c "$HBROOT/source/backends/cocoa/cocoa_core.m" -o cocoa_core.o
 VMLIB="-lhbvm"
 [ -f "$HBLIB/libhbvmmt.a" ] && VMLIB="-lhbvmmt"
 
+# Only link libs that exist in this Harbour install
+hblib() {
+  local name="$1"
+  if [ -f "$HBLIB/lib${name}.a" ] || [ -f "$HBLIB/${name}.a" ]; then
+    echo "-l${name}"
+  fi
+}
+
 OBJS="main.o erp_meta.o erp_http.o classes.o cocoa_core.o mac_stubs.o"
 [ -f cocoa_webserver.o ] && OBJS="$OBJS cocoa_webserver.o"
 
@@ -119,15 +138,19 @@ FRAMEWORKS="-framework Cocoa -framework WebKit -framework Foundation -framework 
   -framework QuartzCore -framework CoreText -framework MapKit -framework CoreLocation \
   -framework SceneKit -framework UniformTypeIdentifiers"
 
+HBLIBS="$(hblib hbcommon) $VMLIB $(hblib hbrtl) $(hblib hbrdd) $(hblib hbmacro) \
+  $(hblib hblang) $(hblib hbcpage) $(hblib hbpp) $(hblib hbcplr) \
+  $(hblib rddntx) $(hblib rddnsx) $(hblib rddcdx) $(hblib rddfpt) \
+  $(hblib hbsix) $(hblib hbusrrdd) $(hblib hbct) $(hblib hbextern) \
+  $(hblib hbsqlit3) $(hblib gtcgi) $(hblib gttrm) $(hblib gtstd) $(hblib gtnul) \
+  $(hblib hbdebug) $(hblib hbpcre) $(hblib hbzlib) $(hblib hbhsx) $(hblib hbuddall)"
+
 echo "[3] link"
+echo "HBLIBS=$HBLIBS"
 clang $OBJS -O2 -mmacosx-version-min=11.0 $ARCH_FLAG -o "$OUT" \
   -L"$HBLIB" \
-  -lhbcommon $VMLIB -lhbrtl -lhbrdd -lhbmacro -lhblang -lhbcpage -lhbpp \
-  -lhbcplr -lrddntx -lrddnsx -lrddcdx -lrddfpt -lhbsix -lhbusrrdd -lhbct \
-  -lhbextern -lhbsqlit3 -lgtcgi -lgttrm -lgtstd \
-  $([ -f "$HBLIB/libgtnul.a" ] && echo "-lgtnul" || true) \
-  -lhbdebug -lhbpcre -lhbzlib \
-  $FRAMEWORKS -lpthread -lsqlite3 -fobjc-arc
+  $HBLIBS \
+  $FRAMEWORKS -lpthread -lsqlite3 -lm -fobjc-arc
 
 chmod +x "$OUT"
 

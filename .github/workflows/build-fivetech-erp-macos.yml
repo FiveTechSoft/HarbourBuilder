@@ -34,34 +34,38 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/harbour
-          key: harbour-fte-${{ matrix.arch }}-v1
+          key: harbour-fte-${{ matrix.arch }}-v2
 
       - name: Build Harbour (if cache miss)
         if: steps.cache-harbour.outputs.cache-hit != 'true'
         run: |
           git clone --depth 1 https://github.com/harbour/core /tmp/harbour-src
           cd /tmp/harbour-src
-          # Multi-thread VM for HTTP server threads
           export HB_USER_CFLAGS="-O2"
-          export HB_BUILD_CONTRIBS="no"
+          export HB_BUILD_CONTRIBS="yes"
+          # Install prefix layout: bin/ + lib/*.a (not lib/darwin/clang)
           HB_INSTALL_PREFIX="$HOME/harbour" make -j"$(sysctl -n hw.ncpu)" install
-          # Ensure mt lib if available in tree
-          ls -la "$HOME/harbour/lib/darwin/clang" | head -40 || ls -la "$HOME/harbour/lib" | head -40
+          echo "=== Harbour libs ==="
+          ls -la "$HOME/harbour/lib" | head -60
+          ls -la "$HOME/harbour/bin" | head -20
+          file "$HOME/harbour/bin/harbour" || file "$HOME/harbour/bin/darwin/clang/harbour"
 
       - name: Build FiveTech_ERP
         env:
-          HBDIR: ${{ github.workspace }}/../harbour
           ARCH: ${{ matrix.arch }}
         run: |
           export HBDIR="$HOME/harbour"
           export ARCH="${{ matrix.arch }}"
+          # Prefer install layout
+          if [ -f "$HOME/harbour/bin/harbour" ]; then
+            export PATH="$HOME/harbour/bin:$PATH"
+          fi
           cd samples/projects/FiveTech_ERP
           chmod +x build_mac.sh assemble_main.sh
           ./build_mac.sh
           file FiveTech_ERP
           lipo -archs FiveTech_ERP
-          echo "$ARCH" | grep -qw "$(lipo -archs FiveTech_ERP | tr ' ' '\n' | head -1)" \
-            || lipo -archs FiveTech_ERP | grep -qw "${{ matrix.arch }}"
+          lipo -archs FiveTech_ERP | grep -qw "${{ matrix.arch }}"
 
       - name: Package
         run: |
