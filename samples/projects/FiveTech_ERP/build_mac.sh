@@ -52,6 +52,7 @@ clang $CFLAGS -c main.c -o main.o
 clang $CFLAGS -c erp_meta.c -o erp_meta.o
 clang $CFLAGS -c erp_http.c -o erp_http.o
 clang $CFLAGS -c classes.c -o classes.o
+clang $CFLAGS -c "$PROJDIR/mac_stubs.c" -o mac_stubs.o
 # cocoa_core.m requires ARC (same as root build_mac.sh)
 clang $OBJCFLAGS -c "$HBROOT/source/backends/cocoa/cocoa_core.m" -o cocoa_core.o
 [ -f "$HBROOT/source/backends/cocoa/cocoa_webserver.m" ] && \
@@ -60,16 +61,22 @@ clang $OBJCFLAGS -c "$HBROOT/source/backends/cocoa/cocoa_core.m" -o cocoa_core.o
 VMLIB="-lhbvm"
 [ -f "$HBLIB/libhbvmmt.a" ] && VMLIB="-lhbvmmt"
 
-OBJS="main.o erp_meta.o erp_http.o classes.o cocoa_core.o"
+OBJS="main.o erp_meta.o erp_http.o classes.o cocoa_core.o mac_stubs.o"
 [ -f cocoa_webserver.o ] && OBJS="$OBJS cocoa_webserver.o"
+
+# Frameworks used by cocoa_core (Map/Scene optional controls + WebView)
+FRAMEWORKS="-framework Cocoa -framework WebKit -framework Foundation -framework AppKit \
+  -framework QuartzCore -framework CoreText -framework MapKit -framework CoreLocation \
+  -framework SceneKit -framework UniformTypeIdentifiers"
 
 echo "[3] link"
 clang $OBJS -O2 -mmacosx-version-min=10.15 -o "$OUT" \
   -L"$HBLIB" \
   -lhbcommon $VMLIB -lhbrtl -lhbrdd -lhbmacro -lhblang -lhbcpage -lhbpp \
-  -lhbcplr -lrddntx -lrddcdx -lrddfpt -lhbsix -lhbusrrdd -lhbct \
+  -lhbcplr -lrddntx -lrddnsx -lrddcdx -lrddfpt -lhbsix -lhbusrrdd -lhbct \
+  -lhbextern -lhbsqlit3 -lgtcgi -lgttrm -lgtstd \
   -lhbdebug -lhbpcre -lhbzlib \
-  $FRAMEWORKS -lpthread -fobjc-arc
+  $FRAMEWORKS -lpthread -lsqlite3 -fobjc-arc
 
 chmod +x "$OUT"
 
