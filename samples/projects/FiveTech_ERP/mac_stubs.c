@@ -2,8 +2,9 @@
  * Same PRG set as Windows; only this file is macOS-specific at link time. */
 #include "hbapi.h"
 
-/* GT force-links */
+/* GT force-links (NUL is preferred on Mac; keep stubs for residual refs) */
 HB_FUNC( HB_GT_GUI_DEFAULT ) {}
+HB_FUNC( HB_GT_NUL ) {}
 HB_FUNC( HB_GT_TRM ) {}
 
 /* Code editor runtime hooks used by cocoa_core window close */

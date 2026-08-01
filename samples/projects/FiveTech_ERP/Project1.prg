@@ -7,7 +7,8 @@
 //--------------------------------------------------------------------
 #include "hbbuilder.ch"
 
-REQUEST HB_GT_GUI_DEFAULT
+// GT is injected by assemble_main (Win: GUI_DEFAULT, Mac/Linux: NUL)
+// so the same Project1.prg works on every OS without #ifdef.
 REQUEST HB_CODEPAGE_UTF8EX
 REQUEST HB_MT
 

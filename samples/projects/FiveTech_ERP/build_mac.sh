@@ -2,15 +2,44 @@
 # FiveTech_ERP — macOS (same PRG set as Windows/Linux)
 # Units: Project1.prg Form1.prg erp_meta.prg erp_http.prg + classes.prg
 # Backend: Cocoa + WKWebView
+#
+# Arch:
+#   default  = host (uname -m)   → arm64 on Apple Silicon, x86_64 on Intel
+#   ARCH=arm64 ./build_mac.sh    → force Apple Silicon (needs arm64 Harbour)
+#   ARCH=x86_64 ./build_mac.sh   → force Intel
+#   ARCH=universal ./build_mac.sh → lipo arm64 + x86_64 if both toolchains exist
 set -e
 
 PROJDIR="$(cd "$(dirname "$0")" && pwd)"
 HBROOT="$(cd "$PROJDIR/../../.." && pwd)"
 export HBROOT
 HBDIR="${HBDIR:-$HOME/harbour}"
-BUILDDIR="$PROJDIR/_build_mac"
-OUT="$PROJDIR/FiveTech_ERP"
-APP="$PROJDIR/FiveTech_ERP.app"
+
+HOST_ARCH="$(uname -m)"
+ARCH="${ARCH:-$HOST_ARCH}"
+case "$ARCH" in
+  arm64|aarch64) ARCH=arm64 ;;
+  x86_64|amd64)  ARCH=x86_64 ;;
+  universal)     ARCH=universal ;;
+  *) echo "ERROR: unsupported ARCH=$ARCH (use arm64|x86_64|universal)"; exit 1 ;;
+esac
+
+if [ "$ARCH" = "universal" ]; then
+  BUILDDIR="$PROJDIR/_build_mac_universal"
+  OUT="$PROJDIR/FiveTech_ERP"
+  APP="$PROJDIR/FiveTech_ERP.app"
+else
+  BUILDDIR="$PROJDIR/_build_mac_${ARCH}"
+  OUT="$PROJDIR/FiveTech_ERP"
+  APP="$PROJDIR/FiveTech_ERP.app"
+fi
+
+# Prefer arch-specific Harbour install if present
+if [ "$ARCH" = "arm64" ] && [ -f "$HOME/harbour-arm64/bin/darwin/clang/harbour" ]; then
+  HBDIR="$HOME/harbour-arm64"
+elif [ "$ARCH" = "x86_64" ] && [ -f "$HOME/harbour-x86_64/bin/darwin/clang/harbour" ]; then
+  HBDIR="$HOME/harbour-x86_64"
+fi
 
 if [ -f "$HBDIR/bin/darwin/clang/harbour" ]; then
   HBBIN="$HBDIR/bin/darwin/clang"
@@ -24,8 +53,31 @@ else
 fi
 HBINC="$HBDIR/include"
 
-echo "=== FiveTech_ERP macOS (same PRGs as Win/Linux) ==="
+# Verify Harbour binary arch when forcing a target
+if [ "$ARCH" != "universal" ]; then
+  HB_ARCH="$(lipo -archs "$HBBIN/harbour" 2>/dev/null || file -b "$HBBIN/harbour" || true)"
+  echo "Harbour arch: $HB_ARCH"
+  if [ "$ARCH" = "arm64" ] && ! echo "$HB_ARCH" | grep -Eq 'arm64|aarch64'; then
+    if [ "$HOST_ARCH" != "arm64" ]; then
+      echo "ERROR: Apple Silicon (arm64) build needs Harbour arm64 on an arm64 Mac."
+      echo "  Host is $HOST_ARCH. Install Harbour for arm64 or run this script on Apple Silicon."
+      echo "  Hint: CI uses macos-14 (arm64). Local: build Harbour with arch arm64 into ~/harbour."
+      exit 1
+    fi
+  fi
+fi
+
+echo "=== FiveTech_ERP macOS ==="
+echo "HOST_ARCH=$HOST_ARCH  TARGET_ARCH=$ARCH"
 echo "HBROOT=$HBROOT  HBDIR=$HBDIR"
+echo "BUILDDIR=$BUILDDIR"
+
+ARCH_FLAG=""
+if [ "$ARCH" = "arm64" ]; then
+  ARCH_FLAG="-arch arm64"
+elif [ "$ARCH" = "x86_64" ]; then
+  ARCH_FLAG="-arch x86_64"
+fi
 
 rm -rf "$BUILDDIR"
 mkdir -p "$BUILDDIR"
@@ -35,7 +87,8 @@ cp -f "$HBROOT/include/hbbuilder.ch" . 2>/dev/null || true
 cp -f "$HBROOT/include/hbide.ch" . 2>/dev/null || true
 cp -f "$HBROOT/source/core/classes.prg" .
 
-bash "$PROJDIR/assemble_main.sh" "$PROJDIR" "$BUILDDIR"
+# On Cocoa, UI is native — use GT_NUL to avoid forcing a GUI GT symbol
+bash "$PROJDIR/assemble_main.sh" "$PROJDIR" "$BUILDDIR" mac
 
 echo "[1] Harbour compile (main + erp_meta + erp_http + classes)"
 "$HBBIN/harbour" main.prg     -n -w -q -I"$HBINC" -I"$BUILDDIR" -I"$HBROOT/include" -omain.c
@@ -43,17 +96,15 @@ echo "[1] Harbour compile (main + erp_meta + erp_http + classes)"
 "$HBBIN/harbour" erp_http.prg -n -w -q -I"$HBINC" -I"$BUILDDIR" -I"$HBROOT/include" -oerp_http.c
 "$HBBIN/harbour" classes.prg  -n -w -q -I"$HBINC" -I"$BUILDDIR" -I"$HBROOT/include" -oclasses.c
 
-echo "[2] clang"
-CFLAGS="-O2 -Wno-unused-value -Wno-deprecated-declarations -mmacosx-version-min=10.15 -I$HBINC -I$HBROOT/include -I$BUILDDIR"
+echo "[2] clang $ARCH_FLAG"
+CFLAGS="-O2 -Wno-unused-value -Wno-deprecated-declarations -mmacosx-version-min=11.0 $ARCH_FLAG -I$HBINC -I$HBROOT/include -I$BUILDDIR"
 OBJCFLAGS="$CFLAGS -fobjc-arc"
-FRAMEWORKS="-framework Cocoa -framework WebKit -framework Foundation -framework AppKit"
 
 clang $CFLAGS -c main.c -o main.o
 clang $CFLAGS -c erp_meta.c -o erp_meta.o
 clang $CFLAGS -c erp_http.c -o erp_http.o
 clang $CFLAGS -c classes.c -o classes.o
 clang $CFLAGS -c "$PROJDIR/mac_stubs.c" -o mac_stubs.o
-# cocoa_core.m requires ARC (same as root build_mac.sh)
 clang $OBJCFLAGS -c "$HBROOT/source/backends/cocoa/cocoa_core.m" -o cocoa_core.o
 [ -f "$HBROOT/source/backends/cocoa/cocoa_webserver.m" ] && \
   clang $OBJCFLAGS -c "$HBROOT/source/backends/cocoa/cocoa_webserver.m" -o cocoa_webserver.o || true
@@ -64,17 +115,17 @@ VMLIB="-lhbvm"
 OBJS="main.o erp_meta.o erp_http.o classes.o cocoa_core.o mac_stubs.o"
 [ -f cocoa_webserver.o ] && OBJS="$OBJS cocoa_webserver.o"
 
-# Frameworks used by cocoa_core (Map/Scene optional controls + WebView)
 FRAMEWORKS="-framework Cocoa -framework WebKit -framework Foundation -framework AppKit \
   -framework QuartzCore -framework CoreText -framework MapKit -framework CoreLocation \
   -framework SceneKit -framework UniformTypeIdentifiers"
 
 echo "[3] link"
-clang $OBJS -O2 -mmacosx-version-min=10.15 -o "$OUT" \
+clang $OBJS -O2 -mmacosx-version-min=11.0 $ARCH_FLAG -o "$OUT" \
   -L"$HBLIB" \
   -lhbcommon $VMLIB -lhbrtl -lhbrdd -lhbmacro -lhblang -lhbcpage -lhbpp \
   -lhbcplr -lrddntx -lrddnsx -lrddcdx -lrddfpt -lhbsix -lhbusrrdd -lhbct \
   -lhbextern -lhbsqlit3 -lgtcgi -lgttrm -lgtstd \
+  $([ -f "$HBLIB/libgtnul.a" ] && echo "-lgtnul" || true) \
   -lhbdebug -lhbpcre -lhbzlib \
   $FRAMEWORKS -lpthread -lsqlite3 -fobjc-arc
 
@@ -87,7 +138,7 @@ cp -f "$OUT" "$APP/Contents/MacOS/FiveTech_ERP"
 cp -R "$PROJDIR/www"  "$APP/Contents/MacOS/www"
 cp -R "$PROJDIR/meta" "$APP/Contents/MacOS/meta"
 cp -R "$PROJDIR/meta" "$APP/Contents/Resources/meta" 2>/dev/null || true
-cat > "$APP/Contents/Info.plist" <<'PLIST'
+cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -101,15 +152,20 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>LSMinimumSystemVersion</key><string>11.0</string>
   <key>NSHighResolutionCapable</key><true/>
+  <key>LSArchitecturePriority</key>
+  <array>
+    <string>${ARCH}</string>
+  </array>
 </dict>
 </plist>
 PLIST
 
 file "$OUT"
+lipo -archs "$OUT" 2>/dev/null || true
 echo
-echo "=== BUILD OK ==="
+echo "=== BUILD OK ($ARCH) ==="
 echo "Binary: $OUT"
 echo "App:    $APP"
-echo "PRGs:   Project1 Form1 erp_meta erp_http (identical to Windows/Linux)"
+echo "Build:  $BUILDDIR"
 echo "Run:    open \"$APP\""
 echo "Login:  admin/1234  or  demo/demo"

@@ -1,0 +1,76 @@
+name: Build FiveTech_ERP (macOS)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'samples/projects/FiveTech_ERP/**'
+      - 'source/backends/cocoa/**'
+      - 'source/core/classes.prg'
+      - '.github/workflows/build-fivetech-erp-macos.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14
+            arch: arm64
+            asset: FiveTech_ERP-macos-arm64.zip
+          - runner: macos-13
+            arch: x86_64
+            asset: FiveTech_ERP-macos-x86_64.zip
+    runs-on: ${{ matrix.runner }}
+    name: FiveTech_ERP (${{ matrix.arch }})
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Harbour
+        id: cache-harbour
+        uses: actions/cache@v4
+        with:
+          path: ~/harbour
+          key: harbour-fte-${{ matrix.arch }}-v1
+
+      - name: Build Harbour (if cache miss)
+        if: steps.cache-harbour.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 https://github.com/harbour/core /tmp/harbour-src
+          cd /tmp/harbour-src
+          # Multi-thread VM for HTTP server threads
+          export HB_USER_CFLAGS="-O2"
+          export HB_BUILD_CONTRIBS="no"
+          HB_INSTALL_PREFIX="$HOME/harbour" make -j"$(sysctl -n hw.ncpu)" install
+          # Ensure mt lib if available in tree
+          ls -la "$HOME/harbour/lib/darwin/clang" | head -40 || ls -la "$HOME/harbour/lib" | head -40
+
+      - name: Build FiveTech_ERP
+        env:
+          HBDIR: ${{ github.workspace }}/../harbour
+          ARCH: ${{ matrix.arch }}
+        run: |
+          export HBDIR="$HOME/harbour"
+          export ARCH="${{ matrix.arch }}"
+          cd samples/projects/FiveTech_ERP
+          chmod +x build_mac.sh assemble_main.sh
+          ./build_mac.sh
+          file FiveTech_ERP
+          lipo -archs FiveTech_ERP
+          echo "$ARCH" | grep -qw "$(lipo -archs FiveTech_ERP | tr ' ' '\n' | head -1)" \
+            || lipo -archs FiveTech_ERP | grep -qw "${{ matrix.arch }}"
+
+      - name: Package
+        run: |
+          cd samples/projects/FiveTech_ERP
+          ditto -c -k --keepParent FiveTech_ERP.app "../../${{ matrix.asset }}"
+          ls -la "../../${{ matrix.asset }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+          if-no-files-found: error
