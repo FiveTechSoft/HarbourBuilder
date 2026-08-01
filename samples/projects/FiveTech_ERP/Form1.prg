@@ -1,14 +1,13 @@
-// Form1.prg — FiveTech_ERP shell: HTTP server + embedded WebView
-// Pattern: TApplication:CreateForm installs AppShowError (HarbourBuilder error manager)
-// Window title = app name + URL (same idea as FWH TWebView2:SetTitle)
+// Form1.prg — FiveTech_ERP shell (same PRG on Windows / Linux / macOS)
+// HTTP server + embedded WebView (title bar shows URL / status, FWH style)
 //--------------------------------------------------------------------
 #include "hbbuilder.ch"
 
 CLASS TForm1 FROM TForm
 
    DATA oWeb
-   DATA nPort   INIT 2222
-   DATA cUrl    INIT ""
+   DATA nPort     INIT 2222
+   DATA cUrl      INIT ""
    DATA cAppTitle INIT "FiveTech_ERP"
 
    METHOD CreateForm()
@@ -21,8 +20,6 @@ ENDCLASS
 
 METHOD CreateForm() CLASS TForm1
 
-   local cMsg := ""
-
    ::cAppTitle := "FiveTech_ERP"
    ::cTitle    := ::cAppTitle + "  |  Starting HTTP server..."
    ::nLeft     := 80
@@ -31,15 +28,13 @@ METHOD CreateForm() CLASS TForm1
    ::nHeight   := 820
    ::nPort     := 2222
 
-   // Full-client WebView (no status label — status lives in window title, FWH style)
+   // Full-client WebView — backend is OS-specific, API is the same TWebView
    @ 0, 0 WEBVIEW ::oWeb OF Self SIZE 1280, 820
-   ::oWeb:nControlAlign := 5   // alClient
+   ::oWeb:nControlAlign := 5   // alClient (resize with form / maximize)
 
-   // TForm event (codeblock) — not a METHOD named OnClose
    ::OnClose := {|| ::StopServer() }
 
-   // HTTP does not need HWND; start before Activate so first Navigate finds the port open.
-   // WebView:Navigate stores pending URL until CreateHandle / EnsureEngine (WebView2).
+   // Start HTTP before Activate so first Navigate finds the port open
    ::StartServer()
 
 return nil
@@ -63,12 +58,12 @@ METHOD StartServer() CLASS TForm1
 
    if ! ErpHttpStart( ::nPort, @cMsg )
       ::SetWinTitle( "HTTP failed: " + cMsg )
-      MsgInfo( "Could not start HTTP on port " + hb_ntos( ::nPort ) + Chr(10) + cMsg, "FiveTech_ERP" )
+      MsgInfo( "Could not start HTTP on port " + hb_ntos( ::nPort ) + ;
+         Chr( 10 ) + cMsg, "FiveTech_ERP" )
       return nil
    endif
 
    ::cUrl := "http://127.0.0.1:" + hb_ntos( ::nPort ) + "/"
-   // FWH: oWebView:SetTitle( cTitle + "  |  " + cUrl )
    ::SetWinTitle( ::cUrl + "   ·   meta: " + ErpMetaRoot() )
    if ::oWeb != nil
       ::oWeb:Navigate( ::cUrl )
@@ -82,9 +77,7 @@ METHOD StopServer() CLASS TForm1
 return nil
 //--------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
 // Form1 factory — TApplication installs ErrorBlock → AppShowError
-// ---------------------------------------------------------------------------
 function Form1()
 
    local oApp, oForm
@@ -92,7 +85,6 @@ function Form1()
    oApp  := TApplication():New()
    oApp:cTitle := "FiveTech_ERP"
    oForm := TForm1():New()
-   // CreateForm once (installs AppShowError + builds UI + starts HTTP)
    oApp:CreateForm( oForm )
    oApp:Run()
 

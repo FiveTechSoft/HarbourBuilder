@@ -1,0 +1,32 @@
+#!/bin/bash
+# Assemble main.prg from the SAME PRG units used on Windows:
+#   Project1.prg + Form1.prg  (erp_meta / erp_http compile as separate units)
+# Usage: assemble_main.sh <ProjDir> <BuildDir>
+set -e
+PROJDIR="${1:?ProjDir}"
+BUILDDIR="${2:?BuildDir}"
+mkdir -p "$BUILDDIR"
+
+{
+  echo '#include "hbbuilder.ch"'
+  echo 'REQUEST HB_GT_GUI_DEFAULT'
+  echo 'REQUEST HB_CODEPAGE_UTF8EX'
+  echo 'REQUEST HB_MT'
+  echo 'REQUEST DBFCDX, DBFNTX, DBFFPT'
+  echo 'REQUEST RDDSYS'
+  echo
+  for f in Project1.prg Form1.prg; do
+    # Strip includes that the build injects / compiles separately
+    sed -e 's/#include *"hbbuilder.ch"//' \
+        -e 's/#include *"classes.prg"//' \
+        "$PROJDIR/$f"
+    echo
+  done
+} > "$BUILDDIR/main.prg"
+
+cp -f "$PROJDIR/erp_meta.prg" "$BUILDDIR/erp_meta.prg"
+cp -f "$PROJDIR/erp_http.prg" "$BUILDDIR/erp_http.prg"
+cp -f "$HBROOT/source/core/classes.prg" "$BUILDDIR/classes.prg" 2>/dev/null || \
+  cp -f "$(cd "$PROJDIR/../../.." && pwd)/source/core/classes.prg" "$BUILDDIR/classes.prg"
+
+echo "Assembled $BUILDDIR/main.prg (+ erp_meta.prg erp_http.prg classes.prg)"

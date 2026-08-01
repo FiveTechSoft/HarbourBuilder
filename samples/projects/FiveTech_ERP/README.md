@@ -1,15 +1,16 @@
 # FiveTech_ERP — HarbourBuilder (Win / Linux / macOS)
 
-Cross-platform ERP shell using the **same meta** as FWH DesktopWeb:
+**Same PRG source on every OS** — only the C/C++/ObjC backend and link step change.
 
-| Layer | Implementation |
-|-------|----------------|
-| Product name | **FiveTech_ERP** |
-| UI shell | HarbourBuilder `TForm` + **`TWebView`** |
-| Windows WebView | **Edge WebView2** (FWH engine in `source/backends/win32/webview2`) |
-| Linux / macOS WebView | Native HbBuilder backends |
-| HTTP | Portable Harbour sockets (`erp_http.prg`, MT) |
-| Meta | **Exact copy** of `C:\fwteam\samples\DesktopWeb\meta` → `./meta` (`sync_meta.bat`) |
+| Layer | Shared | Platform |
+|-------|--------|----------|
+| Entry | `Project1.prg` | — |
+| Form + WebView | `Form1.prg` | Win WebView2 / Mac WKWebView / Linux WebKitGTK |
+| HTTP API | `erp_http.prg` | Harbour MT sockets |
+| Meta loader | `erp_meta.prg` | disk JSON |
+| Framework classes | `classes.prg` (HbBuilder) | — |
+| Meta data | `./meta` (FWH DesktopWeb JSON) | sync on Windows via `sync_meta.bat` |
+| UI HTML | `./www` (login + dashboard from FWH) | — |
 
 ## Build
 
@@ -45,7 +46,15 @@ chmod +x build_mac.sh
 **Output:** `./FiveTech_ERP`  
 Requires: Harbour darwin/clang, Xcode CLI tools.
 
-> Linux/macOS binaries cannot be produced from a Windows host without cross-toolchains; use a Linux VM/CI or a Mac.
+> Linux/macOS binaries must be built **on that OS** (or CI). Source PRGs are identical; only native backends differ.
+
+### Source units (all platforms)
+
+```
+Project1.prg   Form1.prg   erp_meta.prg   erp_http.prg
+assemble_main.ps1 | assemble_main.sh   → main.prg (Project1+Form1 only)
+erp_meta / erp_http compile as separate Harbour units (STATIC-safe)
+```
 
 ## Run
 

@@ -1,22 +1,22 @@
-// Project1.prg — FiveTech_ERP (HarbourBuilder multi-platform)
-// Windows: Edge WebView2 (FWH engine)  |  Linux/macOS: native WebView
-// Shared meta: meta_fwh -> FWH samples/DesktopWeb/meta  (or local meta/)
+// Project1.prg — FiveTech_ERP entry (same PRG on Windows / Linux / macOS)
+// UI: HarbourBuilder TForm + TWebView
+//   Windows  → Edge WebView2
+//   macOS    → WKWebView (Cocoa)
+//   Linux    → GTK WebKit
+// Meta: ./meta (FWH DesktopWeb JSON)  |  HTTP: erp_http.prg (MT sockets)
 //--------------------------------------------------------------------
 #include "hbbuilder.ch"
 
 REQUEST HB_GT_GUI_DEFAULT
 REQUEST HB_CODEPAGE_UTF8EX
+REQUEST HB_MT
 
-// ---------------------------------------------------------------------------
-// Main()
-// ---------------------------------------------------------------------------
+//--------------------------------------------------------------------
 function Main()
 
+   // Same codepage on all hosts so UTF-8 meta (€, accents) is consistent
    hb_cdpSelect( "UTF8EX" )
 
    Form1()
 
 return nil
-
-// Framework classes (cross-platform)
-#include "classes.prg"

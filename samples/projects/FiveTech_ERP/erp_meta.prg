@@ -20,26 +20,35 @@ function ErpMetaRoot()
       cBase += hb_ps()
    endif
 
-   // Exact copy of FWH DesktopWeb meta (sync via build_win64.bat / sync_meta.bat)
+   // 1) ./meta next to the executable (exact FWH DesktopWeb JSON tree)
    cTry := cBase + "meta" + hb_ps()
    if hb_DirExists( cTry ) .and. File( cTry + "app.json" )
       s_cRoot := cTry
       return s_cRoot
    endif
 
-   // Live FWH tree (dev machine) — same files, no local copy yet
-   cTry := "C:\fwteam\samples\DesktopWeb\meta\"
+   // 2) Inside .app bundle Resources (macOS)
+   cTry := cBase + ".." + hb_ps() + "Resources" + hb_ps() + "meta" + hb_ps()
    if hb_DirExists( cTry ) .and. File( cTry + "app.json" )
       s_cRoot := cTry
       return s_cRoot
    endif
 
-   // Legacy junction name
+   // 3) Legacy junction name
    cTry := cBase + "meta_fwh" + hb_ps()
    if hb_DirExists( cTry ) .and. File( cTry + "app.json" )
       s_cRoot := cTry
       return s_cRoot
    endif
+
+#ifdef __PLATFORM__WINDOWS
+   // 4) Windows dev: live FWH tree
+   cTry := "C:\fwteam\samples\DesktopWeb\meta\"
+   if hb_DirExists( cTry ) .and. File( cTry + "app.json" )
+      s_cRoot := cTry
+      return s_cRoot
+   endif
+#endif
 
    s_cRoot := cBase + "meta" + hb_ps()
 return s_cRoot
