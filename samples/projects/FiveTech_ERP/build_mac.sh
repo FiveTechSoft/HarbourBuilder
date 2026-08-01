@@ -108,7 +108,9 @@ echo "[1] Harbour compile (main + erp_meta + erp_http + classes)"
 "$HBBIN/harbour" classes.prg  -n -w -q -I"$HBINC" -I"$BUILDDIR" -I"$HBROOT/include" -oclasses.c
 
 echo "[2] clang $ARCH_FLAG"
-CFLAGS="-O2 -Wno-unused-value -Wno-deprecated-declarations -mmacosx-version-min=11.0 $ARCH_FLAG -I$HBINC -I$HBROOT/include -I$BUILDDIR"
+# Match CI/runtime macOS (runner is 14.x); avoid "built for newer macOS" warnings
+MACOSX_MIN="${MACOSX_MIN:-14.0}"
+CFLAGS="-O2 -Wno-unused-value -Wno-deprecated-declarations -mmacosx-version-min=$MACOSX_MIN $ARCH_FLAG -I$HBINC -I$HBROOT/include -I$BUILDDIR"
 OBJCFLAGS="$CFLAGS -fobjc-arc"
 
 clang $CFLAGS -c main.c -o main.o
@@ -147,7 +149,7 @@ HBLIBS="$(hblib hbcommon) $VMLIB $(hblib hbrtl) $(hblib hbrdd) $(hblib hbmacro) 
 
 echo "[3] link"
 echo "HBLIBS=$HBLIBS"
-clang $OBJS -O2 -mmacosx-version-min=11.0 $ARCH_FLAG -o "$OUT" \
+clang $OBJS -O2 -mmacosx-version-min=$MACOSX_MIN $ARCH_FLAG -o "$OUT" \
   -L"$HBLIB" \
   $HBLIBS \
   $FRAMEWORKS -lpthread -lsqlite3 -lm -fobjc-arc
