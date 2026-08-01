@@ -44,16 +44,18 @@ echo "[1] Harbour compile (main + erp_meta + erp_http + classes)"
 "$HBBIN/harbour" classes.prg  -n -w -q -I"$HBINC" -I"$BUILDDIR" -I"$HBROOT/include" -oclasses.c
 
 echo "[2] clang"
-CFLAGS="-O2 -Wno-unused-value -Wno-deprecated-declarations -I$HBINC -I$HBROOT/include -I$BUILDDIR"
+CFLAGS="-O2 -Wno-unused-value -Wno-deprecated-declarations -mmacosx-version-min=10.15 -I$HBINC -I$HBROOT/include -I$BUILDDIR"
+OBJCFLAGS="$CFLAGS -fobjc-arc"
 FRAMEWORKS="-framework Cocoa -framework WebKit -framework Foundation -framework AppKit"
 
 clang $CFLAGS -c main.c -o main.o
 clang $CFLAGS -c erp_meta.c -o erp_meta.o
 clang $CFLAGS -c erp_http.c -o erp_http.o
 clang $CFLAGS -c classes.c -o classes.o
-clang $CFLAGS -c "$HBROOT/source/backends/cocoa/cocoa_core.m" -o cocoa_core.o
+# cocoa_core.m requires ARC (same as root build_mac.sh)
+clang $OBJCFLAGS -c "$HBROOT/source/backends/cocoa/cocoa_core.m" -o cocoa_core.o
 [ -f "$HBROOT/source/backends/cocoa/cocoa_webserver.m" ] && \
-  clang $CFLAGS -c "$HBROOT/source/backends/cocoa/cocoa_webserver.m" -o cocoa_webserver.o || true
+  clang $OBJCFLAGS -c "$HBROOT/source/backends/cocoa/cocoa_webserver.m" -o cocoa_webserver.o || true
 
 VMLIB="-lhbvm"
 [ -f "$HBLIB/libhbvmmt.a" ] && VMLIB="-lhbvmmt"
@@ -62,12 +64,12 @@ OBJS="main.o erp_meta.o erp_http.o classes.o cocoa_core.o"
 [ -f cocoa_webserver.o ] && OBJS="$OBJS cocoa_webserver.o"
 
 echo "[3] link"
-clang $OBJS -O2 -o "$OUT" \
+clang $OBJS -O2 -mmacosx-version-min=10.15 -o "$OUT" \
   -L"$HBLIB" \
   -lhbcommon $VMLIB -lhbrtl -lhbrdd -lhbmacro -lhblang -lhbcpage -lhbpp \
   -lhbcplr -lrddntx -lrddcdx -lrddfpt -lhbsix -lhbusrrdd -lhbct \
   -lhbdebug -lhbpcre -lhbzlib \
-  $FRAMEWORKS -lpthread
+  $FRAMEWORKS -lpthread -fobjc-arc
 
 chmod +x "$OUT"
 
