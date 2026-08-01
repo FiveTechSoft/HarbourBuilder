@@ -1,0 +1,27 @@
+{
+  "id": "screen.patient_card",
+  "kind": "screen",
+  "layout": "form",
+  "title": "Patient card (tabs)",
+  "dataRef": "data.patient_cards",
+  "keyField": "code",
+  "tabs": [
+    {"id":"identity","label":"Identity","fields":["code","name","dob","phone","email","city"]},
+    {"id":"clinical","label":"Clinical","fields":["blood","allergies","coverage","notes"]},
+    {"id":"status","label":"Status","fields":["active"]}
+  ],
+  "fields": [
+    {"id":"code","label":"Code","type":"text"},
+    {"id":"name","label":"Name","type":"text"},
+    {"id":"dob","label":"Date of birth","type":"text"},
+    {"id":"phone","label":"Phone","type":"text"},
+    {"id":"email","label":"E-mail","type":"text"},
+    {"id":"city","label":"City","type":"text"},
+    {"id":"coverage","label":"Coverage","type":"select","options":["Private","Public","Insurance"]},
+    {"id":"blood","label":"Blood type","type":"select","options":["A+","A-","B+","B-","AB+","AB-","O+","O-"]},
+    {"id":"allergies","label":"Allergies","type":"text"},
+    {"id":"notes","label":"Notes","type":"text"},
+    {"id":"active","label":"Active","type":"checkbox"}
+  ],
+  "toolbar": ["add","edit","delete","refresh"]
+}

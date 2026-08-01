@@ -1,0 +1,13 @@
+{
+  "id": "data.settings",
+  "kind": "data",
+  "entity": "setting",
+  "rows": [
+    {"key":"company.name","label":"Company name","value":"FiveTech Clinic","group":"General"},
+    {"key":"company.taxid","label":"Tax ID","value":"B-00000000","group":"General"},
+    {"key":"docs.invoiceSeries","label":"Invoice series","value":"INV-","group":"Documents"},
+    {"key":"docs.quoteSeries","label":"Quote series","value":"Q-","group":"Documents"},
+    {"key":"tax.default","label":"Default VAT %","value":"21","group":"Tax"},
+    {"key":"mail.from","label":"Mail from","value":"noreply@clinic.local","group":"Mail"}
+  ]
+}

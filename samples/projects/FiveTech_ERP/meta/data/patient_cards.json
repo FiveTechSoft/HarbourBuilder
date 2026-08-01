@@ -1,0 +1,10 @@
+{
+  "id": "data.patient_cards",
+  "kind": "data",
+  "entity": "patient_card",
+  "rows": [
+    {"code":"P0001","name":"ALEX RIVERA","dob":"12/03/1988","phone":"600-100-001","email":"alex@example.com","city":"Madrid","coverage":"Private","blood":"A+","allergies":"None","notes":"Prefers morning appointments","active":true},
+    {"code":"P0002","name":"JORDAN BLAKE","dob":"04/11/1992","phone":"600-100-002","email":"jordan@example.com","city":"Barcelona","coverage":"Public","blood":"O-","allergies":"Penicillin","notes":"","active":true},
+    {"code":"P0003","name":"CASEY MORGAN","dob":"22/07/1975","phone":"600-100-003","email":"casey@example.com","city":"Valencia","coverage":"Insurance","blood":"B+","allergies":"Latex","notes":"VIP","active":false}
+  ]
+}

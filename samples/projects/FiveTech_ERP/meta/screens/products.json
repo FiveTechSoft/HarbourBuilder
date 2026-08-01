@@ -1,0 +1,38 @@
+{
+  "id": "screen.products",
+  "kind": "screen",
+  "layout": "list",
+  "title": "Products",
+  "dataRef": "data.products",
+  "keyField": "code",
+  "searchFields": ["code", "name", "category", "barcode"],
+  "grid": {
+    "columns": [
+      { "id": "code", "label": "SKU", "type": "text" },
+      { "id": "name", "label": "Product", "type": "text" },
+      {
+        "id": "category",
+        "label": "Category",
+        "type": "select",
+        "options": ["Furniture", "Accessories", "Supplies", "F&B", "Gift"]
+      },
+      { "id": "barcode", "label": "Barcode", "type": "text" },
+      { "id": "price", "label": "Price", "type": "money", "format": "money", "align": "right" },
+      { "id": "cost", "label": "Cost", "type": "money", "format": "money", "align": "right" },
+      {
+        "id": "tax",
+        "label": "Tax",
+        "type": "select",
+        "options": ["0%", "10%", "21%"]
+      },
+      {
+        "id": "uom",
+        "label": "UoM",
+        "type": "select",
+        "options": ["Unit", "Pack", "Kg"]
+      },
+      { "id": "active", "label": "Active", "type": "checkbox" }
+    ]
+  },
+  "toolbar": ["add", "edit", "delete", "print", "excel", "refresh"]
+}

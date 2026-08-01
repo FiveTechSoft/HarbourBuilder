@@ -1,0 +1,11 @@
+{
+  "id": "data.dashboard_kpis",
+  "kind": "data",
+  "entity": "kpi",
+  "rows": [
+    {"id":"k1","label":"Open appointments","value":12,"unit":"","trend":"+2","tone":"info"},
+    {"id":"k2","label":"Collections today","value":1840,"unit":"EUR","trend":"+8%","tone":"ok"},
+    {"id":"k3","label":"Pending authorizations","value":3,"unit":"","trend":"-1","tone":"warn"},
+    {"id":"k4","label":"Overdue balances","value":2,"unit":"","trend":"0","tone":"danger"}
+  ]
+}

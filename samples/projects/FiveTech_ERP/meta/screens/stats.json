@@ -1,0 +1,18 @@
+{
+  "id": "screen.stats",
+  "kind": "screen",
+  "title": "Statistics",
+  "dataRef": "data.stats",
+  "searchFields": ["metric", "period", "unit"],
+  "grid": {
+    "columns": [
+      { "id": "metric", "label": "Metric" },
+      { "id": "period", "label": "Period" },
+      { "id": "value", "label": "Value", "align": "right" },
+      { "id": "unit", "label": "Unit" },
+      { "id": "trend", "label": "Trend" },
+      { "id": "status", "label": "Status" }
+    ]
+  },
+  "toolbar": ["add", "edit", "delete", "print", "pdf", "excel", "refresh"]
+}

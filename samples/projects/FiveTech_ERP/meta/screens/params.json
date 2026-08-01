@@ -1,0 +1,9 @@
+{
+  "id": "screen.params",
+  "kind": "screen",
+  "layout": "settings",
+  "title": "Parameters",
+  "dataRef": "data.settings",
+  "keyField": "key",
+  "groupField": "group"
+}

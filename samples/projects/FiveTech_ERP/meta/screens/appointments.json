@@ -1,0 +1,31 @@
+{
+  "id": "screen.appointments",
+  "kind": "screen",
+  "title": "Licensed consultation / Appointments",
+  "route": "/dashboard",
+  "filters": [
+    { "id": "patient", "label": "Patient", "type": "lookup", "lookup": "lookup.patients", "f2": true },
+    { "id": "local", "label": "Local", "type": "text" },
+    { "id": "type", "label": "Type", "type": "select", "options": ["Health", "Task", "Message", "Consult"] },
+    { "id": "status", "label": "Status", "type": "select", "options": ["NORA", "KIM", "AVA", "SAM"] },
+    { "id": "from", "label": "From", "type": "text" },
+    { "id": "to", "label": "To", "type": "text" }
+  ],
+  "grid": {
+    "columns": [
+      { "id": "date", "label": "Date" },
+      { "id": "time", "label": "Time" },
+      { "id": "local", "label": "Local" },
+      { "id": "name", "label": "Name" },
+      { "id": "type", "label": "Type" },
+      { "id": "tel", "label": "Tel" },
+      { "id": "claim", "label": "Claim" },
+      { "id": "esc", "label": "Esc. date" },
+      { "id": "comple", "label": "Comple" },
+      { "id": "status", "label": "Status" },
+      { "id": "attention", "label": "Att." },
+      { "id": "pag", "label": "Pag" }
+    ]
+  },
+  "toolbar": ["print", "day", "agenda", "calendar", "search", "stats", "patient-info", "panel-assist", "close"]
+}

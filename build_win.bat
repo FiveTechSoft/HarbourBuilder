@@ -112,8 +112,18 @@ for %%f in (tform hbbridge tcontrol tcontrols hb_db_real) do (
    )
 )
 
+REM FWH WebView2 host (Edge) — live TWebView on Windows
+set WV2DIR=%~dp0source\backends\win32\webview2
+if exist "%WV2DIR%\fwh_webview2.cpp" (
+   cl.exe %CL_BASE% /W3 /I"%WV2DIR%" "%WV2DIR%\fwh_webview2.cpp" /Fofwh_webview2.obj
+   if errorlevel 1 (echo CL FAILED on fwh_webview2.cpp & pause & exit /b 1)
+) else (
+   echo WARNING: fwh_webview2.cpp not found - TWebView will not render on Windows
+)
+
 echo === Step 3: Link ===
 set OBJS=hbbuilder_common.obj hbbuilder_win.obj tform.obj hbbridge.obj tcontrol.obj tcontrols.obj hb_db_real.obj
+if exist fwh_webview2.obj set OBJS=%OBJS% fwh_webview2.obj
 set HBLIBS=hbvm.lib hbrtl.lib hbcommon.lib hblang.lib hbrdd.lib hbmacro.lib hbpp.lib ^
  hbcplr.lib hbct.lib hbhsx.lib hbsix.lib hbusrrdd.lib ^
  rddntx.lib rddnsx.lib rddcdx.lib rddfpt.lib ^
@@ -122,7 +132,7 @@ set HBLIBS=hbvm.lib hbrtl.lib hbcommon.lib hblang.lib hbrdd.lib hbmacro.lib hbpp
  gtgui.lib gtwin.lib gtwvt.lib
 set SYSLIBS=user32.lib kernel32.lib gdi32.lib comctl32.lib comdlg32.lib shell32.lib ^
  ole32.lib oleaut32.lib advapi32.lib uuid.lib ws2_32.lib winmm.lib msimg32.lib ^
- gdiplus.lib winspool.lib dwmapi.lib iphlpapi.lib
+ gdiplus.lib winspool.lib dwmapi.lib iphlpapi.lib shlwapi.lib
 
 REM /NODEFAULTLIB:LIBCMT: algunos .obj de las libs de Harbour referencian la CRT
 REM estatica; con /MD forzamos la dinamica y silenciamos el LNK4098.
@@ -142,7 +152,13 @@ if not exist "%DLLDIR%\Scintilla.dll" set DLLDIR=%RESDIR%
 if exist "%DLLDIR%\Scintilla.dll" ( copy /y "%DLLDIR%\Scintilla.dll" "%OUTDIR%\" >nul ) else ( echo WARNING: Scintilla.dll no encontrada en "%DLLDIR%" - el editor de codigo no cargara )
 if exist "%DLLDIR%\Lexilla.dll"   ( copy /y "%DLLDIR%\Lexilla.dll"   "%OUTDIR%\" >nul ) else ( echo WARNING: Lexilla.dll no encontrada en "%DLLDIR%" )
 
+REM Optional: ship WebView2Loader next to exe (Evergreen Runtime still required on target)
+if exist "C:\fwteam\dll\webview64\WebView2Loader.dll" (
+   copy /y "C:\fwteam\dll\webview64\WebView2Loader.dll" "%OUTDIR%\" >nul
+)
+
 echo.
 echo === BUILD SUCCESSFUL ===
 echo Output: %OUTDIR%\hbbuilder_win.exe
+echo WebView2: live Edge host (FWH engine) - requires WebView2 Runtime on the machine.
 pause

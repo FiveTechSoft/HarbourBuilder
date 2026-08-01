@@ -1,0 +1,29 @@
+{
+  "id": "screen.balance",
+  "kind": "screen",
+  "title": "Patient balance",
+  "route": "/dashboard#balance",
+  "dataRef": "data.balances",
+  "api": {
+    "list": "GET /api/balances?q={q}"
+  },
+  "filters": [
+    { "id": "q", "label": "Find patient / code", "type": "text", "placeholder": "Type to filter..." }
+  ],
+  "grid": {
+    "columns": [
+      { "id": "code", "label": "Code", "width": 120 },
+      { "id": "name", "label": "Patient", "flex": 1 },
+      { "id": "charges", "label": "Charges", "align": "right", "format": "money" },
+      { "id": "payments", "label": "Payments", "align": "right", "format": "money" },
+      { "id": "balance", "label": "Balance", "align": "right", "format": "money" },
+      { "id": "currency", "label": "Cur.", "width": 50 },
+      { "id": "status", "label": "Status", "width": 90 }
+    ]
+  },
+  "toolbar": ["add", "edit", "delete", "print", "pdf", "excel", "refresh"],
+  "summary": {
+    "showTotals": true,
+    "fields": ["charges", "payments", "balance"]
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "id": "modules",
+  "kind": "modules",
+  "vertical": "services",
+  "sections": [
+    {
+      "id": "crm",
+      "title": "CRM",
+      "items": [
+        { "id": "parties", "label": "Clients & contacts", "icon": "users", "screen": "screen.parties" },
+        { "id": "party_card", "label": "Party card", "icon": "user", "screen": "screen.party_card", "sub": true },
+        { "id": "accounts", "label": "Accounts", "icon": "grid", "screen": "screen.accounts" },
+        { "id": "activities", "label": "Activities", "icon": "calendar", "screen": "screen.activities" },
+        { "id": "opportunities", "label": "Opportunities", "icon": "chart", "screen": "screen.opportunities" },
+        { "id": "pipeline", "label": "Pipeline", "icon": "chart", "screen": "screen.pipeline" }
+      ]
+    },
+    {
+      "id": "delivery",
+      "title": "Delivery",
+      "items": [
+        { "id": "projects", "label": "Projects", "icon": "grid", "screen": "screen.projects", "active": true },
+        { "id": "project_card", "label": "Project card", "icon": "file", "screen": "screen.project_card", "sub": true },
+        { "id": "timesheets", "label": "Timesheets", "icon": "calendar", "screen": "screen.timesheets" },
+        { "id": "tasks", "label": "Work orders", "icon": "grid", "screen": "screen.tasks" },
+        { "id": "approvals", "label": "Approvals", "icon": "grid", "screen": "screen.approvals", "sub": true }
+      ]
+    },
+    {
+      "id": "commercial",
+      "title": "Commercial",
+      "items": [
+        { "id": "quotes", "label": "Quotes", "icon": "chart", "screen": "screen.quotes" },
+        { "id": "invoices", "label": "Invoices", "icon": "money", "screen": "screen.invoices" },
+        { "id": "catalog", "label": "Service catalog", "icon": "file", "screen": "screen.catalog" }
+      ]
+    },
+    {
+      "id": "admin",
+      "title": "Admin",
+      "items": [
+        { "id": "kpis", "label": "Dashboard", "icon": "chart", "screen": "screen.kpis" },
+        { "id": "params", "label": "Parameters", "icon": "file", "screen": "screen.params" },
+        { "id": "user_roles", "label": "Users & roles", "icon": "users", "screen": "screen.user_roles" },
+        { "id": "audit_log", "label": "Audit", "icon": "file", "screen": "screen.audit_log" },
+        { "id": "context", "label": "Company", "icon": "grid", "screen": "screen.context" },
+        { "id": "reports", "label": "Reports", "icon": "file", "screen": "screen.reports" }
+      ]
+    }
+  ]
+}

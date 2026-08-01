@@ -1,0 +1,40 @@
+{
+  "id": "screen.parties",
+  "kind": "screen",
+  "layout": "list",
+  "title": "Parties (CRM)",
+  "dataRef": "data.parties",
+  "keyField": "code",
+  "searchFields": ["code", "name", "city", "email", "kind"],
+  "grid": {
+    "columns": [
+      { "id": "code", "label": "Code", "type": "text" },
+      { "id": "name", "label": "Name", "type": "text" },
+      {
+        "id": "kind",
+        "label": "Kind",
+        "type": "select",
+        "options": ["person", "organization"]
+      },
+      {
+        "id": "roles",
+        "label": "Roles",
+        "type": "checklist",
+        "options": ["Patient", "Customer", "Lead", "VIP", "Payer", "Supplier"]
+      },
+      { "id": "email", "label": "E-mail", "type": "text" },
+      { "id": "phone", "label": "Phone", "type": "text" },
+      { "id": "city", "label": "City", "type": "text" },
+      { "id": "account", "label": "Account", "type": "text" },
+      {
+        "id": "source",
+        "label": "Source",
+        "type": "select",
+        "options": ["Walk-in", "Web", "Referral", "Campaign", "Partner"]
+      },
+      { "id": "owner", "label": "Owner", "type": "text" },
+      { "id": "active", "label": "Active", "type": "checkbox" }
+    ]
+  },
+  "toolbar": ["add", "edit", "delete", "print", "pdf", "excel", "refresh"]
+}

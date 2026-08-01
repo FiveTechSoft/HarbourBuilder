@@ -1,0 +1,8 @@
+{
+  "id": "screen.context",
+  "kind": "screen",
+  "layout": "context",
+  "title": "Company context",
+  "dataRef": "data.companies",
+  "keyField": "code"
+}

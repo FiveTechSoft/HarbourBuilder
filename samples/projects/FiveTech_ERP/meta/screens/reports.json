@@ -1,0 +1,8 @@
+{
+  "id": "screen.reports",
+  "kind": "screen",
+  "layout": "report-list",
+  "title": "Reports",
+  "subtitle": "Meta report definitions (sketch — list / group / print)",
+  "toolbar": ["refresh"]
+}

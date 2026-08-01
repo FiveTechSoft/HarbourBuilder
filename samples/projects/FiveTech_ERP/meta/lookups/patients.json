@@ -1,0 +1,22 @@
+{
+  "id": "lookup.patients",
+  "kind": "lookup",
+  "title": "Patients",
+  "dataRef": "data.patients",
+  "pageSize": 12,
+  "minChars": 2,
+  "columns": [
+    { "id": "code", "label": "Code", "width": 120 },
+    { "id": "name", "label": "Name", "flex": 1 }
+  ],
+  "searchFields": ["code", "name"],
+  "painel": {
+    "width": 560,
+    "height": 560,
+    "draggable": true,
+    "footer": ["new", "clear", "cancel", "select"]
+  },
+  "api": {
+    "list": "GET /api/patients?q={q}&page={page}"
+  }
+}

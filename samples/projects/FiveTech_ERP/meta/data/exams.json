@@ -1,0 +1,16 @@
+{
+  "id": "data.exams",
+  "kind": "data",
+  "entity": "exam",
+  "rows": [
+    { "code": "EX-901", "date": "10/05/2025", "patient": "ALEX RIVERA", "exam": "Blood count", "local": "LAB-A", "result": "Normal", "status": "Filed" },
+    { "code": "EX-902", "date": "11/05/2025", "patient": "ALEX RIVERA", "exam": "ECG", "local": "CARD", "result": "Sinus rhythm", "status": "Filed" },
+    { "code": "EX-903", "date": "14/05/2025", "patient": "CASEY MORGAN", "exam": "X-Ray knee", "local": "IMG", "result": "Mild arthritis", "status": "Filed" },
+    { "code": "EX-904", "date": "16/05/2025", "patient": "RILEY QUINN", "exam": "Ultrasound", "local": "IMG", "result": "Pending review", "status": "Open" },
+    { "code": "EX-905", "date": "19/05/2025", "patient": "AVERY NOLAN", "exam": "MRI lumbar", "local": "IMG", "result": "Disc protrusion", "status": "Filed" },
+    { "code": "EX-906", "date": "21/05/2025", "patient": "CAMERON HAYES", "exam": "Spirometry", "local": "PULM", "result": "Mild restriction", "status": "Filed" },
+    { "code": "EX-907", "date": "25/05/2025", "patient": "TAYLOR BROOKS", "exam": "Urinalysis", "local": "LAB-B", "result": "Normal", "status": "Filed" },
+    { "code": "EX-908", "date": "28/05/2025", "patient": "PARKER REED", "exam": "Allergy panel", "local": "LAB-A", "result": "Pollen+", "status": "Open" },
+    { "code": "EX-909", "date": "02/06/2025", "patient": "EMERY KENT", "exam": "CT abdomen", "local": "IMG", "result": "Awaiting", "status": "Scheduled" }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "id": "data.org_tree",
+  "kind": "data",
+  "entity": "org_node",
+  "rows": [
+    {"id":"1","parent":"","label":"Clinic Group","type":"company"},
+    {"id":"2","parent":"1","label":"Madrid Center","type":"branch"},
+    {"id":"3","parent":"1","label":"Barcelona Center","type":"branch"},
+    {"id":"4","parent":"2","label":"Cardiology","type":"dept"},
+    {"id":"5","parent":"2","label":"Imaging","type":"dept"},
+    {"id":"6","parent":"3","label":"Pediatrics","type":"dept"},
+    {"id":"7","parent":"4","label":"Room C1","type":"room"},
+    {"id":"8","parent":"5","label":"MRI Suite","type":"room"}
+  ]
+}

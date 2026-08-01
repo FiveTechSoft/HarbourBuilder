@@ -1,0 +1,10 @@
+{
+  "id": "data.users",
+  "kind": "data",
+  "entity": "user",
+  "rows": [
+    {"code":"admin","name":"Admin User","email":"admin@example.com"},
+    {"code":"demo","name":"Demo User","email":"demo@example.com"},
+    {"code":"nurse","name":"Nurse Lee","email":"nurse@example.com"}
+  ]
+}

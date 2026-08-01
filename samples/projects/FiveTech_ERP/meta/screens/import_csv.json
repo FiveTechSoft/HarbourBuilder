@@ -1,0 +1,8 @@
+{
+  "id": "screen.import_csv",
+  "kind": "screen",
+  "layout": "import",
+  "title": "CSV import",
+  "targetDataRef": "data.patients",
+  "sampleHeaders": ["code","name"]
+}

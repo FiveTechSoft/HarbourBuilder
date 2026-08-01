@@ -1,0 +1,13 @@
+{
+  "id": "screen.day_agenda",
+  "kind": "screen",
+  "layout": "calendar",
+  "title": "Day agenda",
+  "dataRef": "data.calendar_day",
+  "resources": [
+    {"id":"room1","label":"Room 1"},
+    {"id":"room2","label":"Room 2"},
+    {"id":"room3","label":"Room 3"}
+  ],
+  "timeField": "time"
+}

@@ -1,0 +1,20 @@
+{
+  "id": "report.parties",
+  "kind": "report",
+  "title": "Parties list",
+  "subtitle": "CRM core",
+  "sourceScreen": "screen.parties",
+  "dataRef": "data.parties",
+  "orientation": "landscape",
+  "groupBy": "kind",
+  "footerNote": "DesktopWeb sample — not for production use",
+  "columns": [
+    { "id": "code", "label": "Code", "type": "text" },
+    { "id": "name", "label": "Name", "type": "text" },
+    { "id": "kind", "label": "Kind", "type": "text" },
+    { "id": "email", "label": "E-mail", "type": "text" },
+    { "id": "city", "label": "City", "type": "text" },
+    { "id": "account", "label": "Account", "type": "text" },
+    { "id": "active", "label": "Active", "type": "checkbox" }
+  ]
+}

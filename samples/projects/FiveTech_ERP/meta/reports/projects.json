@@ -1,0 +1,22 @@
+{
+  "id": "report.projects",
+  "kind": "report",
+  "title": "Projects by status",
+  "subtitle": "Services vertical",
+  "sourceScreen": "screen.projects",
+  "dataRef": "data.projects",
+  "orientation": "landscape",
+  "groupBy": "status",
+  "sumFields": ["budget", "spent"],
+  "footerNote": "Budget vs spent",
+  "columns": [
+    { "id": "code", "label": "Code", "type": "text" },
+    { "id": "name", "label": "Project", "type": "text" },
+    { "id": "party", "label": "Party", "type": "text" },
+    { "id": "status", "label": "Status", "type": "text" },
+    { "id": "type", "label": "Type", "type": "text" },
+    { "id": "budget", "label": "Budget", "type": "money", "format": "money", "align": "right" },
+    { "id": "spent", "label": "Spent", "type": "money", "format": "money", "align": "right" },
+    { "id": "owner", "label": "Owner", "type": "text" }
+  ]
+}

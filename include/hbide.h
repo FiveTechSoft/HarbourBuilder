@@ -145,7 +145,8 @@ public:
    void         AddChild( TControl * pChild );
    BOOL         RemoveChild( TControl * pChild );
    void         SetText( const char * szText );
-   void         SetBounds( int nLeft, int nTop, int nWidth, int nHeight );
+   /* Virtual so dock layout (alClient) and maximize resize TWebView's WebView2 */
+   virtual void SetBounds( int nLeft, int nTop, int nWidth, int nHeight );
    void         SetFont( HFONT hFont );
    void         Show();
    void         Hide();
@@ -637,13 +638,27 @@ public:
 };
 
 /*
- * TWebView (Win32 placeholder — design-time only)
+ * TWebView — live Edge WebView2 on Windows (ported from FWH cwebview.cpp).
+ * Linux/macOS use their own UI_WebView* backends; same Harbour TWebView class.
  */
 class TWebView : public TControl
 {
 public:
+   void * FEngine;                 /* FwhWebView2* (Windows WebView2 host) */
+   char   FPendingUrl[2048];
+   char   FUserDataFolder[MAX_PATH];
+
    TWebView();
+   virtual ~TWebView();
    void CreateParams( DWORD * pdwStyle, DWORD * pdwExStyle, const char ** pszClass );
+   void CreateHandle( HWND hParent );
+   virtual void SetBounds( int nLeft, int nTop, int nWidth, int nHeight );
+   virtual LRESULT HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam );
+   void EnsureEngine();
+   void Navigate( const char * szUrl );
+   void LoadHTML( const char * szHtml );
+   void EvaluateJS( const char * szScript );
+   void SyncEngineSize();
    const PROPDESC * GetPropDescs( int * pnCount );
 };
 

@@ -1,0 +1,9 @@
+{
+  "id": "screen.user_roles",
+  "kind": "screen",
+  "layout": "assign",
+  "title": "Users ↔ roles",
+  "left": {"title":"Users","dataRef":"data.users","keyField":"code","labelField":"name"},
+  "right": {"title":"Roles","dataRef":"data.roles","keyField":"code","labelField":"name"},
+  "links": {"dataRef":"data.user_roles","leftField":"user","rightField":"role"}
+}

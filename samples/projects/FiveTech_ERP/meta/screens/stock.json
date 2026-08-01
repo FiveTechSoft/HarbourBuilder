@@ -1,0 +1,33 @@
+{
+  "id": "screen.stock",
+  "kind": "screen",
+  "layout": "list",
+  "title": "Stock by warehouse",
+  "dataRef": "data.stock",
+  "keyField": "code",
+  "searchFields": ["code", "sku", "name", "warehouse", "status"],
+  "grid": {
+    "columns": [
+      { "id": "code", "label": "Line", "type": "text" },
+      { "id": "sku", "label": "SKU", "type": "text" },
+      { "id": "name", "label": "Product", "type": "text" },
+      {
+        "id": "warehouse",
+        "label": "Warehouse",
+        "type": "select",
+        "options": ["Main", "Shop", "Transit"]
+      },
+      { "id": "qty", "label": "Qty", "type": "text", "align": "right" },
+      { "id": "minQty", "label": "Min", "type": "text", "align": "right" },
+      { "id": "reserved", "label": "Reserved", "type": "text", "align": "right" },
+      { "id": "location", "label": "Bin", "type": "text" },
+      {
+        "id": "status",
+        "label": "Status",
+        "type": "select",
+        "options": ["OK", "Low", "Out"]
+      }
+    ]
+  },
+  "toolbar": ["add", "edit", "delete", "print", "excel", "refresh"]
+}

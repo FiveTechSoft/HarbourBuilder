@@ -1,0 +1,17 @@
+{
+  "id": "screen.audit_log",
+  "kind": "screen",
+  "layout": "audit",
+  "title": "Audit log",
+  "dataRef": "data.audit",
+  "grid": {
+    "columns": [
+      {"id":"when","label":"When"},
+      {"id":"user","label":"User"},
+      {"id":"entity","label":"Entity"},
+      {"id":"key","label":"Key"},
+      {"id":"action","label":"Action"},
+      {"id":"detail","label":"Detail"}
+    ]
+  }
+}

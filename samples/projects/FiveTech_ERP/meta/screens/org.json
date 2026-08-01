@@ -1,0 +1,11 @@
+{
+  "id": "screen.org",
+  "kind": "screen",
+  "layout": "tree-detail",
+  "title": "Organization tree",
+  "dataRef": "data.org_tree",
+  "idField": "id",
+  "parentField": "parent",
+  "labelField": "label",
+  "detailFields": ["id","label","type","parent"]
+}

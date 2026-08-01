@@ -1,0 +1,15 @@
+{
+  "id": "data.calendar",
+  "kind": "data",
+  "entity": "calendar_slot",
+  "rows": [
+    { "date": "02/06/2025", "time": "09:00", "patient": "ALEX RIVERA", "resource": "Room 1", "type": "Consult", "professional": "Dr. Nora Voss", "status": "Booked" },
+    { "date": "02/06/2025", "time": "09:30", "patient": "RILEY QUINN", "resource": "Room 2", "type": "Follow-up", "professional": "Dr. Sam Orton", "status": "Booked" },
+    { "date": "02/06/2025", "time": "10:00", "patient": "—", "resource": "Room 1", "type": "Block", "professional": "—", "status": "Blocked" },
+    { "date": "02/06/2025", "time": "10:30", "patient": "CAMERON HAYES", "resource": "OR-A", "type": "Procedure", "professional": "Dr. Kim Adler", "status": "Confirmed" },
+    { "date": "03/06/2025", "time": "08:30", "patient": "TAYLOR BROOKS", "resource": "Room 3", "type": "Consult", "professional": "Dr. Nora Voss", "status": "Booked" },
+    { "date": "03/06/2025", "time": "11:00", "patient": "EMERY KENT", "resource": "IMG", "type": "Exam", "professional": "Imaging team", "status": "Scheduled" },
+    { "date": "03/06/2025", "time": "14:00", "patient": "CASEY MORGAN", "resource": "Room 2", "type": "Physio", "professional": "Dr. Ava Quinn", "status": "Booked" },
+    { "date": "04/06/2025", "time": "09:00", "patient": "DREW SULLIVAN", "resource": "Room 1", "type": "Consult", "professional": "Dr. Nora Voss", "status": "Available" }
+  ]
+}

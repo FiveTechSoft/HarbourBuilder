@@ -1,0 +1,11 @@
+{
+  "id": "data.user_roles",
+  "kind": "data",
+  "entity": "user_role",
+  "rows": [
+    { "code": "admin:ADMIN", "user": "admin", "role": "ADMIN" },
+    { "code": "admin:AUDITOR", "user": "admin", "role": "AUDITOR" },
+    { "code": "demo:RECEP", "user": "demo", "role": "RECEP" },
+    { "code": "demo:CLINIC", "user": "demo", "role": "CLINIC" }
+  ]
+}

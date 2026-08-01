@@ -1,0 +1,43 @@
+{
+  "id": "screen.catalog",
+  "kind": "screen",
+  "title": "Service catalog (controls demo)",
+  "dataRef": "data.catalog",
+  "searchFields": ["code", "name", "category"],
+  "grid": {
+    "columns": [
+      { "id": "code", "label": "SKU", "type": "text" },
+      { "id": "name", "label": "Service", "type": "text" },
+      {
+        "id": "category",
+        "label": "Category",
+        "type": "select",
+        "options": ["Consult", "Lab", "Imaging", "Procedure", "Package"]
+      },
+      {
+        "id": "channels",
+        "label": "Channels",
+        "type": "checklist",
+        "options": ["Desktop", "Web", "Mobile", "Kiosk"]
+      },
+      {
+        "id": "price",
+        "label": "Price",
+        "type": "money",
+        "format": "money",
+        "align": "right"
+      },
+      {
+        "id": "taxable",
+        "label": "Taxable",
+        "type": "checkbox"
+      },
+      {
+        "id": "published",
+        "label": "Published",
+        "type": "checkbox"
+      }
+    ]
+  },
+  "toolbar": ["add", "edit", "delete", "print", "pdf", "excel", "refresh"]
+}

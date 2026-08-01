@@ -1,0 +1,12 @@
+{
+  "id": "data.audit",
+  "kind": "data",
+  "entity": "audit",
+  "rows": [
+    {"when":"01/08/2026 09:12","user":"admin","entity":"invoice","key":"INV-2201","action":"UPDATE","detail":"status Open→Posted"},
+    {"when":"01/08/2026 09:40","user":"demo","entity":"patient","key":"P0001","action":"VIEW","detail":"Opened card"},
+    {"when":"01/08/2026 10:05","user":"admin","entity":"modules","key":"modules","action":"SAVE","detail":"Menu edited"},
+    {"when":"31/07/2026 18:22","user":"demo","entity":"appointment","key":"12","action":"CREATE","detail":"New appointment"},
+    {"when":"31/07/2026 17:01","user":"admin","entity":"settings","key":"tax.default","action":"UPDATE","detail":"21→21"}
+  ]
+}

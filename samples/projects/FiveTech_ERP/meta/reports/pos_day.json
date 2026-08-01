@@ -1,0 +1,21 @@
+{
+  "id": "report.pos_day",
+  "kind": "report",
+  "title": "POS tickets",
+  "subtitle": "Retail vertical — day sales sketch",
+  "sourceScreen": "screen.pos_sales",
+  "dataRef": "data.pos_sales",
+  "orientation": "portrait",
+  "groupBy": "status",
+  "sumFields": ["total"],
+  "footerNote": "Cash-up support list",
+  "columns": [
+    { "id": "code", "label": "Ticket", "type": "text" },
+    { "id": "date", "label": "Date", "type": "text" },
+    { "id": "register", "label": "Register", "type": "text" },
+    { "id": "cashier", "label": "Cashier", "type": "text" },
+    { "id": "total", "label": "Total", "type": "money", "format": "money", "align": "right" },
+    { "id": "tender", "label": "Tender", "type": "text" },
+    { "id": "status", "label": "Status", "type": "text" }
+  ]
+}

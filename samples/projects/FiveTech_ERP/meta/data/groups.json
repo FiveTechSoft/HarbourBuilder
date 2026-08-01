@@ -1,0 +1,13 @@
+{
+  "id": "data.groups",
+  "kind": "data",
+  "entity": "group",
+  "rows": [
+    { "code": "G01", "name": "Cardiology A", "lead": "Dr. Nora Voss", "members": 6, "specialty": "Cardiology", "status": "Active" },
+    { "code": "G02", "name": "Ortho unit", "lead": "Dr. Sam Orton", "members": 4, "specialty": "Orthopedics", "status": "Active" },
+    { "code": "G03", "name": "Pediatrics", "lead": "Dr. Ava Quinn", "members": 5, "specialty": "Pediatrics", "status": "Active" },
+    { "code": "G04", "name": "Imaging", "lead": "Dr. Kim Adler", "members": 3, "specialty": "Radiology", "status": "Active" },
+    { "code": "G05", "name": "Admin desk", "lead": "Lee Mercer", "members": 8, "specialty": "Administration", "status": "Active" },
+    { "code": "G06", "name": "Night shift", "lead": "Chris Dalton", "members": 7, "specialty": "Emergency", "status": "Standby" }
+  ]
+}

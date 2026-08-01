@@ -1,0 +1,30 @@
+{
+  "id": "screen.timesheets",
+  "kind": "screen",
+  "layout": "list",
+  "title": "Timesheets",
+  "dataRef": "data.timesheets",
+  "keyField": "code",
+  "searchFields": ["code", "project", "task", "owner", "status"],
+  "grid": {
+    "columns": [
+      { "id": "code", "label": "Code", "type": "text" },
+      { "id": "date", "label": "Date", "type": "text" },
+      { "id": "project", "label": "Project", "type": "text" },
+      { "id": "party", "label": "Party", "type": "text" },
+      { "id": "task", "label": "Task", "type": "text" },
+      { "id": "hours", "label": "Hours", "type": "text", "align": "right" },
+      { "id": "rate", "label": "Rate", "type": "money", "format": "money", "align": "right" },
+      { "id": "amount", "label": "Amount", "type": "money", "format": "money", "align": "right" },
+      {
+        "id": "status",
+        "label": "Status",
+        "type": "select",
+        "options": ["Draft", "Submitted", "Approved", "Rejected"]
+      },
+      { "id": "owner", "label": "Owner", "type": "text" },
+      { "id": "billable", "label": "Billable", "type": "checkbox" }
+    ]
+  },
+  "toolbar": ["add", "edit", "delete", "print", "excel", "refresh"]
+}

@@ -1,0 +1,10 @@
+{
+  "id": "data.quote_lines",
+  "kind": "data",
+  "entity": "quote_line",
+  "rows": [
+    {"code":"QL-1","quote":"Q-5001","article":"CONSULT","description":"Full check-up","qty":1,"price":120,"amount":120},
+    {"code":"QL-2","quote":"Q-5001","article":"LAB","description":"Lab panel","qty":1,"price":85,"amount":85},
+    {"code":"QL-3","quote":"Q-5002","article":"IMAGING","description":"X-Ray","qty":1,"price":180.5,"amount":180.5}
+  ]
+}

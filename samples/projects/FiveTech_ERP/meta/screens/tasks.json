@@ -1,0 +1,44 @@
+{
+  "id": "screen.tasks",
+  "kind": "screen",
+  "title": "Work orders (controls demo)",
+  "dataRef": "data.tasks",
+  "searchFields": ["code", "title", "status", "priority"],
+  "grid": {
+    "columns": [
+      { "id": "code", "label": "Code", "type": "text" },
+      { "id": "title", "label": "Title", "type": "text" },
+      {
+        "id": "status",
+        "label": "Status",
+        "type": "select",
+        "options": ["Open", "In progress", "On hold", "Done", "Cancelled"]
+      },
+      {
+        "id": "priority",
+        "label": "Priority",
+        "type": "select",
+        "options": ["Low", "Normal", "High", "Urgent"]
+      },
+      {
+        "id": "tags",
+        "label": "Tags",
+        "type": "checklist",
+        "options": ["Clinical", "Billing", "IT", "Facility", "Training"]
+      },
+      {
+        "id": "budget",
+        "label": "Budget",
+        "type": "money",
+        "format": "money",
+        "align": "right"
+      },
+      {
+        "id": "active",
+        "label": "Active",
+        "type": "checkbox"
+      }
+    ]
+  },
+  "toolbar": ["add", "edit", "delete", "print", "pdf", "excel", "refresh"]
+}

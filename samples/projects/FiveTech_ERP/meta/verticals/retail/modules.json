@@ -1,0 +1,49 @@
+{
+  "id": "modules",
+  "kind": "modules",
+  "vertical": "retail",
+  "sections": [
+    {
+      "id": "crm",
+      "title": "Customers",
+      "items": [
+        { "id": "parties", "label": "Customers", "icon": "users", "screen": "screen.parties" },
+        { "id": "party_card", "label": "Customer card", "icon": "user", "screen": "screen.party_card", "sub": true },
+        { "id": "accounts", "label": "Segments", "icon": "grid", "screen": "screen.accounts" },
+        { "id": "activities", "label": "Follow-ups", "icon": "calendar", "screen": "screen.activities" }
+      ]
+    },
+    {
+      "id": "store",
+      "title": "Store",
+      "items": [
+        { "id": "products", "label": "Products", "icon": "file", "screen": "screen.products", "active": true },
+        { "id": "stock", "label": "Stock", "icon": "grid", "screen": "screen.stock" },
+        { "id": "pos_sales", "label": "POS tickets", "icon": "money", "screen": "screen.pos_sales" },
+        { "id": "catalog", "label": "Price list (demo)", "icon": "file", "screen": "screen.catalog", "sub": true }
+      ]
+    },
+    {
+      "id": "backoffice",
+      "title": "Back office",
+      "items": [
+        { "id": "invoices", "label": "Invoices", "icon": "money", "screen": "screen.invoices" },
+        { "id": "quotes", "label": "Quotes / B2B", "icon": "chart", "screen": "screen.quotes" },
+        { "id": "import_csv", "label": "Import catalog", "icon": "file", "screen": "screen.import_csv" }
+      ]
+    },
+    {
+      "id": "admin",
+      "title": "Admin",
+      "items": [
+        { "id": "kpis", "label": "Dashboard", "icon": "chart", "screen": "screen.kpis" },
+        { "id": "day_agenda", "label": "Day agenda", "icon": "calendar", "screen": "screen.day_agenda" },
+        { "id": "params", "label": "Parameters", "icon": "file", "screen": "screen.params" },
+        { "id": "user_roles", "label": "Cashiers & roles", "icon": "users", "screen": "screen.user_roles" },
+        { "id": "audit_log", "label": "Audit", "icon": "file", "screen": "screen.audit_log" },
+        { "id": "context", "label": "Company / store", "icon": "grid", "screen": "screen.context" },
+        { "id": "reports", "label": "Reports", "icon": "file", "screen": "screen.reports" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "id": "screen.budget",
+  "kind": "screen",
+  "title": "Budget study",
+  "dataRef": "data.budgets",
+  "searchFields": ["code", "patient", "procedure"],
+  "grid": {
+    "columns": [
+      { "id": "code", "label": "Budget #" },
+      { "id": "date", "label": "Date" },
+      { "id": "patient", "label": "Patient" },
+      { "id": "procedure", "label": "Procedure" },
+      { "id": "amount", "label": "Amount", "align": "right", "format": "money" },
+      { "id": "status", "label": "Status" }
+    ]
+  },
+  "summary": { "showTotals": true, "fields": ["amount"] },
+  "toolbar": ["add", "edit", "delete", "print", "pdf", "excel", "refresh"]
+}

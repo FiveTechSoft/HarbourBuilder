@@ -1,0 +1,13 @@
+{
+  "id": "data.invoice_lines",
+  "kind": "data",
+  "entity": "invoice_line",
+  "rows": [
+    { "code": "L-1", "invoice": "INV-2201", "article": "CONSULT", "description": "General consult", "qty": 1, "price": 120.00, "amount": 120.00 },
+    { "code": "L-2", "invoice": "INV-2201", "article": "LAB", "description": "Blood panel", "qty": 1, "price": 85.00, "amount": 85.00 },
+    { "code": "L-3", "invoice": "INV-2210", "article": "IMAGING", "description": "MRI knee", "qty": 1, "price": 420.00, "amount": 420.00 },
+    { "code": "L-4", "invoice": "INV-2220", "article": "SURGERY", "description": "Procedure fee", "qty": 1, "price": 2000.00, "amount": 2000.00 },
+    { "code": "L-5", "invoice": "INV-2220", "article": "ANESTH", "description": "Anesthesia", "qty": 1, "price": 500.00, "amount": 500.00 },
+    { "code": "L-6", "invoice": "INV-2230", "article": "CONSULT", "description": "Follow-up visit", "qty": 1, "price": 95.00, "amount": 95.00 }
+  ]
+}

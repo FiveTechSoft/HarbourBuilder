@@ -1,0 +1,10 @@
+{
+  "id": "data.companies",
+  "kind": "data",
+  "entity": "company",
+  "rows": [
+    {"code":"HQ","name":"FiveTech Clinic HQ","currency":"EUR"},
+    {"code":"MAD","name":"Madrid Center","currency":"EUR"},
+    {"code":"BCN","name":"Barcelona Center","currency":"EUR"}
+  ]
+}

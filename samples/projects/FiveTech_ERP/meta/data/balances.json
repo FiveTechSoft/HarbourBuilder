@@ -1,0 +1,23 @@
+{
+  "id": "data.balances",
+  "kind": "data",
+  "entity": "patient_balance",
+  "currency": "EUR",
+  "rows": [
+    { "code": "P0001", "name": "ALEX RIVERA", "charges": 2450.00, "payments": 1800.00, "balance": 650.00, "currency": "EUR", "status": "Open" },
+    { "code": "P0002", "name": "JORDAN BLAKE", "charges": 980.50, "payments": 980.50, "balance": 0.00, "currency": "EUR", "status": "Settled" },
+    { "code": "P0003", "name": "CASEY MORGAN", "charges": 1320.00, "payments": 500.00, "balance": 820.00, "currency": "EUR", "status": "Open" },
+    { "code": "P0004", "name": "RILEY QUINN", "charges": 410.00, "payments": 410.00, "balance": 0.00, "currency": "EUR", "status": "Settled" },
+    { "code": "P0005", "name": "AVERY NOLAN", "charges": 2750.75, "payments": 1000.00, "balance": 1750.75, "currency": "EUR", "status": "Overdue" },
+    { "code": "P0006", "name": "MORGAN ELLIS", "charges": 150.00, "payments": 0.00, "balance": 150.00, "currency": "EUR", "status": "Open" },
+    { "code": "P0007", "name": "TAYLOR BROOKS", "charges": 890.00, "payments": 890.00, "balance": 0.00, "currency": "EUR", "status": "Settled" },
+    { "code": "P0008", "name": "CAMERON HAYES", "charges": 3200.00, "payments": 2100.00, "balance": 1100.00, "currency": "EUR", "status": "Open" },
+    { "code": "P0009", "name": "DREW SULLIVAN", "charges": 560.25, "payments": 200.00, "balance": 360.25, "currency": "EUR", "status": "Open" },
+    { "code": "P0010", "name": "PARKER REED", "charges": 75.00, "payments": 75.00, "balance": 0.00, "currency": "EUR", "status": "Settled" },
+    { "code": "P0015", "name": "EMERY KENT", "charges": 1890.00, "payments": 0.00, "balance": 1890.00, "currency": "EUR", "status": "Overdue" },
+    { "code": "P0020", "name": "LOGAN WEST", "charges": 450.00, "payments": 450.00, "balance": 0.00, "currency": "EUR", "status": "Settled" },
+    { "code": "P0025", "name": "TERRY DUNN", "charges": 720.00, "payments": 300.00, "balance": 420.00, "currency": "EUR", "status": "Open" },
+    { "code": "P0030", "name": "DANA VOSS", "charges": 2100.00, "payments": 2100.00, "balance": 0.00, "currency": "EUR", "status": "Settled" },
+    { "code": "P0035", "name": "INDIA COLE", "charges": 980.00, "payments": 200.00, "balance": 780.00, "currency": "EUR", "status": "Overdue" }
+  ]
+}

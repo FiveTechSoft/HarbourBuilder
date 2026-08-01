@@ -1,0 +1,26 @@
+{
+  "id": "screen.approvals",
+  "kind": "screen",
+  "layout": "workflow",
+  "title": "Approval queue",
+  "dataRef": "data.workflow",
+  "keyField": "code",
+  "statusField": "status",
+  "transitions": {
+    "Pending": ["In review","Approved","Rejected"],
+    "In review": ["Approved","Rejected","Pending"],
+    "Approved": ["Pending"],
+    "Rejected": ["Pending"]
+  },
+  "grid": {
+    "columns": [
+      {"id":"code","label":"Code"},
+      {"id":"type","label":"Type"},
+      {"id":"subject","label":"Subject"},
+      {"id":"requestedBy","label":"By"},
+      {"id":"priority","label":"Priority","type":"select","options":["Low","Normal","High","Urgent"]},
+      {"id":"status","label":"Status"},
+      {"id":"created","label":"Created"}
+    ]
+  }
+}

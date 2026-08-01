@@ -1,0 +1,59 @@
+{
+  "id": "data.opportunities",
+  "kind": "data",
+  "entity": "opportunity",
+  "rows": [
+    {
+      "code": "OPP-01",
+      "title": "Check-up package — Riley Quinn",
+      "party": "P0004",
+      "account": "",
+      "stage": "Qualified",
+      "amount": 310.00,
+      "currency": "EUR",
+      "probability": 40,
+      "owner": "demo",
+      "closeDate": "15/08/2026",
+      "source": "Campaign"
+    },
+    {
+      "code": "OPP-02",
+      "title": "Corporate plan ACME",
+      "party": "C-ACME",
+      "account": "ACC-ACME",
+      "stage": "Proposal",
+      "amount": 12000.00,
+      "currency": "EUR",
+      "probability": 60,
+      "owner": "admin",
+      "closeDate": "30/09/2026",
+      "source": "Partner"
+    },
+    {
+      "code": "OPP-03",
+      "title": "MRI package — Casey Morgan",
+      "party": "P0003",
+      "account": "ACC-INS",
+      "stage": "Negotiation",
+      "amount": 920.00,
+      "currency": "EUR",
+      "probability": 75,
+      "owner": "admin",
+      "closeDate": "10/08/2026",
+      "source": "Referral"
+    },
+    {
+      "code": "OPP-04",
+      "title": "Dental plan — Alex Rivera",
+      "party": "P0001",
+      "account": "ACC-PRIV",
+      "stage": "Won",
+      "amount": 450.00,
+      "currency": "EUR",
+      "probability": 100,
+      "owner": "demo",
+      "closeDate": "20/07/2026",
+      "source": "Walk-in"
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "id": "screen.invoices",
+  "kind": "screen",
+  "layout": "master-detail",
+  "title": "Invoices (master-detail)",
+  "dataRef": "data.invoices",
+  "keyField": "code",
+  "searchFields": ["code", "patient", "status"],
+  "grid": {
+    "columns": [
+      { "id": "code", "label": "Invoice #", "type": "text" },
+      { "id": "date", "label": "Date", "type": "text" },
+      { "id": "patient", "label": "Patient", "type": "text" },
+      {
+        "id": "status",
+        "label": "Status",
+        "type": "select",
+        "options": ["Open", "Posted", "Settled", "Cancelled"]
+      },
+      { "id": "currency", "label": "Cur.", "type": "select", "options": ["EUR", "USD", "BRL"] },
+      { "id": "total", "label": "Total", "type": "money", "format": "money", "align": "right" },
+      { "id": "notes", "label": "Notes", "type": "text" }
+    ]
+  },
+  "toolbar": ["add", "edit", "delete", "print", "pdf", "excel", "refresh"],
+  "detail": {
+    "title": "Invoice lines",
+    "dataRef": "data.invoice_lines",
+    "masterKey": "invoice",
+    "keyField": "code",
+    "searchFields": ["code", "article", "description"],
+    "grid": {
+      "columns": [
+        { "id": "code", "label": "Line #", "type": "text" },
+        { "id": "invoice", "label": "Invoice", "type": "text" },
+        {
+          "id": "article",
+          "label": "Article",
+          "type": "select",
+          "options": ["CONSULT", "LAB", "IMAGING", "SURGERY", "ANESTH", "PHYSIO", "OTHER"]
+        },
+        { "id": "description", "label": "Description", "type": "text" },
+        { "id": "qty", "label": "Qty", "type": "text", "align": "right" },
+        { "id": "price", "label": "Price", "type": "money", "format": "money", "align": "right" },
+        { "id": "amount", "label": "Amount", "type": "money", "format": "money", "align": "right" }
+      ]
+    },
+    "toolbar": ["add", "edit", "delete", "refresh"]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "id": "data.workflow",
+  "kind": "data",
+  "entity": "workflow_item",
+  "rows": [
+    {"code":"WF-01","type":"Authorization","subject":"MRI for CASEY MORGAN","requestedBy":"demo","status":"Pending","priority":"High","created":"01/08/2026"},
+    {"code":"WF-02","type":"Refund","subject":"Overpayment INV-2230","requestedBy":"demo","status":"Pending","priority":"Normal","created":"01/08/2026"},
+    {"code":"WF-03","type":"Lab result","subject":"Blood panel ALEX RIVERA","requestedBy":"nurse","status":"In review","priority":"Urgent","created":"31/07/2026"},
+    {"code":"WF-04","type":"Authorization","subject":"Physio package","requestedBy":"demo","status":"Approved","priority":"Low","created":"28/07/2026"}
+  ]
+}

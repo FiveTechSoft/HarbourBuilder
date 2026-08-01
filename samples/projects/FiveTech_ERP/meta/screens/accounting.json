@@ -1,0 +1,21 @@
+{
+  "id": "screen.accounting",
+  "kind": "screen",
+  "title": "Accounting list",
+  "dataRef": "data.accounting",
+  "searchFields": ["code", "patient", "article", "doc"],
+  "grid": {
+    "columns": [
+      { "id": "code", "label": "Entry" },
+      { "id": "date", "label": "Date" },
+      { "id": "patient", "label": "Patient" },
+      { "id": "article", "label": "Article" },
+      { "id": "doc", "label": "Document" },
+      { "id": "debit", "label": "Debit", "align": "right", "format": "money" },
+      { "id": "credit", "label": "Credit", "align": "right", "format": "money" },
+      { "id": "status", "label": "Status" }
+    ]
+  },
+  "summary": { "showTotals": true, "fields": ["debit", "credit"] },
+  "toolbar": ["add", "edit", "delete", "print", "pdf", "excel", "refresh"]
+}

@@ -1,0 +1,38 @@
+{
+  "id": "screen.project_card",
+  "kind": "screen",
+  "layout": "form",
+  "title": "Project card",
+  "dataRef": "data.projects",
+  "keyField": "code",
+  "tabs": [
+    { "id": "main", "label": "Project", "fields": ["code", "name", "status", "type", "billable"] },
+    { "id": "client", "label": "Client", "fields": ["party", "account", "owner"] },
+    { "id": "plan", "label": "Plan & budget", "fields": ["start", "end", "budget", "spent"] }
+  ],
+  "fields": [
+    { "id": "code", "label": "Code", "type": "text" },
+    { "id": "name", "label": "Name", "type": "text" },
+    {
+      "id": "status",
+      "label": "Status",
+      "type": "select",
+      "options": ["Proposal", "Active", "On hold", "Closed"]
+    },
+    {
+      "id": "type",
+      "label": "Type",
+      "type": "select",
+      "options": ["Fixed price", "T&M", "Internal"]
+    },
+    { "id": "party", "label": "Party", "type": "text" },
+    { "id": "account", "label": "Account", "type": "text" },
+    { "id": "owner", "label": "Owner", "type": "text" },
+    { "id": "start", "label": "Start", "type": "text" },
+    { "id": "end", "label": "End", "type": "text" },
+    { "id": "budget", "label": "Budget", "type": "money", "format": "money" },
+    { "id": "spent", "label": "Spent", "type": "money", "format": "money" },
+    { "id": "billable", "label": "Billable", "type": "checkbox" }
+  ],
+  "toolbar": ["add", "edit", "delete", "refresh"]
+}

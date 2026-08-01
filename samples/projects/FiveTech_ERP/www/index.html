@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FiveTech_ERP</title>
+<style>
+  :root {
+    --bg: #0f172a; --panel: #1e293b; --line: #334155; --text: #e2e8f0;
+    --muted: #94a3b8; --blue: #3b82f6; --blue2: #1d4ed8; --ok: #22c55e;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 system-ui,Segoe UI,sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; }
+  header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  header .brand { font-weight: 700; letter-spacing: .02em; }
+  header .sub { color: var(--muted); font-size: 12px; }
+  header .pill { margin-left: auto; font-size: 12px; color: var(--muted); background: #0f172a; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); }
+  .shell { flex: 1; display: grid; grid-template-columns: 240px 1fr; min-height: 0; }
+  nav { background: var(--panel); border-right: 1px solid var(--line); overflow: auto; padding: 10px 0; }
+  nav .sec { padding: 10px 14px 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; }
+  nav button { display: block; width: 100%; text-align: left; border: 0; background: transparent; color: var(--text); padding: 8px 14px; cursor: pointer; font-size: 13px; }
+  nav button:hover { background: #33415555; }
+  nav button.on { background: #1d4ed833; color: #93c5fd; font-weight: 600; }
+  main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .toolbar { display: flex; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); background: #111827; }
+  .toolbar h1 { margin: 0; font-size: 16px; font-weight: 650; flex: 1; }
+  .toolbar button, .login button {
+    height: 30px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--line);
+    background: #1e293b; color: var(--text); cursor: pointer; font-size: 12px;
+  }
+  .toolbar button.primary, .login button.primary { background: var(--blue); border-color: var(--blue2); font-weight: 600; }
+  .body { flex: 1; overflow: auto; padding: 14px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { border-bottom: 1px solid var(--line); padding: 7px 8px; text-align: left; }
+  th { color: var(--muted); font-weight: 600; position: sticky; top: 0; background: var(--bg); }
+  tr:hover td { background: #1e293b55; }
+  .login { max-width: 360px; margin: 12vh auto; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 24px; }
+  .login h2 { margin: 0 0 6px; }
+  .login p { color: var(--muted); margin: 0 0 16px; font-size: 13px; }
+  .login label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+  .login input { width: 100%; height: 34px; border-radius: 6px; border: 1px solid var(--line); background: #0f172a; color: var(--text); padding: 0 10px; }
+  .login .err { color: #f87171; font-size: 12px; min-height: 18px; margin-top: 8px; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 10px; }
+  code { background: #0f172a; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  .msg { padding: 24px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="app-login" class="login">
+  <h2>FiveTech_ERP</h2>
+  <p>HarbourBuilder · shared meta · Desktop &amp; Web</p>
+  <label>User</label>
+  <input id="user" value="admin" autocomplete="username">
+  <label>Password</label>
+  <input id="pass" type="password" value="1234" autocomplete="current-password">
+  <div class="err" id="login-err"></div>
+  <p style="margin-top:14px"><button class="primary" id="btn-login">Sign in</button></p>
+  <p class="hint">admin/1234 · demo/demo</p>
+</div>
+
+<div id="app-shell" class="shell" style="display:none">
+  <nav id="nav"></nav>
+  <main>
+    <div class="toolbar">
+      <h1 id="title">Dashboard</h1>
+      <span class="pill" id="meta-key" style="font-size:12px;color:var(--muted)"></span>
+      <button id="btn-refresh">Refresh</button>
+    </div>
+    <div class="body" id="body"><div class="msg">Select a screen from the menu.</div></div>
+  </main>
+</div>
+
+<script>
+var MODULES = null, APP = null, AUTH = false;
+
+function esc(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+function api(path) {
+  return fetch(path, { credentials: "same-origin", cache: "no-store" })
+    .then(function (r) { return r.json(); });
+}
+
+// Server may return raw meta JSON or envelope { ok, doc } / { ok:false, msg }.
+function metaDoc(j) {
+  if (!j || typeof j !== "object") return null;
+  if (j.ok === false) return null;
+  if (j.doc && typeof j.doc === "object") return j.doc;
+  return j;
+}
+
+function dataRows(j) {
+  if (!j || typeof j !== "object") return [];
+  if (j.ok === false) return [];
+  if (Array.isArray(j.rows)) return j.rows;
+  if (j.doc && Array.isArray(j.doc.rows)) return j.doc.rows;
+  return [];
+}
+
+function showShell() {
+  document.getElementById("app-login").style.display = "none";
+  document.getElementById("app-shell").style.display = "grid";
+  loadMeta();
+}
+
+function loadMeta() {
+  Promise.all([
+    api("/api/meta?key=app"),
+    api("/api/meta?key=modules")
+  ]).then(function (pair) {
+    APP = metaDoc(pair[0]) || {};
+    MODULES = metaDoc(pair[1]) || { sections: [] };
+    var brand = document.querySelector("header .brand");
+    if (brand && APP.title) brand.textContent = APP.title;
+    renderNav();
+    // open first screen with active flag or parties
+    var first = null, i, j, s, it;
+    var secs = MODULES.sections || [];
+    for (i = 0; i < secs.length; i++) {
+      for (j = 0; j < (secs[i].items || []).length; j++) {
+        it = secs[i].items[j];
+        if (it.active) { first = it; break; }
+        if (!first && it.screen) first = it;
+      }
+      if (first && first.active) break;
+    }
+    if (first) openScreen(first.screen, first.label || first.id);
+  }).catch(function (e) {
+    var msg = (e && e.message) ? e.message : String(e);
+    document.getElementById("body").innerHTML =
+      "<div class='msg'>Meta load error: " + esc(msg) +
+      "<br><small>Check /api/meta?key=app (UTF-8 raw JSON)</small></div>";
+  });
+}
+
+function renderNav() {
+  var html = "", i, j, sec, it, secs = (MODULES && MODULES.sections) || [];
+  var vert = (APP && APP.vertical) ? APP.vertical : "";
+  html += "<div class='sec'>App" + (vert ? " · " + esc(vert) : "") + "</div>";
+  for (i = 0; i < secs.length; i++) {
+    sec = secs[i];
+    html += "<div class='sec'>" + esc(sec.title || sec.id) + "</div>";
+    for (j = 0; j < (sec.items || []).length; j++) {
+      it = sec.items[j];
+      if (!it.screen) continue;
+      html += "<button type='button' data-screen='" + esc(it.screen) + "' data-label='" +
+        esc(it.label || it.id) + "'>" + esc(it.label || it.id) + "</button>";
+    }
+  }
+  document.getElementById("nav").innerHTML = html;
+  document.getElementById("nav").onclick = function (e) {
+    var b = e.target.closest("button[data-screen]");
+    if (!b) return;
+    openScreen(b.getAttribute("data-screen"), b.getAttribute("data-label"));
+    var all = document.querySelectorAll("#nav button");
+    for (var k = 0; k < all.length; k++) all[k].classList.toggle("on", all[k] === b);
+  };
+}
+
+function openScreen(key, label) {
+  document.getElementById("title").textContent = label || key;
+  document.getElementById("meta-key").textContent = key;
+  document.getElementById("body").innerHTML = "<div class='msg'>Loading " + esc(key) + "…</div>";
+  api("/api/meta?key=" + encodeURIComponent(key)).then(function (j) {
+    var scr = metaDoc(j);
+    if (!scr) {
+      document.getElementById("body").innerHTML = "<div class='msg'>Screen meta not found: " + esc(key) + "</div>";
+      return;
+    }
+    var dataRef = scr.dataRef || "";
+    var layout = scr.layout || "list";
+    if (!dataRef) {
+      document.getElementById("body").innerHTML =
+        "<div class='msg'><b>" + esc(scr.title || key) + "</b><br>layout: <code>" +
+        esc(layout) + "</code><br>No dataRef (specialized layout — full UI in FWH sample or future renderer).</div>";
+      return;
+    }
+    return api("/api/dataset?key=" + encodeURIComponent(dataRef)).then(function (dj) {
+      renderGrid(scr, dataRows(dj));
+    });
+  }).catch(function (e) {
+    document.getElementById("body").innerHTML = "<div class='msg'>" + esc(String(e)) + "</div>";
+  });
+}
+
+function renderGrid(scr, rows) {
+  var cols = (scr.grid && scr.grid.columns) ? scr.grid.columns : [];
+  var html = "", i, j, c, r, v;
+  if (!cols.length && rows.length) {
+    cols = Object.keys(rows[0]).map(function (k) { return { id: k, label: k }; });
+  }
+  html += "<p class='hint' style='margin:0 0 10px'>layout <code>" + esc(scr.layout || "list") +
+    "</code> · data <code>" + esc(scr.dataRef || "") + "</code> · " + rows.length + " rows</p>";
+  html += "<table><thead><tr>";
+  for (i = 0; i < cols.length; i++) html += "<th>" + esc(cols[i].label || cols[i].id) + "</th>";
+  html += "</tr></thead><tbody>";
+  for (i = 0; i < rows.length; i++) {
+    r = rows[i]; html += "<tr>";
+    for (j = 0; j < cols.length; j++) {
+      c = cols[j];
+      v = r[c.id];
+      if (Array.isArray(v)) v = v.join(", ");
+      html += "<td>" + esc(v == null ? "" : v) + "</td>";
+    }
+    html += "</tr>";
+  }
+  if (!rows.length) html += "<tr><td colspan='" + Math.max(1, cols.length) + "'>No rows</td></tr>";
+  html += "</tbody></table>";
+  document.getElementById("body").innerHTML = html;
+}
+
+document.getElementById("btn-login").onclick = function () {
+  var user = document.getElementById("user").value;
+  var password = document.getElementById("pass").value;
+  document.getElementById("login-err").textContent = "";
+  fetch("/api/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify({ user: user, password: password })
+  }).then(function (r) { return r.json(); }).then(function (j) {
+    if (j && j.ok) showShell();
+    else document.getElementById("login-err").textContent = (j && j.msg) || "Login failed";
+  }).catch(function (e) {
+    document.getElementById("login-err").textContent = String(e);
+  });
+};
+
+document.getElementById("btn-refresh").onclick = function () {
+  var k = document.getElementById("meta-key").textContent;
+  var t = document.getElementById("title").textContent;
+  if (k) openScreen(k, t);
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,62 @@
+{
+  "id": "data.pos_sales",
+  "kind": "data",
+  "entity": "pos_sale",
+  "rows": [
+    {
+      "code": "T-9001",
+      "date": "01/08/2026 09:14",
+      "register": "POS-1",
+      "cashier": "demo",
+      "party": "P0001",
+      "lines": 3,
+      "total": 238.40,
+      "tender": "Card",
+      "status": "Paid"
+    },
+    {
+      "code": "T-9002",
+      "date": "01/08/2026 10:02",
+      "register": "POS-1",
+      "cashier": "demo",
+      "party": "",
+      "lines": 1,
+      "total": 24.90,
+      "tender": "Cash",
+      "status": "Paid"
+    },
+    {
+      "code": "T-9003",
+      "date": "01/08/2026 11:30",
+      "register": "POS-2",
+      "cashier": "admin",
+      "party": "P0003",
+      "lines": 5,
+      "total": 412.15,
+      "tender": "Card",
+      "status": "Paid"
+    },
+    {
+      "code": "T-9004",
+      "date": "01/08/2026 12:05",
+      "register": "POS-1",
+      "cashier": "demo",
+      "party": "C-ACME",
+      "lines": 2,
+      "total": 98.00,
+      "tender": "Invoice",
+      "status": "Open"
+    },
+    {
+      "code": "T-9005",
+      "date": "01/08/2026 13:40",
+      "register": "POS-2",
+      "cashier": "admin",
+      "party": "",
+      "lines": 1,
+      "total": 12.50,
+      "tender": "Cash",
+      "status": "Void"
+    }
+  ]
+}

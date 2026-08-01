@@ -1204,7 +1204,8 @@ HB_FUNC( UI_MONTHCALENDARNEW )
 }
 
 /* ======================================================================
- * TWebView stubs (design-time placeholder — no live rendering on Windows)
+ * TWebView — Edge WebView2 on Windows (FWH engine in backends/win32/webview2)
+ * Linux/macOS keep their native UI_WebView* backends; Harbour API is the same.
  * ====================================================================== */
 
 HB_FUNC( UI_WEBVIEWNEW )
@@ -1219,14 +1220,41 @@ HB_FUNC( UI_WEBVIEWNEW )
    RetCtrl( p );
 }
 
-HB_FUNC( UI_WEBVIEWLOAD )        { (void)hb_param(1,HB_IT_ANY); }
-HB_FUNC( UI_WEBVIEWLOADHTML )    { (void)hb_param(1,HB_IT_ANY); }
+HB_FUNC( UI_WEBVIEWLOAD )
+{
+   TWebView * p = (TWebView *) GetCtrl(1);
+   if( p && HB_ISCHAR(2) )
+      p->Navigate( hb_parc(2) );
+}
+
+HB_FUNC( UI_WEBVIEWLOADHTML )
+{
+   TWebView * p = (TWebView *) GetCtrl(1);
+   if( p && HB_ISCHAR(2) )
+      p->LoadHTML( hb_parc(2) );
+}
+
+/* History APIs not exposed by the FWH host yet — keep ABI for cross-platform PRG */
 HB_FUNC( UI_WEBVIEWGOBACK )      { (void)hb_param(1,HB_IT_ANY); }
 HB_FUNC( UI_WEBVIEWGOFORWARD )   { (void)hb_param(1,HB_IT_ANY); }
-HB_FUNC( UI_WEBVIEWRELOAD )      { (void)hb_param(1,HB_IT_ANY); }
+HB_FUNC( UI_WEBVIEWRELOAD )
+{
+   TWebView * p = (TWebView *) GetCtrl(1);
+   if( p && p->FText[0] )
+      p->Navigate( p->FText );
+}
 HB_FUNC( UI_WEBVIEWSTOP )        { (void)hb_param(1,HB_IT_ANY); }
-HB_FUNC( UI_WEBVIEWEVALUATEJS )  { (void)hb_param(1,HB_IT_ANY); }
-HB_FUNC( UI_WEBVIEWGETURL )      { TControl * p = GetCtrl(1); hb_retc( p ? p->FText : "" ); }
+HB_FUNC( UI_WEBVIEWEVALUATEJS )
+{
+   TWebView * p = (TWebView *) GetCtrl(1);
+   if( p && HB_ISCHAR(2) )
+      p->EvaluateJS( hb_parc(2) );
+}
+HB_FUNC( UI_WEBVIEWGETURL )
+{
+   TControl * p = GetCtrl(1);
+   hb_retc( p ? p->FText : "" );
+}
 HB_FUNC( UI_WEBVIEWCANGOBACK )   { hb_retl( FALSE ); }
 HB_FUNC( UI_WEBVIEWCANGOFORWARD ){ hb_retl( FALSE ); }
 

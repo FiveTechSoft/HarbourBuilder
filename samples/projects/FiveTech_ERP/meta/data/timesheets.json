@@ -1,0 +1,72 @@
+{
+  "id": "data.timesheets",
+  "kind": "data",
+  "entity": "timesheet",
+  "rows": [
+    {
+      "code": "TS-5001",
+      "date": "28/07/2026",
+      "project": "PRJ-100",
+      "party": "C-ACME",
+      "task": "API integration",
+      "hours": 4.5,
+      "rate": 85.00,
+      "amount": 382.50,
+      "status": "Approved",
+      "owner": "demo",
+      "billable": true
+    },
+    {
+      "code": "TS-5002",
+      "date": "29/07/2026",
+      "project": "PRJ-100",
+      "party": "C-ACME",
+      "task": "UAT support",
+      "hours": 3.0,
+      "rate": 85.00,
+      "amount": 255.00,
+      "status": "Submitted",
+      "owner": "demo",
+      "billable": true
+    },
+    {
+      "code": "TS-5003",
+      "date": "29/07/2026",
+      "project": "PRJ-101",
+      "party": "C-INS",
+      "task": "Schema design",
+      "hours": 6.0,
+      "rate": 95.00,
+      "amount": 570.00,
+      "status": "Draft",
+      "owner": "admin",
+      "billable": true
+    },
+    {
+      "code": "TS-5004",
+      "date": "30/07/2026",
+      "project": "PRJ-102",
+      "party": "",
+      "task": "Menu designer polish",
+      "hours": 2.0,
+      "rate": 0.00,
+      "amount": 0.00,
+      "status": "Approved",
+      "owner": "admin",
+      "billable": false
+    },
+    {
+      "code": "TS-5005",
+      "date": "31/07/2026",
+      "project": "PRJ-101",
+      "party": "C-INS",
+      "task": "Client workshop",
+      "hours": 5.0,
+      "rate": 95.00,
+      "amount": 475.00,
+      "status": "Submitted",
+      "owner": "demo",
+      "billable": true
+    }
+  ]
+}

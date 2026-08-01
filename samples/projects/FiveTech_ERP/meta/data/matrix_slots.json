@@ -1,0 +1,11 @@
+{
+  "id": "data.matrix_slots",
+  "kind": "data",
+  "entity": "matrix",
+  "rows": [
+    {"row":"Dr. Nora Voss","mon":"AM","tue":"AM","wed":"PM","thu":"AM","fri":"OFF"},
+    {"row":"Dr. Sam Orton","mon":"PM","tue":"AM","wed":"AM","thu":"PM","fri":"AM"},
+    {"row":"Dr. Kim Adler","mon":"AM","tue":"OFF","wed":"AM","thu":"AM","fri":"PM"},
+    {"row":"Dr. Ava Quinn","mon":"OFF","tue":"PM","wed":"PM","thu":"AM","fri":"AM"}
+  ]
+}

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ERP - Login</title>
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem("dw-theme");
+    if (t !== "dark" && t !== "light") t = "light";
+    document.documentElement.setAttribute("data-theme", t);
+    document.documentElement.classList.toggle("dark", t === "dark");
+  } catch (e) {}
+})();
+</script>
+<style>
+  :root {
+    --bg: #e8eef5; --card: #ffffff; --text: #0f172a; --text-2: #334155;
+    --muted: #94a3b8; --line: #e2e8f0; --input-bg: #f8fafc; --input-focus-bg: #fff;
+    --blue: #1d4ed8; --blue-deep: #1e40af; --danger-bg: #fef2f2; --danger: #b91c1c;
+    --danger-line: #fecaca; --shadow: 0 2px 4px rgba(15,23,42,.08), 0 12px 28px rgba(15,23,42,.16), 0 28px 64px rgba(15,23,42,.20);
+    --toggle-bg: #fff; --toggle-border: #e2e8f0;
+    color-scheme: light;
+  }
+  html.dark {
+    --bg: #0b1220; --card: #151d2b; --text: #e2e8f0; --text-2: #cbd5e1;
+    --muted: #94a3b8; --line: #2d3a4f; --input-bg: #0f172a; --input-focus-bg: #1a2332;
+    --blue: #3b82f6; --blue-deep: #2563eb; --danger-bg: #3f1d1d; --danger: #fca5a5;
+    --danger-line: #7f1d1d; --shadow: 0 2px 4px rgba(0,0,0,.35), 0 16px 40px rgba(0,0,0,.45);
+    --toggle-bg: #1a2332; --toggle-border: #2d3a4f;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+    background: var(--bg); color: var(--text); padding: 24px;
+    transition: background .2s, color .2s;
+  }
+  .theme-fab {
+    position: fixed; top: 16px; right: 16px; z-index: 20;
+    height: 38px; padding: 0 12px; border-radius: 999px;
+    border: 1px solid var(--toggle-border); background: var(--toggle-bg);
+    color: var(--text); cursor: pointer; font-size: .82rem; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 8px;
+    box-shadow: 0 4px 14px rgba(15,23,42,.1);
+  }
+  .theme-fab:hover { border-color: var(--blue); color: var(--blue); }
+  .card {
+    width: 100%; max-width: 400px; background: var(--card);
+    border-radius: 20px; border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+    padding: 36px 36px 28px;
+  }
+  .brand { display: flex; justify-content: center; margin-bottom: 18px; }
+  .brand-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 120px; height: 56px; padding: 0 28px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    box-shadow: 0 4px 14px rgba(15,23,42,.08);
+    font-size: 28px; font-weight: 800; letter-spacing: .12em;
+  }
+  .brand-badge span {
+    background: linear-gradient(135deg, var(--blue) 0%, #0f172a 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  html.dark .brand-badge span {
+    background: linear-gradient(135deg, #60a5fa 0%, #e2e8f0 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .titles { text-align: center; margin-bottom: 28px; }
+  .titles h1 { font-size: 1.45rem; font-weight: 700; color: var(--text); }
+  .titles p { margin-top: 4px; font-size: .92rem; color: var(--muted); }
+  label { display: block; font-size: .9rem; font-weight: 600; color: var(--text-2); margin-bottom: 6px; }
+  .field { margin-bottom: 16px; }
+  input[type="text"], input[type="password"], input[type="date"] {
+    width: 100%; height: 44px; padding: 0 14px;
+    border: 1px solid var(--line); border-radius: 10px; background: var(--input-bg);
+    font-size: .95rem; color: var(--text); outline: none;
+  }
+  input:focus {
+    border-color: var(--blue); background: var(--input-focus-bg);
+    box-shadow: 0 0 0 3px rgba(37,99,235,.15);
+  }
+  input::placeholder { color: var(--muted); }
+  .btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; height: 48px; margin-top: 10px; border: 0; border-radius: 12px;
+    background: var(--blue); color: #fff; font-size: 1rem; font-weight: 600;
+    cursor: pointer; box-shadow: 0 6px 16px rgba(29,78,216,.28);
+  }
+  .btn:hover { background: var(--blue-deep); }
+  .btn:disabled { opacity: .65; cursor: wait; box-shadow: none; }
+  .btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; }
+  .msg { display: none; margin-top: 14px; padding: 10px 12px; border-radius: 10px; font-size: .88rem; }
+  .msg.err { display: block; background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-line); }
+  .footer { margin-top: 22px; text-align: center; font-size: .78rem; color: var(--muted); }
+</style>
+</head>
+<body>
+  <button type="button" class="theme-fab" id="btn-theme" title="Toggle dark mode" aria-label="Toggle dark mode">
+    <span id="theme-icon">&#9790;</span> <span id="theme-label">Dark</span>
+  </button>
+  <div class="card">
+    <div class="brand"><div class="brand-badge"><span>ERP</span></div></div>
+    <div class="titles">
+      <h1>FiveTech Software</h1>
+      <p>Desktop &amp; Web</p>
+    </div>
+    <form id="login-form" autocomplete="off">
+      <div class="field">
+        <label for="user">User Code:</label>
+        <input type="text" id="user" name="user" placeholder="Code" autofocus>
+      </div>
+      <div class="field">
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password" placeholder="Password">
+      </div>
+      <div class="field">
+        <label for="workdate">Work Date:</label>
+        <input type="date" id="workdate" name="workdate">
+      </div>
+      <button type="submit" class="btn" id="btn-login">
+        <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        Sign in
+      </button>
+    </form>
+    <div id="msg" class="msg" role="alert"></div>
+    <div class="footer">Application __APPVER__ &middot; DesktopWeb</div>
+  </div>
+<script>
+(function () {
+  function themeNow() {
+    return document.documentElement.classList.contains("dark") ? "dark" : "light";
+  }
+  function applyTheme(t) {
+    t = (t === "dark") ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", t);
+    document.documentElement.classList.toggle("dark", t === "dark");
+    try { localStorage.setItem("dw-theme", t); } catch (e) {}
+    var icon = document.getElementById("theme-icon");
+    var lab = document.getElementById("theme-label");
+    if (icon) icon.innerHTML = (t === "dark") ? "&#9728;" : "&#9790;";
+    if (lab) lab.textContent = (t === "dark") ? "Light" : "Dark";
+  }
+  applyTheme(themeNow());
+  var tb = document.getElementById("btn-theme");
+  if (tb) tb.onclick = function () {
+    applyTheme(themeNow() === "dark" ? "light" : "dark");
+  };
+
+  var form = document.getElementById("login-form");
+  var msg  = document.getElementById("msg");
+  var btn  = document.getElementById("btn-login");
+  var inpDate = document.getElementById("workdate");
+  var inpUser = document.getElementById("user");
+  try {
+    var d = new Date();
+    inpDate.value = d.getFullYear() + "-" +
+      String(d.getMonth()+1).padStart(2,"0") + "-" +
+      String(d.getDate()).padStart(2,"0");
+  } catch (e) {}
+  // Focus User as soon as the page is ready (desktop WebView + browser)
+  function focusUser() {
+    try {
+      if (inpUser) { inpUser.focus(); inpUser.select(); }
+    } catch (e) {}
+  }
+  focusUser();
+  setTimeout(focusUser, 50);
+  setTimeout(focusUser, 200);
+  window.addEventListener("load", focusUser);
+  function setBusy(b) {
+    btn.disabled = b;
+    if (b) btn.textContent = "Validating...";
+    else btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg> Sign in';
+  }
+  function showMsg(text) {
+    msg.className = "msg err";
+    msg.textContent = text || "";
+    if (!text) msg.style.display = "none";
+  }
+  form.addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    showMsg("");
+    var user = document.getElementById("user").value;
+    var password = document.getElementById("password").value;
+    var workDate = document.getElementById("workdate").value;
+    setBusy(true);
+    var body = "user=" + encodeURIComponent(user) +
+               "&password=" + encodeURIComponent(password) +
+               "&workDate=" + encodeURIComponent(workDate);
+    fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body,
+      credentials: "same-origin"
+    }).then(function (r) { return r.json(); })
+      .then(function (j) {
+        setBusy(false);
+        if (j && j.ok) window.location.href = "/dashboard";
+        else showMsg((j && j.msg) || "Login failed.");
+      }).catch(function (e) {
+        setBusy(false);
+        showMsg("Network error: " + e);
+      });
+  });
+})();
+</script>
+</body>
+</html>

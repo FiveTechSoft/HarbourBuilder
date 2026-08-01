@@ -1,0 +1,15 @@
+{
+  "id": "data.budgets",
+  "kind": "data",
+  "entity": "budget",
+  "rows": [
+    { "code": "B-1001", "date": "12/05/2025", "patient": "ALEX RIVERA", "procedure": "Full check-up", "amount": 450.00, "status": "Approved" },
+    { "code": "B-1002", "date": "18/05/2025", "patient": "JORDAN BLAKE", "procedure": "Lab panel", "amount": 180.50, "status": "Pending" },
+    { "code": "B-1003", "date": "20/05/2025", "patient": "CASEY MORGAN", "procedure": "MRI knee", "amount": 920.00, "status": "Approved" },
+    { "code": "B-1004", "date": "22/05/2025", "patient": "RILEY QUINN", "procedure": "Physio package", "amount": 320.00, "status": "Draft" },
+    { "code": "B-1005", "date": "01/06/2025", "patient": "AVERY NOLAN", "procedure": "Dental plan", "amount": 1250.00, "status": "Pending" },
+    { "code": "B-1006", "date": "05/06/2025", "patient": "CAMERON HAYES", "procedure": "Surgery estimate", "amount": 4800.00, "status": "Approved" },
+    { "code": "B-1007", "date": "10/06/2025", "patient": "DREW SULLIVAN", "procedure": "Vaccines", "amount": 95.00, "status": "Paid" },
+    { "code": "B-1008", "date": "15/06/2025", "patient": "EMERY KENT", "procedure": "Imaging CT", "amount": 610.00, "status": "Pending" }
+  ]
+}

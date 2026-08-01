@@ -1,0 +1,43 @@
+{
+  "id": "app",
+  "kind": "app",
+  "title": "ERP - FiveTech Software",
+  "subtitle": "Desktop & Web",
+  "brandName": "FiveTech",
+  "brandSubtitle": "Desktop & Web",
+  "logoText": "ERP",
+  "version": "1.0.0",
+  "httpPort": 2222,
+  "vertical": "clinic",
+  "demo": {
+    "enabled": true,
+    "ref": "demo.main",
+    "autoStart": false,
+    "autoStartUsers": ["demo"],
+    "autoStartOncePerSession": true,
+    "autoStartDelayMs": 1400
+  },
+  "locale": {
+    "currency": "EUR",
+    "currencySymbol": "€",
+    "currencyPosition": "suffix",
+    "showCurrencySymbol": true,
+    "decimals": 2,
+    "decimalSep": ",",
+    "thousandSep": ".",
+    "dateFormat": "DD/MM/YYYY",
+    "timeFormat": "24h",
+    "firstDayOfWeek": 1,
+    "taxRate": 21
+  },
+  "entry": {
+    "login": "screen.login",
+    "home": "screen.appointments"
+  },
+  "modulesRef": "modules",
+  "themeRef": "theme",
+  "sessions": {
+    "cookie": "DWSESS",
+    "ttlMinutes": 480
+  }
+}

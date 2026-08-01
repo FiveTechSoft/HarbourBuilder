@@ -1,0 +1,37 @@
+{
+  "id": "theme",
+  "default": "light",
+  "storageKey": "dw-theme",
+  "modes": ["light", "dark"],
+  "colors": {
+    "light": {
+      "bg": "#eef2f7",
+      "side": "#ffffff",
+      "panel": "#ffffff",
+      "surface": "#f8fafc",
+      "border": "#e2e8f0",
+      "text": "#0f172a",
+      "muted": "#64748b",
+      "accent": "#1d4ed8",
+      "accentDeep": "#1e40af",
+      "danger": "#b91c1c"
+    },
+    "dark": {
+      "bg": "#0b1220",
+      "side": "#111827",
+      "panel": "#151d2b",
+      "surface": "#0f172a",
+      "border": "#2d3a4f",
+      "text": "#e2e8f0",
+      "muted": "#94a3b8",
+      "accent": "#3b82f6",
+      "accentDeep": "#2563eb",
+      "danger": "#f87171"
+    }
+  },
+  "painel": {
+    "barGradient": ["#1d4ed8", "#1e40af"],
+    "radius": 10,
+    "shadow": "0 2px 4px rgba(15,23,42,.08), 0 12px 28px rgba(15,23,42,.18), 0 28px 64px rgba(15,23,42,.22)"
+  }
+}

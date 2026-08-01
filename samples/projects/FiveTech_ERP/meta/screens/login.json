@@ -1,0 +1,19 @@
+{
+  "id": "screen.login",
+  "kind": "screen",
+  "title": "Login",
+  "route": "/",
+  "brand": "ERP",
+  "heading": "FiveTech Software",
+  "subheading": "Desktop & Web",
+  "fields": [
+    { "id": "user", "label": "User Code", "type": "text", "required": true, "autofocus": true },
+    { "id": "password", "label": "Password", "type": "password", "required": true },
+    { "id": "workDate", "label": "Work Date", "type": "date", "required": true, "default": "today" }
+  ],
+  "submit": { "label": "Sign in", "action": "login" },
+  "demoUsers": [
+    { "user": "admin", "password": "1234" },
+    { "user": "demo", "password": "demo" }
+  ]
+}

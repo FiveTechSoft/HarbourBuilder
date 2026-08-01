@@ -1,0 +1,12 @@
+{
+  "id": "data.roles",
+  "kind": "data",
+  "entity": "role",
+  "rows": [
+    {"code":"ADMIN","name":"Administrator"},
+    {"code":"RECEP","name":"Reception"},
+    {"code":"CLINIC","name":"Clinical"},
+    {"code":"BILL","name":"Billing"},
+    {"code":"AUDITOR","name":"Auditor"}
+  ]
+}

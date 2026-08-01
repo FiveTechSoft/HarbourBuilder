@@ -273,16 +273,14 @@ void ApplyDockAlign( TForm * form )
    int cRight  = rcClient.right;
    int i;
 
+   /* Use virtual SetBounds (not bare SetWindowPos) so TWebView can resize
+      the Edge WebView2 controller on maximize / form resize. */
    /* Pass 1 — alTop */
    for( i = 0; i < form->FChildCount; i++ )
    {
       TControl * c = form->FChildren[i];
       if( !c || c->FDockAlign != ALIGN_TOP || !c->FHandle ) continue;
-      c->FLeft  = cLeft;
-      c->FTop   = cTop;
-      c->FWidth = cRight - cLeft;
-      SetWindowPos( c->FHandle, NULL, cLeft, cTop, cRight - cLeft, c->FHeight,
-         SWP_NOZORDER | SWP_NOACTIVATE );
+      c->SetBounds( cLeft, cTop, cRight - cLeft, c->FHeight );
       cTop += c->FHeight;
    }
    /* Pass 2 — alBottom */
@@ -291,11 +289,7 @@ void ApplyDockAlign( TForm * form )
       TControl * c = form->FChildren[i];
       if( !c || c->FDockAlign != ALIGN_BOTTOM || !c->FHandle ) continue;
       int vy = cBottom - c->FHeight;
-      c->FLeft  = cLeft;
-      c->FTop   = vy;
-      c->FWidth = cRight - cLeft;
-      SetWindowPos( c->FHandle, NULL, cLeft, vy, cRight - cLeft, c->FHeight,
-         SWP_NOZORDER | SWP_NOACTIVATE );
+      c->SetBounds( cLeft, vy, cRight - cLeft, c->FHeight );
       cBottom -= c->FHeight;
    }
    /* Pass 3 — alLeft */
@@ -303,11 +297,7 @@ void ApplyDockAlign( TForm * form )
    {
       TControl * c = form->FChildren[i];
       if( !c || c->FDockAlign != ALIGN_LEFT || !c->FHandle ) continue;
-      c->FLeft   = cLeft;
-      c->FTop    = cTop;
-      c->FHeight = cBottom - cTop;
-      SetWindowPos( c->FHandle, NULL, cLeft, cTop, c->FWidth, cBottom - cTop,
-         SWP_NOZORDER | SWP_NOACTIVATE );
+      c->SetBounds( cLeft, cTop, c->FWidth, cBottom - cTop );
       cLeft += c->FWidth;
    }
    /* Pass 4 — alRight */
@@ -316,11 +306,7 @@ void ApplyDockAlign( TForm * form )
       TControl * c = form->FChildren[i];
       if( !c || c->FDockAlign != ALIGN_RIGHT || !c->FHandle ) continue;
       int vx = cRight - c->FWidth;
-      c->FLeft   = vx;
-      c->FTop    = cTop;
-      c->FHeight = cBottom - cTop;
-      SetWindowPos( c->FHandle, NULL, vx, cTop, c->FWidth, cBottom - cTop,
-         SWP_NOZORDER | SWP_NOACTIVATE );
+      c->SetBounds( vx, cTop, c->FWidth, cBottom - cTop );
       cRight -= c->FWidth;
    }
    /* Pass 5 — alClient (fills remaining area) */
@@ -328,12 +314,7 @@ void ApplyDockAlign( TForm * form )
    {
       TControl * c = form->FChildren[i];
       if( !c || c->FDockAlign != ALIGN_CLIENT || !c->FHandle ) continue;
-      c->FLeft   = cLeft;
-      c->FTop    = cTop;
-      c->FWidth  = cRight - cLeft;
-      c->FHeight = cBottom - cTop;
-      SetWindowPos( c->FHandle, NULL, cLeft, cTop, cRight - cLeft, cBottom - cTop,
-         SWP_NOZORDER | SWP_NOACTIVATE );
+      c->SetBounds( cLeft, cTop, cRight - cLeft, cBottom - cTop );
    }
 }
 

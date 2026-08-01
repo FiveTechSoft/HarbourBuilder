@@ -1,0 +1,43 @@
+{
+  "id": "data.invoices",
+  "kind": "data",
+  "entity": "invoice",
+  "rows": [
+    {
+      "code": "INV-2201",
+      "date": "01/05/2025",
+      "patient": "ALEX RIVERA",
+      "status": "Open",
+      "currency": "EUR",
+      "total": 205.00,
+      "notes": "Consult + lab"
+    },
+    {
+      "code": "INV-2210",
+      "date": "05/05/2025",
+      "patient": "CASEY MORGAN",
+      "status": "Posted",
+      "currency": "EUR",
+      "total": 420.00,
+      "notes": "Imaging"
+    },
+    {
+      "code": "INV-2220",
+      "date": "10/05/2025",
+      "patient": "CAMERON HAYES",
+      "status": "Open",
+      "currency": "EUR",
+      "total": 2500.00,
+      "notes": "Surgery package"
+    },
+    {
+      "code": "INV-2230",
+      "date": "15/05/2025",
+      "patient": "AVERY NOLAN",
+      "status": "Settled",
+      "currency": "EUR",
+      "total": 95.00,
+      "notes": "Follow-up"
+    }
+  ]
+}

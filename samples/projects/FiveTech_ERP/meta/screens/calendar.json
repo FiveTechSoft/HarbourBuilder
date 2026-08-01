@@ -1,0 +1,19 @@
+{
+  "id": "screen.calendar",
+  "kind": "screen",
+  "title": "Calendar",
+  "dataRef": "data.calendar",
+  "searchFields": ["date", "time", "patient", "resource", "type"],
+  "grid": {
+    "columns": [
+      { "id": "date", "label": "Date" },
+      { "id": "time", "label": "Time" },
+      { "id": "patient", "label": "Patient" },
+      { "id": "resource", "label": "Room / resource" },
+      { "id": "type", "label": "Type" },
+      { "id": "professional", "label": "Professional" },
+      { "id": "status", "label": "Status" }
+    ]
+  },
+  "toolbar": ["add", "edit", "delete", "print", "pdf", "excel", "refresh"]
+}

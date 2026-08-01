@@ -1,0 +1,35 @@
+{
+  "id": "screen.projects",
+  "kind": "screen",
+  "layout": "list",
+  "title": "Projects",
+  "dataRef": "data.projects",
+  "keyField": "code",
+  "searchFields": ["code", "name", "party", "status", "owner"],
+  "grid": {
+    "columns": [
+      { "id": "code", "label": "Code", "type": "text" },
+      { "id": "name", "label": "Project", "type": "text" },
+      { "id": "party", "label": "Party", "type": "text" },
+      {
+        "id": "status",
+        "label": "Status",
+        "type": "select",
+        "options": ["Proposal", "Active", "On hold", "Closed"]
+      },
+      {
+        "id": "type",
+        "label": "Type",
+        "type": "select",
+        "options": ["Fixed price", "T&M", "Internal"]
+      },
+      { "id": "budget", "label": "Budget", "type": "money", "format": "money", "align": "right" },
+      { "id": "spent", "label": "Spent", "type": "money", "format": "money", "align": "right" },
+      { "id": "owner", "label": "Owner", "type": "text" },
+      { "id": "start", "label": "Start", "type": "text" },
+      { "id": "end", "label": "End", "type": "text" },
+      { "id": "billable", "label": "Billable", "type": "checkbox" }
+    ]
+  },
+  "toolbar": ["add", "edit", "delete", "print", "excel", "refresh"]
+}

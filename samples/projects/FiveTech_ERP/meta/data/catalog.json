@@ -1,0 +1,52 @@
+{
+  "id": "data.catalog",
+  "kind": "data",
+  "entity": "service",
+  "rows": [
+    {
+      "code": "SRV-CONS",
+      "name": "General consultation",
+      "category": "Consult",
+      "channels": ["Desktop", "Web"],
+      "price": 95.00,
+      "taxable": true,
+      "published": true
+    },
+    {
+      "code": "SRV-BLOOD",
+      "name": "Full blood panel",
+      "category": "Lab",
+      "channels": ["Desktop", "Web", "Kiosk"],
+      "price": 48.50,
+      "taxable": true,
+      "published": true
+    },
+    {
+      "code": "SRV-MRI",
+      "name": "MRI knee",
+      "category": "Imaging",
+      "channels": ["Desktop"],
+      "price": 420.00,
+      "taxable": true,
+      "published": true
+    },
+    {
+      "code": "SRV-PACK",
+      "name": "Check-up package",
+      "category": "Package",
+      "channels": ["Desktop", "Web", "Mobile"],
+      "price": 310.00,
+      "taxable": false,
+      "published": false
+    },
+    {
+      "code": "SRV-PHYSIO",
+      "name": "Physio session",
+      "category": "Procedure",
+      "channels": ["Desktop", "Mobile"],
+      "price": 65.00,
+      "taxable": true,
+      "published": true
+    }
+  ]
+}

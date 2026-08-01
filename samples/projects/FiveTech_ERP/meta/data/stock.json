@@ -1,0 +1,73 @@
+{
+  "id": "data.stock",
+  "kind": "data",
+  "entity": "stock",
+  "rows": [
+    {
+      "code": "STK-100",
+      "sku": "SKU-100",
+      "name": "Office chair ergonomic",
+      "warehouse": "Main",
+      "qty": 12,
+      "minQty": 4,
+      "reserved": 2,
+      "location": "A-01",
+      "status": "OK"
+    },
+    {
+      "code": "STK-101",
+      "sku": "SKU-101",
+      "name": "Wireless mouse",
+      "warehouse": "Main",
+      "qty": 48,
+      "minQty": 20,
+      "reserved": 5,
+      "location": "B-12",
+      "status": "OK"
+    },
+    {
+      "code": "STK-102",
+      "sku": "SKU-102",
+      "name": "A4 paper ream",
+      "warehouse": "Main",
+      "qty": 8,
+      "minQty": 15,
+      "reserved": 0,
+      "location": "C-03",
+      "status": "Low"
+    },
+    {
+      "code": "STK-103",
+      "sku": "SKU-103",
+      "name": "USB-C hub 7-in-1",
+      "warehouse": "Shop",
+      "qty": 22,
+      "minQty": 10,
+      "reserved": 1,
+      "location": "S-04",
+      "status": "OK"
+    },
+    {
+      "code": "STK-104",
+      "sku": "SKU-104",
+      "name": "Coffee beans 1kg",
+      "warehouse": "Shop",
+      "qty": 3,
+      "minQty": 6,
+      "reserved": 0,
+      "location": "S-01",
+      "status": "Low"
+    },
+    {
+      "code": "STK-105",
+      "sku": "SKU-105",
+      "name": "Gift card 50 EUR",
+      "warehouse": "Shop",
+      "qty": 0,
+      "minQty": 5,
+      "reserved": 0,
+      "location": "S-99",
+      "status": "Out"
+    }
+  ]
+}

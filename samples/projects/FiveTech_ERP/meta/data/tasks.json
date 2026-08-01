@@ -1,0 +1,52 @@
+{
+  "id": "data.tasks",
+  "kind": "data",
+  "entity": "task",
+  "rows": [
+    {
+      "code": "WO-1001",
+      "title": "Replace exam room lights",
+      "status": "Open",
+      "priority": "Normal",
+      "tags": ["Facility", "Clinical"],
+      "budget": 420.00,
+      "active": true
+    },
+    {
+      "code": "WO-1002",
+      "title": "Billing export script",
+      "status": "In progress",
+      "priority": "High",
+      "tags": ["Billing", "IT"],
+      "budget": 1500.50,
+      "active": true
+    },
+    {
+      "code": "WO-1003",
+      "title": "Staff training on WebView login",
+      "status": "On hold",
+      "priority": "Low",
+      "tags": ["Training", "IT"],
+      "budget": 0,
+      "active": true
+    },
+    {
+      "code": "WO-1004",
+      "title": "MRI door sensor",
+      "status": "Done",
+      "priority": "Urgent",
+      "tags": ["Facility", "Clinical"],
+      "budget": 890.00,
+      "active": false
+    },
+    {
+      "code": "WO-1005",
+      "title": "Patient portal FAQ",
+      "status": "Open",
+      "priority": "Normal",
+      "tags": ["IT", "Training"],
+      "budget": 250.00,
+      "active": true
+    }
+  ]
+}

@@ -923,9 +923,140 @@ const PROPDESC* TMonthCalendar::GetPropDescs(int*n) { return TControl::GetPropDe
 /* ======================================================================
  * TWebView (Win32 placeholder — design-time only)
  * ====================================================================== */
-TWebView::TWebView() { lstrcpy(FClassName,"TWebView"); FControlType=CT_WEBVIEW; FWidth=320; FHeight=240; }
-void TWebView::CreateParams(DWORD*s,DWORD*e,const char**c) { *c="STATIC"; *s=WS_CHILD|WS_VISIBLE|WS_BORDER|SS_BLACKFRAME; *e=0; }
-const PROPDESC* TWebView::GetPropDescs(int*n) { return TControl::GetPropDescs(n); }
+/* WebView2 C API (source/backends/win32/webview2/fwh_webview2.cpp) */
+extern "C" {
+   void * webview2_new( HWND hWnd, const char * szUserDataFolder,
+                        const char * szBrowserExecutableFolder );
+   void webview2_end( void * hWebView );
+   void webview2_navigate( void * hWebView, const char * szUrl );
+   void webview2_sethtml( void * hWebView, const char * szHtml );
+   void webview2_setsize( void * hWebView, LONG lWidth, LONG lHeight );
+   void webview2_eval( void * hWebView, const char * szJS );
+}
+
+TWebView::TWebView()
+{
+   lstrcpy( FClassName, "TWebView" );
+   FControlType = CT_WEBVIEW;
+   FWidth = 320;
+   FHeight = 240;
+   FEngine = NULL;
+   FPendingUrl[0] = 0;
+   FUserDataFolder[0] = 0;
+}
+
+TWebView::~TWebView()
+{
+   if( FEngine )
+   {
+      webview2_end( FEngine );
+      FEngine = NULL;
+   }
+}
+
+void TWebView::CreateParams( DWORD * s, DWORD * e, const char ** c )
+{
+   /* Child host window for Edge WebView2 controller (no black frame). */
+   *c = "STATIC";
+   *s = WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
+   *e = 0;
+}
+
+void TWebView::EnsureEngine()
+{
+   if( FEngine || ! FHandle )
+      return;
+   FEngine = webview2_new( FHandle,
+                           FUserDataFolder[0] ? FUserDataFolder : NULL,
+                           NULL );
+   if( FEngine )
+   {
+      webview2_setsize( FEngine, FWidth, FHeight );
+      if( FPendingUrl[0] )
+      {
+         webview2_navigate( FEngine, FPendingUrl );
+         FPendingUrl[0] = 0;
+      }
+   }
+}
+
+void TWebView::CreateHandle( HWND hParent )
+{
+   TControl::CreateHandle( hParent );
+   EnsureEngine();
+}
+
+void TWebView::SyncEngineSize()
+{
+   if( ! FEngine )
+      return;
+   /* Prefer live host client size (maximize / dock) over cached FWidth/FHeight */
+   int w = FWidth, h = FHeight;
+   if( FHandle )
+   {
+      RECT rc;
+      if( GetClientRect( FHandle, &rc ) )
+      {
+         w = rc.right - rc.left;
+         h = rc.bottom - rc.top;
+      }
+   }
+   if( w < 1 ) w = 1;
+   if( h < 1 ) h = 1;
+   webview2_setsize( FEngine, (LONG) w, (LONG) h );
+}
+
+void TWebView::SetBounds( int nLeft, int nTop, int nWidth, int nHeight )
+{
+   TControl::SetBounds( nLeft, nTop, nWidth, nHeight );
+   SyncEngineSize();
+}
+
+LRESULT TWebView::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
+{
+   /* Host STATIC resized by dock layout or user — keep WebView2 bounds in sync */
+   if( msg == WM_SIZE )
+   {
+      FWidth  = LOWORD( lParam );
+      FHeight = HIWORD( lParam );
+      SyncEngineSize();
+   }
+   return TControl::HandleMessage( msg, wParam, lParam );
+}
+
+void TWebView::Navigate( const char * szUrl )
+{
+   if( ! szUrl ) return;
+   lstrcpyn( FPendingUrl, szUrl, (int) sizeof( FPendingUrl ) );
+   lstrcpyn( FText, szUrl, (int) sizeof( FText ) );
+   EnsureEngine();
+   if( FEngine )
+   {
+      webview2_navigate( FEngine, szUrl );
+      FPendingUrl[0] = 0;
+   }
+}
+
+void TWebView::LoadHTML( const char * szHtml )
+{
+   if( ! szHtml ) return;
+   EnsureEngine();
+   if( FEngine )
+      webview2_sethtml( FEngine, szHtml );
+}
+
+void TWebView::EvaluateJS( const char * szScript )
+{
+   if( ! szScript ) return;
+   EnsureEngine();
+   if( FEngine )
+      webview2_eval( FEngine, szScript );
+}
+
+const PROPDESC * TWebView::GetPropDescs( int * n )
+{
+   return TControl::GetPropDescs( n );
+}
 
 /* ======================================================================
  * TPaintBox (System)

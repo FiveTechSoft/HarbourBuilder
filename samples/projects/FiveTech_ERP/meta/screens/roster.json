@@ -1,0 +1,11 @@
+{
+  "id": "screen.roster",
+  "kind": "screen",
+  "layout": "matrix",
+  "title": "Weekly roster matrix",
+  "dataRef": "data.matrix_slots",
+  "rowField": "row",
+  "columns": ["mon","tue","wed","thu","fri"],
+  "columnLabels": {"mon":"Mon","tue":"Tue","wed":"Wed","thu":"Thu","fri":"Fri"},
+  "options": ["AM","PM","OFF"]
+}

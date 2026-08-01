@@ -1,0 +1,29 @@
+{
+  "id": "screen.accounts",
+  "kind": "screen",
+  "layout": "list",
+  "title": "Accounts (CRM)",
+  "dataRef": "data.accounts",
+  "keyField": "code",
+  "grid": {
+    "columns": [
+      { "id": "code", "label": "Code", "type": "text" },
+      { "id": "name", "label": "Account", "type": "text" },
+      {
+        "id": "type",
+        "label": "Type",
+        "type": "select",
+        "options": ["Segment", "Partner", "Company"]
+      },
+      { "id": "industry", "label": "Industry", "type": "text" },
+      { "id": "owner", "label": "Owner", "type": "text" },
+      {
+        "id": "status",
+        "label": "Status",
+        "type": "select",
+        "options": ["Active", "Inactive"]
+      }
+    ]
+  },
+  "toolbar": ["add", "edit", "delete", "print", "excel", "refresh"]
+}

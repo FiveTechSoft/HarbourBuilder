@@ -1,0 +1,38 @@
+{
+  "id": "screen.pos_sales",
+  "kind": "screen",
+  "layout": "list",
+  "title": "POS sales (tickets)",
+  "dataRef": "data.pos_sales",
+  "keyField": "code",
+  "searchFields": ["code", "register", "cashier", "party", "status"],
+  "grid": {
+    "columns": [
+      { "id": "code", "label": "Ticket", "type": "text" },
+      { "id": "date", "label": "Date", "type": "text" },
+      {
+        "id": "register",
+        "label": "Register",
+        "type": "select",
+        "options": ["POS-1", "POS-2", "POS-3"]
+      },
+      { "id": "cashier", "label": "Cashier", "type": "text" },
+      { "id": "party", "label": "Customer", "type": "text" },
+      { "id": "lines", "label": "Lines", "type": "text", "align": "right" },
+      { "id": "total", "label": "Total", "type": "money", "format": "money", "align": "right" },
+      {
+        "id": "tender",
+        "label": "Tender",
+        "type": "select",
+        "options": ["Cash", "Card", "Invoice", "Mixed"]
+      },
+      {
+        "id": "status",
+        "label": "Status",
+        "type": "select",
+        "options": ["Open", "Paid", "Void", "Refund"]
+      }
+    ]
+  },
+  "toolbar": ["add", "edit", "delete", "print", "excel", "refresh"]
+}

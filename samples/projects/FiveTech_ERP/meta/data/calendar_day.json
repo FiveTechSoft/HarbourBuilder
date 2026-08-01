@@ -1,0 +1,13 @@
+{
+  "id": "data.calendar_day",
+  "kind": "data",
+  "entity": "slot",
+  "rows": [
+    {"time":"08:30","room1":"ALEX RIVERA","room2":"","room3":"TAYLOR BROOKS"},
+    {"time":"09:00","room1":"","room2":"RILEY QUINN","room3":""},
+    {"time":"09:30","room1":"JORDAN BLAKE","room2":"","room3":"Block"},
+    {"time":"10:00","room1":"","room2":"CAMERON HAYES","room3":""},
+    {"time":"10:30","room1":"EMERY KENT","room2":"","room3":"DREW SULLIVAN"},
+    {"time":"11:00","room1":"","room2":"AVERY NOLAN","room3":""}
+  ]
+}

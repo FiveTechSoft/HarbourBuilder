@@ -1,0 +1,7 @@
+{
+  "id": "screen.period_close",
+  "kind": "screen",
+  "layout": "period",
+  "title": "Period & close",
+  "dataRef": "data.accounting"
+}

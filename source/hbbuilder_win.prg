@@ -4511,7 +4511,8 @@ static function TBRun()
                  '/I"' + cUcrtInc + '"' + Chr(10) + ;
                  '/I"' + cUmInc + '"' + Chr(10) + ;
                  '/I"' + cSharedInc + '"' + Chr(10) + ;
-                 '/I"' + cProjDir + '\include"' + Chr(10)
+                 '/I"' + cProjDir + '\include"' + Chr(10) + ;
+                 '/I"' + cProjDir + '\source\backends\win32\webview2"' + Chr(10)
       elseif cCompiler == "mingw"
          cCppBase := " -c -O2 -I" + cHbInc + ;
                  " -I" + cProjDir + "\include "
@@ -4546,6 +4547,26 @@ static function TBRun()
             exit
          endif
       next
+      // FWH WebView2 host (Windows live Edge TWebView)
+      if ! lError .and. File( cProjDir + "\source\backends\win32\webview2\fwh_webview2.cpp" )
+         if cCompiler == "msvc"
+            cRsp := cBuildDir + "\cl_fwh_webview2.rsp"
+            MemoWrit( cRsp, cCppBase + ;
+               '"' + cProjDir + '\source\backends\win32\webview2\fwh_webview2.cpp"' + Chr(10) + ;
+               '/Fo"' + cBuildDir + '\fwh_webview2.obj"' )
+            cCmd := 'cmd /S /c ""' + cCC + '" @"' + cRsp + '" 2>&1"'
+         else
+            cCmd := cCC + cCppBase + ;
+               " -I" + cProjDir + "\source\backends\win32\webview2" + ;
+               " -o" + cBuildDir + "\fwh_webview2.obj " + ;
+               cProjDir + "\source\backends\win32\webview2\fwh_webview2.cpp"
+         endif
+         cOutput := W32_ShellExec( cCmd )
+         if "error" $ Lower( cOutput ) .and. ! File( cBuildDir + "\fwh_webview2.obj" )
+            cLog += "    FAILED (fwh_webview2):" + Chr(10) + cOutput + Chr(10)
+            lError := .T.
+         endif
+      endif
       if ! lError; cLog += "    OK" + Chr(10); endif
    endif
 
@@ -4570,6 +4591,9 @@ static function TBRun()
          if File( cBuildDir + "\hix_template.o" )
             cObjs += " " + cBuildDir + "\hix_template.o"
          endif
+         if File( cBuildDir + "\fwh_webview2.o" )
+            cObjs += " " + cBuildDir + "\fwh_webview2.o"
+         endif
       else
          cObjs := cBuildDir + "\main.obj " + ;
                   cBuildDir + "\classes.obj " + ;
@@ -4586,6 +4610,9 @@ static function TBRun()
          endif
          if File( cBuildDir + "\hix_template.obj" )
             cObjs += " " + cBuildDir + "\hix_template.obj"
+         endif
+         if File( cBuildDir + "\fwh_webview2.obj" )
+            cObjs += " " + cBuildDir + "\fwh_webview2.obj"
          endif
       endif
       if cCompiler == "msvc"
@@ -4738,19 +4765,21 @@ static function TBRunAndroid()
 
    local cRepoRoot   := GetHbBuilderRoot()
    local cAndroidDir := GetEnv( "TEMP" ) + "\HarbourAndroid"
-   if ! lIsDir( cAndroidDir ) .and. lIsDir( "C:\HarbourAndroid" )
-      cAndroidDir := "C:\HarbourAndroid"   // legacy dev location
-   endif
-   local cBackend    := cRepoRoot + "\source\backends\android"
-   local cGenPrg     := cBackend + "\_generated.prg"
-   local cBuildSh    := cBackend + "\build-apk-gui.sh"
-   local cApkPath    := cAndroidDir + "\apk-gui\harbour-gui.apk"
-   // Build log lives OUTSIDE apk-gui because build-apk-gui.sh does
-   // rm -rf .../apk-gui at startup, which nuked the file.
-   local cLogPath    := cAndroidDir + "\build-apk-gui.log"
+   local cBackend, cGenPrg, cBuildSh, cApkPath, cLogPath
    local cBash       := "C:\Program Files\Git\bin\bash.exe"
    local cAdb        := "C:\Android\Sdk\platform-tools\adb.exe"
    local cPrg, cLog, cCmd, nRc
+
+   if ! lIsDir( cAndroidDir ) .and. lIsDir( "C:\HarbourAndroid" )
+      cAndroidDir := "C:\HarbourAndroid"   // legacy dev location
+   endif
+   cBackend  := cRepoRoot + "\source\backends\android"
+   cGenPrg   := cBackend + "\_generated.prg"
+   cBuildSh  := cBackend + "\build-apk-gui.sh"
+   cApkPath  := cAndroidDir + "\apk-gui\harbour-gui.apk"
+   // Build log lives OUTSIDE apk-gui because build-apk-gui.sh does
+   // rm -rf .../apk-gui at startup, which nuked the file.
+   cLogPath  := cAndroidDir + "\build-apk-gui.log"
 
    AndroidTrace( "=== TBRunAndroid start ===" )
    AndroidTrace( "cBash    = " + cBash + " exists=" + iif( File(cBash), "Y", "N" ) )
@@ -4851,11 +4880,12 @@ static function AndroidSetupWizard()
    local cReport := "Android toolchain status:" + Chr(10) + Chr(10)
    local lNdk, lSdk, lBT, lPT, lEmu, lJdk, lBash, lHbAnd, lAvd
    local cHbRoot := GetEnv( "TEMP" ) + "\HarbourAndroid\harbour-core"
+   local cAvdDir := GetEnv( "USERPROFILE" ) + "\.android\avd\HarbourBuilderAVD.avd"
+   local cCmd
+
    if ! hb_DirExists( cHbRoot ) .and. hb_DirExists( "C:\HarbourAndroid\harbour-core" )
       cHbRoot := "C:\HarbourAndroid\harbour-core"
    endif
-   local cAvdDir := GetEnv( "USERPROFILE" ) + "\.android\avd\HarbourBuilderAVD.avd"
-   local cCmd
 
    lNdk   := hb_DirExists( "C:\Android\android-ndk-r26d" )
    lSdk   := hb_DirExists( "C:\Android\Sdk\platforms\android-34" )
@@ -5297,7 +5327,7 @@ static function ShowProjectOptions()
    // Project settings stored as statics
    static cHarbourDir   := ""
    static cCompilerDir  := ""
-   static cProjectDir   := GetHbBuilderRoot()
+   static cProjectDir   := ""
    static cOutputDir    := ""
    static cHbFlags      := "/n /w /q"
    static cCFlags       := ""
@@ -5309,6 +5339,10 @@ static function ShowProjectOptions()
    static lWarnings     := .T.
    static lOptimize     := .T.
    local aCI
+
+   if Empty( cProjectDir )
+      cProjectDir := GetHbBuilderRoot()
+   endif
 
    // Auto-detect paths from current compiler on first open
    if Empty( cHarbourDir )

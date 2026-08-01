@@ -1,0 +1,1 @@
+{"id":"screen.patients","kind":"screen","title":"Patients","dataRef":"data.patients","searchFields":["code","name"],"grid":{"columns":[{"id":"code","label":"Code"},{"id":"name","label":"Name"}]},"toolbar":["add","edit","delete","print","pdf","excel","refresh"]}

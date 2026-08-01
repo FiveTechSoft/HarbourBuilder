@@ -1,0 +1,18 @@
+{
+  "id": "screen.group",
+  "kind": "screen",
+  "title": "Group 1",
+  "dataRef": "data.groups",
+  "searchFields": ["code", "name", "specialty"],
+  "grid": {
+    "columns": [
+      { "id": "code", "label": "Code" },
+      { "id": "name", "label": "Group / team" },
+      { "id": "lead", "label": "Lead" },
+      { "id": "members", "label": "Members", "align": "right" },
+      { "id": "specialty", "label": "Specialty" },
+      { "id": "status", "label": "Status" }
+    ]
+  },
+  "toolbar": ["add", "edit", "delete", "print", "pdf", "excel", "refresh"]
+}

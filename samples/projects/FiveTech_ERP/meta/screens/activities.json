@@ -1,0 +1,39 @@
+{
+  "id": "screen.activities",
+  "kind": "screen",
+  "layout": "list",
+  "title": "Activities (CRM)",
+  "dataRef": "data.activities",
+  "keyField": "code",
+  "searchFields": ["code", "subject", "party", "type", "status"],
+  "grid": {
+    "columns": [
+      { "id": "code", "label": "Code", "type": "text" },
+      {
+        "id": "type",
+        "label": "Type",
+        "type": "select",
+        "options": ["Appointment", "Call", "Task", "Meeting", "Note"]
+      },
+      { "id": "subject", "label": "Subject", "type": "text" },
+      { "id": "party", "label": "Party", "type": "text" },
+      { "id": "account", "label": "Account", "type": "text" },
+      { "id": "due", "label": "Due", "type": "text" },
+      {
+        "id": "status",
+        "label": "Status",
+        "type": "select",
+        "options": ["Open", "Planned", "Done", "Cancelled"]
+      },
+      {
+        "id": "priority",
+        "label": "Priority",
+        "type": "select",
+        "options": ["Low", "Normal", "High", "Urgent"]
+      },
+      { "id": "owner", "label": "Owner", "type": "text" },
+      { "id": "notes", "label": "Notes", "type": "text" }
+    ]
+  },
+  "toolbar": ["add", "edit", "delete", "print", "pdf", "excel", "refresh"]
+}

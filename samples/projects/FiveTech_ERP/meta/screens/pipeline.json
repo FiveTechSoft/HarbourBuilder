@@ -1,0 +1,29 @@
+{
+  "id": "screen.pipeline",
+  "kind": "screen",
+  "layout": "workflow",
+  "title": "Pipeline (CRM)",
+  "dataRef": "data.opportunities",
+  "keyField": "code",
+  "statusField": "stage",
+  "transitions": {
+    "Lead": ["Qualified", "Lost"],
+    "Qualified": ["Proposal", "Lost"],
+    "Proposal": ["Negotiation", "Lost"],
+    "Negotiation": ["Won", "Lost"],
+    "Won": ["Qualified"],
+    "Lost": ["Lead"]
+  },
+  "grid": {
+    "columns": [
+      { "id": "code", "label": "Code" },
+      { "id": "title", "label": "Opportunity" },
+      { "id": "party", "label": "Party" },
+      { "id": "stage", "label": "Stage" },
+      { "id": "amount", "label": "Amount" },
+      { "id": "probability", "label": "%" },
+      { "id": "owner", "label": "Owner" },
+      { "id": "closeDate", "label": "Close" }
+    ]
+  }
+}

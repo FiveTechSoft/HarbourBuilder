@@ -1,0 +1,16 @@
+{
+  "id": "data.accounting",
+  "kind": "data",
+  "entity": "accounting_line",
+  "rows": [
+    { "code": "A-501", "date": "01/05/2025", "patient": "ALEX RIVERA", "article": "CONSULT", "doc": "INV-2201", "debit": 120.00, "credit": 0.00, "status": "Posted" },
+    { "code": "A-502", "date": "01/05/2025", "patient": "ALEX RIVERA", "article": "LAB", "doc": "INV-2201", "debit": 85.00, "credit": 0.00, "status": "Posted" },
+    { "code": "A-503", "date": "03/05/2025", "patient": "ALEX RIVERA", "article": "PAYMENT", "doc": "REC-880", "debit": 0.00, "credit": 200.00, "status": "Posted" },
+    { "code": "A-504", "date": "05/05/2025", "patient": "CASEY MORGAN", "article": "IMAGING", "doc": "INV-2210", "debit": 420.00, "credit": 0.00, "status": "Posted" },
+    { "code": "A-505", "date": "08/05/2025", "patient": "RILEY QUINN", "article": "PHYSIO", "doc": "INV-2215", "debit": 60.00, "credit": 0.00, "status": "Draft" },
+    { "code": "A-506", "date": "10/05/2025", "patient": "CAMERON HAYES", "article": "SURGERY", "doc": "INV-2220", "debit": 2500.00, "credit": 0.00, "status": "Posted" },
+    { "code": "A-507", "date": "12/05/2025", "patient": "CAMERON HAYES", "article": "PAYMENT", "doc": "REC-901", "debit": 0.00, "credit": 1000.00, "status": "Posted" },
+    { "code": "A-508", "date": "15/05/2025", "patient": "AVERY NOLAN", "article": "CONSULT", "doc": "INV-2230", "debit": 95.00, "credit": 0.00, "status": "Posted" },
+    { "code": "A-509", "date": "18/05/2025", "patient": "EMERY KENT", "article": "CT", "doc": "INV-2240", "debit": 610.00, "credit": 0.00, "status": "Open" }
+  ]
+}

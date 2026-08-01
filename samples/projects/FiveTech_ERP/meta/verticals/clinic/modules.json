@@ -1,0 +1,55 @@
+{
+  "id": "modules",
+  "kind": "modules",
+  "vertical": "clinic",
+  "sections": [
+    {
+      "id": "crm",
+      "title": "CRM",
+      "items": [
+        { "id": "parties", "label": "Parties", "icon": "users", "screen": "screen.parties" },
+        { "id": "party_card", "label": "Party card", "icon": "user", "screen": "screen.party_card" },
+        { "id": "accounts", "label": "Accounts", "icon": "grid", "screen": "screen.accounts" },
+        { "id": "activities", "label": "Activities", "icon": "calendar", "screen": "screen.activities" },
+        { "id": "opportunities", "label": "Opportunities", "icon": "chart", "screen": "screen.opportunities" },
+        { "id": "pipeline", "label": "Pipeline board", "icon": "chart", "screen": "screen.pipeline" }
+      ]
+    },
+    {
+      "id": "clinic",
+      "title": "Clinic",
+      "items": [
+        { "id": "patients", "label": "Patients", "icon": "user", "screen": "screen.patients" },
+        { "id": "patient_card", "label": "Patient card", "icon": "user", "screen": "screen.patient_card", "sub": true },
+        { "id": "balance", "label": "Patient balance", "icon": "money", "screen": "screen.balance" },
+        { "id": "exams", "label": "Exam archive", "icon": "file", "screen": "screen.exams" },
+        { "id": "invoices", "label": "Invoices", "icon": "money", "screen": "screen.invoices" },
+        { "id": "quotes", "label": "Quotes", "icon": "chart", "screen": "screen.quotes" },
+        { "id": "admission", "label": "Admission", "icon": "users", "screen": "screen.admission" }
+      ]
+    },
+    {
+      "id": "workflow",
+      "title": "Schedule & work",
+      "items": [
+        { "id": "appointments", "label": "Appointments", "icon": "calendar", "screen": "screen.appointments", "active": true },
+        { "id": "day_agenda", "label": "Day agenda", "icon": "calendar", "screen": "screen.day_agenda", "sub": true },
+        { "id": "approvals", "label": "Approvals", "icon": "grid", "screen": "screen.approvals", "sub": true },
+        { "id": "activities_wf", "label": "My activities", "icon": "file", "screen": "screen.activities", "sub": true }
+      ]
+    },
+    {
+      "id": "admin",
+      "title": "Admin",
+      "items": [
+        { "id": "kpis", "label": "Dashboard", "icon": "chart", "screen": "screen.kpis" },
+        { "id": "params", "label": "Parameters", "icon": "file", "screen": "screen.params" },
+        { "id": "audit_log", "label": "Audit", "icon": "file", "screen": "screen.audit_log" },
+        { "id": "context", "label": "Company", "icon": "grid", "screen": "screen.context" },
+        { "id": "user_roles", "label": "Users & roles", "icon": "users", "screen": "screen.user_roles" },
+        { "id": "import_csv", "label": "Import CSV", "icon": "file", "screen": "screen.import_csv" },
+        { "id": "reports", "label": "Reports", "icon": "file", "screen": "screen.reports" }
+      ]
+    }
+  ]
+}

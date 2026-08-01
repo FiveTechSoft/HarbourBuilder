@@ -1,0 +1,11 @@
+{
+  "id": "data.accounts",
+  "kind": "data",
+  "entity": "account",
+  "rows": [
+    { "code": "ACC-PRIV", "name": "Private payers", "type": "Segment", "industry": "Healthcare", "owner": "admin", "status": "Active" },
+    { "code": "ACC-PUB", "name": "Public health", "type": "Segment", "industry": "Public", "owner": "admin", "status": "Active" },
+    { "code": "ACC-INS", "name": "Insurance partners", "type": "Partner", "industry": "Insurance", "owner": "admin", "status": "Active" },
+    { "code": "ACC-ACME", "name": "ACME Health SL", "type": "Company", "industry": "Corporate", "owner": "demo", "status": "Active" }
+  ]
+}

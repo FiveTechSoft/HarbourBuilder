@@ -1,0 +1,38 @@
+{
+  "id": "screen.party_card",
+  "kind": "screen",
+  "layout": "form",
+  "title": "Party card (CRM)",
+  "dataRef": "data.parties",
+  "keyField": "code",
+  "tabs": [
+    { "id": "identity", "label": "Identity", "fields": ["code", "name", "kind", "roles", "active"] },
+    { "id": "contact", "label": "Contact", "fields": ["email", "phone", "city", "account"] },
+    { "id": "crm", "label": "CRM", "fields": ["source", "owner", "notes"] }
+  ],
+  "fields": [
+    { "id": "code", "label": "Code", "type": "text" },
+    { "id": "name", "label": "Name", "type": "text" },
+    { "id": "kind", "label": "Kind", "type": "select", "options": ["person", "organization"] },
+    {
+      "id": "roles",
+      "label": "Roles",
+      "type": "checklist",
+      "options": ["Patient", "Customer", "Lead", "VIP", "Payer", "Supplier"]
+    },
+    { "id": "email", "label": "E-mail", "type": "text" },
+    { "id": "phone", "label": "Phone", "type": "text" },
+    { "id": "city", "label": "City", "type": "text" },
+    { "id": "account", "label": "Account code", "type": "text" },
+    {
+      "id": "source",
+      "label": "Source",
+      "type": "select",
+      "options": ["Walk-in", "Web", "Referral", "Campaign", "Partner"]
+    },
+    { "id": "owner", "label": "Owner", "type": "text" },
+    { "id": "notes", "label": "Notes", "type": "text" },
+    { "id": "active", "label": "Active", "type": "checkbox" }
+  ],
+  "toolbar": ["add", "edit", "delete", "refresh"]
+}

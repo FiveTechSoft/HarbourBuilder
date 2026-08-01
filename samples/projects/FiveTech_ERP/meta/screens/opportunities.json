@@ -1,0 +1,34 @@
+{
+  "id": "screen.opportunities",
+  "kind": "screen",
+  "layout": "list",
+  "title": "Opportunities (CRM)",
+  "dataRef": "data.opportunities",
+  "keyField": "code",
+  "grid": {
+    "columns": [
+      { "id": "code", "label": "Code", "type": "text" },
+      { "id": "title", "label": "Title", "type": "text" },
+      { "id": "party", "label": "Party", "type": "text" },
+      { "id": "account", "label": "Account", "type": "text" },
+      {
+        "id": "stage",
+        "label": "Stage",
+        "type": "select",
+        "options": ["Lead", "Qualified", "Proposal", "Negotiation", "Won", "Lost"]
+      },
+      { "id": "amount", "label": "Amount", "type": "money", "format": "money", "align": "right" },
+      { "id": "currency", "label": "Cur.", "type": "select", "options": ["EUR", "USD"] },
+      { "id": "probability", "label": "%", "type": "text", "align": "right" },
+      { "id": "owner", "label": "Owner", "type": "text" },
+      { "id": "closeDate", "label": "Close date", "type": "text" },
+      {
+        "id": "source",
+        "label": "Source",
+        "type": "select",
+        "options": ["Walk-in", "Web", "Referral", "Campaign", "Partner"]
+      }
+    ]
+  },
+  "toolbar": ["add", "edit", "delete", "print", "excel", "refresh"]
+}

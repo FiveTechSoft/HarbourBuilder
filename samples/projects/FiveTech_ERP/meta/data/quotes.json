@@ -1,0 +1,9 @@
+{
+  "id": "data.quotes",
+  "kind": "data",
+  "entity": "quote",
+  "rows": [
+    {"code":"Q-5001","date":"20/07/2026","patient":"ALEX RIVERA","status":"Draft","currency":"EUR","subtotal":0,"tax":0,"total":0},
+    {"code":"Q-5002","date":"22/07/2026","patient":"JORDAN BLAKE","status":"Sent","currency":"EUR","subtotal":180.5,"tax":37.91,"total":218.41}
+  ]
+}

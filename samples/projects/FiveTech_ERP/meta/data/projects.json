@@ -1,0 +1,63 @@
+{
+  "id": "data.projects",
+  "kind": "data",
+  "entity": "project",
+  "rows": [
+    {
+      "code": "PRJ-100",
+      "name": "ACME Health portal",
+      "party": "C-ACME",
+      "account": "ACC-ACME",
+      "status": "Active",
+      "type": "Fixed price",
+      "budget": 24000.00,
+      "spent": 11200.00,
+      "owner": "admin",
+      "start": "01/03/2026",
+      "end": "30/09/2026",
+      "billable": true
+    },
+    {
+      "code": "PRJ-101",
+      "name": "North Insurance API",
+      "party": "C-INS",
+      "account": "ACC-INS",
+      "status": "Active",
+      "type": "T&M",
+      "budget": 18000.00,
+      "spent": 6400.00,
+      "owner": "demo",
+      "start": "15/04/2026",
+      "end": "15/12/2026",
+      "billable": true
+    },
+    {
+      "code": "PRJ-102",
+      "name": "Internal CRM rollout",
+      "party": "",
+      "account": "",
+      "status": "On hold",
+      "type": "Internal",
+      "budget": 8000.00,
+      "spent": 2100.00,
+      "owner": "admin",
+      "start": "01/06/2026",
+      "end": "31/12/2026",
+      "billable": false
+    },
+    {
+      "code": "PRJ-103",
+      "name": "Riley Quinn consult package",
+      "party": "P0004",
+      "account": "",
+      "status": "Proposal",
+      "type": "T&M",
+      "budget": 3200.00,
+      "spent": 0.00,
+      "owner": "demo",
+      "start": "01/09/2026",
+      "end": "31/10/2026",
+      "billable": true
+    }
+  ]
+}

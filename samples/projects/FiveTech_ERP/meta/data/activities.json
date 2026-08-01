@@ -1,0 +1,67 @@
+{
+  "id": "data.activities",
+  "kind": "data",
+  "entity": "activity",
+  "rows": [
+    {
+      "code": "ACT-1001",
+      "type": "Appointment",
+      "subject": "Consult — ALEX RIVERA",
+      "party": "P0001",
+      "account": "ACC-PRIV",
+      "due": "02/08/2026 09:00",
+      "status": "Planned",
+      "priority": "Normal",
+      "owner": "demo",
+      "notes": "Room 1"
+    },
+    {
+      "code": "ACT-1002",
+      "type": "Call",
+      "subject": "Follow-up quote Q-5002",
+      "party": "P0002",
+      "account": "ACC-PUB",
+      "due": "01/08/2026 16:00",
+      "status": "Done",
+      "priority": "High",
+      "owner": "demo",
+      "notes": "Left voicemail"
+    },
+    {
+      "code": "ACT-1003",
+      "type": "Task",
+      "subject": "Request insurance pre-auth",
+      "party": "P0003",
+      "account": "ACC-INS",
+      "due": "03/08/2026 12:00",
+      "status": "Open",
+      "priority": "Urgent",
+      "owner": "admin",
+      "notes": "MRI package"
+    },
+    {
+      "code": "ACT-1004",
+      "type": "Note",
+      "subject": "Lead from campaign",
+      "party": "P0004",
+      "account": "",
+      "due": "01/08/2026 10:00",
+      "status": "Open",
+      "priority": "Low",
+      "owner": "demo",
+      "notes": "Wants weekend slot"
+    },
+    {
+      "code": "ACT-1005",
+      "type": "Meeting",
+      "subject": "Corporate review ACME",
+      "party": "C-ACME",
+      "account": "ACC-ACME",
+      "due": "05/08/2026 11:00",
+      "status": "Planned",
+      "priority": "Normal",
+      "owner": "admin",
+      "notes": "Annual plan"
+    }
+  ]
+}

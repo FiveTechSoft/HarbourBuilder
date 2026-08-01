@@ -1,0 +1,73 @@
+{
+  "id": "data.products",
+  "kind": "data",
+  "entity": "product",
+  "rows": [
+    {
+      "code": "SKU-100",
+      "name": "Office chair ergonomic",
+      "category": "Furniture",
+      "barcode": "8412345678901",
+      "price": 189.00,
+      "cost": 95.00,
+      "tax": "21%",
+      "uom": "Unit",
+      "active": true
+    },
+    {
+      "code": "SKU-101",
+      "name": "Wireless mouse",
+      "category": "Accessories",
+      "barcode": "8412345678902",
+      "price": 24.90,
+      "cost": 9.50,
+      "tax": "21%",
+      "uom": "Unit",
+      "active": true
+    },
+    {
+      "code": "SKU-102",
+      "name": "A4 paper ream",
+      "category": "Supplies",
+      "barcode": "8412345678903",
+      "price": 4.50,
+      "cost": 2.10,
+      "tax": "21%",
+      "uom": "Pack",
+      "active": true
+    },
+    {
+      "code": "SKU-103",
+      "name": "USB-C hub 7-in-1",
+      "category": "Accessories",
+      "barcode": "8412345678904",
+      "price": 49.00,
+      "cost": 22.00,
+      "tax": "21%",
+      "uom": "Unit",
+      "active": true
+    },
+    {
+      "code": "SKU-104",
+      "name": "Coffee beans 1kg",
+      "category": "F&B",
+      "barcode": "8412345678905",
+      "price": 12.50,
+      "cost": 6.00,
+      "tax": "10%",
+      "uom": "Kg",
+      "active": true
+    },
+    {
+      "code": "SKU-105",
+      "name": "Gift card 50 EUR",
+      "category": "Gift",
+      "barcode": "8412345678906",
+      "price": 50.00,
+      "cost": 0.00,
+      "tax": "0%",
+      "uom": "Unit",
+      "active": false
+    }
+  ]
+}

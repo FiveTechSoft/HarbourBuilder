@@ -1,0 +1,7 @@
+{
+  "id": "screen.kpis",
+  "kind": "screen",
+  "layout": "dashboard",
+  "title": "Clinic dashboard",
+  "dataRef": "data.dashboard_kpis"
+}

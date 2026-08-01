@@ -1,0 +1,17 @@
+{
+  "id": "data.stats",
+  "kind": "data",
+  "entity": "stat_kpi",
+  "rows": [
+    { "metric": "Appointments", "period": "May 2025", "value": 128, "unit": "visits", "trend": "+8%", "status": "OK" },
+    { "metric": "New patients", "period": "May 2025", "value": 22, "unit": "patients", "trend": "+12%", "status": "OK" },
+    { "metric": "Avg wait time", "period": "May 2025", "value": 14, "unit": "min", "trend": "-3%", "status": "OK" },
+    { "metric": "No-shows", "period": "May 2025", "value": 9, "unit": "visits", "trend": "+1%", "status": "Watch" },
+    { "metric": "Revenue", "period": "May 2025", "value": 48500, "unit": "EUR", "trend": "+5%", "status": "OK" },
+    { "metric": "Open balances", "period": "May 2025", "value": 12340, "unit": "EUR", "trend": "-2%", "status": "OK" },
+    { "metric": "Exams filed", "period": "May 2025", "value": 86, "unit": "exams", "trend": "+4%", "status": "OK" },
+    { "metric": "Budgets approved", "period": "May 2025", "value": 31, "unit": "budgets", "trend": "+6%", "status": "OK" },
+    { "metric": "Occupancy Room 1", "period": "May 2025", "value": 78, "unit": "%", "trend": "+2%", "status": "OK" },
+    { "metric": "Patient satisfaction", "period": "May 2025", "value": 4.6, "unit": "/5", "trend": "0%", "status": "OK" }
+  ]
+}

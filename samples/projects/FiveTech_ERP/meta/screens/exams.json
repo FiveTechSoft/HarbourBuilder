@@ -1,0 +1,19 @@
+{
+  "id": "screen.exams",
+  "kind": "screen",
+  "title": "Exam archive",
+  "dataRef": "data.exams",
+  "searchFields": ["code", "patient", "exam", "local"],
+  "grid": {
+    "columns": [
+      { "id": "code", "label": "Exam #" },
+      { "id": "date", "label": "Date" },
+      { "id": "patient", "label": "Patient" },
+      { "id": "exam", "label": "Exam" },
+      { "id": "local", "label": "Local" },
+      { "id": "result", "label": "Result" },
+      { "id": "status", "label": "Status" }
+    ]
+  },
+  "toolbar": ["add", "edit", "delete", "print", "pdf", "excel", "refresh"]
+}
