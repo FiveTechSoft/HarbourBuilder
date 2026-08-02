@@ -56,7 +56,7 @@
     background: var(--side); border-right: 1px solid var(--line);
     display: flex; flex-direction: column; padding: 18px 14px 12px;
   }
-  .side-brand { display: flex; align-items: center; gap: 12px; padding: 4px 8px 16px; }
+  .side-brand { display: flex; align-items: center; gap: 12px; padding: 4px 8px 16px; flex-shrink: 0; }
   .side-logo {
     width: 40px; height: 40px; border-radius: 12px;
     background: linear-gradient(135deg, var(--blue), #0f172a);
@@ -66,7 +66,7 @@
   .side-brand h1 { font-size: 1rem; font-weight: 700; line-height: 1.15; color: var(--text); }
   .side-brand p  { font-size: .75rem; color: var(--muted); margin-top: 2px; }
   .side-search {
-    display: flex; align-items: center; gap: 8px;
+    display: flex; align-items: center; gap: 8px; flex-shrink: 0;
     background: var(--surface); border: 1px solid var(--line);
     border-radius: 10px; padding: 0 12px; height: 38px; margin: 0 4px 14px;
   }
@@ -74,7 +74,7 @@
     border: 0; background: transparent; outline: none; width: 100%;
     font-size: .85rem; color: var(--text);
   }
-  .nav { flex: 1; overflow: auto; padding: 0 4px; }
+  .nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 4px; }
   .nav-section {
     font-size: .68rem; font-weight: 700; letter-spacing: .08em;
     text-transform: uppercase; color: var(--muted); margin: 14px 8px 6px;
@@ -87,7 +87,7 @@
   .nav-item:hover { background: var(--nav-hover); }
   .nav-item.active { background: var(--blue-soft); color: var(--blue); font-weight: 600; }
   .nav-item.sub { padding-left: 28px; font-size: .86rem; color: var(--text-3); }
-  .side-foot { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 8px; }
+  .side-foot { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 8px; flex-shrink: 0; }
   .btn-logout {
     display: flex; align-items: center; gap: 8px; width: 100%; border: 0;
     background: transparent; color: var(--muted); padding: 10px 12px; border-radius: 10px;
