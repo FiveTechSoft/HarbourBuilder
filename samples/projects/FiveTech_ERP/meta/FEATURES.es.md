@@ -46,7 +46,7 @@ Motor genérico de pantallas impulsado por JSON. **Layouts** soportados:
 
 | Layout | Propósito |
 |--------|-----------|
-| `list` | Una sola rejilla + barra de herramientas |
+| `list` | Rejilla + toolbar; opcionales `filters`, `markRows`, `totals` / `sumFields` |
 | `master-detail` | Rejilla maestra + líneas de detalle enlazadas |
 | `document` | Documento + totales de líneas + impuestos |
 | `form` | Ficha / formulario con pestañas |

@@ -46,7 +46,7 @@ Generic screen engine driven by JSON. Supported **layouts**:
 
 | Layout | Purpose |
 |--------|---------|
-| `list` | Single grid + toolbar |
+| `list` | Single grid + toolbar; optional `filters`, `markRows`, `totals` / `sumFields` |
 | `master-detail` | Master grid + linked detail lines |
 | `document` | Document + line totals + tax |
 | `form` | Card form with tabs |

@@ -821,14 +821,34 @@
     display: flex; gap: 10px; align-items: flex-end; margin-bottom: 10px; flex-wrap: wrap;
   }
   #ws-meta .meta-filters label { display: block; font-size: .72rem; color: var(--muted); font-weight: 600; margin-bottom: 4px; }
-  #ws-meta .meta-filters input {
+  #ws-meta .meta-filters input,
+  #ws-meta .meta-filters select {
     height: 34px; border: 1px solid var(--line); border-radius: 6px;
-    padding: 0 12px; min-width: 240px; font-size: .9rem; outline: none;
+    padding: 0 12px; min-width: 140px; font-size: .9rem; outline: none;
     background: var(--input-bg); color: var(--text);
   }
-  #ws-meta .meta-filters input:focus {
+  #ws-meta .meta-filters input[type="search"] { min-width: 220px; }
+  #ws-meta .meta-filters input:focus,
+  #ws-meta .meta-filters select:focus {
     border-color: var(--blue); box-shadow: 0 0 0 3px var(--focus-ring);
   }
+  #ws-meta .meta-filters .mf-field { display: flex; flex-direction: column; min-width: 0; }
+  #ws-meta .meta-filters .mf-acts { display: flex; gap: 6px; align-items: center; padding-bottom: 1px; }
+  #ws-meta table.meta thead th.mark,
+  #ws-meta table.meta tbody td.mark {
+    width: 36px; text-align: center; padding-left: 8px; padding-right: 8px;
+  }
+  #ws-meta table.meta tbody td.mark { cursor: default; }
+  #ws-meta table.meta tbody tr.marked { background: rgba(29, 78, 216, .06); }
+  #ws-meta table.meta tbody tr.marked.selected { background: var(--row-sel); }
+  #ws-meta .list-totals-bar {
+    display: none; flex-wrap: wrap; gap: 14px 20px; align-items: center;
+    padding: 10px 12px; margin: 0 0 8px; border: 1px solid var(--line);
+    border-radius: 8px; background: var(--surface-2); font-size: .85rem; color: var(--muted);
+  }
+  #ws-meta .list-totals-bar.is-on { display: flex; }
+  #ws-meta .list-totals-bar b { color: var(--text); font-variant-numeric: tabular-nums; }
+  #ws-meta .list-totals-bar .lt-item { white-space: nowrap; }
   #ws-meta .meta-scroll {
     flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--line); border-radius: 6px;
     background: var(--surface-2);
@@ -1661,10 +1681,14 @@
         <button type="button" class="painel-x" id="meta-btn-close" title="Close">&#10005;</button>
       </div>
       <div class="meta-body">
-        <div class="meta-filters meta-single">
-          <div style="flex:1;min-width:200px">
+        <div class="meta-filters meta-single" id="meta-filters">
+          <div class="mf-field" id="meta-search-wrap" style="flex:1;min-width:200px">
             <label for="meta-q">Search</label>
             <input type="search" id="meta-q" placeholder="Type to filter..." autocomplete="off">
+          </div>
+          <div id="meta-filter-fields" style="display:contents"></div>
+          <div class="mf-acts" id="meta-filter-acts" style="display:none">
+            <button type="button" class="btn" id="meta-filter-clear" style="height:34px">Clear filters</button>
           </div>
         </div>
         <div class="meta-scroll meta-single">
@@ -1673,6 +1697,7 @@
             <tbody id="meta-tbody"></tbody>
           </table>
         </div>
+        <div class="list-totals-bar meta-single" id="list-totals-bar" aria-live="polite"></div>
         <!-- Specialized ERP layouts (form, wizard, dashboard, …) -->
         <div class="xf-host" id="xf-host"></div>
         <!-- Master-detail panes -->
@@ -3811,7 +3836,7 @@ function hideAllWorkspaces() {
 
 var META_VIEW = {
   screenKey: "", prevKey: "", dataRef: "", columns: [], q: "", timer: null, doc: null,
-  toolbar: [], rows: [], selected: -1, keyField: "code",
+  toolbar: [], rows: [], allRows: [], selected: -1, keyField: "code",
   layout: "list",
   detail: null,
   detailRowsAll: [],
@@ -3821,7 +3846,14 @@ var META_VIEW = {
   page: 1,
   pageSize: 20,
   detailPage: 1,
-  detailPageSize: 20
+  detailPageSize: 20,
+  // optional list features (meta-driven)
+  filterDefs: [],
+  filterValues: {},
+  markRows: false,
+  marked: {},       // keyField value -> true
+  totalsDefs: [],
+  enableSearch: true
 };
 
 /* ---------- List pagination ---------- */
@@ -4124,14 +4156,287 @@ function setMetaError(text) {
   if (tb) tb.innerHTML = msg;
 }
 
-function buildTheadHtml(cols) {
+function buildTheadHtml(cols, opts) {
   var th = "", i, c;
+  opts = opts || {};
+  if (opts.markRows) {
+    th += "<th class='mark' title='Mark rows'><input type='checkbox' id='meta-mark-all' aria-label='Mark all visible'></th>";
+  }
   for (i = 0; i < cols.length; i++) {
     c = cols[i];
     th += "<th" + (c.align === "right" || c.format === "money" || colControlType(c) === "money" ? " class='n'" : "") + ">" +
       esc(c.label || c.id) + "</th>";
   }
   return "<tr>" + (th || "<th>—</th>") + "</tr>";
+}
+
+/* ---------- Optional list filters / mark / totals (layout list) ---------- */
+function listMarkEnabled() {
+  var d = META_VIEW.doc || {};
+  return !!(d.markRows || d.multiSelect || d.markable);
+}
+function listSearchEnabled() {
+  var d = META_VIEW.doc || {};
+  if (d.enableSearch === false || d.search === false) return false;
+  return true; // default on for list
+}
+function listFilterDefs() {
+  var d = META_VIEW.doc || {};
+  return Array.isArray(d.filters) ? d.filters : [];
+}
+function listTotalsDefs() {
+  var d = META_VIEW.doc || {}, out = [], i, f, sf;
+  if (Array.isArray(d.totals) && d.totals.length) {
+    for (i = 0; i < d.totals.length; i++) {
+      f = d.totals[i] || {};
+      if (!f.field && !f.id) continue;
+      out.push({
+        field: f.field || f.id,
+        label: f.label || f.field || f.id,
+        op: String(f.op || "sum").toLowerCase(),
+        format: f.format || ""
+      });
+    }
+    return out;
+  }
+  // Convenience: sumFields: ["amount", "qty"]
+  sf = d.sumFields;
+  if (Array.isArray(sf)) {
+    for (i = 0; i < sf.length; i++) {
+      if (!sf[i]) continue;
+      out.push({ field: String(sf[i]), label: String(sf[i]), op: "sum", format: "money" });
+    }
+  }
+  return out;
+}
+function listSearchFields() {
+  var d = META_VIEW.doc || {}, cols = META_VIEW.columns || [], i;
+  if (Array.isArray(d.searchFields) && d.searchFields.length) return d.searchFields.slice();
+  // default: all column ids
+  return cols.map(function (c) { return c.id; }).filter(Boolean);
+}
+function listRowKey(row) {
+  if (!row) return "";
+  var kf = META_VIEW.keyField || "code";
+  return String(row[kf] != null ? row[kf] : "");
+}
+function listMarkedCount() {
+  var k, n = 0;
+  for (k in META_VIEW.marked) {
+    if (Object.prototype.hasOwnProperty.call(META_VIEW.marked, k) && META_VIEW.marked[k]) n++;
+  }
+  return n;
+}
+function listMarkedRows() {
+  var out = [], i, r, k, rows = META_VIEW.allRows || META_VIEW.rows || [];
+  for (i = 0; i < rows.length; i++) {
+    r = rows[i];
+    k = listRowKey(r);
+    if (k && META_VIEW.marked[k]) out.push(r);
+  }
+  return out;
+}
+function clearListMarks() {
+  META_VIEW.marked = {};
+  updateMetaSelHint();
+  try { renderListView(); } catch (e) {}
+}
+function setupListOptionsFromDoc(scr) {
+  META_VIEW.enableSearch = true;
+  META_VIEW.filterDefs = [];
+  META_VIEW.filterValues = {};
+  META_VIEW.markRows = false;
+  META_VIEW.marked = {};
+  META_VIEW.totalsDefs = [];
+  META_VIEW.allRows = [];
+  if (!scr || String(scr.layout || "list") !== "list") return;
+  META_VIEW.enableSearch = !(scr.enableSearch === false || scr.search === false);
+  META_VIEW.filterDefs = Array.isArray(scr.filters) ? scr.filters.slice() : [];
+  META_VIEW.markRows = !!(scr.markRows || scr.multiSelect || scr.markable);
+  META_VIEW.totalsDefs = listTotalsDefs();
+}
+function renderListFilterBar() {
+  var host = document.getElementById("meta-filters");
+  var searchWrap = document.getElementById("meta-search-wrap");
+  var fields = document.getElementById("meta-filter-fields");
+  var acts = document.getElementById("meta-filter-acts");
+  var qEl = document.getElementById("meta-q");
+  var i, f, html = "", fid, lab, typ, opts, j, o, val, showBar;
+  if (!host) return;
+  if (isMasterDetail() || isSpecialLayout(META_VIEW.layout)) {
+    host.style.display = "none";
+    return;
+  }
+  showBar = listSearchEnabled() || listFilterDefs().length > 0;
+  host.style.display = showBar ? "flex" : "none";
+  if (searchWrap) searchWrap.style.display = listSearchEnabled() ? "" : "none";
+  if (qEl && !listSearchEnabled()) qEl.value = "";
+  if (!fields) return;
+  html = "";
+  for (i = 0; i < META_VIEW.filterDefs.length; i++) {
+    f = META_VIEW.filterDefs[i] || {};
+    fid = f.id || f.field || ("f" + i);
+    lab = f.label || f.field || fid;
+    typ = String(f.type || "text").toLowerCase();
+    val = META_VIEW.filterValues[fid] != null ? META_VIEW.filterValues[fid] : (f.default != null ? f.default : "");
+    html += "<div class='mf-field' data-fid='" + esc(fid) + "'>";
+    html += "<label for='meta-ff-" + esc(fid) + "'>" + esc(lab) + "</label>";
+    if (typ === "select" || typ === "combo") {
+      opts = colOptionsList(f);
+      html += "<select id='meta-ff-" + esc(fid) + "' data-list-filter='" + esc(fid) + "'>";
+      html += "<option value=''>" + esc(f.emptyLabel || "— all —") + "</option>";
+      for (j = 0; j < opts.length; j++) {
+        o = opts[j];
+        if (o.value === "") continue;
+        html += "<option value='" + esc(o.value) + "'" +
+          (String(val) === String(o.value) ? " selected" : "") + ">" + esc(o.label) + "</option>";
+      }
+      html += "</select>";
+    } else if (typ === "checkbox" || typ === "bool") {
+      html += "<select id='meta-ff-" + esc(fid) + "' data-list-filter='" + esc(fid) + "'>";
+      html += "<option value=''>" + esc(f.emptyLabel || "— all —") + "</option>";
+      html += "<option value='1'" + (String(val) === "1" || val === true ? " selected" : "") + ">Yes</option>";
+      html += "<option value='0'" + (String(val) === "0" || val === false ? " selected" : "") + ">No</option>";
+      html += "</select>";
+    } else {
+      html += "<input type='search' id='meta-ff-" + esc(fid) + "' data-list-filter='" + esc(fid) +
+        "' value='" + esc(String(val == null ? "" : val)) + "' placeholder='" + esc(f.placeholder || "") + "' autocomplete='off'>";
+    }
+    html += "</div>";
+  }
+  fields.innerHTML = html;
+  if (acts) acts.style.display = META_VIEW.filterDefs.length ? "flex" : "none";
+}
+function readListFilterValues() {
+  var map = {}, nodes, i, el, fid;
+  nodes = document.querySelectorAll("#meta-filters [data-list-filter]");
+  for (i = 0; i < nodes.length; i++) {
+    el = nodes[i];
+    fid = el.getAttribute("data-list-filter");
+    if (fid) map[fid] = el.value;
+  }
+  if (listSearchEnabled()) {
+    el = document.getElementById("meta-q");
+    META_VIEW.q = el ? (el.value || "") : (META_VIEW.q || "");
+  } else {
+    META_VIEW.q = "";
+  }
+  META_VIEW.filterValues = map;
+  return map;
+}
+function applyListClientFilter() {
+  var all = META_VIEW.allRows || [], out = [], i, r, q, sf, ok, j, f, fid, field, fv, rv, typ;
+  readListFilterValues();
+  q = String(META_VIEW.q || "").trim().toLowerCase();
+  sf = listSearchFields();
+  for (i = 0; i < all.length; i++) {
+    r = all[i] || {};
+    ok = true;
+    // free-text search across searchFields
+    if (q && listSearchEnabled()) {
+      ok = false;
+      for (j = 0; j < sf.length; j++) {
+        rv = r[sf[j]];
+        if (rv != null && String(rv).toLowerCase().indexOf(q) >= 0) { ok = true; break; }
+      }
+    }
+    if (!ok) continue;
+    // optional field filters
+    for (j = 0; j < META_VIEW.filterDefs.length; j++) {
+      f = META_VIEW.filterDefs[j] || {};
+      fid = f.id || f.field;
+      field = f.field || f.id;
+      if (!field) continue;
+      fv = META_VIEW.filterValues[fid];
+      if (fv == null || String(fv) === "") continue;
+      rv = r[field];
+      typ = String(f.type || "text").toLowerCase();
+      if (typ === "select" || typ === "combo") {
+        if (String(rv) !== String(fv)) { ok = false; break; }
+      } else if (typ === "checkbox" || typ === "bool") {
+        var truthy = (rv === true || rv === 1 || rv === "1" || String(rv).toLowerCase() === "true" || String(rv).toLowerCase() === "yes");
+        if (String(fv) === "1" && !truthy) { ok = false; break; }
+        if (String(fv) === "0" && truthy) { ok = false; break; }
+      } else {
+        if (String(rv == null ? "" : rv).toLowerCase().indexOf(String(fv).toLowerCase()) < 0) {
+          ok = false; break;
+        }
+      }
+    }
+    if (ok) out.push(r);
+  }
+  META_VIEW.rows = out;
+  return out;
+}
+function updateListTotalsBar() {
+  var bar = document.getElementById("list-totals-bar");
+  var defs = META_VIEW.totalsDefs || [], rows, html = "", i, d, acc, j, v, n, r;
+  if (!bar) return;
+  if (isMasterDetail() || isSpecialLayout(META_VIEW.layout) || !defs.length) {
+    bar.classList.remove("is-on");
+    bar.innerHTML = "";
+    return;
+  }
+  rows = META_VIEW.rows || [];
+  html = "<span class='lt-item'>Rows <b>" + rows.length + "</b></span>";
+  if (listMarkEnabled()) {
+    html += "<span class='lt-item'>Marked <b id='list-marked-n'>" + listMarkedCount() + "</b></span>";
+  }
+  for (i = 0; i < defs.length; i++) {
+    d = defs[i];
+    acc = 0; n = 0;
+    for (j = 0; j < rows.length; j++) {
+      r = rows[j] || {};
+      v = r[d.field];
+      if (d.op === "count") {
+        if (v != null && String(v) !== "") n++;
+      } else if (d.op === "avg" || d.op === "sum") {
+        v = Number(v);
+        if (!isNaN(v)) { acc += v; n++; }
+      }
+    }
+    if (d.op === "count") acc = n;
+    else if (d.op === "avg") acc = n ? (acc / n) : 0;
+    html += "<span class='lt-item'>" + esc(d.label) + " <b>" +
+      (d.format === "money" || d.op === "sum" || d.op === "avg" ? moneyFmt(acc) : String(acc)) +
+      "</b></span>";
+  }
+  bar.innerHTML = html;
+  bar.classList.add("is-on");
+}
+function renderListView() {
+  if (isMasterDetail() || isSpecialLayout(META_VIEW.layout)) return;
+  document.getElementById("meta-thead").innerHTML =
+    buildTheadHtml(META_VIEW.columns, { markRows: listMarkEnabled() });
+  renderMetaRows(META_VIEW.rows, META_VIEW.columns, "meta-tbody", "list");
+  setMetaCount((META_VIEW.rows || []).length);
+  updateMetaSelHint();
+  updateListTotalsBar();
+  wireListMarkHeader();
+}
+function wireListMarkHeader() {
+  var all = document.getElementById("meta-mark-all");
+  if (!all) return;
+  all.onclick = function (e) {
+    e.stopPropagation();
+    var on = !!all.checked, rows = META_VIEW.rows || [], i, k, sl, pageSize, page;
+    pageSize = pagerPageSize("list");
+    page = META_VIEW.page || 1;
+    sl = slicePage(rows, page, pageSize);
+    for (i = sl.start; i < sl.end; i++) {
+      k = listRowKey(rows[i]);
+      if (!k) continue;
+      if (on) META_VIEW.marked[k] = true;
+      else delete META_VIEW.marked[k];
+    }
+    renderListView();
+  };
+}
+function applyListFiltersAndRender() {
+  applyListClientFilter();
+  META_VIEW.page = 1;
+  META_VIEW.selected = -1;
+  renderListView();
 }
 
 function applyMetaScreenDoc(scr, screenKey, label) {
@@ -4150,6 +4455,7 @@ function applyMetaScreenDoc(scr, screenKey, label) {
   META_VIEW.toolbar = Array.isArray(tb) ? tb.slice() : [];
   META_VIEW.selected = -1;
   META_VIEW.rows = [];
+  META_VIEW.allRows = [];
   META_VIEW.keyField = (scr && scr.keyField) ? scr.keyField : ((cols.length && cols[0].id) ? cols[0].id : "code");
   META_VIEW.layout = layout;
   META_VIEW.detail = null;
@@ -4157,6 +4463,7 @@ function applyMetaScreenDoc(scr, screenKey, label) {
   META_VIEW.detailRows = [];
   META_VIEW.detailSelected = -1;
   META_VIEW.masterKeyValue = "";
+  setupListOptionsFromDoc(scr);
 
   if ((layout === "master-detail" || layout === "document") && scr && scr.detail) {
     d = scr.detail;
@@ -4213,12 +4520,15 @@ function applyMetaScreenDoc(scr, screenKey, label) {
     else ensureDocTotalsBar(false);
   } else {
     ensureDocTotalsBar(false);
-    document.getElementById("meta-thead").innerHTML = buildTheadHtml(cols);
+    renderListFilterBar();
+    document.getElementById("meta-thead").innerHTML =
+      buildTheadHtml(cols, { markRows: listMarkEnabled() });
     renderMetaToolbar("list");
     updateMetaSelHint();
+    updateListTotalsBar();
     if (!dataRef) {
       document.getElementById("meta-tbody").innerHTML =
-        "<tr><td colspan='" + Math.max(1, cols.length) +
+        "<tr><td colspan='" + Math.max(1, cols.length + (listMarkEnabled() ? 1 : 0)) +
         "' style='padding:24px;text-align:center;color:#94a3b8'>No dataRef in screen JSON.</td></tr>";
       return;
     }
@@ -4433,7 +4743,7 @@ function runProcess(key, opts) {
 }
 
 function updateMetaSelHint() {
-  var text = "";
+  var text = "", nMark;
   if (META_VIEW.selected >= 0 && META_VIEW.rows[META_VIEW.selected]) {
     var r = META_VIEW.rows[META_VIEW.selected];
     var kf = META_VIEW.keyField;
@@ -4441,10 +4751,16 @@ function updateMetaSelHint() {
   } else {
     text = (toolbarHas("edit", "master") || toolbarHas("delete", "master")) ? "click a row" : "";
   }
+  if (!isMasterDetail() && listMarkEnabled()) {
+    nMark = listMarkedCount();
+    if (nMark) text = (text ? (text + " · ") : "") + nMark + " marked";
+  }
   var el = document.getElementById("meta-sel-hint");
   if (el) el.textContent = text;
   el = document.getElementById("meta-sel-hint-single");
   if (el) el.textContent = text ? (" · " + text) : "";
+  el = document.getElementById("list-marked-n");
+  if (el) el.textContent = String(listMarkedCount());
 }
 
 function updateDetailHint() {
@@ -4520,6 +4836,8 @@ function metaToolbarAction(act, scope) {
     if (scope === "detail") {
       if (META_VIEW.detailSelected < 0) { toast("Select a detail line first"); return; }
       metaDeleteRow(META_VIEW.detailRows[META_VIEW.detailSelected], "detail");
+    } else if (!isMasterDetail() && listMarkEnabled() && listMarkedCount() > 0) {
+      metaDeleteMarkedRows();
     } else {
       if (META_VIEW.selected < 0) { toast("Select a row first"); return; }
       metaDeleteRow(META_VIEW.rows[META_VIEW.selected], "master");
@@ -4767,6 +5085,32 @@ function metaDeleteRow(row, scope) {
       }
     })
     .catch(function (e) { toast("Delete error: " + e); });
+}
+
+function metaDeleteMarkedRows() {
+  var marked = listMarkedRows(), i, kf = META_VIEW.keyField, dataRef = META_VIEW.dataRef, chain;
+  if (!marked.length) { toast("No marked rows"); return; }
+  if (!confirm("Delete " + marked.length + " marked record(s)?")) return;
+  chain = Promise.resolve();
+  for (i = 0; i < marked.length; i++) {
+    (function (row) {
+      var kv = String(row[kf] != null ? row[kf] : "");
+      chain = chain.then(function () {
+        return fetch("/api/dataset", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ key: dataRef, action: "delete", keyField: kf, keyValue: kv })
+        }).then(function (r) { return r.json(); });
+      });
+    })(marked[i]);
+  }
+  chain.then(function () {
+    toast("Deleted " + marked.length + " record(s)");
+    META_VIEW.marked = {};
+    META_VIEW.selected = -1;
+    loadMetaDataset();
+  }).catch(function (e) { toast("Delete error: " + e); });
 }
 
 function metaPrintReport(asPdf) {
@@ -6750,7 +7094,11 @@ function setMetaCount(n) {
 }
 
 function loadMetaDataset(q) {
-  META_VIEW.q = q || "";
+  if (q !== undefined && q !== null) META_VIEW.q = q;
+  else {
+    var qEl = document.getElementById(isMasterDetail() ? "meta-q-md" : "meta-q");
+    if (qEl) META_VIEW.q = qEl.value || "";
+  }
   META_VIEW.selected = -1;
   META_VIEW.page = 1;
   if (!isMasterDetail()) META_VIEW.masterKeyValue = "";
@@ -6759,28 +7107,36 @@ function loadMetaDataset(q) {
   var cols = META_VIEW.columns || [];
   var tbId = isMasterDetail() ? "md-master-tbody" : "meta-tbody";
   var tb = document.getElementById(tbId);
-  var span = Math.max(1, cols.length);
+  var span = Math.max(1, cols.length + (!isMasterDetail() && listMarkEnabled() ? 1 : 0));
   if (tb) tb.innerHTML = "<tr><td colspan='" + span +
     "' style='padding:24px;text-align:center;color:#94a3b8'>Loading " + esc(META_VIEW.dataRef) + "...</td></tr>";
   var url = "/api/dataset?key=" + encodeURIComponent(META_VIEW.dataRef) +
-            "&q=" + encodeURIComponent(META_VIEW.q);
+            "&q=" + encodeURIComponent(META_VIEW.q || "");
   fetch(url, { credentials: "same-origin", cache: "no-store" })
     .then(function (r) { return r.json(); })
     .then(function (j) {
       if (!j || !j.ok) {
         META_VIEW.rows = [];
+        META_VIEW.allRows = [];
         if (tb) tb.innerHTML = "<tr><td colspan='" + span +
           "' style='padding:24px;text-align:center;color:#b91c1c'>" +
           esc((j && j.msg) || "Failed to load dataset") + "</td></tr>";
         setMetaCount(0);
         updateMetaSelHint();
+        updateListTotalsBar();
         updatePaginacaoUi(isMasterDetail() ? "master" : "list");
         return;
       }
-      META_VIEW.rows = j.rows || [];
+      META_VIEW.allRows = j.rows || [];
       META_VIEW.page = 1;
-      renderMetaRows(META_VIEW.rows, cols, tbId, "master");
-      setMetaCount(j.total || META_VIEW.rows.length);
+      if (isMasterDetail()) {
+        META_VIEW.rows = META_VIEW.allRows.slice();
+        renderMetaRows(META_VIEW.rows, cols, tbId, "master");
+        setMetaCount(META_VIEW.rows.length);
+      } else {
+        applyListClientFilter();
+        renderListView();
+      }
       var ex = document.getElementById("meta-extra");
       if (ex) ex.textContent = "";
       updateMetaSelHint();
@@ -6794,10 +7150,12 @@ function loadMetaDataset(q) {
     })
     .catch(function (e) {
       META_VIEW.rows = [];
+      META_VIEW.allRows = [];
       if (tb) tb.innerHTML = "<tr><td colspan='" + span +
         "' style='padding:24px;text-align:center;color:#b91c1c'>" + esc(String(e)) + "</td></tr>";
       setMetaCount(0);
       updateMetaSelHint();
+      updateListTotalsBar();
       updatePaginacaoUi(isMasterDetail() ? "master" : "list");
     });
 }
@@ -8809,26 +9167,39 @@ function renderMetaRows(rows, cols, tbId, scope) {
   tbId = tbId || "meta-tbody";
   scope = scope || "master";
   var tb = document.getElementById(tbId);
-  var html = "", i, j, r, c, cls, selIdx, pageKey, page, pageSize, sl;
+  var html = "", i, j, r, c, cls, selIdx, pageKey, page, pageSize, sl, markOn, k, marked, colSpan;
   selIdx = (scope === "detail") ? META_VIEW.detailSelected : META_VIEW.selected;
   rows = rows || [];
   cols = cols || [];
+  markOn = (scope === "list" || (!isMasterDetail() && scope !== "detail" && scope !== "master")) && listMarkEnabled();
+  if (scope === "list") markOn = listMarkEnabled();
+  if (!isMasterDetail() && (scope === "master" || scope === "list")) markOn = listMarkEnabled();
+  if (isMasterDetail()) markOn = false;
   pageKey = (scope === "detail") ? "detail" : (isMasterDetail() ? "master" : "list");
   pageSize = pagerPageSize(pageKey);
   page = (scope === "detail") ? (META_VIEW.detailPage || 1) : (META_VIEW.page || 1);
   sl = slicePage(rows, page, pageSize);
   if (scope === "detail") META_VIEW.detailPage = sl.page;
   else META_VIEW.page = sl.page;
+  colSpan = Math.max(1, cols.length + (markOn ? 1 : 0));
   if (!rows.length) {
-    html = "<tr><td colspan='" + Math.max(1, cols.length) +
+    html = "<tr><td colspan='" + colSpan +
       "' style='padding:24px;text-align:center;color:#94a3b8'>" +
       (scope === "detail" && !META_VIEW.masterKeyValue ? "Select a master row." : "No rows.") +
       "</td></tr>";
   } else {
     for (i = sl.start; i < sl.end; i++) {
       r = rows[i];
-      html += "<tr data-i='" + i + "' data-scope='" + scope + "'" +
-        (selIdx === i ? " class='selected'" : "") + ">";
+      k = listRowKey(r);
+      marked = markOn && k && META_VIEW.marked[k];
+      html += "<tr data-i='" + i + "' data-scope='" + (isMasterDetail() ? scope : "list") + "'" +
+        (k ? (" data-key='" + esc(k) + "'") : "") +
+        (selIdx === i ? " class='selected" + (marked ? " marked" : "") + "'" :
+          (marked ? " class='marked'" : "")) + ">";
+      if (markOn) {
+        html += "<td class='mark'><input type='checkbox' class='meta-mark' data-key='" +
+          esc(k) + "'" + (marked ? " checked" : "") + " aria-label='Mark row'></td>";
+      }
       for (j = 0; j < cols.length; j++) {
         c = cols[j];
         cls = (c.align === "right" || c.format === "money" || colControlType(c) === "money") ? " class='n'" : "";
@@ -8839,6 +9210,7 @@ function renderMetaRows(rows, cols, tbId, scope) {
   }
   if (tb) tb.innerHTML = html;
   updatePaginacaoUi(pageKey);
+  if (!isMasterDetail()) updateListTotalsBar();
 }
 
 function statusPill(st) {
@@ -9373,15 +9745,55 @@ document.getElementById("modsearch").addEventListener("input", function (e) {
     q.oninput = function () {
       if (META_VIEW.timer) clearTimeout(META_VIEW.timer);
       META_VIEW.timer = setTimeout(function () {
-        loadMetaDataset(q.value || "");
+        if (id === "meta-q" && !isMasterDetail() && META_VIEW.allRows && META_VIEW.allRows.length) {
+          applyListFiltersAndRender();
+        } else {
+          loadMetaDataset(q.value || "");
+        }
       }, 280);
     };
     q.onkeydown = function (e) {
-      if (e.key === "Enter") { e.preventDefault(); loadMetaDataset(q.value || ""); }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (id === "meta-q" && !isMasterDetail() && META_VIEW.allRows && META_VIEW.allRows.length)
+          applyListFiltersAndRender();
+        else loadMetaDataset(q.value || "");
+      }
     };
   }
   wireSearch("meta-q");
   wireSearch("meta-q-md");
+
+  // Optional list field-filters (event delegation)
+  var mf = document.getElementById("meta-filters");
+  if (mf && !mf._listFilterWired) {
+    mf._listFilterWired = true;
+    mf.addEventListener("input", function (e) {
+      var t = e.target;
+      if (!t || !t.getAttribute) return;
+      if (t.id === "meta-q") return; // handled above
+      if (!t.getAttribute("data-list-filter")) return;
+      if (META_VIEW.timer) clearTimeout(META_VIEW.timer);
+      META_VIEW.timer = setTimeout(function () { applyListFiltersAndRender(); }, 200);
+    });
+    mf.addEventListener("change", function (e) {
+      var t = e.target;
+      if (!t || !t.getAttribute || !t.getAttribute("data-list-filter")) return;
+      applyListFiltersAndRender();
+    });
+  }
+  var clr = document.getElementById("meta-filter-clear");
+  if (clr && !clr._wired) {
+    clr._wired = true;
+    clr.onclick = function () {
+      META_VIEW.filterValues = {};
+      META_VIEW.q = "";
+      var qEl = document.getElementById("meta-q");
+      if (qEl) qEl.value = "";
+      renderListFilterBar();
+      applyListFiltersAndRender();
+    };
+  }
 
   function wireToolbar(id) {
     var tb = document.getElementById(id);
@@ -9394,6 +9806,19 @@ document.getElementById("modsearch").addEventListener("input", function (e) {
       var proc = btn.getAttribute("data-process");
       var scope = btn.getAttribute("data-scope") || "master";
       if (proc) {
+        // If rows marked, run process once per marked row (optional convenience)
+        if (!isMasterDetail() && listMarkEnabled() && listMarkedCount() > 0) {
+          var marked = listMarkedRows(), mi, chain = Promise.resolve();
+          for (mi = 0; mi < marked.length; mi++) {
+            (function (row) {
+              chain = chain.then(function () {
+                return runProcess(proc, { row: row, skipMetaFetch: mi > 0 });
+              });
+            })(marked[mi]);
+          }
+          chain.then(function () { toast("Process finished on " + marked.length + " row(s)"); });
+          return;
+        }
         runProcess(proc, {});
         return;
       }
@@ -9409,11 +9834,26 @@ document.getElementById("modsearch").addEventListener("input", function (e) {
     var tbody = document.getElementById(id);
     if (!tbody) return;
     tbody.onclick = function (e) {
+      var t = e.target;
+      // Mark checkbox
+      if (t && t.classList && t.classList.contains("meta-mark")) {
+        e.stopPropagation();
+        var key = t.getAttribute("data-key") || "";
+        if (key) {
+          if (t.checked) META_VIEW.marked[key] = true;
+          else delete META_VIEW.marked[key];
+          updateMetaSelHint();
+          var tr = t.closest("tr");
+          if (tr) tr.classList.toggle("marked", !!t.checked);
+          updateListTotalsBar();
+        }
+        return;
+      }
       var tr = e.target && e.target.closest ? e.target.closest("tr[data-i]") : null;
       if (!tr) return;
       var i = parseInt(tr.getAttribute("data-i"), 10);
       var sc = tr.getAttribute("data-scope") || scope;
-      if (!isNaN(i)) metaSelectRow(i, sc);
+      if (!isNaN(i)) metaSelectRow(i, sc === "list" ? "master" : sc);
     };
     tbody.ondblclick = function (e) {
       var tr = e.target && e.target.closest ? e.target.closest("tr[data-i]") : null;

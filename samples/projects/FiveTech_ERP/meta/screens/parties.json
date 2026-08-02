@@ -5,99 +5,69 @@
   "title": "Parties (CRM)",
   "dataRef": "data.parties",
   "keyField": "code",
-  "searchFields": [
-    "code",
-    "name",
-    "city",
-    "email",
-    "kind"
+  "searchFields": ["code", "name", "city", "email", "kind"],
+  "enableSearch": true,
+  "filters": [
+    {
+      "id": "kind",
+      "field": "kind",
+      "label": "Kind",
+      "type": "select",
+      "options": ["person", "organization"]
+    },
+    {
+      "id": "company",
+      "field": "company",
+      "label": "Company",
+      "type": "select",
+      "options": ["HQ", "MAD", "BCN"]
+    },
+    {
+      "id": "active",
+      "field": "active",
+      "label": "Active",
+      "type": "checkbox"
+    }
+  ],
+  "markRows": true,
+  "totals": [
+    { "field": "code", "label": "Count", "op": "count" }
   ],
   "grid": {
     "columns": [
-      {
-        "id": "code",
-        "label": "Code",
-        "type": "text"
-      },
+      { "id": "code", "label": "Code", "type": "text" },
       {
         "id": "company",
         "label": "Company",
         "type": "select",
-        "options": [
-          "HQ",
-          "MAD",
-          "BCN"
-        ]
+        "options": ["HQ", "MAD", "BCN"]
       },
-      {
-        "id": "name",
-        "label": "Name",
-        "type": "text"
-      },
+      { "id": "name", "label": "Name", "type": "text" },
       {
         "id": "kind",
         "label": "Kind",
         "type": "select",
-        "options": [
-          "person",
-          "organization"
-        ]
+        "options": ["person", "organization"]
       },
       {
         "id": "roles",
         "label": "Roles",
         "type": "checklist",
-        "options": [
-          "Patient",
-          "Customer",
-          "Lead",
-          "VIP",
-          "Payer",
-          "Supplier"
-        ]
+        "options": ["Patient", "Customer", "Lead", "VIP", "Payer", "Supplier"]
       },
-      {
-        "id": "email",
-        "label": "E-mail",
-        "type": "text"
-      },
-      {
-        "id": "phone",
-        "label": "Phone",
-        "type": "text"
-      },
-      {
-        "id": "city",
-        "label": "City",
-        "type": "text"
-      },
-      {
-        "id": "account",
-        "label": "Account",
-        "type": "text"
-      },
+      { "id": "email", "label": "E-mail", "type": "text" },
+      { "id": "phone", "label": "Phone", "type": "text" },
+      { "id": "city", "label": "City", "type": "text" },
+      { "id": "account", "label": "Account", "type": "text" },
       {
         "id": "source",
         "label": "Source",
         "type": "select",
-        "options": [
-          "Walk-in",
-          "Web",
-          "Referral",
-          "Campaign",
-          "Partner"
-        ]
+        "options": ["Walk-in", "Web", "Referral", "Campaign", "Partner"]
       },
-      {
-        "id": "owner",
-        "label": "Owner",
-        "type": "text"
-      },
-      {
-        "id": "active",
-        "label": "Active",
-        "type": "checkbox"
-      }
+      { "id": "owner", "label": "Owner", "type": "text" },
+      { "id": "active", "label": "Active", "type": "checkbox" },
+      { "id": "notes", "label": "Notes", "type": "text" }
     ]
   },
   "toolbar": [
@@ -107,6 +77,12 @@
     "print",
     "pdf",
     "excel",
-    "refresh"
+    "refresh",
+    {
+      "id": "echo_ctx",
+      "label": "Echo context",
+      "process": "process.echo_context",
+      "title": "Run process.echo_context with selected / marked party rows"
+    }
   ]
 }
