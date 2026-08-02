@@ -77,7 +77,7 @@ if not exist "%BUILDDIR%\main.prg" (
   exit /b 1
 )
 
-echo [2] Harbour compile main + erp_meta + erp_http + classes
+echo [2] Harbour compile main + erp_meta + erp_http + erp_db + classes
 "%HBBIN%\harbour.exe" main.prg -n -w -q -i"%HBINC%" -i"%BUILDDIR%" -i"%HBROOT%\include" -omain.c
 if errorlevel 1 (
   echo HARBOUR FAILED on main.prg
@@ -93,6 +93,12 @@ if errorlevel 1 (
   echo HARBOUR FAILED on erp_http.prg
   exit /b 1
 )
+copy /y "%PROJDIR%\erp_db.prg" "%BUILDDIR%\erp_db.prg" >nul
+"%HBBIN%\harbour.exe" erp_db.prg -n -w -q -i"%HBINC%" -i"%BUILDDIR%" -i"%HBROOT%\include" -oerp_db.c
+if errorlevel 1 (
+  echo HARBOUR FAILED on erp_db.prg
+  exit /b 1
+)
 "%HBBIN%\harbour.exe" classes.prg -n -w -q -i"%HBINC%" -i"%BUILDDIR%" -i"%HBROOT%\include" -oclasses.c
 if errorlevel 1 (
   echo HARBOUR FAILED on classes.prg
@@ -106,6 +112,8 @@ if errorlevel 1 exit /b 1
 cl.exe %CL_BASE% erp_meta.c /Foerp_meta.obj
 if errorlevel 1 exit /b 1
 cl.exe %CL_BASE% erp_http.c /Foerp_http.obj
+if errorlevel 1 exit /b 1
+cl.exe %CL_BASE% erp_db.c /Foerp_db.obj
 if errorlevel 1 exit /b 1
 cl.exe %CL_BASE% classes.c /Foclasses.obj
 if errorlevel 1 exit /b 1
@@ -141,19 +149,36 @@ if errorlevel 1 (
 )
 
 echo [4] Link FiveTech_ERP.exe  (hbvmmt)
-set "OBJS=main.obj erp_meta.obj erp_http.obj classes.obj tcontrol.obj tform.obj tcontrols.obj hbbridge.obj hb_db_real.obj fwh_webview2.obj fte_errdlg.obj"
+set "OBJS=main.obj erp_meta.obj erp_http.obj erp_db.obj classes.obj tcontrol.obj tform.obj tcontrols.obj hbbridge.obj hb_db_real.obj fwh_webview2.obj fte_errdlg.obj"
 if exist stddlgs.obj set "OBJS=%OBJS% stddlgs.obj"
 
 set "HBLIBS=hbvmmt.lib hbrtl.lib hbcommon.lib hblang.lib hbrdd.lib hbmacro.lib hbpp.lib hbcplr.lib hbct.lib hbhsx.lib hbsix.lib hbusrrdd.lib rddntx.lib rddnsx.lib rddcdx.lib rddfpt.lib hbcpage.lib hbpcre.lib hbzlib.lib hbdebug.lib hbsqlit3.lib sqlite3.lib gtgui.lib gtwin.lib gtwvt.lib hbmainwin.lib"
 REM hbmainwin may be named differently
 if not exist "%HBLIB%\hbmainwin.lib" set "HBLIBS=hbvmmt.lib hbrtl.lib hbcommon.lib hblang.lib hbrdd.lib hbmacro.lib hbpp.lib hbcplr.lib hbct.lib hbhsx.lib hbsix.lib hbusrrdd.lib rddntx.lib rddnsx.lib rddcdx.lib rddfpt.lib hbcpage.lib hbpcre.lib hbzlib.lib hbdebug.lib hbsqlit3.lib sqlite3.lib gtgui.lib gtwin.lib gtwvt.lib"
 
+REM OpenADS: rddads (Harbour contrib) + ACE import lib; ace64.dll is
+REM delay-loaded so the exe still starts when the DLL is not present
+set "ADSLIBS="
+set "ADSLINK="
+if exist "%HBLIB%\rddads.lib" (
+  set "ADSLIBS=rddads.lib ace64.lib delayimp.lib legacy_stdio_definitions.lib oldnames.lib"
+  set "ADSLINK=/DELAYLOAD:ace64.dll"
+) else (
+  echo WARNING: rddads.lib not found in %HBLIB% - openads driver will not link
+)
+
 set "SYSLIBS=user32.lib kernel32.lib gdi32.lib comctl32.lib comdlg32.lib shell32.lib ole32.lib oleaut32.lib advapi32.lib uuid.lib ws2_32.lib winmm.lib msimg32.lib gdiplus.lib winspool.lib dwmapi.lib iphlpapi.lib shlwapi.lib"
 
-link.exe /NOLOGO /OUT:"%OUT%" /SUBSYSTEM:WINDOWS /NODEFAULTLIB:LIBCMT /LIBPATH:"%HBLIB%" %OBJS% %HBLIBS% %SYSLIBS%
+link.exe /NOLOGO /OUT:"%OUT%" /SUBSYSTEM:WINDOWS /NODEFAULTLIB:LIBCMT %ADSLINK% /LIBPATH:"%HBLIB%" %OBJS% %HBLIBS% %ADSLIBS% %SYSLIBS%
 if errorlevel 1 (
   echo LINK FAILED
   exit /b 1
+)
+
+REM ACE client DLL for the openads driver (OpenADS build copied as ace64.dll)
+if exist "C:\OpenADS\build\default\src\Release\openace64.dll" (
+  copy /y "C:\OpenADS\build\default\src\Release\openace64.dll" "%PROJDIR%\ace64.dll" >nul
+  echo Copied ace64.dll - OpenADS ACE - next to the exe
 )
 
 REM Runtime next to exe: www + exact FWH meta JSON copy

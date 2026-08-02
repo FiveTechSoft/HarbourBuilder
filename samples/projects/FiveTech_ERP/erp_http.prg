@@ -539,7 +539,7 @@ return cHdr + cBody
 static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
 
    local cOut, hDoc, aItems, cKey, hQ, cUser, cPass, cTok, hSess
-   local cFile, cMime, cCookie, cDate, cAction, cArg, nSel, cRel
+   local cFile, cMime, cCookie, cDate, cAction, cArg, nSel, cRel, bOld
 
    cPath := Lower( AllTrim( cPath ) )
    if Empty( cPath )
@@ -660,14 +660,17 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
       endif
       // Prefer live data-layer status; fall back to app.database so the UI
       // always knows which driver is configured.
-      BEGIN SEQUENCE
-         return ErpHttpOk( hb_jsonEncode( ErpDbStatus() ), ;
-            "application/json; charset=utf-8" )
-      RECOVER
-         // erp_db not linked or driver error — still report app.json driver
-      END SEQUENCE
-      return ErpHttpOk( hb_jsonEncode( ErpDbStatusFromApp() ), ;
-         "application/json; charset=utf-8" )
+      bOld := ErrorBlock( {| e | Break( e ) } )
+      begin sequence
+         cOut := hb_jsonEncode( ErpDbStatus() )
+      recover
+         cOut := ""
+      end sequence
+      ErrorBlock( bOld )
+      if Empty( cOut )
+         cOut := hb_jsonEncode( ErpDbStatusFromApp() )
+      endif
+      return ErpHttpOk( cOut, "application/json; charset=utf-8" )
    endif
 
    if cMethod == "POST" .and. cPath == "/api/login"

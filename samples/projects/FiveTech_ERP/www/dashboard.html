@@ -247,12 +247,18 @@
   }
   #workdate-scrim.is-open { display: block; }
   #workdate-box {
+    display: none;
+    visibility: hidden;
     position: fixed; z-index: 3210;
     width: min(380px, calc(100vw - 28px));
     background: var(--painel-bg); color: var(--text);
     border: 1px solid var(--line); border-radius: 12px;
     box-shadow: 0 20px 50px rgba(0,0,0,.4); overflow: hidden;
     left: 50%; top: 50%; transform: translate(-50%, -50%);
+  }
+  #workdate-box.is-open {
+    display: block;
+    visibility: visible;
   }
   #workdate-box.dragging {
     box-shadow: 0 24px 56px rgba(0,0,0,.5);
@@ -1645,30 +1651,34 @@
 </footer>
 </div><!-- /.shell -->
 
-<!-- Work date calendar (status bar) — custom grid (works in WebView2) -->
-<div id="workdate-scrim" role="presentation">
-  <div id="workdate-box" role="dialog" aria-modal="true" aria-labelledby="workdate-title">
-    <div class="wd-head" title="Arrastre para mover">
-      <span class="tit" id="workdate-title">Fecha de trabajo</span>
-      <button type="button" id="workdate-x" title="Cerrar" aria-label="Cerrar">&#10005;</button>
+<!-- Work date calendar (status bar) — custom grid (works in WebView2).
+     Box is a SIBLING of the scrim (not nested): dragging repositions the box
+     without tying its visibility to the overlay. Close must hide BOTH. -->
+<div id="workdate-scrim" role="presentation" aria-hidden="true"></div>
+<div id="workdate-box" role="dialog" aria-modal="true" aria-labelledby="workdate-title" aria-hidden="true">
+  <div class="wd-head" title="Arrastre para mover">
+    <span class="tit" id="workdate-title">Fecha de trabajo</span>
+    <button type="button" id="workdate-x" title="Cerrar" aria-label="Cerrar"
+      onclick="event.preventDefault();event.stopPropagation();window.closeWorkDatePicker&&window.closeWorkDatePicker();return false;">&#10005;</button>
+  </div>
+  <div class="wd-body">
+    <p>Seleccione el día en el calendario y pulse <b>Aplicar</b>.</p>
+    <div class="wd-nav">
+      <button type="button" id="workdate-prev" title="Mes anterior" aria-label="Mes anterior">&#8249;</button>
+      <div class="wd-month" id="workdate-month">—</div>
+      <button type="button" id="workdate-next" title="Mes siguiente" aria-label="Mes siguiente">&#8250;</button>
     </div>
-    <div class="wd-body">
-      <p>Seleccione el día en el calendario y pulse <b>Aplicar</b>.</p>
-      <div class="wd-nav">
-        <button type="button" id="workdate-prev" title="Mes anterior" aria-label="Mes anterior">&#8249;</button>
-        <div class="wd-month" id="workdate-month">—</div>
-        <button type="button" id="workdate-next" title="Mes siguiente" aria-label="Mes siguiente">&#8250;</button>
-      </div>
-      <div class="wd-week" id="workdate-week" aria-hidden="true"></div>
-      <div class="wd-grid" id="workdate-grid" role="grid" aria-label="Calendario"></div>
-      <div class="wd-iso">Selección: <b id="workdate-sel-label">—</b></div>
-      <input type="hidden" id="workdate-input" value="">
-    </div>
-    <div class="wd-foot">
-      <button type="button" class="btn-ghost" id="workdate-today">Hoy</button>
-      <button type="button" class="btn-ghost" id="workdate-cancel">Cancelar</button>
-      <button type="button" class="btn-blue" id="workdate-ok">Aplicar</button>
-    </div>
+    <div class="wd-week" id="workdate-week" aria-hidden="true"></div>
+    <div class="wd-grid" id="workdate-grid" role="grid" aria-label="Calendario"></div>
+    <div class="wd-iso">Selección: <b id="workdate-sel-label">—</b></div>
+    <input type="hidden" id="workdate-input" value="">
+  </div>
+  <div class="wd-foot">
+    <button type="button" class="btn-ghost" id="workdate-today">Hoy</button>
+    <button type="button" class="btn-ghost" id="workdate-cancel"
+      onclick="event.preventDefault();event.stopPropagation();window.closeWorkDatePicker&&window.closeWorkDatePicker();return false;">Cancelar</button>
+    <button type="button" class="btn-blue" id="workdate-ok"
+      onclick="event.preventDefault();event.stopPropagation();window.confirmWorkDatePicker&&window.confirmWorkDatePicker();return false;">Aplicar</button>
   </div>
 </div>
 
@@ -2921,9 +2931,21 @@ function paintWorkDateCalendar() {
 function closeWorkDatePicker() {
   var scrim = document.getElementById("workdate-scrim");
   var box = document.getElementById("workdate-box");
-  if (scrim) scrim.classList.remove("is-open");
-  if (box) box.classList.remove("dragging");
   WD_PICK.drag = false;
+  // Always hide BOTH: box is a sibling of scrim (not nested), so hiding
+  // only the overlay would leave the calendar floating forever.
+  if (scrim) {
+    scrim.classList.remove("is-open");
+    scrim.style.display = "none";
+    scrim.setAttribute("aria-hidden", "true");
+  }
+  if (box) {
+    box.classList.remove("dragging", "is-open");
+    box.style.display = "none";
+    box.style.visibility = "hidden";
+    box.setAttribute("aria-hidden", "true");
+  }
+  try { setStatusMsg("Listo"); } catch (e0) {}
 }
 function centerWorkDateBox() {
   var box = document.getElementById("workdate-box");
@@ -2946,10 +2968,12 @@ function openWorkDatePicker() {
     return;
   }
   try { wireWorkDatePicker(); } catch (e1) {}
-  // Keep box under body so fixed coords are viewport-relative
+  // Keep both under body so fixed coords are viewport-relative.
   try {
     if (scrim.parentNode !== document.body) document.body.appendChild(scrim);
     if (box.parentNode !== document.body) document.body.appendChild(box);
+    // Ensure box is never nested under scrim (would re-hide with overlay).
+    if (box.parentNode === scrim) document.body.appendChild(box);
   } catch (eMove) {}
   WD_PICK.selIso = workDateToIso(WORK_DATE);
   p = isoToParts(WD_PICK.selIso);
@@ -2961,8 +2985,13 @@ function openWorkDatePicker() {
   WD_PICK.viewY = p.y;
   WD_PICK.viewM = p.m;
   paintWorkDateCalendar();
+  scrim.style.display = "block";
   scrim.classList.add("is-open");
+  scrim.setAttribute("aria-hidden", "false");
   box.style.display = "block";
+  box.style.visibility = "visible";
+  box.classList.add("is-open");
+  box.setAttribute("aria-hidden", "false");
   // Center after paint (size known)
   setTimeout(function () { centerWorkDateBox(); }, 0);
   try { setStatusMsg("Elija fecha de trabajo…"); } catch (e2) {}
@@ -3044,11 +3073,21 @@ function wireWorkDateDrag() {
 
 function wireWorkDatePicker() {
   var scrim, ok, cancel, x, prev, next, today;
-  if (WD_PICK.wired) {
-    try { wireWorkDateDrag(); } catch (e0) {}
-    return;
+  function bindClose(el) {
+    if (!el) return;
+    // Close on click; stop mousedown bubbling so the title-bar drag never starts.
+    // Do NOT preventDefault on mousedown — WebView2 may then suppress the click.
+    el.onclick = function (e) {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      closeWorkDatePicker();
+      return false;
+    };
+    el.onmousedown = function (e) {
+      if (e) e.stopPropagation();
+      WD_PICK.drag = false;
+    };
   }
-  WD_PICK.wired = true;
+  // Always re-bind close/cancel (safe even if already wired)
   scrim = document.getElementById("workdate-scrim");
   ok = document.getElementById("workdate-ok");
   cancel = document.getElementById("workdate-cancel");
@@ -3056,30 +3095,60 @@ function wireWorkDatePicker() {
   prev = document.getElementById("workdate-prev");
   next = document.getElementById("workdate-next");
   today = document.getElementById("workdate-today");
-  if (ok) ok.onclick = function (e) { e.preventDefault(); confirmWorkDatePicker(); };
-  if (cancel) cancel.onclick = function (e) { e.preventDefault(); closeWorkDatePicker(); };
-  if (x) x.onclick = function (e) { e.preventDefault(); closeWorkDatePicker(); };
-  if (prev) prev.onclick = function (e) { e.preventDefault(); workDateShiftMonth(-1); };
-  if (next) next.onclick = function (e) { e.preventDefault(); workDateShiftMonth(1); };
-  if (today) today.onclick = function (e) { e.preventDefault(); workDatePickToday(); };
+  if (ok) ok.onclick = function (e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    confirmWorkDatePicker();
+    return false;
+  };
+  bindClose(cancel);
+  bindClose(x);
+  if (prev) prev.onclick = function (e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    workDateShiftMonth(-1);
+  };
+  if (next) next.onclick = function (e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    workDateShiftMonth(1);
+  };
+  if (today) today.onclick = function (e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    workDatePickToday();
+  };
   if (scrim) {
     scrim.onclick = function (e) {
-      // Do not close while dragging the window
       if (WD_PICK.drag) return;
       if (e.target === scrim) closeWorkDatePicker();
     };
   }
-  document.addEventListener("keydown", function (e) {
-    var s = document.getElementById("workdate-scrim");
-    if (!s || !s.classList.contains("is-open")) return;
-    if (e.key === "Escape") { e.preventDefault(); closeWorkDatePicker(); }
-    if (e.key === "Enter") { e.preventDefault(); confirmWorkDatePicker(); }
-  });
+  if (!WD_PICK.wired) {
+    WD_PICK.wired = true;
+    document.addEventListener("keydown", function (e) {
+      var s = document.getElementById("workdate-scrim");
+      var b = document.getElementById("workdate-box");
+      var open = (s && s.classList.contains("is-open")) ||
+        (b && b.classList.contains("is-open")) ||
+        (b && b.style.display === "block" && b.style.visibility !== "hidden");
+      if (!open) return;
+      if (e.key === "Escape") { e.preventDefault(); closeWorkDatePicker(); }
+      else if (e.key === "Enter") { e.preventDefault(); confirmWorkDatePicker(); }
+    });
+    // Capture-phase safety net (works even if element handlers are lost)
+    document.addEventListener("click", function (e) {
+      var t = e.target;
+      if (!t || !t.closest) return;
+      if (t.closest("#workdate-cancel") || t.closest("#workdate-x")) {
+        e.preventDefault();
+        e.stopPropagation();
+        closeWorkDatePicker();
+      }
+    }, true);
+  }
   try { wireWorkDateDrag(); } catch (e1) {}
 }
-// Expose for inline onclick on status bar
+// Expose for inline onclick on status bar / footer buttons
 window.openWorkDatePicker = openWorkDatePicker;
 window.closeWorkDatePicker = closeWorkDatePicker;
+window.confirmWorkDatePicker = confirmWorkDatePicker;
 
 function initStatusBar() {
   var ver = APP_VER;
