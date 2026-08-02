@@ -1106,11 +1106,16 @@ return h
 static function ErpFwhLoginHtml()
 
    local cFile := hb_DirBase() + "www" + hb_ps() + "login.html"
-   if File( cFile )
-      return MemoRead( cFile )
+   local cHtml
+
+   if ! File( cFile )
+      return "<!DOCTYPE html><html><body><h1>login.html missing</h1>" + ;
+         "<p>Run _extract_fwh_html.py</p></body></html>"
    endif
-return "<!DOCTYPE html><html><body><h1>login.html missing</h1>" + ;
-       "<p>Run _extract_fwh_html.py</p></body></html>"
+   cHtml := MemoRead( cFile )
+   // Same placeholders as dashboard (login only uses version for now)
+   cHtml := StrTran( cHtml, "__APPVER__", ErpAppVersion() )
+return cHtml
 
 //--------------------------------------------------------------------
 // Version string for status bar (__APPVER__)

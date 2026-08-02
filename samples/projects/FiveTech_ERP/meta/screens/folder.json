@@ -1,0 +1,1 @@
+{"id":"screen.folder","kind":"screen","layout":"folder","title":"Folder","toolbar":["add","edit","delete","refresh"],"grid":{"columns":[]},"tabs":[{"id":"clientes","label":"Clients","screen":"screen.parties"}]}
