@@ -728,6 +728,16 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
       elseif cAction == "filter"
          return ErpHttpOk( hb_jsonEncode( { "ok" => .T., "filter" => cArg } ), ;
             "application/json; charset=utf-8" )
+      elseif cAction == "workdate" .or. cAction == "work_date" .or. cAction == "work-date"
+         // a1 = display date (DD/MM/YYYY etc.), optional a2 = ISO YYYY-MM-DD
+         if Empty( cArg )
+            return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "work date required" } ), ;
+               "application/json; charset=utf-8" )
+         endif
+         hSess[ "workDate" ] := cArg
+         ErpSessPut( cTok, hSess )
+         return ErpHttpOk( hb_jsonEncode( { "ok" => .T., "workDate" => cArg } ), ;
+            "application/json; charset=utf-8" )
       endif
       return ErpHttpOk( hb_jsonEncode( { "ok" => .T., "toast" => "Action: " + cArg } ), ;
          "application/json; charset=utf-8" )

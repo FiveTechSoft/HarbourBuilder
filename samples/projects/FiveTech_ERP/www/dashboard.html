@@ -196,6 +196,52 @@
   #status-bar .sb-spacer { flex: 1 1 auto; min-width: 8px; border: 0; margin: 0; padding: 0; }
   #status-bar .sb-msg { max-width: 280px; color: var(--muted); font-style: italic; }
   #status-bar .sb-warn .sb-txt { color: #d97706; }
+  /* Work date picker modal (status bar) */
+  #workdate-scrim {
+    display: none; position: fixed; inset: 0; z-index: 3200;
+    background: var(--scrim); align-items: center; justify-content: center;
+  }
+  #workdate-scrim.is-open { display: flex; }
+  #workdate-box {
+    width: min(380px, calc(100vw - 28px));
+    background: var(--painel-bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: 0 20px 50px rgba(0,0,0,.4); overflow: hidden;
+  }
+  #workdate-box .wd-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 10px 0 16px; height: 42px;
+    background: linear-gradient(90deg, var(--blue), var(--blue-deep));
+    color: #fff; font-weight: 600; font-size: .92rem;
+  }
+  #workdate-box .wd-head .tit { flex: 1; }
+  #workdate-box .wd-head button {
+    width: 34px; height: 28px; border: 0; border-radius: 6px;
+    background: transparent; color: #fff; cursor: pointer; font-size: 15px;
+  }
+  #workdate-box .wd-head button:hover { background: rgba(255,255,255,.16); }
+  #workdate-box .wd-body { padding: 18px 20px 8px; }
+  #workdate-box .wd-body p {
+    margin: 0 0 12px; font-size: .82rem; color: var(--muted); line-height: 1.4;
+  }
+  #workdate-box .wd-body label {
+    display: block; font-size: .72rem; font-weight: 700; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px;
+  }
+  #workdate-box input[type="date"] {
+    width: 100%; height: 42px; padding: 0 12px;
+    border: 1px solid var(--line); border-radius: 8px;
+    background: var(--input-bg); color: var(--text);
+    font: inherit; font-size: 1rem; outline: none;
+    color-scheme: inherit;
+  }
+  #workdate-box input[type="date"]:focus {
+    border-color: var(--blue); box-shadow: 0 0 0 3px var(--focus-ring);
+  }
+  #workdate-box .wd-foot {
+    display: flex; justify-content: flex-end; gap: 8px;
+    padding: 12px 16px 16px;
+  }
   .topbar {
     display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 12px; padding: 0 4px; flex-shrink: 0;
@@ -1456,6 +1502,25 @@
 </footer>
 </div><!-- /.shell -->
 
+<!-- Work date calendar (status bar) -->
+<div id="workdate-scrim" role="presentation">
+  <div id="workdate-box" role="dialog" aria-modal="true" aria-labelledby="workdate-title">
+    <div class="wd-head">
+      <span class="tit" id="workdate-title">Fecha de trabajo</span>
+      <button type="button" id="workdate-x" title="Cerrar">&#10005;</button>
+    </div>
+    <div class="wd-body">
+      <p>Seleccione la fecha de trabajo de la sesión. Se usa en listados, documentos y filtros.</p>
+      <label for="workdate-input">Calendario</label>
+      <input type="date" id="workdate-input" autocomplete="off">
+    </div>
+    <div class="wd-foot">
+      <button type="button" class="btn-ghost" id="workdate-cancel">Cancelar</button>
+      <button type="button" class="btn-blue" id="workdate-ok">Aplicar</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <!-- Product tour demo overlay -->
@@ -2423,6 +2488,141 @@ function refreshStatusCompany() {
   } catch (e) {}
   sbSetText("sb-company", c || "(sin empresa)");
 }
+/* ---- Work date: parse / format for calendar input ---- */
+function workDateFmtPref() {
+  try {
+    var L = (typeof appLocale === "function") ? appLocale() : null;
+    if (L && L.dateFormat) return String(L.dateFormat);
+  } catch (e) {}
+  try {
+    if (APP_META && APP_META.locale && APP_META.locale.dateFormat)
+      return String(APP_META.locale.dateFormat);
+  } catch (e2) {}
+  return "DD/MM/YYYY";
+}
+function pad2(n) { n = parseInt(n, 10) || 0; return (n < 10 ? "0" : "") + n; }
+/** Convert WORK_DATE (any common form) → YYYY-MM-DD for <input type=date> */
+function workDateToIso(s) {
+  s = String(s || "").trim();
+  var m, y, mo, d, fmt;
+  if (!s || s === "—") {
+    var now = new Date();
+    return now.getFullYear() + "-" + pad2(now.getMonth() + 1) + "-" + pad2(now.getDate());
+  }
+  m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) return m[1] + "-" + pad2(m[2]) + "-" + pad2(m[3]);
+  m = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/);
+  if (m) {
+    fmt = workDateFmtPref().toUpperCase();
+    if (fmt.indexOf("MM/DD") === 0 || fmt.indexOf("MM-DD") === 0) {
+      mo = parseInt(m[1], 10); d = parseInt(m[2], 10); y = parseInt(m[3], 10);
+    } else {
+      // default DD/MM/YYYY (Europe)
+      d = parseInt(m[1], 10); mo = parseInt(m[2], 10); y = parseInt(m[3], 10);
+    }
+    if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31)
+      return y + "-" + pad2(mo) + "-" + pad2(d);
+  }
+  return workDateToIso(""); // fallback today
+}
+/** Format ISO YYYY-MM-DD for status bar using app locale */
+function workDateFromIso(iso) {
+  var m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return iso;
+  var y = m[1], mo = m[2], d = m[3];
+  var fmt = workDateFmtPref().toUpperCase();
+  if (fmt.indexOf("YYYY-MM-DD") === 0) return y + "-" + mo + "-" + d;
+  if (fmt.indexOf("MM/DD") === 0) return mo + "/" + d + "/" + y;
+  return d + "/" + mo + "/" + y; // DD/MM/YYYY
+}
+function applyWorkDate(displayDate, isoDate) {
+  WORK_DATE = displayDate || isoDate || WORK_DATE;
+  sbSetText("sb-data", WORK_DATE);
+  try {
+    var sub = document.querySelector("#ws-appointments .ws-title .sub");
+    if (sub) {
+      var t = sub.textContent || "";
+      if (t.indexOf("·") >= 0)
+        sub.textContent = t.replace(/·\s*.*$/, "· " + WORK_DATE);
+      else sub.textContent = WORK_DATE;
+    }
+    var fTo = document.getElementById("f-to");
+    if (fTo && (!fTo.dataset.userEdited || fTo.dataset.userEdited === "0"))
+      fTo.value = WORK_DATE;
+  } catch (e) {}
+  setStatusMsg("Fecha de trabajo: " + WORK_DATE, "ok");
+  // Persist on server session (best-effort)
+  try {
+    fetch("/api/cmd", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "action=workdate&a1=" + encodeURIComponent(WORK_DATE) +
+        (isoDate ? ("&a2=" + encodeURIComponent(isoDate)) : ""),
+      credentials: "same-origin",
+      cache: "no-store"
+    }).catch(function () {});
+  } catch (e2) {}
+}
+function closeWorkDatePicker() {
+  var scrim = document.getElementById("workdate-scrim");
+  if (scrim) scrim.classList.remove("is-open");
+}
+function openWorkDatePicker() {
+  var scrim = document.getElementById("workdate-scrim");
+  var inp = document.getElementById("workdate-input");
+  if (!scrim || !inp) return;
+  inp.value = workDateToIso(WORK_DATE);
+  scrim.classList.add("is-open");
+  setTimeout(function () {
+    try {
+      inp.focus();
+      if (typeof inp.showPicker === "function") inp.showPicker();
+    } catch (e) {}
+  }, 40);
+}
+function confirmWorkDatePicker() {
+  var inp = document.getElementById("workdate-input");
+  var iso, disp;
+  if (!inp || !inp.value) {
+    toast("Seleccione una fecha en el calendario");
+    return;
+  }
+  iso = inp.value;
+  disp = workDateFromIso(iso);
+  applyWorkDate(disp, iso);
+  closeWorkDatePicker();
+}
+function wireWorkDatePicker() {
+  var scrim = document.getElementById("workdate-scrim");
+  var ok = document.getElementById("workdate-ok");
+  var cancel = document.getElementById("workdate-cancel");
+  var x = document.getElementById("workdate-x");
+  var inp = document.getElementById("workdate-input");
+  if (ok) ok.onclick = confirmWorkDatePicker;
+  if (cancel) cancel.onclick = closeWorkDatePicker;
+  if (x) x.onclick = closeWorkDatePicker;
+  if (scrim) {
+    scrim.onclick = function (e) {
+      if (e.target === scrim) closeWorkDatePicker();
+    };
+  }
+  if (inp) {
+    inp.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); confirmWorkDatePicker(); }
+      if (e.key === "Escape") { e.preventDefault(); closeWorkDatePicker(); }
+    });
+    // Double-click / change then Enter on some browsers
+    inp.addEventListener("change", function () {
+      // keep selection; user still hits Aplicar (or Enter)
+    });
+  }
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    var s = document.getElementById("workdate-scrim");
+    if (s && s.classList.contains("is-open")) closeWorkDatePicker();
+  });
+}
+
 function initStatusBar() {
   var ver = APP_VER;
   try { if (APP_META && APP_META.version) ver = String(APP_META.version); } catch (e) {}
@@ -2435,13 +2635,11 @@ function initStatusBar() {
   if (STATUS_BAR.clockTimer) clearInterval(STATUS_BAR.clockTimer);
   STATUS_BAR.clockTimer = setInterval(refreshStatusClock, 1000);
   setInterval(refreshStatusDb, 60000);
+  try { wireWorkDatePicker(); } catch (eW) {}
   var di = document.getElementById("sb-date-item");
-  if (di) di.onclick = function () {
-    var n = window.prompt("Fecha de trabajo (esta sesión):", WORK_DATE || "");
-    if (n == null) return;
-    n = String(n).trim();
-    if (!n) return;
-    WORK_DATE = n; sbSetText("sb-data", n); setStatusMsg("Fecha: " + n);
+  if (di) di.onclick = function (e) {
+    e.preventDefault();
+    openWorkDatePicker();
   };
   var ci = document.getElementById("sb-company-item");
   if (ci) ci.onclick = function () {
