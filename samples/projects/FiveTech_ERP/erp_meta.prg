@@ -301,6 +301,34 @@ function ErpMetaCatalog()
 return aList
 
 //--------------------------------------------------------------------
+// Vertical packs available on disk: subfolders of meta/verticals that
+// contain a modules.json. Scanned live (no cache) so new packs appear
+// without restarting the app.
+function ErpMetaVerticals()
+
+   local aOut := {}
+   local cDir := ErpMetaRoot() + "verticals" + hb_ps()
+   local aDir, aItem, cName
+
+   if hb_DirExists( cDir )
+      aDir := Directory( cDir + "*.*", "D" )
+      for each aItem in aDir
+         cName := AllTrim( ErpToStr( aItem[ 1 ] ) )
+         if Empty( cName ) .or. cName == "." .or. cName == ".."
+            loop
+         endif
+         if ! "D" $ Upper( ErpToStr( aItem[ 5 ] ) )
+            loop
+         endif
+         if File( cDir + cName + hb_ps() + "modules.json" )
+            AAdd( aOut, cName )
+         endif
+      next
+   endif
+   ASort( aOut )
+return aOut
+
+//--------------------------------------------------------------------
 function ErpMetaClearCache()
    hb_MutexLock( s_mtxMeta )
    s_hMeta := { => }

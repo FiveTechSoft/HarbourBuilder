@@ -691,7 +691,7 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
          return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Not authenticated" } ), ;
             "application/json; charset=utf-8" )
       endif
-      cOut := hb_jsonEncode( { "ok" => .T., "items" => { "clinic", "services", "retail" }, ;
+      cOut := hb_jsonEncode( { "ok" => .T., "items" => ErpMetaVerticals(), ;
          "current" => ErpToStr( hb_HGetDef( ErpMetaGet( "app" ), "vertical", "" ) ) } )
       return ErpHttpOk( cOut, "application/json; charset=utf-8" )
    endif
