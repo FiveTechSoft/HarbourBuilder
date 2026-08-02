@@ -1,0 +1,46 @@
+{
+  "id": "demo.designers",
+  "kind": "demo",
+  "title": "Diseñadores (admin)",
+  "loop": false,
+  "returnToMenu": true,
+  "steps": [
+    {
+      "section": "1 · Solo admin",
+      "caption": "Design form y Edit app requieren rol admin (p. ej. admin/1234). Los cambios se escriben en meta JSON en caliente.",
+      "durationMs": 5000,
+      "highlight": "#btn-design"
+    },
+    {
+      "section": "2 · Design form",
+      "action": "openFormDesigner",
+      "screen": "screen.products",
+      "adminOnly": true,
+      "caption": "Design form: layout, dataRef, columnas de la list, toolbar y la sección Edit dialog (ancho, columnas, campos custom del popup).",
+      "durationMs": 7000,
+      "highlight": "#designer"
+    },
+    {
+      "section": "3 · Edit dialog en el diseñador",
+      "adminOnly": true,
+      "caption": "Bloque Edit dialog: width + columns en Auto = default. Custom fields = form.fields propio de esta pantalla. Scope Form fields vs Master/grid.",
+      "durationMs": 6500,
+      "highlight": "#des-edit-form-block"
+    },
+    {
+      "section": "4 · Edit app",
+      "action": "openAppDesigner",
+      "adminOnly": true,
+      "caption": "Edit app: branding, puerto HTTP, locale (moneda, decimales, IVA) y el menú completo del vertical activo.",
+      "durationMs": 6500,
+      "highlight": "#menu-designer"
+    },
+    {
+      "section": "5 · Cerrar",
+      "action": "closeOverlays",
+      "caption": "Fin del tour de diseñadores. Vuelves al menú Demo para seguir con otro tema.",
+      "durationMs": 4500,
+      "highlight": "#btn-demo"
+    }
+  ]
+}

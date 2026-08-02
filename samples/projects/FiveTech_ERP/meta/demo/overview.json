@@ -1,0 +1,83 @@
+{
+  "id": "demo.overview",
+  "kind": "demo",
+  "title": "Visita general del producto",
+  "loop": false,
+  "returnToMenu": true,
+  "steps": [
+    {
+      "section": "1 · Bienvenida",
+      "caption": "FiveTech Desktop & Web: las mismas pantallas en Windows (WebView2) y en el navegador. Una UI HTML, una API HTTP, un modelo meta JSON.",
+      "durationMs": 5000,
+      "highlight": "#brand-name"
+    },
+    {
+      "section": "2 · Meta",
+      "caption": "Todo se define bajo meta/: pantallas, menús, datos, informes y demos. Cambias JSON → Save o reinicio → la UI se actualiza. Sin recompilar la estructura.",
+      "durationMs": 5500,
+      "highlight": "#nav"
+    },
+    {
+      "section": "3 · Navegación",
+      "action": "nav",
+      "screen": "screen.appointments",
+      "menuId": "appointments",
+      "label": "Appointments",
+      "caption": "El menú lateral viene de modules.json o del vertical activo (meta/verticals/<pack>/modules.json).",
+      "durationMs": 5000,
+      "highlight": "#nav"
+    },
+    {
+      "section": "4 · CRM · Parties",
+      "action": "nav",
+      "screen": "screen.parties",
+      "menuId": "parties",
+      "label": "Parties",
+      "caption": "CRM genérico: parties (personas y organizaciones), roles, origen y propietario. Sirve a cualquier sector.",
+      "durationMs": 5000,
+      "highlight": "#ws-meta"
+    },
+    {
+      "section": "5 · Layout form",
+      "action": "nav",
+      "screen": "screen.party_card",
+      "menuId": "party_card",
+      "label": "Party card",
+      "caption": "layout form = ficha con pestañas. Misma dataRef que la lista, otra presentación.",
+      "durationMs": 4800,
+      "highlight": "#ws-meta"
+    },
+    {
+      "section": "6 · Pipeline",
+      "action": "nav",
+      "screen": "screen.pipeline",
+      "menuId": "pipeline",
+      "label": "Pipeline",
+      "caption": "layout workflow: oportunidades por etapas con transiciones. Otros layouts: document, master-detail, calendar, dashboard…",
+      "durationMs": 5000,
+      "highlight": "#ws-meta"
+    },
+    {
+      "section": "7 · Verticals",
+      "caption": "Vertical packs (clinic, services, retail, ferreteria, demo) cambian menú y etiquetas. Los datos core se comparten. Cada empresa puede enlazar varias apps.",
+      "durationMs": 5500,
+      "highlight": "#nav"
+    },
+    {
+      "section": "8 · KPIs",
+      "action": "nav",
+      "screen": "screen.kpis",
+      "menuId": "kpis",
+      "label": "Dashboard",
+      "caption": "layout dashboard: tiles desde data.dashboard_kpis. Todo sigue siendo meta + JSON.",
+      "durationMs": 4500,
+      "highlight": "#ws-meta"
+    },
+    {
+      "section": "9 · Siguiente paso",
+      "caption": "Fin de la visita general. Vuelve al menú Demo y prueba «Listas + formulario de edición» para el tutorial de construcción de pantallas.",
+      "durationMs": 5500,
+      "highlight": "#btn-demo"
+    }
+  ]
+}

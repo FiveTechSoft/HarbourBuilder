@@ -1,0 +1,49 @@
+{
+  "id": "demo.multi_app",
+  "kind": "demo",
+  "title": "Multi-empresa y multi-app",
+  "loop": false,
+  "returnToMenu": true,
+  "steps": [
+    {
+      "section": "1 · Empresa en sesión",
+      "caption": "Cada login elige empresa (defaultCompany del usuario). Los listados se filtran por company; las altas sellan la empresa de sesión.",
+      "durationMs": 5500,
+      "highlight": "#sb-company-item"
+    },
+    {
+      "section": "2 · N apps por empresa",
+      "caption": "En data.companies cada fila puede tener verticals/apps (clinic, demo, retail, ferreteria…). defaultApp es la app al entrar en esa empresa.",
+      "durationMs": 6000,
+      "highlight": "#sb-company-item"
+    },
+    {
+      "section": "3 · Pantalla de contexto",
+      "action": "nav",
+      "screen": "screen.context",
+      "menuId": "context",
+      "label": "Company context",
+      "caption": "Company & app context: elige empresa y, si tiene varias apps, la app. El menú lateral recarga el vertical pack de esa app.",
+      "durationMs": 7000,
+      "highlight": "#ws-meta"
+    },
+    {
+      "section": "4 · Resolución",
+      "caption": "Orden: user.defaultApp (si la empresa la tiene) → company.defaultApp → primera app. cmd company / cmd app en la API de sesión.",
+      "durationMs": 5500,
+      "highlight": "#ws-meta"
+    },
+    {
+      "section": "5 · Ferretería de ejemplo",
+      "caption": "Empresa FER (Ferretería El Tornillo) solo tiene app ferreteria. HQ y BCN pueden mezclar varias. Admin → Companies marca verticals en checklist.",
+      "durationMs": 6000,
+      "highlight": "#sb-company-item"
+    },
+    {
+      "section": "6 · Cierre",
+      "caption": "Datos por company · menú por app/vertical. Vuelve al menú Demo para el tutorial de list/edit u otra ruta.",
+      "durationMs": 5000,
+      "highlight": "#btn-demo"
+    }
+  ]
+}

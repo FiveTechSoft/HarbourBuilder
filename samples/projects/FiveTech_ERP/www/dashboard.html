@@ -737,19 +737,24 @@
     border: 1px solid var(--line); border-radius: 14px;
     box-shadow: 0 16px 40px rgba(0,0,0,.22); padding: 14px 16px 12px;
     pointer-events: auto; z-index: 81;
+    max-height: min(78vh, 640px); display: flex; flex-direction: column;
+  }
+  #demo-card.demo-menu-mode {
+    width: min(720px, calc(100vw - 28px));
+    bottom: auto; top: 50%; transform: translate(-50%, -50%);
+    max-height: min(86vh, 720px);
   }
   #demo-card .demo-kicker {
     font-size: .7rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
     color: var(--blue); margin-bottom: 4px;
-  }
-  #demo-card .demo-caption {
-    font-size: .9rem; line-height: 1.45; color: var(--text); margin: 0 0 10px; min-height: 3.2em;
-  }
-  #demo-card .demo-kicker {
     max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
+  #demo-card .demo-caption {
+    font-size: .9rem; line-height: 1.45; color: var(--text); margin: 0 0 10px; min-height: 0;
+  }
+  #demo-card.demo-menu-mode .demo-caption { min-height: 0; margin-bottom: 8px; }
   #demo-card .demo-bar {
-    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex-shrink: 0;
   }
   #demo-card .demo-bar .prog {
     flex: 1; min-width: 80px; font-size: .72rem; color: var(--muted);
@@ -762,6 +767,54 @@
   #demo-card .demo-bar button.primary {
     background: var(--blue); color: #fff; border-color: var(--blue);
   }
+  #demo-menu {
+    display: none; flex: 1; overflow: auto; margin: 4px 0 10px; padding-right: 2px;
+  }
+  #demo-card.demo-menu-mode #demo-menu { display: block; }
+  #demo-card.demo-menu-mode #demo-caption { display: none; }
+  #demo-card.demo-menu-mode .demo-bar .prog { display: none; }
+  #demo-card.demo-menu-mode #demo-btn-pause,
+  #demo-card.demo-menu-mode #demo-btn-next { display: none; }
+  .demo-menu-sub {
+    font-size: .82rem; color: var(--muted); line-height: 1.4; margin: 0 0 12px;
+  }
+  .demo-menu-group { margin-bottom: 14px; }
+  .demo-menu-group h4 {
+    margin: 0 0 8px; font-size: .72rem; font-weight: 700; letter-spacing: .04em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .demo-menu-items {
+    display: grid; grid-template-columns: 1fr; gap: 8px;
+  }
+  @media (min-width: 640px) {
+    .demo-menu-items { grid-template-columns: 1fr 1fr; }
+  }
+  .demo-menu-item {
+    text-align: left; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--surface-2); padding: 10px 12px; cursor: pointer;
+    color: var(--text); transition: border-color .15s, box-shadow .15s;
+  }
+  .demo-menu-item:hover {
+    border-color: var(--blue); box-shadow: 0 0 0 2px var(--focus-ring);
+  }
+  .demo-menu-item .dmi-top {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
+    margin-bottom: 4px;
+  }
+  .demo-menu-item .dmi-label { font-weight: 700; font-size: .88rem; line-height: 1.25; }
+  .demo-menu-item .dmi-hint {
+    font-size: .68rem; font-weight: 700; color: var(--muted); white-space: nowrap;
+  }
+  .demo-menu-item .dmi-desc {
+    font-size: .78rem; color: var(--text-2); line-height: 1.35; margin: 0;
+  }
+  .demo-menu-item .dmi-badges { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .demo-menu-item .dmi-badge {
+    font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+    padding: 2px 6px; border-radius: 999px; background: var(--blue-soft); color: var(--blue);
+  }
+  .demo-menu-item .dmi-badge.admin { background: rgba(220,38,38,.1); color: #dc2626; }
+  .demo-menu-item:disabled { opacity: .45; cursor: not-allowed; }
   .view-placeholder {
     display: none; flex: 1; align-items: center; justify-content: center;
     flex-direction: column; gap: 8px; color: var(--muted); background: var(--painel-body);
@@ -1132,6 +1185,11 @@
     border: 1px solid var(--line); box-shadow: 0 16px 48px rgba(0,0,0,.35);
     display: flex; flex-direction: column; overflow: hidden;
   }
+  /* Default & admin form.width: more width than height for multi-col edit */
+  .rec-box.rec-w-narrow { width: min(480px, 100%); }
+  .rec-box.rec-w-normal { width: min(640px, 100%); }
+  .rec-box.rec-w-wide { width: min(960px, 96vw); }
+  .rec-box.rec-w-xl { width: min(1180px, 96vw); }
   .rec-head {
     display: flex; align-items: center; gap: 8px; padding: 12px 14px;
     background: linear-gradient(90deg, var(--blue), var(--blue-deep)); color: #fff; font-weight: 600;
@@ -1143,7 +1201,23 @@
   }
   .rec-head button:hover { background: rgba(255,255,255,.16); }
   .rec-body { flex: 1; overflow: auto; padding: 14px 16px; background: var(--surface); }
-  .rec-field { margin-bottom: 12px; }
+  .rec-body.rec-form-grid {
+    display: grid;
+    gap: 10px 14px;
+    align-content: start;
+    grid-template-columns: 1fr;
+  }
+  .rec-body.rec-form-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+  .rec-body.rec-form-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+  @media (max-width: 720px) {
+    .rec-body.rec-form-grid.cols-2,
+    .rec-body.rec-form-grid.cols-3 { grid-template-columns: 1fr; }
+  }
+  .rec-field { margin-bottom: 0; min-width: 0; }
+  .rec-field.span-2 { grid-column: span 2; }
+  .rec-field.span-3 { grid-column: span 3; }
+  .rec-field.span-full { grid-column: 1 / -1; }
+  .rec-body:not(.rec-form-grid) .rec-field { margin-bottom: 12px; }
   .rec-field label {
     display: block; font-size: .72rem; font-weight: 700; color: var(--muted);
     text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px;
@@ -1838,17 +1912,18 @@
 
 <div id="toast"></div>
 
-<!-- Product tour demo overlay -->
+<!-- Product tour demo overlay (+ learning menu) -->
 <div id="demo-overlay" aria-hidden="true">
   <div id="demo-spotlight"></div>
-  <div id="demo-card" role="dialog" aria-labelledby="demo-caption">
+  <div id="demo-card" role="dialog" aria-labelledby="demo-kicker">
     <div class="demo-kicker" id="demo-kicker">Product tour</div>
     <p class="demo-caption" id="demo-caption">Loading demo…</p>
+    <div id="demo-menu" aria-label="Demo catalog"></div>
     <div class="demo-bar">
       <span class="prog" id="demo-prog">—</span>
       <button type="button" id="demo-btn-pause">Pause</button>
       <button type="button" id="demo-btn-next">Next</button>
-      <button type="button" class="primary" id="demo-btn-stop">Stop</button>
+      <button type="button" class="primary" id="demo-btn-stop">Close</button>
     </div>
   </div>
 </div>
@@ -2013,6 +2088,41 @@
         </p>
       </div>
     </div>
+    <div class="designer-section" id="des-edit-form-block">
+      <h3><span>Edit dialog (Add / Edit popup)</span></h3>
+      <div class="designer-grid" style="padding:12px">
+        <div class="designer-field">
+          <label for="des-form-width">Dialog width</label>
+          <select id="des-form-width">
+            <option value="auto">Auto (from field count)</option>
+            <option value="narrow">Narrow (~480)</option>
+            <option value="normal">Normal (~640)</option>
+            <option value="wide">Wide (~960)</option>
+            <option value="xl">Extra wide (~1180)</option>
+          </select>
+        </div>
+        <div class="designer-field">
+          <label for="des-form-columns">Field columns</label>
+          <select id="des-form-columns">
+            <option value="auto">Auto (1–3)</option>
+            <option value="1">1 column</option>
+            <option value="2">2 columns</option>
+            <option value="3">3 columns</option>
+          </select>
+        </div>
+        <div class="designer-field" style="grid-column:1/-1">
+          <label class="rec-bool" style="height:auto;margin-top:4px">
+            <input type="checkbox" id="des-form-custom">
+            Customize form fields separately from the list grid
+          </label>
+          <p style="margin:6px 0 0;font-size:.72rem;color:var(--muted)">
+            By default the popup uses the same fields as the list grid (multi-column layout).
+            Enable this only when the edit form should differ (order, labels, extra fields, colSpan).
+            Use the <b>Form fields</b> scope button below when custom is on.
+          </p>
+        </div>
+      </div>
+    </div>
     <div class="designer-section">
       <h3>
         <span id="des-cols-title">Grid columns (master)</span>
@@ -2036,11 +2146,12 @@
       </table>
       <p style="padding:8px 12px 10px;margin:0;font-size:.72rem;color:var(--muted)">
         Control types: text, money, select (combobox), checklist (multi), checkbox (yes/no).
-        Options apply to select and checklist (comma-separated). Use the buttons to switch master/detail columns when layout is master-detail.
+        Options apply to select and checklist (comma-separated). Use the buttons to switch master/detail/form columns.
       </p>
-      <div style="padding:0 12px 10px;display:flex;gap:8px" id="des-cols-scope-bar">
-        <button type="button" class="btn-ghost" id="des-scope-master" style="height:28px;font-size:.75rem">Master columns</button>
+      <div style="padding:0 12px 10px;display:flex;gap:8px;flex-wrap:wrap" id="des-cols-scope-bar">
+        <button type="button" class="btn-ghost" id="des-scope-master" style="height:28px;font-size:.75rem">Master / grid</button>
         <button type="button" class="btn-ghost" id="des-scope-detail" style="height:28px;font-size:.75rem">Detail columns</button>
+        <button type="button" class="btn-ghost" id="des-scope-form" style="height:28px;font-size:.75rem">Form fields</button>
       </div>
     </div>
     <div class="designer-section">
@@ -4071,10 +4182,11 @@ document.addEventListener("click", function (e) {
 });
 
 var DESIGNER = {
-  key: "", doc: null, cols: [], detailCols: [], dirty: false,
-  toolbar: [], detailToolbar: [], layout: "list", colScope: "master", fromScreen: ""
+  key: "", doc: null, cols: [], detailCols: [], formCols: [], dirty: false,
+  toolbar: [], detailToolbar: [], layout: "list", colScope: "master",
+  formCustom: false, fromScreen: ""
 };
-var REC_EDIT = { mode: "add", keyValue: "", scope: "master" };
+var REC_EDIT = { mode: "add", keyValue: "", scope: "master", fields: [], baseRow: null };
 var TOOLBAR_DEFS = [
   { id: "add", label: "New", ico: "&#10010;", primary: true },
   { id: "edit", label: "Edit", ico: "&#9998;" },
@@ -4911,37 +5023,121 @@ function metaToolbarAction(act, scope) {
   if (act === "excel") { metaExportExcel(); return; }
 }
 
+/** Resolve edit-dialog spec: per-screen form or default from grid columns. */
+function resolveRecordFormSpec(scope) {
+  var isDet = (scope === "detail" && META_VIEW.detail);
+  var gridCols = isDet ? (META_VIEW.detail.columns || []) : (META_VIEW.columns || []);
+  var form = null;
+  if (isDet && META_VIEW.detail && META_VIEW.detail.form) form = META_VIEW.detail.form;
+  else if (!isDet && META_VIEW.doc && META_VIEW.doc.form) form = META_VIEW.doc.form;
+  var fields = [], i, f, id, src, map = {}, nCol, width, w;
+  for (i = 0; i < gridCols.length; i++) {
+    if (gridCols[i] && gridCols[i].id) map[String(gridCols[i].id)] = gridCols[i];
+  }
+  if (form && Array.isArray(form.fields) && form.fields.length) {
+    for (i = 0; i < form.fields.length; i++) {
+      f = form.fields[i];
+      if (typeof f === "string") {
+        id = f;
+        src = map[id] || { id: id, label: id, type: "text" };
+        fields.push(Object.assign({}, src, { id: id }));
+      } else if (f && f.id) {
+        src = map[f.id] || {};
+        fields.push(Object.assign({}, src, f));
+      }
+    }
+  } else {
+    for (i = 0; i < gridCols.length; i++) {
+      if (gridCols[i] && gridCols[i].id) fields.push(Object.assign({}, gridCols[i]));
+    }
+  }
+  // Auto layout: wider multi-column by default
+  nCol = 1;
+  if (form && form.columns != null && String(form.columns) !== "auto") {
+    nCol = Math.max(1, Math.min(3, parseInt(form.columns, 10) || 1));
+  } else {
+    if (fields.length >= 9) nCol = 3;
+    else if (fields.length >= 5) nCol = 2;
+    else nCol = 1;
+  }
+  width = "normal";
+  if (form && form.width && String(form.width) !== "auto") {
+    width = String(form.width).toLowerCase();
+  } else {
+    if (nCol >= 3) width = "wide";
+    else if (nCol === 2) width = "wide";
+    else if (fields.length <= 3) width = "narrow";
+    else width = "normal";
+  }
+  if (["narrow", "normal", "wide", "xl"].indexOf(width) < 0) width = "normal";
+  // Default colSpan for long controls when auto (no custom form fields)
+  if (!(form && Array.isArray(form.fields) && form.fields.length)) {
+    for (i = 0; i < fields.length; i++) {
+      f = fields[i];
+      w = colControlType(f);
+      if (!f.colSpan && (w === "checklist" || w === "multiselect" ||
+          f.id === "notes" || f.id === "password" || f.type === "password")) {
+        f.colSpan = "full";
+      } else if (!f.colSpan && nCol >= 2 && (f.id === "name" || f.id === "title")) {
+        f.colSpan = 2;
+      }
+    }
+  }
+  return { fields: fields, columns: nCol, width: width, isDet: isDet };
+}
+
+function recFieldSpanClass(c, nCol) {
+  var cs = c && c.colSpan != null ? c.colSpan : null;
+  if (cs === "full" || cs === "*" || cs === -1) return "span-full";
+  cs = parseInt(cs, 10);
+  if (!isNaN(cs) && cs >= nCol) return "span-full";
+  if (cs === 3 && nCol >= 3) return "span-3";
+  if (cs === 2 && nCol >= 2) return "span-2";
+  return "";
+}
+
 function openRecordForm(mode, row, scope) {
   scope = scope || "master";
-  var isDet = (scope === "detail" && META_VIEW.detail);
-  var cols = isDet ? (META_VIEW.detail.columns || []) : (META_VIEW.columns || []);
+  var spec = resolveRecordFormSpec(scope);
+  var isDet = spec.isDet;
+  var cols = spec.fields || [];
   var keyField = isDet ? META_VIEW.detail.keyField : META_VIEW.keyField;
   var body = document.getElementById("rec-body");
+  var box = document.querySelector("#rec-ov .rec-box");
   var html = "", i, c, val, ov = document.getElementById("rec-ov");
-  var t, opts, j, o, selected, checked, ro;
+  var t, opts, j, o, selected, checked, ro, spanCls;
   var formTitle = isDet
     ? (META_VIEW.detail.title || "Detail")
     : ((META_VIEW.doc && META_VIEW.doc.title) ? META_VIEW.doc.title : "record");
   REC_EDIT.mode = mode || "add";
   REC_EDIT.scope = isDet ? "detail" : "master";
   REC_EDIT.keyValue = "";
+  REC_EDIT.fields = cols;
+  REC_EDIT.baseRow = (mode === "edit" && row) ? JSON.parse(JSON.stringify(row)) : null;
   if (mode === "edit" && row) {
     REC_EDIT.keyValue = String(row[keyField] != null ? row[keyField] : "");
   }
   document.getElementById("rec-title").textContent =
     (mode === "edit" ? "Edit " : "New ") + formTitle;
+  if (box) {
+    box.classList.remove("rec-w-narrow", "rec-w-normal", "rec-w-wide", "rec-w-xl");
+    box.classList.add("rec-w-" + (spec.width || "normal"));
+  }
   for (i = 0; i < cols.length; i++) {
     c = cols[i];
     val = (mode === "edit" && row && row[c.id] != null) ? row[c.id] : "";
     if (mode === "add" && isDet && META_VIEW.detail && c.id === META_VIEW.detail.masterKey) {
       val = META_VIEW.masterKeyValue;
     }
+    if (mode === "add" && c.default != null && (val === "" || val == null)) val = c.default;
     t = colControlType(c);
     // Password fields: never prefill CRC; leave blank to keep current on update
     if (t === "password" || c.id === "password") val = "";
     ro = (mode === "edit" && c.id === keyField) ||
       (isDet && c.id === META_VIEW.detail.masterKey && mode === "add");
-    html += "<div class='rec-field'><label for='rec-f-" + esc(c.id) + "'>" + esc(c.label || c.id) + "</label>";
+    spanCls = recFieldSpanClass(c, spec.columns || 1);
+    html += "<div class='rec-field" + (spanCls ? (" " + spanCls) : "") +
+      "'><label for='rec-f-" + esc(c.id) + "'>" + esc(c.label || c.id) + "</label>";
     if (t === "password" || c.id === "password") {
       html += "<input type='password' id='rec-f-" + esc(c.id) + "' data-fid='" + esc(c.id) +
         "' data-ctype='password' value='' autocomplete='new-password'" +
@@ -4999,8 +5195,12 @@ function openRecordForm(mode, row, scope) {
     }
     html += "</div>";
   }
-  if (!cols.length) html = "<p style='color:var(--muted)'>No columns defined.</p>";
-  if (body) body.innerHTML = html;
+  if (!cols.length) html = "<p style='color:var(--muted);grid-column:1/-1'>No columns defined.</p>";
+  if (body) {
+    body.className = "rec-body rec-form-grid" +
+      (spec.columns === 2 ? " cols-2" : (spec.columns === 3 ? " cols-3" : ""));
+    body.innerHTML = html;
+  }
   applyWhens(body, cols, "rec-f");
   if (ov) ov.classList.add("is-open");
   setTimeout(function () {
@@ -5012,14 +5212,25 @@ function openRecordForm(mode, row, scope) {
 function closeRecordForm() {
   var ov = document.getElementById("rec-ov");
   if (ov) ov.classList.remove("is-open");
+  REC_EDIT.fields = [];
+  REC_EDIT.baseRow = null;
 }
 
 function saveRecordForm() {
   var isDet = REC_EDIT.scope === "detail" && META_VIEW.detail;
-  var cols = isDet ? (META_VIEW.detail.columns || []) : (META_VIEW.columns || []);
+  var cols = (REC_EDIT.fields && REC_EDIT.fields.length)
+    ? REC_EDIT.fields
+    : (isDet ? (META_VIEW.detail.columns || []) : (META_VIEW.columns || []));
   var kf = isDet ? META_VIEW.detail.keyField : META_VIEW.keyField;
   var dataRef = isDet ? META_VIEW.detail.dataRef : META_VIEW.dataRef;
-  var row = {}, i, c, el, raw, t, boxes, j, picked;
+  var row = {}, i, c, el, raw, t, boxes, j, picked, k;
+  // On update, start from original row so fields not on the form are kept
+  if (REC_EDIT.mode === "edit" && REC_EDIT.baseRow && typeof REC_EDIT.baseRow === "object") {
+    for (k in REC_EDIT.baseRow) {
+      if (Object.prototype.hasOwnProperty.call(REC_EDIT.baseRow, k))
+        row[k] = REC_EDIT.baseRow[k];
+    }
+  }
   for (i = 0; i < cols.length; i++) {
     c = cols[i];
     t = colControlType(c);
@@ -5036,6 +5247,12 @@ function saveRecordForm() {
     } else if (t === "money" || c.format === "money") {
       raw = el ? String(el.value) : "";
       row[c.id] = parseMoney(raw);
+    } else if (t === "password" || c.id === "password") {
+      // blank keeps previous (server CRC logic); only send if typed
+      raw = el ? String(el.value) : "";
+      if (raw) row[c.id] = raw;
+      else if (REC_EDIT.mode === "add") row[c.id] = "";
+      // edit + blank: leave baseRow password as-is
     } else {
       row[c.id] = el ? el.value : "";
     }
@@ -5305,23 +5522,32 @@ function closeFormDesigner() {
   if (scrim) scrim.classList.remove("is-open");
   if (box) box.classList.remove("is-open");
   DESIGNER = {
-    key: "", doc: null, cols: [], detailCols: [], dirty: false,
-    toolbar: [], detailToolbar: [], layout: "list", colScope: "master", fromScreen: ""
+    key: "", doc: null, cols: [], detailCols: [], formCols: [], dirty: false,
+    toolbar: [], detailToolbar: [], layout: "list", colScope: "master",
+    formCustom: false, fromScreen: ""
   };
 }
 
 function designerActiveCols() {
-  return DESIGNER.colScope === "detail" ? DESIGNER.detailCols : DESIGNER.cols;
+  if (DESIGNER.colScope === "detail") return DESIGNER.detailCols;
+  if (DESIGNER.colScope === "form") return DESIGNER.formCols;
+  return DESIGNER.cols;
 }
 
 function setDesignerColScope(scope) {
   syncDesignerColsFromDom();
-  DESIGNER.colScope = (scope === "detail") ? "detail" : "master";
+  if (scope === "detail") DESIGNER.colScope = "detail";
+  else if (scope === "form") DESIGNER.colScope = "form";
+  else DESIGNER.colScope = "master";
   var t = document.getElementById("des-cols-title");
-  if (t) t.textContent = DESIGNER.colScope === "detail" ? "Grid columns (detail)" : "Grid columns (master)";
+  if (t) {
+    if (DESIGNER.colScope === "detail") t.textContent = "Grid columns (detail)";
+    else if (DESIGNER.colScope === "form") t.textContent = "Form fields (edit dialog)";
+    else t.textContent = "Grid columns (master)";
+  }
   var lab = document.getElementById("des-tb-scope-lab");
   if (lab) lab.textContent = DESIGNER.colScope;
-  // swap toolbar checks
+  // swap toolbar checks (form scope keeps master toolbar)
   if (DESIGNER.colScope === "detail") setDesignerToolbarChecks(DESIGNER.detailToolbar);
   else setDesignerToolbarChecks(DESIGNER.toolbar);
   renderDesignerCols();
@@ -5333,6 +5559,7 @@ function updateDesignerLayoutUi() {
   var layout = lay ? lay.value : "list";
   var md = document.getElementById("des-md-block");
   var formB = document.getElementById("des-form-block");
+  var editFormB = document.getElementById("des-edit-form-block");
   var folderB = document.getElementById("des-folder-block");
   var menuB = document.getElementById("des-menu-block");
   var wfB = document.getElementById("des-wf-block");
@@ -5341,20 +5568,33 @@ function updateDesignerLayoutUi() {
   var isFolder = (layout === "folder");
   var isMenu = (layout === "menu");
   var isWf = (layout === "workflow");
+  var isListish = (!isForm && !isFolder && !isMenu);
   if (md) md.style.display = isMd ? "block" : "none";
   if (formB) formB.style.display = isForm ? "block" : "none";
+  if (editFormB) editFormB.style.display = isListish ? "block" : "none";
   if (folderB) folderB.style.display = isFolder ? "block" : "none";
   if (menuB) menuB.style.display = isMenu ? "block" : "none";
   if (wfB) wfB.style.display = isWf ? "block" : "none";
+  var custom = document.getElementById("des-form-custom");
+  DESIGNER.formCustom = !!(custom && custom.checked);
   var bar = document.getElementById("des-cols-scope-bar");
-  if (bar) bar.style.display = isMd ? "flex" : "none";
+  var showBar = isMd || (isListish && DESIGNER.formCustom);
+  if (bar) bar.style.display = showBar ? "flex" : "none";
+  var sf = document.getElementById("des-scope-form");
+  if (sf) sf.style.display = (isListish && DESIGNER.formCustom) ? "inline-block" : "none";
+  var sd = document.getElementById("des-scope-detail");
+  if (sd) sd.style.display = isMd ? "inline-block" : "none";
   if (!isMd && DESIGNER.colScope === "detail") setDesignerColScope("master");
+  if (!(isListish && DESIGNER.formCustom) && DESIGNER.colScope === "form")
+    setDesignerColScope("master");
   var t = document.getElementById("des-cols-title");
-  if (t && !isMd) {
+  if (t && DESIGNER.colScope === "master") {
     if (isForm) t.textContent = "Form fields (controls)";
     else if (isWf) t.textContent = "Queue / board columns";
     else if (isMenu || isFolder) t.textContent = "Optional (unused for this layout)";
-    else t.textContent = "Grid columns";
+    else t.textContent = "Grid columns (master)";
+  } else if (t && DESIGNER.colScope === "form") {
+    t.textContent = "Form fields (edit dialog)";
   }
 }
 
@@ -5537,13 +5777,23 @@ function loadDesignerKey(key) {
           toolbar: ["add", "edit", "delete", "print", "pdf", "excel", "refresh"] };
         DESIGNER.cols = [];
         DESIGNER.detailCols = [];
+        DESIGNER.formCols = [];
+        DESIGNER.formCustom = false;
         DESIGNER.layout = "list";
         DESIGNER.toolbar = ["add", "edit", "delete", "print", "pdf", "excel", "refresh"];
         DESIGNER.detailToolbar = ["add", "edit", "delete", "refresh"];
+        var _fw = document.getElementById("des-form-width");
+        var _fc = document.getElementById("des-form-columns");
+        var _fcu = document.getElementById("des-form-custom");
+        if (_fw) _fw.value = "auto";
+        if (_fc) _fc.value = "auto";
+        if (_fcu) _fcu.checked = false;
       } else {
         DESIGNER.doc = j.doc;
         DESIGNER.cols = [];
         DESIGNER.detailCols = [];
+        DESIGNER.formCols = [];
+        DESIGNER.formCustom = false;
         DESIGNER.layout = j.doc.layout ? String(j.doc.layout) : "list";
         // Unknown layouts are kept as-is (a temp option is added to the
         // dropdown below) so saving never rewrites them to "list".
@@ -5571,7 +5821,28 @@ function loadDesignerKey(key) {
         for (i = 0; i < colsSrc.length; i++) DESIGNER.cols.push(copyCol(colsSrc[i] || {}));
         DESIGNER.toolbar = Array.isArray(j.doc.toolbar) ? j.doc.toolbar.slice() :
           ["add", "edit", "delete", "print", "pdf", "excel", "refresh"];
-        var el;
+        var el, fw, fc, formSrc, ff;
+        // Edit dialog form (list / master-detail popup)
+        fw = document.getElementById("des-form-width");
+        fc = document.getElementById("des-form-columns");
+        el = document.getElementById("des-form-custom");
+        if (j.doc.form && typeof j.doc.form === "object") {
+          if (fw) fw.value = j.doc.form.width != null ? String(j.doc.form.width) : "auto";
+          if (fc) fc.value = j.doc.form.columns != null ? String(j.doc.form.columns) : "auto";
+          formSrc = Array.isArray(j.doc.form.fields) ? j.doc.form.fields : [];
+          DESIGNER.formCustom = formSrc.length > 0;
+          if (el) el.checked = DESIGNER.formCustom;
+          for (i = 0; i < formSrc.length; i++) {
+            ff = formSrc[i];
+            if (typeof ff === "string") DESIGNER.formCols.push(copyCol({ id: ff, label: ff, type: "text" }));
+            else if (ff && ff.id) DESIGNER.formCols.push(copyCol(ff));
+          }
+        } else {
+          if (fw) fw.value = "auto";
+          if (fc) fc.value = "auto";
+          if (el) el.checked = false;
+          DESIGNER.formCustom = false;
+        }
         if (j.doc.detail) {
           dcols = (j.doc.detail.grid && j.doc.detail.grid.columns) ? j.doc.detail.grid.columns : [];
           for (i = 0; i < dcols.length; i++) DESIGNER.detailCols.push(copyCol(dcols[i] || {}));
@@ -5849,6 +6120,28 @@ function saveFormDesigner() {
       toolbar: DESIGNER.detailToolbar && DESIGNER.detailToolbar.length
         ? DESIGNER.detailToolbar : ["add", "edit", "delete", "refresh"]
     };
+  }
+
+  // Edit dialog form (list-like): default = no form key (runtime auto from grid).
+  // Admin saves width/columns and optional custom fields.
+  if (layout !== "form" && layout !== "wizard" && layout !== "folder" && layout !== "menu") {
+    var fWidth = ((document.getElementById("des-form-width") || {}).value || "auto");
+    var fCols = ((document.getElementById("des-form-columns") || {}).value || "auto");
+    var fCustom = !!(document.getElementById("des-form-custom") || {}).checked;
+    var formObj = {}, hasForm = false;
+    if (fWidth && fWidth !== "auto") { formObj.width = fWidth; hasForm = true; }
+    if (fCols && fCols !== "auto") {
+      formObj.columns = (fCols === "1" || fCols === "2" || fCols === "3") ? parseInt(fCols, 10) : fCols;
+      hasForm = true;
+    }
+    if (fCustom) {
+      formObj.fields = packCols(DESIGNER.formCols || []);
+      // if empty custom list, seed from grid so admin has a starting set
+      if (!formObj.fields.length) formObj.fields = packCols(DESIGNER.cols || []);
+      hasForm = true;
+    }
+    if (hasForm) doc.form = formObj;
+    else delete doc.form;
   }
 
   // form / wizard: fields + tabs (or steps)
@@ -9410,12 +9703,15 @@ function dashToast(msg) {
 /* ---------- Product tour demo (meta demo.* + overlay) ---------- */
 var DEMO = {
   doc: null,
+  catalog: null,
   steps: [],
   idx: -1,
   timer: null,
   paused: false,
   running: false,
-  loading: false
+  loading: false,
+  menuMode: false,
+  returnToMenu: true
 };
 
 function demoCfg() {
@@ -9450,13 +9746,140 @@ function demoSetPlayingUi(on) {
   if (!b) return;
   if (on) {
     b.classList.add("is-playing");
-    b.innerHTML = "&#9632; Stop demo";
-    b.title = "Stop product tour";
+    b.innerHTML = DEMO.menuMode ? "&#9632; Close demo" : "&#9632; Stop demo";
+    b.title = DEMO.menuMode ? "Close learning menu" : "Stop product tour";
   } else {
     b.classList.remove("is-playing");
     b.innerHTML = "&#9654; Demo";
-    b.title = "Play product tour demo";
+    b.title = "Learning demos — choose a tutorial";
   }
+}
+
+function demoIsMenuDoc(doc) {
+  if (!doc || typeof doc !== "object") return false;
+  if (String(doc.mode || "").toLowerCase() === "menu") return true;
+  if (Array.isArray(doc.groups) && doc.groups.length) return true;
+  if (Array.isArray(doc.items) && doc.items.length && !Array.isArray(doc.steps)) return true;
+  return false;
+}
+
+function demoCatalogItems(doc) {
+  var out = [], g, i, j, it, groups;
+  if (!doc) return out;
+  if (Array.isArray(doc.groups) && doc.groups.length) {
+    for (i = 0; i < doc.groups.length; i++) {
+      g = doc.groups[i] || {};
+      for (j = 0; j < (g.items || []).length; j++) {
+        it = g.items[j] || {};
+        if (it.adminOnly && !IS_ADMIN) continue;
+        out.push({
+          group: g.label || g.title || g.id || "",
+          groupId: g.id || "",
+          item: it
+        });
+      }
+    }
+    return out;
+  }
+  if (Array.isArray(doc.items)) {
+    for (i = 0; i < doc.items.length; i++) {
+      it = doc.items[i] || {};
+      if (it.adminOnly && !IS_ADMIN) continue;
+      out.push({ group: "", groupId: "", item: it });
+    }
+  }
+  return out;
+}
+
+function demoShowMenu(doc) {
+  var card = document.getElementById("demo-card");
+  var menu = document.getElementById("demo-menu");
+  var kick = document.getElementById("demo-kicker");
+  var stopBtn = document.getElementById("demo-btn-stop");
+  var html = "", i, g, j, it, groups, badge;
+  demoClearTimer();
+  DEMO.catalog = doc || DEMO.catalog;
+  DEMO.doc = DEMO.catalog;
+  DEMO.menuMode = true;
+  DEMO.running = true;
+  DEMO.paused = false;
+  DEMO.idx = -1;
+  DEMO.steps = [];
+  if (card) card.classList.add("demo-menu-mode");
+  if (kick) kick.textContent = (doc && (doc.title || doc.label)) || "Centro de aprendizaje";
+  if (stopBtn) stopBtn.textContent = "Close";
+  html += "<p class='demo-menu-sub'>" +
+    esc((doc && (doc.subtitle || doc.description)) ||
+      "Elige un tutorial. Puedes parar en cualquier momento y volver a este menú.") +
+    "</p>";
+  groups = (doc && Array.isArray(doc.groups) && doc.groups.length)
+    ? doc.groups
+    : [{ id: "all", label: "Tutorials", items: (doc && doc.items) || [] }];
+  for (i = 0; i < groups.length; i++) {
+    g = groups[i] || {};
+    html += "<div class='demo-menu-group'>";
+    if (g.label || g.title)
+      html += "<h4>" + esc(g.label || g.title) + "</h4>";
+    html += "<div class='demo-menu-items'>";
+    for (j = 0; j < (g.items || []).length; j++) {
+      it = g.items[j] || {};
+      if (it.adminOnly && !IS_ADMIN) continue;
+      if (!it.ref && !it.steps) continue;
+      html += "<button type='button' class='demo-menu-item' data-demo-ref='" +
+        esc(it.ref || "") + "' data-demo-id='" + esc(it.id || "") + "'>" +
+        "<div class='dmi-top'><span class='dmi-label'>" + esc(it.label || it.id || it.ref) +
+        "</span>" +
+        (it.durationHint ? ("<span class='dmi-hint'>" + esc(it.durationHint) + "</span>") : "") +
+        "</div>" +
+        (it.description ? ("<p class='dmi-desc'>" + esc(it.description) + "</p>") : "") +
+        "<div class='dmi-badges'>";
+      if (it.recommended) html += "<span class='dmi-badge'>Recomendado</span>";
+      if (it.adminOnly) html += "<span class='dmi-badge admin'>Admin</span>";
+      html += "</div></button>";
+    }
+    html += "</div></div>";
+  }
+  if (menu) {
+    menu.innerHTML = html;
+    menu.onclick = function (e) {
+      var btn = e.target && e.target.closest ? e.target.closest(".demo-menu-item") : null;
+      var ref;
+      if (!btn) return;
+      ref = btn.getAttribute("data-demo-ref") || "";
+      if (!ref) {
+        toast("Demo sin ref");
+        return;
+      }
+      demoLaunchTour(ref);
+    };
+  }
+  demoHighlight(null);
+  demoShowOverlay(true);
+  demoSetPlayingUi(true);
+}
+
+function demoLaunchTour(ref) {
+  if (!ref) return;
+  if (DEMO.loading) return;
+  DEMO.loading = true;
+  fetch("/api/meta?key=" + encodeURIComponent(ref), { credentials: "same-origin", cache: "no-store" })
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      DEMO.loading = false;
+      if (!j || !j.ok || !j.doc) {
+        toast((j && j.msg) || ("Demo not found: " + ref));
+        return;
+      }
+      if (demoIsMenuDoc(j.doc)) {
+        demoShowMenu(j.doc);
+        return;
+      }
+      demoStart(j.doc);
+    })
+    .catch(function (e) {
+      DEMO.loading = false;
+      toast("Demo load error: " + e);
+    });
 }
 
 function demoClearTimer() {
@@ -9538,7 +9961,7 @@ function demoNavToScreen(screen, menuId, label) {
 
 function demoRunAction(step) {
   var act = String((step && step.action) || "wait");
-  var screen, menuId, label;
+  var screen, menuId, label, mode, row, scope;
   if (act === "nav") {
     screen = demoPick(step, "screenByVertical", "screen");
     menuId = demoPick(step, "menuIdByVertical", "menuId");
@@ -9556,7 +9979,27 @@ function demoRunAction(step) {
     try { openFormDesigner(step.screen || META_VIEW.screenKey || "screen.parties"); } catch (e2) {}
     return;
   }
+  if (act === "openRecordForm") {
+    // Need a list screen already open (META_VIEW columns)
+    mode = String((step && step.mode) || "add");
+    scope = String((step && step.scope) || "master");
+    row = null;
+    if (mode === "edit") {
+      if (scope === "detail" && META_VIEW.detailRows && META_VIEW.detailRows.length)
+        row = META_VIEW.detailRows[META_VIEW.detailSelected >= 0 ? META_VIEW.detailSelected : 0];
+      else if (META_VIEW.rows && META_VIEW.rows.length)
+        row = META_VIEW.rows[META_VIEW.selected >= 0 ? META_VIEW.selected : 0];
+      if (!row) mode = "add";
+    }
+    try { openRecordForm(mode, row, scope); } catch (e3) {}
+    return;
+  }
+  if (act === "closeRecordForm") {
+    try { closeRecordForm(); } catch (e4) {}
+    return;
+  }
   if (act === "closeOverlays") {
+    try { closeRecordForm(); } catch (e5) {}
     demoCloseDesigners();
     return;
   }
@@ -9582,29 +10025,41 @@ function demoPaintStep() {
   var prog = document.getElementById("demo-prog");
   var kick = document.getElementById("demo-kicker");
   var pauseBtn = document.getElementById("demo-btn-pause");
+  var stopBtn = document.getElementById("demo-btn-stop");
   var card = document.getElementById("demo-card");
   var n = DEMO.steps.length;
   var i = DEMO.idx + 1;
   if (!step) return;
+  DEMO.menuMode = false;
+  if (card) card.classList.remove("demo-menu-mode");
+  if (stopBtn) stopBtn.textContent = "Stop";
   if (kick) {
     kick.textContent = step.section
       ? String(step.section)
       : ((DEMO.doc && DEMO.doc.title) ? DEMO.doc.title : "Product tour");
   }
-  if (cap) cap.textContent = demoStepCaption(step);
+  if (cap) {
+    cap.style.display = "";
+    cap.textContent = demoStepCaption(step);
+  }
   if (prog) {
+    prog.style.display = "";
     prog.textContent = "Step " + i + " / " + n +
       (DEMO.paused ? " · paused" : "");
   }
-  if (pauseBtn) pauseBtn.textContent = DEMO.paused ? "Resume" : "Pause";
+  if (pauseBtn) {
+    pauseBtn.style.display = "";
+    pauseBtn.textContent = DEMO.paused ? "Resume" : "Pause";
+  }
   if (card) card.setAttribute("data-step", String(i));
   demoShowOverlay(true);
   demoRunAction(step);
-  // highlight after nav / designers paint
+  // highlight after nav / designers / edit form paint
   setTimeout(function () {
-    if (!DEMO.running) return;
+    if (!DEMO.running || DEMO.menuMode) return;
     demoHighlight(step.highlight || null);
-  }, (step.action === "openAppDesigner" || step.action === "openFormDesigner") ? 500 : 380);
+  }, (step.action === "openAppDesigner" || step.action === "openFormDesigner" ||
+      step.action === "openRecordForm") ? 520 : 380);
   if (!DEMO.paused) demoScheduleNext(step.durationMs || 3500);
 }
 
@@ -9624,14 +10079,30 @@ function demoAdvance(delta) {
 }
 
 function demoStop(finished) {
+  var backToMenu = false;
   demoClearTimer();
+  try { closeRecordForm(); } catch (e0) {}
+  demoCloseDesigners();
+  // End of a tour that asked to return to the learning menu
+  if (finished && !DEMO.menuMode && DEMO.returnToMenu && DEMO.catalog && demoIsMenuDoc(DEMO.catalog)) {
+    backToMenu = true;
+  }
   DEMO.running = false;
   DEMO.paused = false;
   DEMO.idx = -1;
-  demoCloseDesigners();
+  DEMO.menuMode = false;
+  DEMO.steps = [];
+  DEMO.doc = null;
+  var card = document.getElementById("demo-card");
+  if (card) card.classList.remove("demo-menu-mode");
+  if (backToMenu) {
+    toast("Tutorial finished — elige otro en el menú");
+    demoShowMenu(DEMO.catalog);
+    return;
+  }
   demoShowOverlay(false);
   demoSetPlayingUi(false);
-  if (finished) toast("Demo finished — explore the menu");
+  if (finished) toast("Demo finished");
 }
 
 function demoPauseToggle() {
@@ -9659,27 +10130,36 @@ function demoFilterSteps(raw) {
 }
 
 function demoStart(doc) {
+  if (demoIsMenuDoc(doc)) {
+    demoShowMenu(doc);
+    return;
+  }
   if (!doc || !Array.isArray(doc.steps) || !doc.steps.length) {
     toast("Demo has no steps");
     return;
   }
   DEMO.doc = doc;
+  DEMO.returnToMenu = doc.returnToMenu !== false && !!DEMO.catalog;
   DEMO.steps = demoFilterSteps(doc.steps);
   if (!DEMO.steps.length) {
     toast("No demo steps available for this user");
     return;
   }
   demoClearTimer();
+  DEMO.menuMode = false;
   DEMO.running = true;
   DEMO.paused = false;
   DEMO.idx = 0;
+  var card = document.getElementById("demo-card");
+  if (card) card.classList.remove("demo-menu-mode");
   demoSetPlayingUi(true);
   demoPaintStep();
 }
 
 function demoLoadAndStart() {
+  // Toggle: tour → back to menu; menu open → close learning center
   if (DEMO.running) {
-    demoStop(false);
+    demoBackOrClose();
     return;
   }
   if (DEMO.loading) return;
@@ -9698,7 +10178,13 @@ function demoLoadAndStart() {
         toast((j && j.msg) || ("Demo not found: " + key));
         return;
       }
-      demoStart(j.doc);
+      if (demoIsMenuDoc(j.doc)) {
+        DEMO.catalog = j.doc;
+        demoShowMenu(j.doc);
+      } else {
+        DEMO.catalog = null;
+        demoStart(j.doc);
+      }
     })
     .catch(function (e) {
       DEMO.loading = false;
@@ -9743,6 +10229,28 @@ function maybeAutoStartDemo() {
   }, delay);
 }
 
+function demoBackOrClose() {
+  // Menu open → close learning center. Tour running → back to menu if any.
+  if (DEMO.menuMode) {
+    DEMO.catalog = null;
+    DEMO.returnToMenu = false;
+    demoStop(false);
+    return;
+  }
+  if (DEMO.catalog && demoIsMenuDoc(DEMO.catalog)) {
+    try { closeRecordForm(); } catch (e1) {}
+    demoCloseDesigners();
+    demoClearTimer();
+    DEMO.paused = false;
+    DEMO.steps = [];
+    DEMO.idx = -1;
+    DEMO.doc = null;
+    demoShowMenu(DEMO.catalog);
+    return;
+  }
+  demoStop(false);
+}
+
 function bindDemoPlayerUi() {
   var b = document.getElementById("btn-demo");
   if (b) b.onclick = function () { demoLoadAndStart(); };
@@ -9750,19 +10258,19 @@ function bindDemoPlayerUi() {
   if (p) p.onclick = function () { demoPauseToggle(); };
   var n = document.getElementById("demo-btn-next");
   if (n) n.onclick = function () {
-    if (!DEMO.running) return;
+    if (!DEMO.running || DEMO.menuMode) return;
     demoClearTimer();
     demoAdvance(1);
   };
   var s = document.getElementById("demo-btn-stop");
-  if (s) s.onclick = function () { demoStop(false); };
+  if (s) s.onclick = function () { demoBackOrClose(); };
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && DEMO.running) {
-      demoStop(false);
+      demoBackOrClose();
     }
   });
   window.addEventListener("resize", function () {
-    if (!DEMO.running) return;
+    if (!DEMO.running || DEMO.menuMode) return;
     var step = DEMO.steps[DEMO.idx];
     if (step && step.highlight) demoHighlight(step.highlight);
   });
@@ -10023,6 +10531,28 @@ document.getElementById("modsearch").addEventListener("input", function (e) {
   if (sm) sm.onclick = function () { setDesignerColScope("master"); };
   var sd = document.getElementById("des-scope-detail");
   if (sd) sd.onclick = function () { setDesignerColScope("detail"); };
+  var sform = document.getElementById("des-scope-form");
+  if (sform) sform.onclick = function () {
+    var custom = document.getElementById("des-form-custom");
+    if (custom && !custom.checked) {
+      custom.checked = true;
+      DESIGNER.formCustom = true;
+      if (!DESIGNER.formCols || !DESIGNER.formCols.length) {
+        // seed form fields from current grid
+        DESIGNER.formCols = JSON.parse(JSON.stringify(DESIGNER.cols || []));
+      }
+    }
+    setDesignerColScope("form");
+  };
+  var fcustom = document.getElementById("des-form-custom");
+  if (fcustom) fcustom.onchange = function () {
+    DESIGNER.formCustom = !!fcustom.checked;
+    if (DESIGNER.formCustom && (!DESIGNER.formCols || !DESIGNER.formCols.length)) {
+      DESIGNER.formCols = JSON.parse(JSON.stringify(DESIGNER.cols || []));
+    }
+    if (!DESIGNER.formCustom && DESIGNER.colScope === "form") setDesignerColScope("master");
+    else updateDesignerLayoutUi();
+  };
   var lay = document.getElementById("des-layout");
   if (lay) lay.onchange = function () {
     DESIGNER.layout = lay.value;

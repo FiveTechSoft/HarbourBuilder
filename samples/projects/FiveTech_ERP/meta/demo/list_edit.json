@@ -1,0 +1,146 @@
+{
+  "id": "demo.list_edit",
+  "kind": "demo",
+  "title": "Listas + formulario de edición",
+  "loop": false,
+  "returnToMenu": true,
+  "steps": [
+    {
+      "section": "T1 · ¿Qué es una list?",
+      "caption": "Una pantalla layout \"list\" = toolbar + rejilla + búsqueda (+ filters / markRows / totals opcionales). Un archivo JSON: meta/screens/<nombre>.json. Sin código C/Harbour para la estructura.",
+      "durationMs": 7000,
+      "highlight": "#nav"
+    },
+    {
+      "section": "T2 · Abrir un list real",
+      "action": "nav",
+      "screen": "screen.products",
+      "menuId": "products",
+      "label": "Products",
+      "caption": "Products / Artículos = screen.products → layout list → dataRef data.products. Todo lo que ves sale de ese JSON + las filas del dataset.",
+      "durationMs": 6500,
+      "highlight": "#ws-meta"
+    },
+    {
+      "section": "T3 · Esqueleto del JSON",
+      "caption": "Mínimo: id (screen.products), kind \"screen\", layout \"list\", title, dataRef, keyField (code), searchFields[], grid.columns[], toolbar[]. Con eso ya tienes CRUD completo.",
+      "durationMs": 7500,
+      "highlight": "#ws-meta .meta-head"
+    },
+    {
+      "section": "T4 · grid.columns = la tabla",
+      "caption": "grid.columns define la LISTA: id, label, type (text, money, select, checklist, checkbox, lookup), options, align/format. El orden de columnas = orden en pantalla. En Design form se edita como «Grid columns».",
+      "durationMs": 7000,
+      "highlight": "#ws-meta table.meta"
+    },
+    {
+      "section": "T5 · Toolbar y búsqueda",
+      "caption": "toolbar: add, edit, delete, print, pdf, excel, refresh, close. searchFields indica en qué columnas busca el filtro. Opcional: filters, markRows, totals / sumFields.",
+      "durationMs": 6500,
+      "highlight": "#ws-meta .meta-foot"
+    },
+    {
+      "section": "T6 · Edit por defecto",
+      "caption": "CLAVE: si la pantalla NO tiene bloque \"form\", Add/Edit se genera SOLO desde grid.columns. No hace falta definir un form aparte. Esa es la versión por defecto.",
+      "durationMs": 7000,
+      "highlight": "#ws-meta .meta-foot"
+    },
+    {
+      "section": "T7 · Diálogo Add por defecto",
+      "action": "openRecordForm",
+      "mode": "add",
+      "caption": "Diálogo por defecto (grid.columns). Auto: pocos campos → 1 col; más campos → 2–3 cols y caja ancha. name ocupa 2; checklist/password/notes a todo el ancho.",
+      "durationMs": 7500,
+      "highlight": "#rec-ov .rec-box"
+    },
+    {
+      "section": "T8 · Reglas del layout auto",
+      "caption": "≤4 campos → narrow 1-col · 5–8 → wide 2-col · ≥9 → wide 3-col. En update se hace merge: lo que no está en el form se conserva. Password en blanco = mantener CRC.",
+      "durationMs": 7000,
+      "highlight": "#rec-ov .rec-body"
+    },
+    {
+      "section": "T9 · Cerrar diálogo",
+      "action": "closeRecordForm",
+      "caption": "Cerramos el popup. Ahora: cómo un ADMIN personaliza el diálogo por pantalla sin tocar la rejilla si no quiere.",
+      "durationMs": 4500,
+      "highlight": "#ws-meta"
+    },
+    {
+      "section": "T10 · Design form (admin)",
+      "action": "openFormDesigner",
+      "screen": "screen.products",
+      "adminOnly": true,
+      "caption": "Admin → Design form. Título, dataRef, layout, columnas de grid y toolbar. NUEVO: sección «Edit dialog» solo controla el popup Add/Edit.",
+      "durationMs": 7000,
+      "highlight": "#designer"
+    },
+    {
+      "section": "T11 · Sección Edit dialog",
+      "adminOnly": true,
+      "caption": "Edit dialog: (1) Dialog width = auto / narrow / normal / wide / xl. (2) Field columns = auto / 1 / 2 / 3. Todo en Auto = motor por defecto (no se escribe form en el JSON).",
+      "durationMs": 7000,
+      "highlight": "#des-edit-form-block"
+    },
+    {
+      "section": "T12 · Personalizar campos",
+      "adminOnly": true,
+      "caption": "Marca «Customize form fields…» SOLO si el edit debe diferir de la tabla (orden, labels, menos/más campos, colSpan). Luego botón Form fields — se rellena copiando la grid.",
+      "durationMs": 7500,
+      "highlight": "#des-form-custom"
+    },
+    {
+      "section": "T13 · Grid vs Form fields",
+      "adminOnly": true,
+      "caption": "Dos ámbitos: Master/grid = columnas de la LISTA. Form fields = columnas del POPUP (solo si custom). Mismos tipos de control. Cada list es independiente.",
+      "durationMs": 7000,
+      "highlight": "#des-cols-scope-bar"
+    },
+    {
+      "section": "T14 · Qué escribe Save",
+      "adminOnly": true,
+      "caption": "Save escribe meta/screens/<id>.json. Por defecto: sin clave form (o solo width/columns). Custom: form: { width, columns, fields:[…] }. Runtime: form.fields si existe; si no, grid + auto layout.",
+      "durationMs": 7500,
+      "highlight": "#des-save"
+    },
+    {
+      "section": "T15 · Un form por pantalla",
+      "adminOnly": true,
+      "caption": "screen.products, companies, users… cada una su archivo. Personalizar Products no toca Companies. En master-detail puede haber detail.form para las líneas.",
+      "durationMs": 6000,
+      "highlight": "#des-key"
+    },
+    {
+      "section": "T16 · Cerrar diseñador",
+      "action": "closeOverlays",
+      "caption": "Los no-admin solo ven el form por defecto (o el ya guardado). Nunca necesitan el diseñador.",
+      "durationMs": 4500,
+      "highlight": "#btn-demo"
+    },
+    {
+      "section": "T17 · Receta",
+      "action": "nav",
+      "screen": "screen.products",
+      "menuId": "products",
+      "label": "Products",
+      "caption": "RECETA: 1) data.<entity>.json  2) screen con layout list + grid + toolbar  3) enlazar en modules/vertical  4) usar edit por defecto  5) solo si hace falta: Design form → Edit dialog → custom → Save.",
+      "durationMs": 8000,
+      "highlight": "#ws-meta"
+    },
+    {
+      "section": "T18 · Edit de una fila",
+      "action": "openRecordForm",
+      "mode": "edit",
+      "caption": "Edit sobre una fila existente: sigue el form por defecto salvo que hayas guardado uno custom. Prueba cambiar un precio y Save.",
+      "durationMs": 6500,
+      "highlight": "#rec-ov .rec-box"
+    },
+    {
+      "section": "T19 · Resumen",
+      "action": "closeRecordForm",
+      "caption": "grid = tabla · form opcional = popup. Default multi-columna inteligente. Admin puede override por pantalla. Al terminar vuelves al menú Demo para elegir otro tema.",
+      "durationMs": 6500,
+      "highlight": "#ws-meta"
+    }
+  ]
+}

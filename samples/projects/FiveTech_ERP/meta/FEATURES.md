@@ -36,7 +36,7 @@ Product roadmap: [ROADMAP.md](ROADMAP.md) · [ROADMAP.es.md](ROADMAP.es.md)
 - Dark / light theme tokens (`theme.json`)
 - Branding: logo text, brand name, subtitle, window title
 - Toast messages, floating modals, patient F2-style lookup panel
-- **Product tour demo** (`demo.main` / **▶ Demo** button): ~19 didactic steps (CRM, vertical pack, documents, calendar, KPIs, reports, designers, locale); captions + section titles + highlight; Pause/Next/Stop; auto-starts once per session for user `demo`
+- **Learning-center demo** (`demo.main` menu mode / **▶ Demo**): catalog of tours (`demo.overview`, `demo.list_edit`, `demo.designers`, `demo.multi_app`); pick what to learn; Pause/Next/Stop; returns to menu when a tour ends; optional auto-start for user `demo`
 
 ---
 
@@ -46,7 +46,7 @@ Generic screen engine driven by JSON. Supported **layouts**:
 
 | Layout | Purpose |
 |--------|---------|
-| `list` | Single grid + toolbar; optional `filters`, `markRows`, `totals` / `sumFields` |
+| `list` | Single grid + toolbar; optional `filters`, `markRows`, `totals` / `sumFields`; **edit dialog** defaults from `grid.columns` (auto multi-col width); optional per-screen `form` (admin designer) |
 | `master-detail` | Master grid + linked detail lines |
 | `document` | Document + line totals + tax |
 | `form` | Card form with tabs |

@@ -36,7 +36,7 @@ Hoja de ruta: [ROADMAP.es.md](ROADMAP.es.md) · [ROADMAP.md](ROADMAP.md)
 - Tokens de tema claro / oscuro (`theme.json`)
 - Branding: texto del logo, nombre de marca, subtítulo, título de ventana
 - Mensajes toast, modales flotantes, panel de búsqueda de pacientes estilo F2
-- **Demo automática de producto** (`demo.main` / botón **▶ Demo**): ~19 pasos didácticos (CRM, vertical, documentos, agenda, KPIs, informes, diseñadores, locale); textos + secciones + resaltado; Pause/Next/Stop; autoarranque una vez por sesión para el usuario `demo`
+- **Centro de aprendizaje Demo** (`demo.main` modo menú / **▶ Demo**): catálogo de tours (`demo.overview`, `demo.list_edit`, `demo.designers`, `demo.multi_app`); elige qué aprender; Pause/Next/Stop; al terminar vuelve al menú; autoarranque opcional para `demo`
 
 ---
 
@@ -46,7 +46,7 @@ Motor genérico de pantallas impulsado por JSON. **Layouts** soportados:
 
 | Layout | Propósito |
 |--------|-----------|
-| `list` | Rejilla + toolbar; opcionales `filters`, `markRows`, `totals` / `sumFields` |
+| `list` | Rejilla + toolbar; opcionales `filters`, `markRows`, `totals` / `sumFields`; **diálogo Add/Edit** por defecto desde `grid.columns` (auto multi-columna); `form` opcional por pantalla (diseñador admin) |
 | `master-detail` | Rejilla maestra + líneas de detalle enlazadas |
 | `document` | Documento + totales de líneas + impuestos |
 | `form` | Ficha / formulario con pestañas |

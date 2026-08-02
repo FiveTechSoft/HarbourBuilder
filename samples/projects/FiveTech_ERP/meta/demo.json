@@ -1,246 +1,57 @@
 {
   "id": "demo.main",
   "kind": "demo",
-  "title": "DesktopWeb guided tour",
-  "loop": false,
-  "steps": [
+  "mode": "menu",
+  "title": "Centro de aprendizaje",
+  "subtitle": "Elige qué quieres aprender. Cada opción es un tour guiado con pausa, siguiente y resaltado en pantalla.",
+  "groups": [
     {
-      "section": "1 · Welcome",
-      "caption": "FiveTech Desktop & Web — the same ERP screens run inside Windows (WebView2) and in any browser. One HTML UI, one HTTP API, one meta model.",
-      "durationMs": 5200,
-      "highlight": "#brand-name"
+      "id": "start",
+      "label": "Empezar",
+      "items": [
+        {
+          "id": "overview",
+          "label": "Visita general del producto",
+          "ref": "demo.overview",
+          "description": "Arquitectura meta, menú, CRM, verticals, KPIs y multi-empresa. Ideal la primera vez.",
+          "durationHint": "~4 min"
+        }
+      ]
     },
     {
-      "section": "2 · Meta architecture",
-      "caption": "Everything you see is driven by JSON under meta/: screens, menus, data, reports and even this tour. Change JSON → restart or Save → UI updates. No recompile for structure.",
-      "durationMs": 5500,
-      "highlight": "#nav"
+      "id": "build",
+      "label": "Construir pantallas",
+      "items": [
+        {
+          "id": "list_edit",
+          "label": "Listas + formulario de edición",
+          "ref": "demo.list_edit",
+          "description": "Cómo se define una pantalla layout list, el edit por defecto (multi-columna) y cómo el admin lo personaliza en Design form.",
+          "durationHint": "~8 min",
+          "recommended": true
+        },
+        {
+          "id": "designers",
+          "label": "Diseñadores (admin)",
+          "ref": "demo.designers",
+          "description": "Design form y Edit app: columnas, toolbar, diálogo de edición, branding, locale y menú del vertical.",
+          "durationHint": "~3 min",
+          "adminOnly": true
+        }
+      ]
     },
     {
-      "section": "3 · Navigation",
-      "action": "nav",
-      "screen": "screen.appointments",
-      "menuId": "appointments",
-      "label": "Appointments",
-      "caption": "The left sidebar comes from modules.json (or your vertical pack). Click any item to open a meta screen. Home today: Appointments.",
-      "durationMs": 5000,
-      "highlight": "#nav"
-    },
-    {
-      "section": "4 · CRM · Parties",
-      "action": "nav",
-      "screen": "screen.parties",
-      "menuId": "parties",
-      "label": "Parties",
-      "caption": "CRM core starts with Parties: people and companies in one list. Roles (Patient, Customer, Lead…), source and owner — generic for any industry.",
-      "durationMs": 5500,
-      "highlight": "#ws-meta"
-    },
-    {
-      "section": "5 · CRM · Party card",
-      "action": "nav",
-      "screen": "screen.party_card",
-      "menuId": "party_card",
-      "label": "Party card",
-      "caption": "Layout form = tabbed card. Same party data as the list, different presentation. Design form (admin) can edit tabs, fields and control types at runtime.",
-      "durationMs": 5500,
-      "highlight": "#ws-meta"
-    },
-    {
-      "section": "6 · CRM · Activities",
-      "action": "nav",
-      "screen": "screen.activities",
-      "menuId": "activities",
-      "label": "Activities",
-      "caption": "Activities track calls, tasks, meetings and notes linked to a party. Grid columns use select / checklist / checkbox controls from meta.",
-      "durationMs": 5000,
-      "highlight": "#ws-meta"
-    },
-    {
-      "section": "7 · CRM · Opportunities",
-      "action": "nav",
-      "screen": "screen.opportunities",
-      "menuId": "opportunities",
-      "label": "Opportunities",
-      "caption": "Opportunities hold pipeline amounts, probability and close date. Money fields respect app.locale (currency, decimals, separators).",
-      "durationMs": 5000,
-      "highlight": "#ws-meta"
-    },
-    {
-      "section": "8 · CRM · Pipeline",
-      "action": "nav",
-      "screen": "screen.pipeline",
-      "menuId": "pipeline",
-      "label": "Pipeline board",
-      "caption": "Layout workflow: same opportunities, shown as a stage board with allowed transitions (Lead → Qualified → …). Great for sales process demos.",
-      "durationMs": 5500,
-      "highlight": "#ws-meta"
-    },
-    {
-      "section": "9 · Vertical packs",
-      "caption": "Verticals (clinic / services / retail) only reshuffle the menu and labels. Core CRM and datasets stay shared. Switch pack in Edit app → Vertical — applies immediately.",
-      "durationMs": 5500,
-      "highlight": "#nav"
-    },
-    {
-      "section": "10 · Vertical screen",
-      "action": "nav",
-      "screenByVertical": {
-        "clinic": "screen.patients",
-        "services": "screen.projects",
-        "retail": "screen.products",
-        "demo": "screen.engagements"
-      },
-      "screen": "screen.patients",
-      "menuIdByVertical": {
-        "clinic": "patients",
-        "services": "projects",
-        "retail": "products",
-        "demo": "engagements"
-      },
-      "labelByVertical": {
-        "clinic": "Patients",
-        "services": "Projects",
-        "retail": "Products",
-        "demo": "Engagements"
-      },
-      "captionByVertical": {
-        "clinic": "Clinic pack: Patients master — clinic language on top of party codes. Lists are still meta grids with search, toolbar and CRUD.",
-        "services": "Services pack: Projects — budget, spent, status and type. Delivery work sits next to CRM clients.",
-        "retail": "Retail pack: Products — SKU, barcode, tax and price. Store catalog ready for POS.",
-        "demo": "Demo pack: Engagements — a full consulting list with F2 lookups, field validations and conditional (when) fields in the add/edit form."
-      },
-      "caption": "Active vertical showcase",
-      "durationMs": 6000,
-      "highlight": "#ws-meta"
-    },
-    {
-      "section": "11 · Vertical deep dive",
-      "action": "nav",
-      "screenByVertical": {
-        "clinic": "screen.admission",
-        "services": "screen.timesheets",
-        "retail": "screen.pos_sales",
-        "demo": "screen.onboarding"
-      },
-      "screen": "screen.admission",
-      "menuIdByVertical": {
-        "clinic": "admission",
-        "services": "timesheets",
-        "retail": "pos_sales",
-        "demo": "onboarding"
-      },
-      "labelByVertical": {
-        "clinic": "Admission",
-        "services": "Timesheets",
-        "retail": "POS tickets",
-        "demo": "Client onboarding"
-      },
-      "captionByVertical": {
-        "clinic": "Layout wizard: Admission — multi-step capture. Other layouts in the pack: form cards, calendars, invoices…",
-        "services": "Timesheets: hours × rate, billable flag, approval status — classic professional-services loop.",
-        "retail": "POS tickets: register, cashier, tender and status — day sales without a full POS hardware stack.",
-        "demo": "Client onboarding wizard: validated steps (code pattern, e-mail, required owner via F2 lookup) writing straight into the CRM parties master."
-      },
-      "caption": "Second vertical screen",
-      "durationMs": 6000,
-      "highlight": "#ws-meta"
-    },
-    {
-      "section": "12 · Commercial documents",
-      "action": "nav",
-      "screenByVertical": {
-        "clinic": "screen.invoices",
-        "services": "screen.quotes",
-        "retail": "screen.stock",
-        "demo": "screen.cons_quotes"
-      },
-      "screen": "screen.invoices",
-      "menuIdByVertical": {
-        "clinic": "invoices",
-        "services": "quotes",
-        "retail": "stock",
-        "demo": "cons_quotes"
-      },
-      "labelByVertical": {
-        "clinic": "Invoices",
-        "services": "Quotes",
-        "retail": "Stock",
-        "demo": "Quotes"
-      },
-      "captionByVertical": {
-        "clinic": "Layout master-detail: Invoices — header grid + linked lines. Toolbar: add/edit/delete, print, PDF, Excel.",
-        "services": "Layout document: Quotes with line totals and default VAT from app.locale.taxRate. Recalc updates subtotal / tax / total.",
-        "retail": "Stock by warehouse: qty, min, reserved, bin and status — inventory sketch for the store.",
-        "demo": "Consulting quotes: layout document with client F2 lookup, line totals and VAT from app.locale.taxRate. Recalc updates subtotal / tax / total."
-      },
-      "caption": "Documents or stock",
-      "durationMs": 6000,
-      "highlight": "#ws-meta"
-    },
-    {
-      "section": "13 · Calendar layout",
-      "action": "nav",
-      "screen": "screen.day_agenda",
-      "menuId": "day_agenda",
-      "label": "Day agenda",
-      "caption": "Layout calendar: Day agenda slots by room/resource. Same idea as appointments, different meta layout engine.",
-      "durationMs": 5000,
-      "highlight": "#ws-meta"
-    },
-    {
-      "section": "14 · Dashboard KPIs",
-      "action": "nav",
-      "screen": "screen.kpis",
-      "menuId": "kpis",
-      "label": "Dashboard",
-      "caption": "Layout dashboard: KPI tiles from data.dashboard_kpis. Useful landing page for managers — still just meta + data JSON.",
-      "durationMs": 4800,
-      "highlight": "#ws-meta"
-    },
-    {
-      "section": "15 · Reports sketch",
-      "action": "nav",
-      "screen": "screen.reports",
-      "menuId": "reports",
-      "label": "Reports",
-      "caption": "report.* definitions: columns + dataRef + optional groupBy/sumFields. Preview, PDF or CSV. From any list, admin can Save as report. Not a band designer — by design.",
-      "durationMs": 6000,
-      "highlight": "#ws-meta"
-    },
-    {
-      "section": "16 · Form designer",
-      "action": "openFormDesigner",
-      "screen": "screen.parties",
-      "adminOnly": true,
-      "caption": "Admin only — Design form: change layout, columns, select/checklist options, master-detail and workflow transitions. Save writes meta JSON live.",
-      "durationMs": 6500,
-      "highlight": "#designer"
-    },
-    {
-      "section": "17 · Edit app",
-      "action": "openAppDesigner",
-      "adminOnly": true,
-      "caption": "Admin only — Edit app: branding, HTTP port, vertical pack, locale (currency/decimals/VAT) and the full sidebar menu. Menu saves into the active vertical pack.",
-      "durationMs": 6500,
-      "highlight": "#menu-designer"
-    },
-    {
-      "section": "18 · Locale",
-      "action": "closeOverlays",
-      "caption": "Locale settings format every money cell and document tax. Try EUR with comma decimals vs USD with point — Save app and watch grids refresh.",
-      "durationMs": 5200,
-      "highlight": "#btn-demo"
-    },
-    {
-      "section": "19 · Try it yourself",
-      "action": "nav",
-      "screen": "screen.parties",
-      "menuId": "parties",
-      "label": "Parties",
-      "caption": "Tour finished. Explore freely. Tips: demo/demo auto-starts this tour · admin/1234 unlocks designers · ▶ Demo replays anytime · Escape stops the tour.",
-      "durationMs": 6500,
-      "highlight": "#nav"
+      "id": "runtime",
+      "label": "Runtime y contexto",
+      "items": [
+        {
+          "id": "multi_app",
+          "label": "Multi-empresa y multi-app",
+          "ref": "demo.multi_app",
+          "description": "Empresas con N apps (verticals), selector de contexto, menú por app y filtro de datos por empresa.",
+          "durationHint": "~3 min"
+        }
+      ]
     }
   ]
 }
