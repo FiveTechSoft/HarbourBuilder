@@ -6,63 +6,239 @@
       "id": "crm",
       "title": "CRM",
       "items": [
-        { "id": "parties", "label": "Parties", "icon": "users", "screen": "screen.parties" },
-        { "id": "party_card", "label": "Party card", "icon": "user", "screen": "screen.party_card", "sub": true },
-        { "id": "accounts", "label": "Accounts", "icon": "grid", "screen": "screen.accounts" },
-        { "id": "activities", "label": "Activities", "icon": "calendar", "screen": "screen.activities" },
-        { "id": "opportunities", "label": "Opportunities", "icon": "chart", "screen": "screen.opportunities" },
-        { "id": "pipeline", "label": "Pipeline board", "icon": "chart", "screen": "screen.pipeline" }
+        {
+          "id": "parties",
+          "label": "Parties",
+          "icon": "users",
+          "screen": "screen.parties"
+        },
+        {
+          "id": "party_card",
+          "label": "Party card",
+          "icon": "user",
+          "screen": "screen.party_card",
+          "sub": true
+        },
+        {
+          "id": "accounts",
+          "label": "Accounts",
+          "icon": "grid",
+          "screen": "screen.accounts"
+        },
+        {
+          "id": "activities",
+          "label": "Activities",
+          "icon": "calendar",
+          "screen": "screen.activities"
+        },
+        {
+          "id": "opportunities",
+          "label": "Opportunities",
+          "icon": "chart",
+          "screen": "screen.opportunities"
+        },
+        {
+          "id": "pipeline",
+          "label": "Pipeline board",
+          "icon": "chart",
+          "screen": "screen.pipeline"
+        }
       ]
     },
     {
       "id": "clinic",
       "title": "Clinic",
       "items": [
-        { "id": "patients", "label": "Patients", "icon": "user", "screen": "screen.patients" },
-        { "id": "patient_card", "label": "Patient card", "icon": "user", "screen": "screen.patient_card" },
-        { "id": "balance", "label": "Patient balance", "icon": "money", "screen": "screen.balance" },
-        { "id": "exams", "label": "Exam archive", "icon": "file", "screen": "screen.exams" },
-        { "id": "invoices", "label": "Invoices (M/D)", "icon": "money", "screen": "screen.invoices" },
-        { "id": "quotes", "label": "Quotes (document)", "icon": "chart", "screen": "screen.quotes" }
+        {
+          "id": "patients",
+          "label": "Patients",
+          "icon": "user",
+          "screen": "screen.patients"
+        },
+        {
+          "id": "patient_card",
+          "label": "Patient card",
+          "icon": "user",
+          "screen": "screen.patient_card"
+        },
+        {
+          "id": "balance",
+          "label": "Patient balance",
+          "icon": "money",
+          "screen": "screen.balance"
+        },
+        {
+          "id": "exams",
+          "label": "Exam archive",
+          "icon": "file",
+          "screen": "screen.exams"
+        },
+        {
+          "id": "invoices",
+          "label": "Invoices (M/D)",
+          "icon": "money",
+          "screen": "screen.invoices"
+        },
+        {
+          "id": "quotes",
+          "label": "Quotes (document)",
+          "icon": "chart",
+          "screen": "screen.quotes"
+        }
       ]
     },
     {
       "id": "workflow",
       "title": "Workflow",
       "items": [
-        { "id": "appointments", "label": "Appointments", "icon": "calendar", "screen": "screen.appointments", "active": true },
-        { "id": "day_agenda", "label": "Day agenda", "icon": "calendar", "screen": "screen.day_agenda", "sub": true },
-        { "id": "approvals", "label": "Approvals queue", "icon": "grid", "screen": "screen.approvals", "sub": true },
-        { "id": "admission", "label": "Admission wizard", "icon": "users", "screen": "screen.admission", "sub": true }
+        {
+          "id": "appointments",
+          "label": "Appointments",
+          "icon": "calendar",
+          "screen": "screen.appointments",
+          "active": true
+        },
+        {
+          "id": "day_agenda",
+          "label": "Day agenda",
+          "icon": "calendar",
+          "screen": "screen.day_agenda",
+          "sub": true
+        },
+        {
+          "id": "approvals",
+          "label": "Approvals queue",
+          "icon": "grid",
+          "screen": "screen.approvals",
+          "sub": true
+        },
+        {
+          "id": "admission",
+          "label": "Admission wizard",
+          "icon": "users",
+          "screen": "screen.admission",
+          "sub": true
+        }
       ]
     },
     {
       "id": "erp_forms",
       "title": "ERP forms",
       "items": [
-        { "id": "kpis", "label": "Dashboard KPIs", "icon": "chart", "screen": "screen.kpis" },
-        { "id": "org", "label": "Org tree", "icon": "users", "screen": "screen.org" },
-        { "id": "roster", "label": "Roster matrix", "icon": "grid", "screen": "screen.roster" },
-        { "id": "user_roles", "label": "Users ↔ roles", "icon": "users", "screen": "screen.user_roles" },
-        { "id": "params", "label": "Parameters", "icon": "file", "screen": "screen.params" },
-        { "id": "audit_log", "label": "Audit log", "icon": "file", "screen": "screen.audit_log" },
-        { "id": "import_csv", "label": "CSV import", "icon": "file", "screen": "screen.import_csv" },
-        { "id": "period_close", "label": "Period & close", "icon": "calendar", "screen": "screen.period_close" },
-        { "id": "context", "label": "Company context", "icon": "grid", "screen": "screen.context" },
-        { "id": "reports", "label": "Reports", "icon": "file", "screen": "screen.reports" }
+        {
+          "id": "kpis",
+          "label": "Dashboard KPIs",
+          "icon": "chart",
+          "screen": "screen.kpis"
+        },
+        {
+          "id": "org",
+          "label": "Org tree",
+          "icon": "users",
+          "screen": "screen.org"
+        },
+        {
+          "id": "roster",
+          "label": "Roster matrix",
+          "icon": "grid",
+          "screen": "screen.roster"
+        },
+        {
+          "id": "users",
+          "label": "Users",
+          "icon": "users",
+          "screen": "screen.users"
+        },
+        {
+          "id": "user_roles",
+          "label": "Users ↔ roles",
+          "icon": "users",
+          "screen": "screen.user_roles"
+        },
+        {
+          "id": "params",
+          "label": "Parameters",
+          "icon": "file",
+          "screen": "screen.params"
+        },
+        {
+          "id": "audit_log",
+          "label": "Audit log",
+          "icon": "file",
+          "screen": "screen.audit_log"
+        },
+        {
+          "id": "import_csv",
+          "label": "CSV import",
+          "icon": "file",
+          "screen": "screen.import_csv"
+        },
+        {
+          "id": "period_close",
+          "label": "Period & close",
+          "icon": "calendar",
+          "screen": "screen.period_close"
+        },
+        {
+          "id": "context",
+          "label": "Company context",
+          "icon": "grid",
+          "screen": "screen.context"
+        },
+        {
+          "id": "reports",
+          "label": "Reports",
+          "icon": "file",
+          "screen": "screen.reports"
+        }
       ]
     },
     {
       "id": "demo",
       "title": "Demo controls",
       "items": [
-        { "id": "tasks", "label": "Work orders", "icon": "grid", "screen": "screen.tasks" },
-        { "id": "catalog", "label": "Service catalog", "icon": "file", "screen": "screen.catalog" },
-        { "id": "group", "label": "Group 1", "icon": "users", "screen": "screen.group" },
-        { "id": "budget", "label": "Budget study", "icon": "chart", "screen": "screen.budget" },
-        { "id": "accounting", "label": "Accounting list", "icon": "grid", "screen": "screen.accounting" },
-        { "id": "calendar", "label": "Calendar list", "icon": "calendar", "screen": "screen.calendar" },
-        { "id": "stats", "label": "Statistics list", "icon": "chart", "screen": "screen.stats" }
+        {
+          "id": "tasks",
+          "label": "Work orders",
+          "icon": "grid",
+          "screen": "screen.tasks"
+        },
+        {
+          "id": "catalog",
+          "label": "Service catalog",
+          "icon": "file",
+          "screen": "screen.catalog"
+        },
+        {
+          "id": "group",
+          "label": "Group 1",
+          "icon": "users",
+          "screen": "screen.group"
+        },
+        {
+          "id": "budget",
+          "label": "Budget study",
+          "icon": "chart",
+          "screen": "screen.budget"
+        },
+        {
+          "id": "accounting",
+          "label": "Accounting list",
+          "icon": "grid",
+          "screen": "screen.accounting"
+        },
+        {
+          "id": "calendar",
+          "label": "Calendar list",
+          "icon": "calendar",
+          "screen": "screen.calendar"
+        },
+        {
+          "id": "stats",
+          "label": "Statistics list",
+          "icon": "chart",
+          "screen": "screen.stats"
+        }
       ]
     }
   ]

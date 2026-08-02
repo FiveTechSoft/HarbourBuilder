@@ -249,7 +249,7 @@ static function ErpApiMetaPost( cBody, hSess )
       return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Not authenticated", ;
          "error" => "Not authenticated" } ), "application/json; charset=utf-8" )
    endif
-   if Upper( AllTrim( ErpToStr( hb_HGetDef( hSess, "user", "" ) ) ) ) != "ADMIN"
+   if ! ErpSessIsAdmin( hSess )
       return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Admin only", ;
          "error" => "Admin only" } ), "application/json; charset=utf-8" )
    endif
@@ -574,6 +574,15 @@ static function ErpApiDatasetPost( cBody, hSess )
          return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
             "msg" => "row must be a JSON object" } ), "application/json; charset=utf-8" )
       endif
+      // data.users: store only CRC of password (never plain text)
+      if cKey == "data.users"
+         if Empty( AllTrim( ErpToStr( hb_HGetDef( hRow, "password", "" ) ) ) )
+            return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
+               "msg" => "Password required for new user" } ), ;
+               "application/json; charset=utf-8" )
+         endif
+         ErpUsersNormalizeRow( hRow, NIL )
+      endif
       AAdd( aRows, hRow )
    else
       if Empty( cKeyField )
@@ -597,8 +606,20 @@ static function ErpApiDatasetPost( cBody, hSess )
             return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
                "msg" => "row must be a JSON object" } ), "application/json; charset=utf-8" )
          endif
+         if cKey == "data.users"
+            ErpUsersNormalizeRow( hRow, aRows[ n ] )
+         endif
          aRows[ n ] := hRow
       else
+         // protect last admin user
+         if cKey == "data.users" .and. ValType( aRows[ n ] ) == "H" .and. ;
+               ErpUserRowIsAdmin( aRows[ n ] )
+            if ErpUsersAdminCount( aRows ) <= 1
+               return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
+                  "msg" => "Cannot delete the last admin user" } ), ;
+                  "application/json; charset=utf-8" )
+            endif
+         endif
          ADel( aRows, n )
          ASize( aRows, Len( aRows ) - 1 )
       endif
@@ -624,6 +645,209 @@ static function ErpApiDatasetPost( cBody, hSess )
    ErpMetaInvalidate( cKey )
 return ErpHttpOk( hb_jsonEncode( { "ok" => .T., "key" => cKey, ;
    "action" => cAction, "rows" => Len( aRows ) } ), "application/json; charset=utf-8" )
+
+//--------------------------------------------------------------------
+// Password storage: decimal CRC32 of the plain password (never store plain).
+// hb_CRC32 is IEEE polynomial; value stored as unsigned decimal string.
+function ErpPassCrc( cPass )
+
+   local n
+
+   cPass := AllTrim( ErpToStr( cPass ) )
+   n := hb_CRC32( cPass )
+   // Harbour may return signed 32-bit; normalize to unsigned decimal
+   if n < 0
+      n += 4294967296
+   endif
+return hb_ntos( n )
+
+//--------------------------------------------------------------------
+// True if string looks like a stored CRC (digits only, not a typical plain pass)
+static function ErpPassLooksLikeCrc( c )
+
+   local n, cCh
+   c := AllTrim( ErpToStr( c ) )
+   if Empty( c ) .or. Len( c ) < 5 .or. Len( c ) > 12
+      return .F.
+   endif
+   for n := 1 to Len( c )
+      cCh := SubStr( c, n, 1 )
+      if ! ( cCh >= "0" .and. cCh <= "9" )
+         return .F.
+      endif
+   next
+return .T.
+
+//--------------------------------------------------------------------
+// Normalize data.users row before save: password → CRC only.
+// Empty password on update keeps the previous CRC.
+static function ErpUsersNormalizeRow( hRow, hOld )
+
+   local cP
+
+   if ValType( hRow ) != "H"
+      return NIL
+   endif
+   if ! hb_HHasKey( hRow, "password" )
+      if ValType( hOld ) == "H" .and. hb_HHasKey( hOld, "password" )
+         hRow[ "password" ] := hOld[ "password" ]
+      else
+         hRow[ "password" ] := ErpPassCrc( "" )
+      endif
+      return NIL
+   endif
+   cP := AllTrim( ErpToStr( hRow[ "password" ] ) )
+   if Empty( cP )
+      if ValType( hOld ) == "H" .and. hb_HHasKey( hOld, "password" )
+         hRow[ "password" ] := hOld[ "password" ]
+      else
+         hRow[ "password" ] := ErpPassCrc( "" )
+      endif
+   elseif ErpPassLooksLikeCrc( cP ) .and. ValType( hOld ) == "H" .and. ;
+         AllTrim( ErpToStr( hb_HGetDef( hOld, "password", "" ) ) ) == cP
+      // already CRC, leave as-is (e.g. re-save without changing password)
+      hRow[ "password" ] := cP
+   else
+      hRow[ "password" ] := ErpPassCrc( cP )
+   endif
+   // default role / active
+   if ! hb_HHasKey( hRow, "role" ) .or. Empty( AllTrim( ErpToStr( hRow[ "role" ] ) ) )
+      hRow[ "role" ] := "user"
+   endif
+   if ! hb_HHasKey( hRow, "active" )
+      hRow[ "active" ] := .T.
+   endif
+return NIL
+
+//--------------------------------------------------------------------
+static function ErpUserRowIsAdmin( hRow )
+
+   local cRole, cCode
+   if ValType( hRow ) != "H"
+      return .F.
+   endif
+   cRole := Lower( AllTrim( ErpToStr( hb_HGetDef( hRow, "role", "" ) ) ) )
+   cCode := Lower( AllTrim( ErpToStr( hb_HGetDef( hRow, "code", "" ) ) ) )
+   if cRole == "admin" .or. cRole == "administrator"
+      return .T.
+   endif
+   // legacy: code "admin" without role still admin
+   if cCode == "admin" .and. Empty( cRole )
+      return .T.
+   endif
+return .F.
+
+//--------------------------------------------------------------------
+static function ErpUsersAdminCount( aRows )
+
+   local n := 0, h
+   if ValType( aRows ) != "A"
+      return 0
+   endif
+   for each h in aRows
+      if ValType( h ) == "H" .and. ErpUserRowIsAdmin( h )
+         // count only active admins when active is present
+         if hb_HHasKey( h, "active" )
+            if h[ "active" ] == .T. .or. Upper( AllTrim( ErpToStr( h[ "active" ] ) ) ) $ "1|Y|YES|TRUE|.T."
+               n++
+            endif
+         else
+            n++
+         endif
+      endif
+   next
+return n
+
+//--------------------------------------------------------------------
+// Find user row in data.users; NIL if bad password / inactive / missing.
+function ErpUserAuth( cUser, cPass )
+
+   local hDoc := { => }, aRows, h, cCode, cStored, cCrc, lActive
+
+   cUser := AllTrim( ErpToStr( cUser ) )
+   cPass := AllTrim( ErpToStr( cPass ) )
+   if Empty( cUser )
+      return NIL
+   endif
+
+   hDoc := ErpMetaGet( "data.users" )
+   if ValType( hDoc ) != "H" .or. ! hb_HHasKey( hDoc, "rows" ) .or. ;
+         ValType( hDoc[ "rows" ] ) != "A"
+      // Fallback hardcoded only if dataset missing (fresh install)
+      if ( Upper( cUser ) == "ADMIN" .and. cPass == "1234" ) .or. ;
+            ( Upper( cUser ) == "DEMO" .and. cPass == "demo" )
+         return { "code" => Lower( cUser ), "name" => cUser, ;
+            "role" => iif( Upper( cUser ) == "ADMIN", "admin", "user" ), ;
+            "active" => .T. }
+      endif
+      return NIL
+   endif
+
+   aRows := hDoc[ "rows" ]
+   cCrc := ErpPassCrc( cPass )
+   for each h in aRows
+      if ValType( h ) != "H"
+         loop
+      endif
+      cCode := AllTrim( ErpToStr( hb_HGetDef( h, "code", "" ) ) )
+      if Upper( cCode ) != Upper( cUser )
+         loop
+      endif
+      lActive := .T.
+      if hb_HHasKey( h, "active" )
+         lActive := ( h[ "active" ] == .T. ) .or. ;
+            Upper( AllTrim( ErpToStr( h[ "active" ] ) ) ) $ "1|Y|YES|TRUE|.T."
+      endif
+      if ! lActive
+         return NIL
+      endif
+      cStored := AllTrim( ErpToStr( hb_HGetDef( h, "password", "" ) ) )
+      // Stored value is CRC decimal; accept match only (never plain)
+      if ! Empty( cStored ) .and. cStored == cCrc
+         return h
+      endif
+      return NIL
+   next
+return NIL
+
+//--------------------------------------------------------------------
+// Is this user code an admin (look up data.users, fallback to code name)
+function ErpUserCodeIsAdmin( cUser )
+
+   local hDoc, aRows, h, cCode
+   cUser := AllTrim( ErpToStr( cUser ) )
+   if Empty( cUser )
+      return .F.
+   endif
+   hDoc := ErpMetaGet( "data.users" )
+   if ValType( hDoc ) == "H" .and. hb_HHasKey( hDoc, "rows" ) .and. ;
+         ValType( hDoc[ "rows" ] ) == "A"
+      aRows := hDoc[ "rows" ]
+      for each h in aRows
+         if ValType( h ) != "H"
+            loop
+         endif
+         cCode := AllTrim( ErpToStr( hb_HGetDef( h, "code", "" ) ) )
+         if Upper( cCode ) == Upper( cUser )
+            return ErpUserRowIsAdmin( h )
+         endif
+      next
+   endif
+return Upper( cUser ) == "ADMIN"
+
+//--------------------------------------------------------------------
+function ErpSessIsAdmin( hSess )
+
+   if Empty( hSess ) .or. ValType( hSess ) != "H"
+      return .F.
+   endif
+   if hb_HHasKey( hSess, "isAdmin" ) .and. ValType( hSess[ "isAdmin" ] ) == "L"
+      return hSess[ "isAdmin" ]
+   endif
+   if Lower( AllTrim( ErpToStr( hb_HGetDef( hSess, "role", "" ) ) ) ) == "admin"
+      return .T.
+   endif
+return ErpUserCodeIsAdmin( hb_HGetDef( hSess, "user", "" ) )
 
 //--------------------------------------------------------------------
 // Strict meta key whitelist: prefix + [A-Za-z0-9_] only.
@@ -880,23 +1104,29 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
       if Empty( cDate )
          cDate := DToC( Date() )
       endif
-      // Case-insensitive user like FWH
-      if ( Upper( cUser ) == "ADMIN" .and. cPass == "1234" ) .or. ;
-            ( Upper( cUser ) == "DEMO" .and. cPass == "demo" )
+      // Authenticate against data.users (password stored as CRC32 only)
+      hDoc := ErpUserAuth( cUser, cPass )
+      if ValType( hDoc ) == "H"
+         cUser := AllTrim( ErpToStr( hb_HGetDef( hDoc, "code", cUser ) ) )
          cTok := hb_MD5( cUser + cDate + Time() + hb_ntos( Seconds() ) )
          if s_mtx != NIL
             hb_mutexLock( s_mtx )
          endif
          s_hSess[ cTok ] := { "user" => cUser, "workDate" => cDate, "sel" => 2, ;
-            "ts" => hb_DateTime() }
+            "ts" => hb_DateTime(), ;
+            "role" => Lower( AllTrim( ErpToStr( hb_HGetDef( hDoc, "role", "user" ) ) ) ), ;
+            "isAdmin" => ErpUserRowIsAdmin( hDoc ) }
          if s_mtx != NIL
             hb_mutexUnlock( s_mtx )
          endif
-         cOut := hb_jsonEncode( { "ok" => .T., "msg" => "Welcome, " + cUser, "user" => cUser } )
+         cOut := hb_jsonEncode( { "ok" => .T., "msg" => "Welcome, " + cUser, ;
+            "user" => cUser, "role" => hb_HGetDef( s_hSess[ cTok ], "role", "user" ), ;
+            "isAdmin" => hb_HGetDef( s_hSess[ cTok ], "isAdmin", .F. ) } )
          return ErpHttpOkCookie( cOut, "application/json; charset=utf-8", ;
             "DWSESS=" + cTok + "; Path=/; HttpOnly; SameSite=Lax" )
       endif
-      cOut := hb_jsonEncode( { "ok" => .F., "msg" => "Invalid credentials (admin/1234 or demo/demo)" } )
+      cOut := hb_jsonEncode( { "ok" => .F., ;
+         "msg" => "Invalid credentials (manage users in Admin → Users)" } )
       return ErpHttpOk( cOut, "application/json; charset=utf-8" )
    endif
 
@@ -1199,8 +1429,10 @@ static function ErpFwhDashboardHtml( cUser, cWorkDate, nSel )
    cHtml := StrTran( cHtml, "__AVATAR__", cAv )
    cHtml := StrTran( cHtml, "__SEL__", hb_ntos( nSel ) )
    cHtml := StrTran( cHtml, "__APPTDATA__", ErpApptDataJson() )
-   cHtml := StrTran( cHtml, "__IS_ADMIN__", iif( Upper( AllTrim( cUser ) ) == "ADMIN", "true", "false" ) )
-   cHtml := StrTran( cHtml, "__BODY_ADMIN_CLASS__", iif( Upper( AllTrim( cUser ) ) == "ADMIN", "is-admin", "" ) )
+   cHtml := StrTran( cHtml, "__IS_ADMIN__", ;
+      iif( ErpUserCodeIsAdmin( cUser ), "true", "false" ) )
+   cHtml := StrTran( cHtml, "__BODY_ADMIN_CLASS__", ;
+      iif( ErpUserCodeIsAdmin( cUser ), "is-admin", "" ) )
    cHtml := StrTran( cHtml, "__HTTP_PORT__", hb_ntos( s_nPort ) )
 
    // Raw meta JSON embeds (avoid hb_jsonEncode UTF-8 truncation)

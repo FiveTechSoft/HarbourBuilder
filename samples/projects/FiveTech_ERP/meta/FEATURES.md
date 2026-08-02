@@ -11,7 +11,8 @@ Product roadmap: [ROADMAP.md](ROADMAP.md) · [ROADMAP.es.md](ROADMAP.es.md)
 
 - **Dual delivery**: desktop WebView2 app and pure browser UI share the same HTML/CSS/JS and HTTP API
 - **Embedded multi-thread HTTP server** (default port **2222**, configurable)
-- **Session login** with cookie auth (`DWSESS`), demo users (`admin` / `demo`)
+- **Session login** with cookie auth (`DWSESS`); users in `data.users` (Admin → Users)
+- Passwords stored as **CRC32 only** (never plain text); seed: `admin`/`1234`, `demo`/`demo`
 - **App metadata model**: JSON files under `meta/` → `data/appmeta.dbf` → in-memory cache
 - **Live APIs**: `/api/login`, `/api/meta`, `/api/dataset`, `/api/patients`, `/api/balances`, `/api/verticals`, …
 - **CRUD on demo datasets** (`data.*`) from the UI (add / edit / delete)

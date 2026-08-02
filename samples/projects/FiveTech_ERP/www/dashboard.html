@@ -3967,6 +3967,8 @@ function cellValue(row, col) {
   var v = row[col.id];
   var t = colControlType(col);
   if (v === null || v === undefined) return "";
+  // Never show stored password CRC in grids
+  if (t === "password" || col.id === "password") return v ? "••••••••" : "";
   if (t === "money" || col.format === "money") return moneyFmt(v);
   if (t === "checkbox" || t === "bool" || t === "boolean") {
     if (v === true || v === 1 || v === "1" || String(v).toLowerCase() === "true" || String(v).toLowerCase() === "yes")
@@ -4485,10 +4487,21 @@ function openRecordForm(mode, row, scope) {
       val = META_VIEW.masterKeyValue;
     }
     t = colControlType(c);
+    // Password fields: never prefill CRC; leave blank to keep current on update
+    if (t === "password" || c.id === "password") val = "";
     ro = (mode === "edit" && c.id === keyField) ||
       (isDet && c.id === META_VIEW.detail.masterKey && mode === "add");
     html += "<div class='rec-field'><label for='rec-f-" + esc(c.id) + "'>" + esc(c.label || c.id) + "</label>";
-    if (t === "select" || t === "combo" || t === "combobox") {
+    if (t === "password" || c.id === "password") {
+      html += "<input type='password' id='rec-f-" + esc(c.id) + "' data-fid='" + esc(c.id) +
+        "' data-ctype='password' value='' autocomplete='new-password'" +
+        (ro ? " disabled" : "") + " placeholder='" +
+        (mode === "edit" ? "Leave blank to keep current" : "Password") + "'>";
+      if (c.hint || mode === "edit")
+        html += "<span class='fld-err-msg' style='color:var(--muted)'>" +
+          esc(c.hint || "Only a CRC of the password is stored. Leave blank to keep the current password.") +
+          "</span>";
+    } else if (t === "select" || t === "combo" || t === "combobox") {
       opts = colOptionsList(c);
       html += "<select id='rec-f-" + esc(c.id) + "' data-fid='" + esc(c.id) + "' data-ctype='select'" +
         (ro ? " disabled" : "") + ">";

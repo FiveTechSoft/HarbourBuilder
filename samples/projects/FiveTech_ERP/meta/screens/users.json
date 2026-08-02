@@ -1,0 +1,59 @@
+{
+  "id": "screen.users",
+  "kind": "screen",
+  "layout": "list",
+  "title": "Users",
+  "dataRef": "data.users",
+  "keyField": "code",
+  "searchFields": [
+    "code",
+    "name",
+    "email",
+    "role"
+  ],
+  "grid": {
+    "columns": [
+      {
+        "id": "code",
+        "label": "User code",
+        "type": "text"
+      },
+      {
+        "id": "name",
+        "label": "Name",
+        "type": "text"
+      },
+      {
+        "id": "email",
+        "label": "E-mail",
+        "type": "text"
+      },
+      {
+        "id": "role",
+        "label": "Role",
+        "type": "select",
+        "options": [
+          "admin",
+          "user"
+        ]
+      },
+      {
+        "id": "active",
+        "label": "Active",
+        "type": "checkbox"
+      },
+      {
+        "id": "password",
+        "label": "Password",
+        "type": "password",
+        "hint": "Plain on edit; only CRC stored. Blank keeps current."
+      }
+    ]
+  },
+  "toolbar": [
+    "add",
+    "edit",
+    "delete",
+    "refresh"
+  ]
+}

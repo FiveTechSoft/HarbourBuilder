@@ -7,13 +7,46 @@
   "heading": "FiveTech Software",
   "subheading": "Desktop & Web",
   "fields": [
-    { "id": "user", "label": "User Code", "type": "text", "required": true, "autofocus": true },
-    { "id": "password", "label": "Password", "type": "password", "required": true },
-    { "id": "workDate", "label": "Work Date", "type": "date", "required": true, "default": "today" }
+    {
+      "id": "user",
+      "label": "User Code",
+      "type": "text",
+      "required": true,
+      "autofocus": true
+    },
+    {
+      "id": "password",
+      "label": "Password",
+      "type": "password",
+      "required": true
+    },
+    {
+      "id": "workDate",
+      "label": "Work Date",
+      "type": "date",
+      "required": true,
+      "default": "today"
+    }
   ],
-  "submit": { "label": "Sign in", "action": "login" },
+  "submit": {
+    "label": "Sign in",
+    "action": "login"
+  },
   "demoUsers": [
-    { "user": "admin", "password": "1234" },
-    { "user": "demo", "password": "demo" }
-  ]
+    {
+      "user": "admin",
+      "password": "1234"
+    },
+    {
+      "user": "demo",
+      "password": "demo"
+    }
+  ],
+  "auth": {
+    "dataRef": "data.users",
+    "userField": "code",
+    "passwordField": "password",
+    "passwordStorage": "crc32",
+    "note": "Passwords stored as decimal CRC32 only"
+  }
 }

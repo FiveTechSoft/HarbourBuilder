@@ -11,7 +11,8 @@ Hoja de ruta: [ROADMAP.es.md](ROADMAP.es.md) · [ROADMAP.md](ROADMAP.md)
 
 - **Doble entrega**: la app de escritorio WebView2 y la UI en navegador comparten el mismo HTML/CSS/JS y la API HTTP
 - **Servidor HTTP multihilo embebido** (puerto por defecto **2222**, configurable)
-- **Login con sesión** y cookie de autenticación (`DWSESS`), usuarios demo (`admin` / `demo`)
+- **Login con sesión** y cookie (`DWSESS`); usuarios en `data.users` (Admin → Users)
+- Contraseñas guardadas solo como **CRC32** (nunca en claro); seed: `admin`/`1234`, `demo`/`demo`
 - **Modelo de metadatos de la app**: archivos JSON en `meta/` → `data/appmeta.dbf` → caché en memoria
 - **APIs en vivo**: `/api/login`, `/api/meta`, `/api/dataset`, `/api/patients`, `/api/balances`, `/api/verticals`, …
 - **CRUD sobre datasets demo** (`data.*`) desde la UI (alta / edición / baja)

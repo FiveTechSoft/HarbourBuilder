@@ -3,8 +3,29 @@
   "kind": "data",
   "entity": "user",
   "rows": [
-    {"code":"admin","name":"Admin User","email":"admin@example.com"},
-    {"code":"demo","name":"Demo User","email":"demo@example.com"},
-    {"code":"nurse","name":"Nurse Lee","email":"nurse@example.com"}
+    {
+      "code": "admin",
+      "name": "Admin User",
+      "email": "admin@example.com",
+      "role": "admin",
+      "active": true,
+      "password": "2615402659"
+    },
+    {
+      "code": "demo",
+      "name": "Demo User",
+      "email": "demo@example.com",
+      "role": "user",
+      "active": true,
+      "password": "3594706848"
+    },
+    {
+      "code": "nurse",
+      "name": "Nurse Lee",
+      "email": "nurse@example.com",
+      "role": "user",
+      "active": true,
+      "password": "3531500867"
+    }
   ]
 }
