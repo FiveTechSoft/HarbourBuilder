@@ -2615,11 +2615,36 @@ function setStatusMsg(msg, kind) {
     STATUS_BAR.msgTimer = setTimeout(function () { setStatusMsg("Listo"); }, 6000);
   }
 }
+function formatStatusTime(d) {
+  d = d || new Date();
+  var h = d.getHours(), m = d.getMinutes(), s = d.getSeconds();
+  var use12 = false, ap = "", hh;
+  try {
+    var L = (typeof appLocale === "function") ? appLocale() : null;
+    if (L && String(L.timeFormat || "").indexOf("12") === 0) use12 = true;
+    else if (APP_META && APP_META.locale && String(APP_META.locale.timeFormat || "").indexOf("12") === 0)
+      use12 = true;
+  } catch (e) {}
+  if (use12) {
+    ap = h >= 12 ? " PM" : " AM";
+    hh = h % 12;
+    if (hh === 0) hh = 12;
+    return (hh < 10 ? "0" : "") + hh + ":" +
+      (m < 10 ? "0" : "") + m + ":" +
+      (s < 10 ? "0" : "") + s + ap;
+  }
+  return (h < 10 ? "0" : "") + h + ":" +
+    (m < 10 ? "0" : "") + m + ":" +
+    (s < 10 ? "0" : "") + s;
+}
 function refreshStatusClock() {
   var el = document.getElementById("sb-clock");
+  var item = document.getElementById("sb-clock-item");
+  var txt;
   if (!el) return;
-  var n = new Date(), h = n.getHours(), m = n.getMinutes(), s = n.getSeconds();
-  el.textContent = (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
+  txt = formatStatusTime(new Date());
+  el.textContent = txt;
+  if (item) item.title = "Hora local: " + txt;
 }
 /** Short label + CSS class for DB driver used in the status bar. */
 function dbTypeBadge(driver, backend) {
