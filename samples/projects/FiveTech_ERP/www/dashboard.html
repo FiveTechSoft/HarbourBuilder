@@ -731,47 +731,101 @@
     transition: top .25s, left .25s, width .25s, height .25s;
     pointer-events: none;
   }
+  /* Learning center / tour — same floating painel look as other ERP windows */
   #demo-card {
-    position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%);
-    width: min(520px, calc(100vw - 32px)); background: var(--surface);
-    border: 1px solid var(--line); border-radius: 14px;
-    box-shadow: 0 16px 40px rgba(0,0,0,.22); padding: 14px 16px 12px;
-    pointer-events: auto; z-index: 81;
-    max-height: min(78vh, 640px); display: flex; flex-direction: column;
+    position: fixed;
+    left: 50%; top: auto; bottom: 28px;
+    transform: translateX(-50%);
+    width: min(520px, calc(100vw - 32px));
+    max-width: calc(100vw - 32px);
+    max-height: min(78vh, 640px);
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    pointer-events: auto;
+    z-index: 81;
+    background: var(--painel-bg);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow:
+      0 2px 4px rgba(15, 23, 42, 0.08),
+      0 12px 28px rgba(15, 23, 42, 0.18),
+      0 28px 64px rgba(15, 23, 42, 0.22);
+    font: 13px/1.5 "Segoe UI", -apple-system, Roboto, Arial, sans-serif;
   }
+  #demo-overlay.is-open #demo-card { display: flex; }
   #demo-card.demo-menu-mode {
     width: min(720px, calc(100vw - 28px));
-    bottom: auto; top: 50%; transform: translate(-50%, -50%);
+    bottom: auto;
+    top: 50%;
+    transform: translate(-50%, -50%);
     max-height: min(86vh, 720px);
+    height: min(640px, 86vh);
+  }
+  #demo-card.dragging {
+    box-shadow:
+      0 4px 8px rgba(15, 23, 42, 0.12),
+      0 20px 40px rgba(15, 23, 42, 0.28),
+      0 40px 80px rgba(15, 23, 42, 0.24);
+    opacity: 0.98;
+    cursor: move;
+  }
+  #demo-card .demo-head {
+    height: 40px; flex: 0 0 40px;
+    display: flex; align-items: center; gap: 4px;
+    padding: 0 6px 0 14px;
+    background: linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%);
+    color: #fff; user-select: none; cursor: move;
+  }
+  #demo-card .demo-head .demo-tit {
+    flex: 1; font-weight: 600; font-size: 13.5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  #demo-card .demo-head .demo-x {
+    width: 34px; height: 28px; border: 0; border-radius: 6px;
+    background: transparent; color: #fff; cursor: pointer;
+    font-size: 15px; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center;
+    opacity: .92;
+  }
+  #demo-card .demo-head .demo-x:hover { background: #e11d48; color: #fff; }
+  #demo-card .demo-body {
+    flex: 1; min-height: 0; overflow: auto;
+    padding: 12px 14px 8px;
+    background: var(--painel-body, var(--surface));
   }
   #demo-card .demo-kicker {
     font-size: .7rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
-    color: var(--blue); margin-bottom: 4px;
+    color: var(--blue); margin: 0 0 6px;
     max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
+  #demo-card.demo-menu-mode .demo-kicker { display: none; }
   #demo-card .demo-caption {
-    font-size: .9rem; line-height: 1.45; color: var(--text); margin: 0 0 10px; min-height: 0;
+    font-size: .9rem; line-height: 1.45; color: var(--text); margin: 0 0 8px; min-height: 0;
   }
-  #demo-card.demo-menu-mode .demo-caption { min-height: 0; margin-bottom: 8px; }
+  #demo-card.demo-menu-mode .demo-caption { display: none; }
   #demo-card .demo-bar {
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex-shrink: 0;
+    padding: 10px 14px;
+    border-top: 1px solid var(--line);
+    background: var(--surface-2);
   }
   #demo-card .demo-bar .prog {
     flex: 1; min-width: 80px; font-size: .72rem; color: var(--muted);
   }
   #demo-card .demo-bar button {
     height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--line);
-    background: var(--surface-2); color: var(--text-2); font-size: .75rem; cursor: pointer; font-weight: 600;
+    background: var(--surface); color: var(--text-2); font-size: .75rem; cursor: pointer; font-weight: 600;
   }
   #demo-card .demo-bar button:hover { border-color: var(--blue); color: var(--blue); }
   #demo-card .demo-bar button.primary {
     background: var(--blue); color: #fff; border-color: var(--blue);
   }
   #demo-menu {
-    display: none; flex: 1; overflow: auto; margin: 4px 0 10px; padding-right: 2px;
+    display: none; flex: 1; min-height: 0;
   }
   #demo-card.demo-menu-mode #demo-menu { display: block; }
-  #demo-card.demo-menu-mode #demo-caption { display: none; }
   #demo-card.demo-menu-mode .demo-bar .prog { display: none; }
   #demo-card.demo-menu-mode #demo-btn-pause,
   #demo-card.demo-menu-mode #demo-btn-next { display: none; }
@@ -1912,13 +1966,19 @@
 
 <div id="toast"></div>
 
-<!-- Product tour demo overlay (+ learning menu) -->
+<!-- Product tour / learning center — floating painel (title bar + drag) -->
 <div id="demo-overlay" aria-hidden="true">
   <div id="demo-spotlight"></div>
-  <div id="demo-card" role="dialog" aria-labelledby="demo-kicker">
-    <div class="demo-kicker" id="demo-kicker">Product tour</div>
-    <p class="demo-caption" id="demo-caption">Loading demo…</p>
-    <div id="demo-menu" aria-label="Demo catalog"></div>
+  <div id="demo-card" role="dialog" aria-labelledby="demo-tit" aria-modal="false">
+    <div class="demo-head" id="demo-head">
+      <span class="demo-tit" id="demo-tit">Centro de aprendizaje</span>
+      <button type="button" class="demo-x" id="demo-btn-x" title="Close">&#10005;</button>
+    </div>
+    <div class="demo-body">
+      <div class="demo-kicker" id="demo-kicker">Product tour</div>
+      <p class="demo-caption" id="demo-caption">Loading demo…</p>
+      <div id="demo-menu" aria-label="Demo catalog"></div>
+    </div>
     <div class="demo-bar">
       <span class="prog" id="demo-prog">—</span>
       <button type="button" id="demo-btn-pause">Pause</button>
@@ -9791,10 +9851,24 @@ function demoCatalogItems(doc) {
   return out;
 }
 
+function demoCenterCard(card) {
+  if (!card) return;
+  // Place as floating painel (not CSS transform) so drag works cleanly
+  var w = card.offsetWidth || 720;
+  var h = card.offsetHeight || 480;
+  var x = Math.max(12, Math.round((window.innerWidth - w) / 2));
+  var y = Math.max(12, Math.round((window.innerHeight - h) / 2));
+  card.style.left = x + "px";
+  card.style.top = y + "px";
+  card.style.bottom = "auto";
+  card.style.transform = "none";
+}
+
 function demoShowMenu(doc) {
   var card = document.getElementById("demo-card");
   var menu = document.getElementById("demo-menu");
   var kick = document.getElementById("demo-kicker");
+  var tit = document.getElementById("demo-tit");
   var stopBtn = document.getElementById("demo-btn-stop");
   var html = "", i, g, j, it, groups, badge;
   demoClearTimer();
@@ -9806,6 +9880,7 @@ function demoShowMenu(doc) {
   DEMO.idx = -1;
   DEMO.steps = [];
   if (card) card.classList.add("demo-menu-mode");
+  if (tit) tit.textContent = (doc && (doc.title || doc.label)) || "Centro de aprendizaje";
   if (kick) kick.textContent = (doc && (doc.title || doc.label)) || "Centro de aprendizaje";
   if (stopBtn) stopBtn.textContent = "Close";
   html += "<p class='demo-menu-sub'>" +
@@ -9856,6 +9931,10 @@ function demoShowMenu(doc) {
   demoHighlight(null);
   demoShowOverlay(true);
   demoSetPlayingUi(true);
+  // Center after layout (menu mode has fixed height)
+  setTimeout(function () {
+    try { demoCenterCard(document.getElementById("demo-card")); } catch (eC) {}
+  }, 30);
 }
 
 function demoLaunchTour(ref) {
@@ -10033,10 +10112,13 @@ function demoPaintStep() {
   DEMO.menuMode = false;
   if (card) card.classList.remove("demo-menu-mode");
   if (stopBtn) stopBtn.textContent = "Stop";
+  var tit = document.getElementById("demo-tit");
+  var headTitle = step.section
+    ? String(step.section)
+    : ((DEMO.doc && DEMO.doc.title) ? DEMO.doc.title : "Product tour");
+  if (tit) tit.textContent = headTitle;
   if (kick) {
-    kick.textContent = step.section
-      ? String(step.section)
-      : ((DEMO.doc && DEMO.doc.title) ? DEMO.doc.title : "Product tour");
+    kick.textContent = (DEMO.doc && DEMO.doc.title) ? DEMO.doc.title : "Product tour";
   }
   if (cap) {
     cap.style.display = "";
@@ -10151,7 +10233,16 @@ function demoStart(doc) {
   DEMO.paused = false;
   DEMO.idx = 0;
   var card = document.getElementById("demo-card");
-  if (card) card.classList.remove("demo-menu-mode");
+  if (card) {
+    card.classList.remove("demo-menu-mode");
+    // Keep current position if already placed (e.g. after menu); else bottom-center once
+    if (!card.style.left || card.style.left === "") {
+      card.style.bottom = "28px";
+      card.style.top = "auto";
+      card.style.left = "50%";
+      card.style.transform = "translateX(-50%)";
+    }
+  }
   demoSetPlayingUi(true);
   demoPaintStep();
 }
@@ -10251,6 +10342,55 @@ function demoBackOrClose() {
   demoStop(false);
 }
 
+function wireDemoCardDrag() {
+  var modal = document.getElementById("demo-card");
+  var bar = document.getElementById("demo-head");
+  if (!modal || !bar || bar._dragWired) return;
+  bar._dragWired = true;
+  var drag = { on: false, dx: 0, dy: 0 };
+
+  function onMove(e) {
+    if (!drag.on) return;
+    var x = e.clientX - drag.dx;
+    var y = e.clientY - drag.dy;
+    var maxX = Math.max(0, window.innerWidth - modal.offsetWidth);
+    var maxY = Math.max(0, window.innerHeight - 40);
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    if (x > maxX) x = maxX;
+    if (y > maxY) y = maxY;
+    modal.style.left = x + "px";
+    modal.style.top = y + "px";
+    modal.style.bottom = "auto";
+    modal.style.transform = "none";
+  }
+  function onUp() {
+    if (!drag.on) return;
+    drag.on = false;
+    modal.classList.remove("dragging");
+    document.removeEventListener("mousemove", onMove);
+    document.removeEventListener("mouseup", onUp);
+  }
+
+  bar.addEventListener("mousedown", function (e) {
+    if (e.button !== 0) return;
+    if (e.target.closest && e.target.closest("button")) return;
+    if (e.target.tagName === "BUTTON") return;
+    drag.on = true;
+    var rect = modal.getBoundingClientRect();
+    drag.dx = e.clientX - rect.left;
+    drag.dy = e.clientY - rect.top;
+    modal.style.left = rect.left + "px";
+    modal.style.top = rect.top + "px";
+    modal.style.bottom = "auto";
+    modal.style.transform = "none";
+    modal.classList.add("dragging");
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    e.preventDefault();
+  });
+}
+
 function bindDemoPlayerUi() {
   var b = document.getElementById("btn-demo");
   if (b) b.onclick = function () { demoLoadAndStart(); };
@@ -10264,13 +10404,21 @@ function bindDemoPlayerUi() {
   };
   var s = document.getElementById("demo-btn-stop");
   if (s) s.onclick = function () { demoBackOrClose(); };
+  var x = document.getElementById("demo-btn-x");
+  if (x) x.onclick = function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    demoBackOrClose();
+  };
+  try { wireDemoCardDrag(); } catch (eD) {}
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && DEMO.running) {
       demoBackOrClose();
     }
   });
   window.addEventListener("resize", function () {
-    if (!DEMO.running || DEMO.menuMode) return;
+    if (!DEMO.running) return;
+    if (DEMO.menuMode) return;
     var step = DEMO.steps[DEMO.idx];
     if (step && step.highlight) demoHighlight(step.highlight);
   });
