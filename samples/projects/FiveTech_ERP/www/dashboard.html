@@ -894,7 +894,7 @@
     display: none; flex: 1; min-height: 0; flex-direction: column;
     padding: 12px 14px; background: var(--painel-body); overflow: auto;
   }
-  /* Layout "menu" — SisaNG content-painel launch pad */
+  /* Layout "menu" — content painel launch pad (groups of actions) */
   .content-painel {
     flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto;
   }
@@ -975,6 +975,54 @@
     background: var(--surface-2); color: var(--text-2); cursor: pointer; font-size: .8rem;
   }
   .xf-tabs button.on { background: var(--blue); border-color: var(--blue); color: #fff; }
+  /* Layout "folder" — notebook-style tabs hosting child screens */
+  .xf-folder {
+    display: flex; flex-direction: column; flex: 1; min-height: 0; height: 100%;
+  }
+  .xf-folder-intro {
+    font-size: .82rem; color: var(--muted); margin: 0 0 10px; line-height: 1.4;
+  }
+  .xf-folder-tabs {
+    display: flex; flex-wrap: wrap; gap: 2px; padding: 0 2px;
+    border-bottom: 1px solid var(--line); background: var(--surface-2);
+    border-radius: 8px 8px 0 0;
+  }
+  .xf-folder-tabs button {
+    height: 34px; padding: 0 14px; margin-bottom: -1px;
+    border: 1px solid transparent; border-bottom: 0;
+    border-radius: 8px 8px 0 0;
+    background: transparent; color: var(--muted);
+    font: inherit; font-size: .82rem; font-weight: 600;
+    cursor: pointer;
+  }
+  .xf-folder-tabs button:hover { color: var(--text); background: var(--surface); }
+  .xf-folder-tabs button.on {
+    color: var(--blue); background: var(--painel-body, var(--surface));
+    border-color: var(--line); border-bottom-color: var(--painel-body, var(--surface));
+  }
+  .xf-folder-body {
+    flex: 1; min-height: 0; overflow: auto;
+    padding: 12px 4px 8px;
+    border: 1px solid var(--line); border-top: 0;
+    border-radius: 0 0 10px 10px;
+    background: var(--painel-body, var(--surface));
+  }
+  .xf-folder-toolbar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    margin-bottom: 10px;
+  }
+  .xf-folder-toolbar .hint { font-size: .78rem; color: var(--muted); flex: 1; }
+  .xf-folder-table-wrap { overflow: auto; max-height: min(52vh, 520px); border: 1px solid var(--line); border-radius: 8px; }
+  .xf-folder-table-wrap table.meta { margin: 0; }
+  .xf-folder-empty {
+    padding: 28px 12px; text-align: center; color: var(--muted); font-size: .9rem;
+  }
+  .xf-folder-launch {
+    padding: 20px 16px; border: 1px dashed var(--line); border-radius: 10px;
+    background: var(--surface-2); max-width: 520px;
+  }
+  .xf-folder-launch h4 { margin: 0 0 6px; font-size: .95rem; }
+  .xf-folder-launch p { margin: 0 0 12px; font-size: .82rem; color: var(--muted); line-height: 1.45; }
   .xf-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
   .xf-form-grid .full { grid-column: 1 / -1; }
   .xf-steps { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
@@ -1267,7 +1315,38 @@
   }
   .menu-des-items .act button:hover { border-color: var(--blue); color: var(--blue); }
   .menu-des-items .chk { text-align: center; width: 48px; }
-  #menu-designer.designer { width: min(980px, calc(100vw - 24px)); height: min(700px, calc(100vh - 32px)); }
+  #menu-designer.designer { width: min(980px, calc(100vw - 24px)); height: min(720px, calc(100vh - 28px)); }
+  /* Edit app — tabbed sections (avoids one long vertical form) */
+  #menu-des-body.designer-body {
+    display: flex; flex-direction: column; padding: 0; overflow: hidden;
+  }
+  .menu-des-tabs {
+    flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 4px;
+    padding: 10px 12px 0; border-bottom: 1px solid var(--line);
+    background: var(--surface-2);
+  }
+  .menu-des-tabs button {
+    height: 34px; padding: 0 14px; border: 1px solid transparent;
+    border-bottom: 0; border-radius: 8px 8px 0 0;
+    background: transparent; color: var(--muted);
+    font: inherit; font-size: .82rem; font-weight: 600;
+    cursor: pointer; margin-bottom: -1px;
+  }
+  .menu-des-tabs button:hover { color: var(--text); background: var(--surface); }
+  .menu-des-tabs button.on {
+    color: var(--blue); background: var(--surface);
+    border-color: var(--line); border-bottom-color: var(--surface);
+  }
+  .menu-des-panels {
+    flex: 1 1 auto; min-height: 0; overflow: auto;
+    padding: 14px 16px 16px; background: var(--surface);
+  }
+  .menu-des-panel { display: none; }
+  .menu-des-panel.on { display: block; }
+  .menu-des-panel > .designer-section { margin-bottom: 0; }
+  .menu-des-panel .menu-des-intro {
+    font-size: .82rem; color: var(--muted); margin: 0 0 12px; line-height: 1.45;
+  }
 </style>
 </head>
 <body class="__BODY_ADMIN_CLASS__">
@@ -1743,6 +1822,7 @@
           <option value="document">Document + totals</option>
           <option value="form">Card form (tabs)</option>
           <option value="wizard">Wizard</option>
+          <option value="folder">Folder (screen tabs)</option>
           <option value="menu">Menu (painel groups)</option>
           <option value="calendar">Calendar / agenda</option>
           <option value="dashboard">Dashboard KPIs</option>
@@ -1804,6 +1884,21 @@
         </p>
       </div>
     </div>
+    <div class="designer-section" id="des-folder-block" style="display:none;margin-bottom:12px">
+      <h3><span>Folder tabs</span></h3>
+      <div style="padding:0 12px 12px">
+        <label for="des-folder-tabs" style="display:block;font-size:.72rem;font-weight:600;color:var(--muted);margin-bottom:4px">
+          Tabs (one per line: id|Label|target)
+        </label>
+        <textarea id="des-folder-tabs" rows="8" style="width:100%;font-family:ui-monospace,Consolas,monospace;font-size:.78rem;padding:8px;border:1px solid var(--line);border-radius:8px;resize:vertical"
+          placeholder="parties|Clients|screen.parties&#10;activities|Activities|screen.activities&#10;pipeline|Pipeline|screen.pipeline"></textarea>
+        <p style="margin:6px 0 0;font-size:.72rem;color:var(--muted)">
+          Each line is a folder tab: <code>id|Label|target</code>.
+          Target is <code>screen.xxx</code>, <code>menu:menuId</code>, or empty.
+          List screens open embedded in the tab; other layouts offer “Open full”.
+        </p>
+      </div>
+    </div>
     <div class="designer-section" id="des-menu-block" style="display:none;margin-bottom:12px">
       <h3><span>Menu painel groups</span></h3>
       <div style="padding:0 12px 12px">
@@ -1816,7 +1911,7 @@
           First line of each block = group <code>id|Label</code>.
           Following lines = items <code>id|Label|target</code> where target is
           <code>screen.xxx</code>, <code>menu:menuId</code>, or empty.
-          Renders as SisaNG-style painel columns (grupo-titulo + grupo-item).
+          Renders as painel columns (group title + group items).
         </p>
       </div>
     </div>
@@ -1899,7 +1994,7 @@
   </div>
 </div>
 
-<!-- Runtime sidebar menu designer (admin only) -->
+<!-- Runtime sidebar menu designer (admin only) — tabbed sections -->
 <div class="designer-scrim" id="menu-designer-scrim"></div>
 <div class="designer" id="menu-designer" role="dialog" aria-modal="true" aria-labelledby="menu-des-title">
   <div class="designer-bar">
@@ -1907,196 +2002,227 @@
     <button type="button" id="menu-des-close" title="Close">&#10005;</button>
   </div>
   <div class="designer-body" id="menu-des-body">
-    <div class="designer-section" style="margin-bottom:14px">
-      <h3><span>Branding</span></h3>
-      <div class="designer-grid" style="padding:12px">
-        <div class="designer-field">
-          <label for="app-logo">Logo text</label>
-          <input type="text" id="app-logo" placeholder="ERP" maxlength="6">
-        </div>
-        <div class="designer-field">
-          <label for="app-brand">Brand name</label>
-          <input type="text" id="app-brand" placeholder="FiveTech">
-        </div>
-        <div class="designer-field">
-          <label for="app-sub">Subtitle</label>
-          <input type="text" id="app-sub" placeholder="Desktop &amp; Web">
-        </div>
-        <div class="designer-field">
-          <label for="app-title">Window / app title</label>
-          <input type="text" id="app-title" placeholder="ERP - FiveTech Software">
-        </div>
-        <div class="designer-field">
-          <label for="app-port">HTTP port</label>
-          <input type="number" id="app-port" min="1" max="65535" step="1" placeholder="2222">
-        </div>
-        <div class="designer-field">
-          <label for="app-vertical">Vertical pack</label>
-          <select id="app-vertical">
-            <option value="">(none — base modules)</option>
-            <option value="clinic">clinic</option>
-          </select>
-        </div>
-      </div>
-      <p style="padding:0 12px 8px;font-size:.75rem;color:var(--muted);margin:0">
-        Port applies after restart. Current server: <b id="app-port-live">__HTTP_PORT__</b>.
-        Vertical reloads the sidebar menu from <code>meta/verticals/&lt;name&gt;/modules.json</code>
-        (or base <code>modules.json</code> when none). Applies immediately on Save.
-      </p>
-      <div style="padding:0 12px 12px;display:flex;align-items:center;gap:12px">
-        <div class="side-logo" id="app-logo-preview" style="width:40px;height:40px;font-size:11px">ERP</div>
-        <div>
-          <div style="font-weight:700" id="app-brand-preview">FiveTech</div>
-          <div style="font-size:.78rem;color:var(--muted)" id="app-sub-preview">Desktop &amp; Web</div>
-        </div>
-      </div>
+    <div class="menu-des-tabs" id="menu-des-tabs" role="tablist" aria-label="App settings">
+      <button type="button" role="tab" id="menu-tab-brand" data-tab="brand" class="on"
+        aria-selected="true" aria-controls="menu-panel-brand">Branding</button>
+      <button type="button" role="tab" id="menu-tab-db" data-tab="db"
+        aria-selected="false" aria-controls="menu-panel-db">Database</button>
+      <button type="button" role="tab" id="menu-tab-locale" data-tab="locale"
+        aria-selected="false" aria-controls="menu-panel-locale">Locale</button>
+      <button type="button" role="tab" id="menu-tab-menu" data-tab="menu"
+        aria-selected="false" aria-controls="menu-panel-menu">Menu</button>
     </div>
-    <div class="designer-section" style="margin-bottom:14px">
-      <h3><span>Database</span></h3>
-      <div class="designer-grid" style="padding:12px">
-        <div class="designer-field">
-          <label for="app-db-driver">Driver</label>
-          <select id="app-db-driver">
-            <option value="json">JSON files (meta/data)</option>
-            <option value="dbfcdx">DbfCdx (local .dbf/.cdx)</option>
-            <option value="openads">OpenADS (client-server)</option>
-          </select>
+    <div class="menu-des-panels">
+      <!-- Branding -->
+      <div class="menu-des-panel on" id="menu-panel-brand" role="tabpanel" data-panel="brand"
+        aria-labelledby="menu-tab-brand">
+        <div class="designer-section">
+          <h3><span>Branding</span></h3>
+          <div class="designer-grid" style="padding:12px">
+            <div class="designer-field">
+              <label for="app-logo">Logo text</label>
+              <input type="text" id="app-logo" placeholder="ERP" maxlength="6">
+            </div>
+            <div class="designer-field">
+              <label for="app-brand">Brand name</label>
+              <input type="text" id="app-brand" placeholder="FiveTech">
+            </div>
+            <div class="designer-field">
+              <label for="app-sub">Subtitle</label>
+              <input type="text" id="app-sub" placeholder="Desktop &amp; Web">
+            </div>
+            <div class="designer-field">
+              <label for="app-title">Window / app title</label>
+              <input type="text" id="app-title" placeholder="ERP - FiveTech Software">
+            </div>
+            <div class="designer-field">
+              <label for="app-port">HTTP port</label>
+              <input type="number" id="app-port" min="1" max="65535" step="1" placeholder="2222">
+            </div>
+            <div class="designer-field">
+              <label for="app-vertical">Vertical pack</label>
+              <select id="app-vertical">
+                <option value="">(none — base modules)</option>
+                <option value="clinic">clinic</option>
+              </select>
+            </div>
+          </div>
+          <p style="padding:0 12px 8px;font-size:.75rem;color:var(--muted);margin:0">
+            Port applies after restart. Current server: <b id="app-port-live">__HTTP_PORT__</b>.
+            Vertical reloads the sidebar menu from <code>meta/verticals/&lt;name&gt;/modules.json</code>
+            (or base <code>modules.json</code> when none). Applies immediately on Save.
+          </p>
+          <div style="padding:0 12px 12px;display:flex;align-items:center;gap:12px">
+            <div class="side-logo" id="app-logo-preview" style="width:40px;height:40px;font-size:11px">ERP</div>
+            <div>
+              <div style="font-weight:700" id="app-brand-preview">FiveTech</div>
+              <div style="font-size:.78rem;color:var(--muted)" id="app-sub-preview">Desktop &amp; Web</div>
+            </div>
+          </div>
         </div>
       </div>
-      <div id="app-db-openads" style="display:none">
-        <div class="designer-grid" style="padding:0 12px 12px">
-          <div class="designer-field">
-            <label for="app-db-backend">Backend</label>
-            <select id="app-db-backend">
-              <option value="dbfcdx">DbfCdx files via server</option>
-              <option value="sqlite">SQLite</option>
-              <option value="mysql">MySQL</option>
-              <option value="mariadb">MariaDB</option>
-              <option value="postgresql">PostgreSQL</option>
-            </select>
+
+      <!-- Database -->
+      <div class="menu-des-panel" id="menu-panel-db" role="tabpanel" data-panel="db"
+        aria-labelledby="menu-tab-db" hidden>
+        <div class="designer-section">
+          <h3><span>Database</span></h3>
+          <div class="designer-grid" style="padding:12px">
+            <div class="designer-field">
+              <label for="app-db-driver">Driver</label>
+              <select id="app-db-driver">
+                <option value="json">JSON files (meta/data)</option>
+                <option value="dbfcdx">DbfCdx (local .dbf/.cdx)</option>
+                <option value="openads">OpenADS (client-server)</option>
+              </select>
+            </div>
           </div>
-          <div class="designer-field">
-            <label for="app-db-host">Server host</label>
-            <input type="text" id="app-db-host" placeholder="192.168.18.184">
+          <div id="app-db-openads" style="display:none">
+            <div class="designer-grid" style="padding:0 12px 12px">
+              <div class="designer-field">
+                <label for="app-db-backend">Backend</label>
+                <select id="app-db-backend">
+                  <option value="dbfcdx">DbfCdx files via server</option>
+                  <option value="sqlite">SQLite</option>
+                  <option value="mysql">MySQL</option>
+                  <option value="mariadb">MariaDB</option>
+                  <option value="postgresql">PostgreSQL</option>
+                </select>
+              </div>
+              <div class="designer-field">
+                <label for="app-db-host">Server host</label>
+                <input type="text" id="app-db-host" placeholder="192.168.18.184">
+              </div>
+              <div class="designer-field">
+                <label for="app-db-port">Port</label>
+                <input type="number" id="app-db-port" min="1" max="65535" step="1" placeholder="16262">
+              </div>
+              <div class="designer-field">
+                <label for="app-db-datapath">Data path</label>
+                <input type="text" id="app-db-datapath" placeholder="/tmp/openads_mac">
+              </div>
+              <div class="designer-field">
+                <label for="app-db-user">User</label>
+                <input type="text" id="app-db-user" placeholder="">
+              </div>
+              <div class="designer-field">
+                <label for="app-db-password">Password</label>
+                <input type="password" id="app-db-password" placeholder="">
+              </div>
+            </div>
           </div>
-          <div class="designer-field">
-            <label for="app-db-port">Port</label>
-            <input type="number" id="app-db-port" min="1" max="65535" step="1" placeholder="16262">
+          <div id="app-db-dbfcdx" style="display:none">
+            <p style="padding:0 12px 12px;font-size:.75rem;color:var(--muted);margin:0">
+              On Save, the app auto-generates .dbf + .cdx tables from meta/data JSON into data\
+              (existing tables are kept). OpenADS can serve those files remotely later.
+            </p>
           </div>
-          <div class="designer-field">
-            <label for="app-db-datapath">Data path</label>
-            <input type="text" id="app-db-datapath" placeholder="/tmp/openads_mac">
-          </div>
-          <div class="designer-field">
-            <label for="app-db-user">User</label>
-            <input type="text" id="app-db-user" placeholder="">
-          </div>
-          <div class="designer-field">
-            <label for="app-db-password">Password</label>
-            <input type="password" id="app-db-password" placeholder="">
-          </div>
+          <p style="padding:0 12px 12px;font-size:.72rem;color:var(--muted);margin:0">
+            Driver changes apply on Save; the active driver is reported by GET /api/db/status.
+          </p>
         </div>
       </div>
-      <div id="app-db-dbfcdx" style="display:none">
-        <p style="padding:0 12px 12px;font-size:.75rem;color:var(--muted);margin:0">
-          On Save, the app auto-generates .dbf + .cdx tables from meta/data JSON into data\
-          (existing tables are kept). OpenADS can serve those files remotely later.
+
+      <!-- Locale & numbers -->
+      <div class="menu-des-panel" id="menu-panel-locale" role="tabpanel" data-panel="locale"
+        aria-labelledby="menu-tab-locale" hidden>
+        <div class="designer-section">
+          <h3><span>Locale &amp; numbers</span></h3>
+          <div class="designer-grid" style="padding:12px">
+            <div class="designer-field">
+              <label for="app-currency">Currency code</label>
+              <input type="text" id="app-currency" placeholder="EUR" maxlength="8" list="app-currency-list">
+              <datalist id="app-currency-list">
+                <option value="EUR"></option><option value="USD"></option><option value="GBP"></option>
+                <option value="CHF"></option><option value="MXN"></option><option value="BRL"></option>
+              </datalist>
+            </div>
+            <div class="designer-field">
+              <label for="app-currency-symbol">Currency symbol</label>
+              <input type="text" id="app-currency-symbol" placeholder="€" maxlength="6">
+            </div>
+            <div class="designer-field">
+              <label for="app-currency-pos">Symbol position</label>
+              <select id="app-currency-pos">
+                <option value="suffix">After amount (1.234,56 €)</option>
+                <option value="prefix">Before amount (€ 1.234,56)</option>
+                <option value="none">Code only / none</option>
+              </select>
+            </div>
+            <div class="designer-field">
+              <label for="app-show-symbol">Show symbol in grids</label>
+              <select id="app-show-symbol">
+                <option value="1">Yes</option>
+                <option value="0">No (plain number)</option>
+              </select>
+            </div>
+            <div class="designer-field">
+              <label for="app-decimals">Decimal places</label>
+              <input type="number" id="app-decimals" min="0" max="6" step="1" placeholder="2">
+            </div>
+            <div class="designer-field">
+              <label for="app-dec-sep">Decimal separator</label>
+              <select id="app-dec-sep">
+                <option value=",">Comma (1.234,56)</option>
+                <option value=".">Point (1,234.56)</option>
+              </select>
+            </div>
+            <div class="designer-field">
+              <label for="app-thou-sep">Thousands separator</label>
+              <select id="app-thou-sep">
+                <option value=".">Point (1.234,56)</option>
+                <option value=",">Comma (1,234.56)</option>
+                <option value=" ">Space (1 234,56)</option>
+                <option value="">None</option>
+              </select>
+            </div>
+            <div class="designer-field">
+              <label for="app-tax-rate">Default VAT / tax %</label>
+              <input type="number" id="app-tax-rate" min="0" max="100" step="0.01" placeholder="21">
+            </div>
+            <div class="designer-field">
+              <label for="app-date-fmt">Date format</label>
+              <select id="app-date-fmt">
+                <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+              </select>
+            </div>
+            <div class="designer-field">
+              <label for="app-time-fmt">Time format</label>
+              <select id="app-time-fmt">
+                <option value="24h">24-hour</option>
+                <option value="12h">12-hour (am/pm)</option>
+              </select>
+            </div>
+            <div class="designer-field">
+              <label for="app-first-dow">First day of week</label>
+              <select id="app-first-dow">
+                <option value="1">Monday</option>
+                <option value="0">Sunday</option>
+                <option value="6">Saturday</option>
+              </select>
+            </div>
+          </div>
+          <p style="padding:0 12px 12px;font-size:.75rem;color:var(--muted);margin:0">
+            Sample amount: <b id="app-money-preview">1.234,56 €</b>
+            · Currency, separators and VAT apply immediately after Save (grids, documents, reports).
+          </p>
+        </div>
+      </div>
+
+      <!-- Sidebar menu -->
+      <div class="menu-des-panel" id="menu-panel-menu" role="tabpanel" data-panel="menu"
+        aria-labelledby="menu-tab-menu" hidden>
+        <p class="menu-des-intro">
+          Sidebar menu sections and items. Screen must be a meta key such as
+          <code>screen.patients</code> or <code>screen.appointments</code>.
+          With a vertical active, Save writes the menu into that pack folder.
         </p>
+        <div id="menu-des-sections"></div>
+        <button type="button" class="btn-ghost" id="menu-des-add-sec" style="height:32px;margin-top:4px">+ Add section</button>
       </div>
-      <p style="padding:0 12px 12px;font-size:.72rem;color:var(--muted);margin:0">
-        Driver changes apply on Save; the active driver is reported by GET /api/db/status.
-      </p>
     </div>
-    <div class="designer-section" style="margin-bottom:14px">
-      <h3><span>Locale &amp; numbers</span></h3>
-      <div class="designer-grid" style="padding:12px">
-        <div class="designer-field">
-          <label for="app-currency">Currency code</label>
-          <input type="text" id="app-currency" placeholder="EUR" maxlength="8" list="app-currency-list">
-          <datalist id="app-currency-list">
-            <option value="EUR"></option><option value="USD"></option><option value="GBP"></option>
-            <option value="CHF"></option><option value="MXN"></option><option value="BRL"></option>
-          </datalist>
-        </div>
-        <div class="designer-field">
-          <label for="app-currency-symbol">Currency symbol</label>
-          <input type="text" id="app-currency-symbol" placeholder="€" maxlength="6">
-        </div>
-        <div class="designer-field">
-          <label for="app-currency-pos">Symbol position</label>
-          <select id="app-currency-pos">
-            <option value="suffix">After amount (1.234,56 €)</option>
-            <option value="prefix">Before amount (€ 1.234,56)</option>
-            <option value="none">Code only / none</option>
-          </select>
-        </div>
-        <div class="designer-field">
-          <label for="app-show-symbol">Show symbol in grids</label>
-          <select id="app-show-symbol">
-            <option value="1">Yes</option>
-            <option value="0">No (plain number)</option>
-          </select>
-        </div>
-        <div class="designer-field">
-          <label for="app-decimals">Decimal places</label>
-          <input type="number" id="app-decimals" min="0" max="6" step="1" placeholder="2">
-        </div>
-        <div class="designer-field">
-          <label for="app-dec-sep">Decimal separator</label>
-          <select id="app-dec-sep">
-            <option value=",">Comma (1.234,56)</option>
-            <option value=".">Point (1,234.56)</option>
-          </select>
-        </div>
-        <div class="designer-field">
-          <label for="app-thou-sep">Thousands separator</label>
-          <select id="app-thou-sep">
-            <option value=".">Point (1.234,56)</option>
-            <option value=",">Comma (1,234.56)</option>
-            <option value=" ">Space (1 234,56)</option>
-            <option value="">None</option>
-          </select>
-        </div>
-        <div class="designer-field">
-          <label for="app-tax-rate">Default VAT / tax %</label>
-          <input type="number" id="app-tax-rate" min="0" max="100" step="0.01" placeholder="21">
-        </div>
-        <div class="designer-field">
-          <label for="app-date-fmt">Date format</label>
-          <select id="app-date-fmt">
-            <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-            <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-            <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-          </select>
-        </div>
-        <div class="designer-field">
-          <label for="app-time-fmt">Time format</label>
-          <select id="app-time-fmt">
-            <option value="24h">24-hour</option>
-            <option value="12h">12-hour (am/pm)</option>
-          </select>
-        </div>
-        <div class="designer-field">
-          <label for="app-first-dow">First day of week</label>
-          <select id="app-first-dow">
-            <option value="1">Monday</option>
-            <option value="0">Sunday</option>
-            <option value="6">Saturday</option>
-          </select>
-        </div>
-      </div>
-      <p style="padding:0 12px 12px;font-size:.75rem;color:var(--muted);margin:0">
-        Sample amount: <b id="app-money-preview">1.234,56 €</b>
-        · Currency, separators and VAT apply immediately after Save (grids, documents, reports).
-      </p>
-    </div>
-    <p style="font-size:.82rem;color:var(--muted);margin-bottom:10px">
-      Sidebar menu sections and items. Screen must be a meta key such as
-      <code>screen.patients</code> or <code>screen.appointments</code>.
-      With a vertical active, Save writes the menu into that pack folder.
-    </p>
-    <div id="menu-des-sections"></div>
-    <button type="button" class="btn-ghost" id="menu-des-add-sec" style="height:32px;margin-top:4px">+ Add section</button>
   </div>
   <div class="designer-foot">
     <span class="hint" id="menu-des-hint">Admin only. Saves app branding + menu.</span>
@@ -3445,7 +3571,7 @@ var META_VIEW = {
   detailPageSize: 20
 };
 
-/* ---------- List pagination (SisaNG paginacao / vaiPagina) ---------- */
+/* ---------- List pagination ---------- */
 var DEFAULT_PAGE_SIZE = 20;
 var pagInfo = { pagina: 1, paginas: 1, total: 0, pageSize: DEFAULT_PAGE_SIZE, key: "list" };
 var APPT_PAGE = { pagina: 1, pageSize: DEFAULT_PAGE_SIZE, filtered: [] };
@@ -3678,7 +3804,7 @@ function isMasterDetail() {
 
 function isSpecialLayout(layout) {
   var L = [
-    "form", "wizard", "menu", "calendar", "dashboard", "tree-detail", "matrix",
+    "form", "wizard", "folder", "menu", "calendar", "dashboard", "tree-detail", "matrix",
     "assign", "workflow", "settings", "audit", "import", "period", "context",
     "report-list"
   ];
@@ -4430,14 +4556,17 @@ function updateDesignerLayoutUi() {
   var layout = lay ? lay.value : "list";
   var md = document.getElementById("des-md-block");
   var formB = document.getElementById("des-form-block");
+  var folderB = document.getElementById("des-folder-block");
   var menuB = document.getElementById("des-menu-block");
   var wfB = document.getElementById("des-wf-block");
   var isMd = (layout === "master-detail" || layout === "document");
   var isForm = (layout === "form" || layout === "wizard");
+  var isFolder = (layout === "folder");
   var isMenu = (layout === "menu");
   var isWf = (layout === "workflow");
   if (md) md.style.display = isMd ? "block" : "none";
   if (formB) formB.style.display = isForm ? "block" : "none";
+  if (folderB) folderB.style.display = isFolder ? "block" : "none";
   if (menuB) menuB.style.display = isMenu ? "block" : "none";
   if (wfB) wfB.style.display = isWf ? "block" : "none";
   var bar = document.getElementById("des-cols-scope-bar");
@@ -4447,7 +4576,7 @@ function updateDesignerLayoutUi() {
   if (t && !isMd) {
     if (isForm) t.textContent = "Form fields (controls)";
     else if (isWf) t.textContent = "Queue / board columns";
-    else if (isMenu) t.textContent = "Optional (unused for menu layout)";
+    else if (isMenu || isFolder) t.textContent = "Optional (unused for this layout)";
     else t.textContent = "Grid columns";
   }
 }
@@ -4470,6 +4599,39 @@ function menuGroupsToText(groups) {
     }
   }
   return lines.join(String.fromCharCode(10));
+}
+
+function folderTabsToText(tabs) {
+  var lines = [], i, t, target;
+  if (!Array.isArray(tabs)) return "";
+  for (i = 0; i < tabs.length; i++) {
+    t = tabs[i] || {};
+    target = "";
+    if (t.screen) target = String(t.screen);
+    else if (t.menuId) target = "menu:" + String(t.menuId);
+    lines.push(String(t.id || ("tab" + (i + 1))) + "|" +
+      String(t.label || t.id || ("Tab " + (i + 1))) +
+      (target ? ("|" + target) : ""));
+  }
+  return lines.join(String.fromCharCode(10));
+}
+
+function textToFolderTabs(s) {
+  var lines = String(s || "").split(/\r?\n/), i, line, parts, out = [], t, target;
+  for (i = 0; i < lines.length; i++) {
+    line = strTrim(lines[i]);
+    if (!line) continue;
+    parts = line.split("|").map(strTrim);
+    if (!parts[0]) continue;
+    t = { id: parts[0], label: parts[1] || parts[0] };
+    target = parts[2] || "";
+    if (target.indexOf("menu:") === 0) t.menuId = target.slice(5);
+    else if (target) {
+      t.screen = target.indexOf("screen.") === 0 ? target : ("screen." + target);
+    }
+    out.push(t);
+  }
+  return out;
 }
 
 function textToMenuGroups(s) {
@@ -4650,7 +4812,8 @@ function loadDesignerKey(key) {
         if (el) el.value = j.doc.keyField || "code";
         el = document.getElementById("des-tabs");
         if (el) {
-          if (Array.isArray(j.doc.tabs) && j.doc.tabs.length) el.value = tabsToText(j.doc.tabs);
+          if (DESIGNER.layout === "folder") el.value = "";
+          else if (Array.isArray(j.doc.tabs) && j.doc.tabs.length) el.value = tabsToText(j.doc.tabs);
           else if (Array.isArray(j.doc.steps) && j.doc.steps.length) el.value = tabsToText(j.doc.steps);
           else el.value = "";
         }
@@ -4659,6 +4822,13 @@ function loadDesignerKey(key) {
         if (el) {
           if (Array.isArray(j.doc.groups) && j.doc.groups.length) el.value = menuGroupsToText(j.doc.groups);
           else el.value = "";
+        }
+        // folder layout tabs (screen targets, not form field tabs)
+        el = document.getElementById("des-folder-tabs");
+        if (el) {
+          if (DESIGNER.layout === "folder" && Array.isArray(j.doc.tabs) && j.doc.tabs.length)
+            el.value = folderTabsToText(j.doc.tabs);
+          else if (DESIGNER.layout === "folder") el.value = "";
         }
         // workflow extras
         el = document.getElementById("des-statusfield");
@@ -4949,11 +5119,22 @@ function saveFormDesigner() {
     else delete doc.groups;
   }
 
+  // folder: notebook tabs hosting child screens
+  if (layout === "folder") {
+    var ftTxt = ((document.getElementById("des-folder-tabs") || {}).value || "");
+    var fTabs = textToFolderTabs(ftTxt);
+    if (fTabs.length) doc.tabs = fTabs;
+    else delete doc.tabs;
+    delete doc.fields;
+    delete doc.steps;
+    delete doc.groups;
+  }
+
   // Drop keys that do not apply to the target layout. Unknown (custom)
   // layouts are left untouched so their specific keys survive the save.
   var KNOWN_LAYOUTS = {
     "list": 1, "master-detail": 1, "document": 1, "form": 1, "wizard": 1,
-    "menu": 1,
+    "folder": 1, "menu": 1,
     "calendar": 1, "dashboard": 1, "tree-detail": 1, "matrix": 1, "assign": 1,
     "workflow": 1, "settings": 1, "audit": 1, "import": 1, "period": 1, "context": 1,
     "report-list": 1
@@ -4962,8 +5143,8 @@ function saveFormDesigner() {
     if (layout !== "master-detail" && layout !== "document") delete doc.detail;
     if (layout !== "form" && layout !== "wizard") {
       delete doc.fields;
-      delete doc.tabs;
       delete doc.steps;
+      if (layout !== "folder") delete doc.tabs;
       if (layout !== "workflow") delete doc.keyField;
     }
     if (layout !== "menu") delete doc.groups;
@@ -5158,6 +5339,56 @@ function wireAppLocalePreview() {
   }
 }
 
+function setMenuDesTab(tabId) {
+  var tabs = document.querySelectorAll("#menu-des-tabs [data-tab]");
+  var panels = document.querySelectorAll("#menu-des-body .menu-des-panel[data-panel]");
+  var i, t, p, id, on;
+  tabId = String(tabId || "brand");
+  for (i = 0; i < tabs.length; i++) {
+    t = tabs[i];
+    id = t.getAttribute("data-tab") || "";
+    on = (id === tabId);
+    t.classList.toggle("on", on);
+    t.setAttribute("aria-selected", on ? "true" : "false");
+    t.tabIndex = on ? 0 : -1;
+  }
+  for (i = 0; i < panels.length; i++) {
+    p = panels[i];
+    id = p.getAttribute("data-panel") || "";
+    on = (id === tabId);
+    p.classList.toggle("on", on);
+    if (on) p.removeAttribute("hidden");
+    else p.setAttribute("hidden", "");
+  }
+}
+
+function wireMenuDesTabs() {
+  var bar = document.getElementById("menu-des-tabs");
+  if (!bar || bar._wired) return;
+  bar._wired = true;
+  bar.addEventListener("click", function (e) {
+    var btn = e.target && e.target.closest ? e.target.closest("button[data-tab]") : null;
+    if (!btn || !bar.contains(btn)) return;
+    e.preventDefault();
+    setMenuDesTab(btn.getAttribute("data-tab") || "brand");
+  });
+  bar.addEventListener("keydown", function (e) {
+    var order = ["brand", "db", "locale", "menu"];
+    var cur = document.querySelector("#menu-des-tabs button.on");
+    var idx = cur ? order.indexOf(cur.getAttribute("data-tab") || "brand") : 0;
+    var next = idx;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (idx + 1) % order.length;
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (idx - 1 + order.length) % order.length;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = order.length - 1;
+    else return;
+    e.preventDefault();
+    setMenuDesTab(order[next]);
+    var b = document.querySelector('#menu-des-tabs button[data-tab="' + order[next] + '"]');
+    if (b) b.focus();
+  });
+}
+
 function openMenuDesigner() {
   if (!requireAdmin("App designer")) return;
   var scrim = document.getElementById("menu-designer-scrim");
@@ -5169,6 +5400,8 @@ function openMenuDesigner() {
   scrim.classList.add("is-open");
   box.classList.add("is-open");
   try {
+    wireMenuDesTabs();
+    setMenuDesTab("brand");
     document.getElementById("menu-des-title").textContent = "Edit app";
     document.getElementById("menu-des-hint").textContent = "Loading app + modules...";
     fillAppBrandFields(APP_META || {});
@@ -6291,6 +6524,7 @@ function renderSpecialLayout(scr) {
   var layout = String(scr.layout || "");
   if (layout === "form") return xfRenderForm(scr);
   if (layout === "wizard") return xfRenderWizard(scr);
+  if (layout === "folder") return xfRenderFolder(scr);
   if (layout === "menu") return xfRenderMenuPainel(scr);
   if (layout === "calendar") return xfRenderCalendar(scr);
   if (layout === "dashboard") return xfRenderDashboard(scr);
@@ -6307,7 +6541,232 @@ function renderSpecialLayout(scr) {
   host.innerHTML = "<p style='color:var(--danger)'>Unknown layout: " + esc(layout) + "</p>";
 }
 
-/* ---------- Layout "menu" — SisaNG content-painel (groups of actions) ---------- */
+/* ---------- Layout "folder" — notebook tabs hosting child screens ---------- */
+function folderNormalizeTabs(scr) {
+  var tabs = [], i, t;
+  if (scr && Array.isArray(scr.tabs) && scr.tabs.length) {
+    for (i = 0; i < scr.tabs.length; i++) {
+      t = scr.tabs[i] || {};
+      tabs.push({
+        id: t.id || ("tab" + (i + 1)),
+        label: t.label || t.title || t.id || ("Tab " + (i + 1)),
+        screen: t.screen || "",
+        menuId: t.menuId || "",
+        hint: t.hint || t.subtitle || ""
+      });
+    }
+  }
+  return tabs;
+}
+
+function xfFolderFormatCell(row, col) {
+  var v = row ? row[col.id] : "";
+  var t = colControlType(col);
+  if (v == null) return "";
+  if (t === "money" || col.format === "money") {
+    try { return moneyFmt(v); } catch (e0) { return String(v); }
+  }
+  if (t === "checkbox" || t === "bool" || t === "boolean") {
+    return (v === true || v === 1 || v === "1" || String(v).toLowerCase() === "true") ? "Yes" : "No";
+  }
+  if (Array.isArray(v)) return v.join(", ");
+  return String(v);
+}
+
+function xfFolderOpenTarget(tab) {
+  if (!tab) return;
+  if (tab.menuId) {
+    launchMenuPainelItem({ menuId: tab.menuId, label: tab.label });
+    return;
+  }
+  if (tab.screen) {
+    launchMenuPainelItem({ screen: tab.screen, label: tab.label });
+    return;
+  }
+  toast("No target on this tab");
+}
+
+function xfFolderPaintList(body, child, tab) {
+  var cols = (child.grid && Array.isArray(child.grid.columns)) ? child.grid.columns :
+    (Array.isArray(child.columns) ? child.columns : []);
+  var dataRef = child.dataRef || "";
+  var html = "";
+  html += "<div class='xf-folder-toolbar'>";
+  html += "<button type='button' class='btn' id='xf-folder-open'><span class='btn-ico'>&#8599;</span> Open full</button>";
+  html += "<button type='button' class='btn' id='xf-folder-refresh'><span class='btn-ico'>&#8635;</span> Refresh</button>";
+  html += "<span class='hint' id='xf-folder-hint'>" + esc(child.title || tab.label || dataRef) +
+    (dataRef ? (" · " + dataRef) : "") + "</span>";
+  html += "</div>";
+  if (!dataRef) {
+    html += "<div class='xf-folder-empty'>Child screen has no dataRef.</div>";
+    body.innerHTML = html;
+    var open0 = document.getElementById("xf-folder-open");
+    if (open0) open0.onclick = function () { xfFolderOpenTarget(tab); };
+    return;
+  }
+  html += "<div class='xf-folder-table-wrap'><table class='meta'><thead><tr>";
+  if (!cols.length) html += "<th>—</th>";
+  else {
+    var i, c;
+    for (i = 0; i < cols.length; i++) {
+      c = cols[i];
+      html += "<th" + (c.align === "right" || c.format === "money" || colControlType(c) === "money" ? " class='n'" : "") + ">" +
+        esc(c.label || c.id) + "</th>";
+    }
+  }
+  html += "</tr></thead><tbody id='xf-folder-tbody'><tr><td colspan='" +
+    Math.max(1, cols.length) + "' style='padding:20px;text-align:center;color:var(--muted)'>Loading…</td></tr></tbody></table></div>";
+  body.innerHTML = html;
+  var openBtn = document.getElementById("xf-folder-open");
+  var refBtn = document.getElementById("xf-folder-refresh");
+  if (openBtn) openBtn.onclick = function () { xfFolderOpenTarget(tab); };
+  function loadRows() {
+    var tb = document.getElementById("xf-folder-tbody");
+    var hint = document.getElementById("xf-folder-hint");
+    if (tb) tb.innerHTML = "<tr><td colspan='" + Math.max(1, cols.length) +
+      "' style='padding:20px;text-align:center;color:var(--muted)'>Loading…</td></tr>";
+    xfFetch(dataRef, function (rows) {
+      var rhtml = "", r, j, c2, n = rows ? rows.length : 0;
+      if (!n) {
+        rhtml = "<tr><td colspan='" + Math.max(1, cols.length) +
+          "' style='padding:24px;text-align:center;color:var(--muted)'>No rows</td></tr>";
+      } else {
+        for (r = 0; r < rows.length; r++) {
+          rhtml += "<tr data-ri='" + r + "'>";
+          if (!cols.length) rhtml += "<td>" + esc(JSON.stringify(rows[r])) + "</td>";
+          else {
+            for (j = 0; j < cols.length; j++) {
+              c2 = cols[j];
+              rhtml += "<td" + (c2.align === "right" || c2.format === "money" || colControlType(c2) === "money" ? " class='n'" : "") + ">" +
+                esc(xfFolderFormatCell(rows[r], c2)) + "</td>";
+            }
+          }
+          rhtml += "</tr>";
+        }
+      }
+      if (tb) tb.innerHTML = rhtml;
+      if (hint) hint.textContent = (child.title || tab.label || dataRef) + " · " + n + " row(s)";
+    });
+  }
+  if (refBtn) refBtn.onclick = loadRows;
+  loadRows();
+}
+
+function xfFolderPaintLaunch(body, child, tab) {
+  var layout = (child && child.layout) ? String(child.layout) : "list";
+  var title = (child && child.title) || tab.label || tab.screen || "Screen";
+  var html = "<div class='xf-folder-launch'>";
+  html += "<h4>" + esc(title) + "</h4>";
+  html += "<p>Layout <b>" + esc(layout) + "</b> opens in full workspace. " +
+    "Use list-style screens for an embedded grid inside the folder tab.</p>";
+  html += "<button type='button' class='btn primary' id='xf-folder-open'>" +
+    "<span class='btn-ico'>&#8599;</span> Open " + esc(title) + "</button>";
+  html += "</div>";
+  body.innerHTML = html;
+  var b = document.getElementById("xf-folder-open");
+  if (b) b.onclick = function () { xfFolderOpenTarget(tab); };
+}
+
+function xfFolderLoadTab(tab, body) {
+  if (!body || !tab) return;
+  body.innerHTML = "<div class='xf-folder-empty'>Loading…</div>";
+  if (tab.menuId && !tab.screen) {
+    body.innerHTML = "<div class='xf-folder-launch'><h4>" + esc(tab.label) + "</h4>" +
+      "<p>Menu target <code>" + esc(tab.menuId) + "</code>.</p>" +
+      "<button type='button' class='btn primary' id='xf-folder-open'>Open</button></div>";
+    var mb = document.getElementById("xf-folder-open");
+    if (mb) mb.onclick = function () { xfFolderOpenTarget(tab); };
+    return;
+  }
+  if (!tab.screen) {
+    body.innerHTML = "<div class='xf-folder-empty'>" +
+      esc(tab.hint || "Empty tab — set a screen target in Design form.") + "</div>";
+    return;
+  }
+  fetch("/api/meta?key=" + encodeURIComponent(tab.screen), { credentials: "same-origin", cache: "no-store" })
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      if (!j || !j.ok || !j.doc) {
+        body.innerHTML = "<div class='xf-folder-empty' style='color:var(--danger)'>Screen not found: " +
+          esc(tab.screen) + "</div>";
+        return;
+      }
+      var child = j.doc;
+      var layout = String(child.layout || "list");
+      // Embed list-like grids; other layouts use a launch card
+      if (!layout || layout === "list" || layout === "master-detail" || layout === "document" ||
+          layout === "audit" || layout === "report-list") {
+        xfFolderPaintList(body, child, tab);
+      } else {
+        xfFolderPaintLaunch(body, child, tab);
+      }
+    })
+    .catch(function (e) {
+      body.innerHTML = "<div class='xf-folder-empty' style='color:var(--danger)'>" + esc(String(e)) + "</div>";
+    });
+}
+
+function xfRenderFolder(scr) {
+  var host = xfHost();
+  var tabs = folderNormalizeTabs(scr);
+  var html = "", i, active = 0;
+  if (!host) return;
+  XF.folderTab = 0;
+  html += "<div class='xf-folder' id='xf-folder'>";
+  if (scr.subtitle)
+    html += "<p class='xf-folder-intro'>" + esc(scr.subtitle) + "</p>";
+  if (!tabs.length) {
+    html += "<div class='xf-folder-empty'>No folder tabs. In Design form choose layout <b>folder</b> and add lines <code>id|Label|screen.xxx</code>.</div>";
+    html += "</div>";
+    host.innerHTML = html;
+    return;
+  }
+  html += "<div class='xf-folder-tabs' id='xf-folder-tabs' role='tablist'>";
+  for (i = 0; i < tabs.length; i++) {
+    html += "<button type='button' role='tab' data-ti='" + i + "' class='" + (i === active ? "on" : "") + "'" +
+      " aria-selected='" + (i === active ? "true" : "false") + "'>" +
+      esc(tabs[i].label) + "</button>";
+  }
+  html += "</div>";
+  html += "<div class='xf-folder-body' id='xf-folder-body' role='tabpanel'></div>";
+  html += "</div>";
+  host.innerHTML = html;
+  var bar = document.getElementById("xf-folder-tabs");
+  var body = document.getElementById("xf-folder-body");
+  function selectTab(ti) {
+    var btns, j;
+    if (ti < 0 || ti >= tabs.length) return;
+    XF.folderTab = ti;
+    btns = bar ? bar.querySelectorAll("button[data-ti]") : [];
+    for (j = 0; j < btns.length; j++) {
+      btns[j].classList.toggle("on", j === ti);
+      btns[j].setAttribute("aria-selected", j === ti ? "true" : "false");
+    }
+    xfFolderLoadTab(tabs[ti], body);
+  }
+  if (bar) {
+    bar.onclick = function (e) {
+      var b = e.target && e.target.closest ? e.target.closest("button[data-ti]") : null;
+      if (!b) return;
+      selectTab(parseInt(b.getAttribute("data-ti"), 10) || 0);
+    };
+    bar.onkeydown = function (e) {
+      var n = tabs.length, cur = XF.folderTab || 0, next = cur;
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (cur + 1) % n;
+      else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (cur - 1 + n) % n;
+      else if (e.key === "Home") next = 0;
+      else if (e.key === "End") next = n - 1;
+      else return;
+      e.preventDefault();
+      selectTab(next);
+      var focusBtn = bar.querySelector('button[data-ti="' + next + '"]');
+      if (focusBtn) focusBtn.focus();
+    };
+  }
+  selectTab(active);
+}
+
+/* ---------- Layout "menu" — content painel (groups of actions) ---------- */
 function menuPainelNormalizeGroups(scr) {
   var groups = [], i, g, flat;
   if (scr && Array.isArray(scr.groups) && scr.groups.length) {

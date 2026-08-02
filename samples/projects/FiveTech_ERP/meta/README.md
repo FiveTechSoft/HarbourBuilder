@@ -118,6 +118,8 @@ Open a row with **Edit** / **New** to exercise select, checklist and checkbox.
 |--------|-----------|--------|
 | `form` | Patient card | `screen.patient_card` |
 | `wizard` | Admission wizard | `screen.admission` |
+| `folder` | CRM folder (tabs) | `screen.crm_folder` |
+| `menu` | Cadastros / launch pad | (vertical packs) |
 | `calendar` | Day agenda | `screen.day_agenda` |
 | `dashboard` | Dashboard KPIs | `screen.kpis` |
 | `tree-detail` | Org tree | `screen.org` |

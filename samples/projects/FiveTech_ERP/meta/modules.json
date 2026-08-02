@@ -40,7 +40,6 @@
       "id": "erp_forms",
       "title": "ERP forms",
       "items": [
-        { "id": "cadastros_menu", "label": "Cadastros (menu)", "icon": "grid", "screen": "screen.cadastros_menu" },
         { "id": "kpis", "label": "Dashboard KPIs", "icon": "chart", "screen": "screen.kpis" },
         { "id": "org", "label": "Org tree", "icon": "users", "screen": "screen.org" },
         { "id": "roster", "label": "Roster matrix", "icon": "grid", "screen": "screen.roster" },

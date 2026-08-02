@@ -49,7 +49,8 @@ Generic screen engine driven by JSON. Supported **layouts**:
 | `document` | Document + line totals + tax |
 | `form` | Card form with tabs |
 | `wizard` | Multi-step wizard |
-| `menu` | Launch painel: columns of groups (`grupo-titulo` + clickable `grupo-item` → other screens) |
+| `folder` | Notebook tabs hosting child screens |
+| `menu` | Painel groups of actions |
 | `calendar` | Day / agenda style |
 | `dashboard` | KPI tiles |
 | `tree-detail` | Org tree + detail |

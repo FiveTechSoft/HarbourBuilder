@@ -49,6 +49,8 @@ Motor genérico de pantallas impulsado por JSON. **Layouts** soportados:
 | `document` | Documento + totales de líneas + impuestos |
 | `form` | Ficha / formulario con pestañas |
 | `wizard` | Asistente multipaso |
+| `folder` | Carpeta con pestañas (pantallas hijas) |
+| `menu` | Painel de grupos de acciones |
 | `calendar` | Estilo día / agenda |
 | `dashboard` | Tiles de KPIs |
 | `tree-detail` | Árbol organizativo + detalle |

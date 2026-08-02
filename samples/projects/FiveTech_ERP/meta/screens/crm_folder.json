@@ -1,0 +1,15 @@
+{
+  "id": "screen.crm_folder",
+  "kind": "screen",
+  "layout": "folder",
+  "title": "CRM folder",
+  "subtitle": "Notebook tabs for related CRM screens. List tabs embed a grid; form/workflow tabs open full.",
+  "tabs": [
+    { "id": "parties", "label": "Clients", "screen": "screen.parties" },
+    { "id": "activities", "label": "Activities", "screen": "screen.activities" },
+    { "id": "opportunities", "label": "Opportunities", "screen": "screen.opportunities" },
+    { "id": "pipeline", "label": "Pipeline", "screen": "screen.pipeline" },
+    { "id": "party_card", "label": "Client card", "screen": "screen.party_card" }
+  ],
+  "toolbar": ["refresh"]
+}
