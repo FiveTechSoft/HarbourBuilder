@@ -1115,8 +1115,8 @@
       <button type="button" class="btn-menu-edit admin-only" id="btn-menu-edit" title="Edit app branding and menu (admin)">
         &#9998; Edit app
       </button>
-      <button class="btn-logout" onclick="cmd('logout')" title="Sign out">
-        <span class="ico" aria-hidden="true">&#9211;</span><span class="lbl"> Sign out</span>
+      <button class="btn-logout" onclick="salirSistema()" title="Salir del sistema">
+        <span class="ico" aria-hidden="true">&#9211;</span><span class="lbl"> Salir del sistema</span>
       </button>
     </div>
   </aside>
@@ -1137,7 +1137,7 @@
         <div class="avatar" title="__USER__" id="top-avatar">__AVATAR__</div>
         <button type="button" class="btn-salir" id="btn-salir"
           title="Salir del sistema" aria-label="Salir del sistema"
-          onclick="cmd('logout')">
+          onclick="salirSistema()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -2600,6 +2600,8 @@ function openPatientsFromMetafunction openPatientsFromMeta(ev) {
 }
 
 function cmd(action, a1, a2) {
+  // Logout always goes to login screen (do not depend on other cmd branches)
+  if (String(action || "").toLowerCase() === "logout") return salirSistema();
   var body = "action=" + encodeURIComponent(action || "");
   if (a1 !== undefined && a1 !== null) body += "&a1=" + encodeURIComponent(a1);
   if (a2 !== undefined && a2 !== null) body += "&a2=" + encodeURIComponent(a2);
@@ -2611,13 +2613,34 @@ function cmd(action, a1, a2) {
   }).then(function (r) { return r.json(); })
     .then(function (j) {
       if (!j) return j;
-      if (j.redirect) { window.location.href = j.redirect; return j; }
+      if (j.redirect) { window.location.replace(j.redirect); return j; }
       if (j.nav) dashNav(j.nav);
       if (j.sel) dashSelect(j.sel);
       if (j.filter !== undefined) dashFilter(j.filter);
       if (j.toast) dashToast(j.toast);
       return j;
     }).catch(function (e) { dashToast("API error: " + e); throw e; });
+}
+
+/** End session and always open the login screen. */
+function salirSistema() {
+  var loginUrl = "/login";
+  return fetch("/api/cmd", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: "action=logout",
+    credentials: "same-origin",
+    cache: "no-store"
+  }).then(function (r) {
+    return r.json().catch(function () { return {}; });
+  }).then(function (j) {
+    var url = (j && j.redirect) ? String(j.redirect) : loginUrl;
+    if (!url || url === "/" || url === "/index.html") url = loginUrl;
+    try { window.location.replace(url); } catch (e1) { window.location.href = url; }
+  }).catch(function () {
+    // Even if the API fails, leave the dashboard
+    try { window.location.replace(loginUrl); } catch (e2) { window.location.href = loginUrl; }
+  });
 }
 
 function esc(s) {

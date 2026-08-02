@@ -572,7 +572,7 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
 
    if cMethod == "GET" .and. cPath == "/logout"
       ErpSessDel( cTok )
-      return ErpHttpRedirect( "/", "DWSESS=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0" )
+      return ErpHttpRedirect( "/login", "DWSESS=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0" )
    endif
 
    // --- API (FWH-compatible) ---
@@ -705,14 +705,15 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
    if cMethod == "POST" .and. cPath == "/api/cmd"
       if Empty( hSess )
          return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Not authenticated", ;
-            "redirect" => "/" } ), "application/json; charset=utf-8" )
+            "redirect" => "/login" } ), "application/json; charset=utf-8" )
       endif
       hQ := ErpQuery( cBody )
       cAction := Lower( AllTrim( hb_HGetDef( hQ, "action", "" ) ) )
       cArg := AllTrim( hb_HGetDef( hQ, "a1", "" ) )
       if cAction == "logout"
          ErpSessDel( cTok )
-         return ErpHttpOkCookie( hb_jsonEncode( { "ok" => .T., "redirect" => "/" } ), ;
+         // Always land on login page (same HTML as /)
+         return ErpHttpOkCookie( hb_jsonEncode( { "ok" => .T., "redirect" => "/login" } ), ;
             "application/json; charset=utf-8", ;
             "DWSESS=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0" )
       elseif cAction == "select"
