@@ -837,6 +837,70 @@
     display: none; flex: 1; min-height: 0; flex-direction: column;
     padding: 12px 14px; background: var(--painel-body); overflow: auto;
   }
+  /* Layout "menu" — SisaNG content-painel launch pad */
+  .content-painel {
+    flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto;
+  }
+  .painel-wrap { padding: 4px 2px 16px; }
+  .painel-intro {
+    font-size: .85rem; color: var(--muted); margin: 0 0 14px; line-height: 1.45; max-width: 72ch;
+  }
+  .painel-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 14px;
+    align-content: start;
+  }
+  .painel-grupo {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface-2);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .painel-grupo .grupo-titulo {
+    padding: 10px 12px;
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--th-bg);
+    border-bottom: 1px solid var(--line);
+  }
+  .painel-grupo .grupo-item {
+    padding: 9px 12px;
+    font-size: .88rem;
+    color: var(--text-2);
+    cursor: pointer;
+    border-bottom: 1px solid var(--td-line);
+    user-select: none;
+    transition: background .12s, color .12s;
+  }
+  .painel-grupo .grupo-item:last-child { border-bottom: 0; }
+  .painel-grupo .grupo-item:hover {
+    background: var(--nav-hover);
+    color: var(--text);
+  }
+  .painel-grupo .grupo-item:active {
+    background: var(--blue-soft);
+    color: var(--blue);
+  }
+  .painel-grupo .grupo-item .gi-hint {
+    display: block;
+    font-size: .72rem;
+    color: var(--muted);
+    margin-top: 2px;
+    font-weight: 400;
+  }
+  .painel-empty {
+    padding: 28px 12px;
+    text-align: center;
+    color: var(--muted);
+    font-size: .9rem;
+  }
   .xf-kpis { display: grid; grid-template-columns: repeat(auto-fill,minmax(180px,1fr)); gap: 12px; }
   .xf-kpi {
     border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px;
@@ -1617,6 +1681,7 @@
           <option value="document">Document + totals</option>
           <option value="form">Card form (tabs)</option>
           <option value="wizard">Wizard</option>
+          <option value="menu">Menu (painel groups)</option>
           <option value="calendar">Calendar / agenda</option>
           <option value="dashboard">Dashboard KPIs</option>
           <option value="tree-detail">Tree + detail</option>
@@ -1674,6 +1739,22 @@
         <p style="margin:6px 0 0;font-size:.72rem;color:var(--muted)">
           Columns below define field controls (type, options). Field ids must match the lists above.
           For <b>wizard</b>, each line is a step.
+        </p>
+      </div>
+    </div>
+    <div class="designer-section" id="des-menu-block" style="display:none;margin-bottom:12px">
+      <h3><span>Menu painel groups</span></h3>
+      <div style="padding:0 12px 12px">
+        <label for="des-menu-groups" style="display:block;font-size:.72rem;font-weight:600;color:var(--muted);margin-bottom:4px">
+          Groups &amp; items (blank line between groups)
+        </label>
+        <textarea id="des-menu-groups" rows="10" style="width:100%;font-family:ui-monospace,Consolas,monospace;font-size:.78rem;padding:8px;border:1px solid var(--line);border-radius:8px;resize:vertical"
+          placeholder="tabelas|Tabelas&#10;pessoas|Cadastro de Pessoas|screen.parties&#10;contas|Cadastro de Conta|menu:accounts&#10;&#10;relatorios|Relatórios Gerais&#10;dados|Dados de Contas|screen.reports"></textarea>
+        <p style="margin:6px 0 0;font-size:.72rem;color:var(--muted)">
+          First line of each block = group <code>id|Label</code>.
+          Following lines = items <code>id|Label|target</code> where target is
+          <code>screen.xxx</code>, <code>menu:menuId</code>, or empty.
+          Renders as SisaNG-style painel columns (grupo-titulo + grupo-item).
         </p>
       </div>
     </div>
@@ -3298,7 +3379,7 @@ function isMasterDetail() {
 
 function isSpecialLayout(layout) {
   var L = [
-    "form", "wizard", "calendar", "dashboard", "tree-detail", "matrix",
+    "form", "wizard", "menu", "calendar", "dashboard", "tree-detail", "matrix",
     "assign", "workflow", "settings", "audit", "import", "period", "context",
     "report-list"
   ];
@@ -4050,12 +4131,15 @@ function updateDesignerLayoutUi() {
   var layout = lay ? lay.value : "list";
   var md = document.getElementById("des-md-block");
   var formB = document.getElementById("des-form-block");
+  var menuB = document.getElementById("des-menu-block");
   var wfB = document.getElementById("des-wf-block");
   var isMd = (layout === "master-detail" || layout === "document");
   var isForm = (layout === "form" || layout === "wizard");
+  var isMenu = (layout === "menu");
   var isWf = (layout === "workflow");
   if (md) md.style.display = isMd ? "block" : "none";
   if (formB) formB.style.display = isForm ? "block" : "none";
+  if (menuB) menuB.style.display = isMenu ? "block" : "none";
   if (wfB) wfB.style.display = isWf ? "block" : "none";
   var bar = document.getElementById("des-cols-scope-bar");
   if (bar) bar.style.display = isMd ? "flex" : "none";
@@ -4064,8 +4148,54 @@ function updateDesignerLayoutUi() {
   if (t && !isMd) {
     if (isForm) t.textContent = "Form fields (controls)";
     else if (isWf) t.textContent = "Queue / board columns";
+    else if (isMenu) t.textContent = "Optional (unused for menu layout)";
     else t.textContent = "Grid columns";
   }
+}
+
+function menuGroupsToText(groups) {
+  var lines = [], g, i, j, it, target;
+  if (!Array.isArray(groups)) return "";
+  for (i = 0; i < groups.length; i++) {
+    g = groups[i] || {};
+    if (i) lines.push("");
+    lines.push(String(g.id || ("g" + (i + 1))) + "|" + String(g.label || g.title || g.id || ("Group " + (i + 1))));
+    for (j = 0; j < (g.items || []).length; j++) {
+      it = g.items[j] || {};
+      target = "";
+      if (it.screen) target = String(it.screen);
+      else if (it.menuId) target = "menu:" + String(it.menuId);
+      lines.push(String(it.id || ("i" + (j + 1))) + "|" +
+        String(it.label || it.id || ("Item " + (j + 1))) +
+        (target ? ("|" + target) : ""));
+    }
+  }
+  return lines.join(String.fromCharCode(10));
+}
+
+function textToMenuGroups(s) {
+  // Blocks separated by blank lines. First line of a block = group (id|Label).
+  // Following lines = items (id|Label|target).
+  var lines = String(s || "").split(/\r?\n/), i, line, parts, groups = [], cur = null, target, it;
+  for (i = 0; i < lines.length; i++) {
+    line = strTrim(lines[i]);
+    if (!line) { cur = null; continue; }
+    parts = line.split("|").map(strTrim);
+    if (!parts[0]) continue;
+    if (!cur) {
+      cur = { id: parts[0], label: parts[1] || parts[0], items: [] };
+      groups.push(cur);
+      continue;
+    }
+    it = { id: parts[0], label: parts[1] || parts[0] };
+    target = parts[2] || "";
+    if (target.indexOf("menu:") === 0) it.menuId = target.slice(5);
+    else if (target) {
+      it.screen = target.indexOf("screen.") === 0 ? target : ("screen." + target);
+    }
+    cur.items.push(it);
+  }
+  return groups;
 }
 
 function tabsToText(tabs) {
@@ -4223,6 +4353,12 @@ function loadDesignerKey(key) {
         if (el) {
           if (Array.isArray(j.doc.tabs) && j.doc.tabs.length) el.value = tabsToText(j.doc.tabs);
           else if (Array.isArray(j.doc.steps) && j.doc.steps.length) el.value = tabsToText(j.doc.steps);
+          else el.value = "";
+        }
+        // menu layout groups
+        el = document.getElementById("des-menu-groups");
+        if (el) {
+          if (Array.isArray(j.doc.groups) && j.doc.groups.length) el.value = menuGroupsToText(j.doc.groups);
           else el.value = "";
         }
         // workflow extras
@@ -4506,10 +4642,19 @@ function saveFormDesigner() {
     else delete doc.transitions;
   }
 
+  // menu painel groups
+  if (layout === "menu") {
+    var mgTxt = ((document.getElementById("des-menu-groups") || {}).value || "");
+    var mGroups = textToMenuGroups(mgTxt);
+    if (mGroups.length) doc.groups = mGroups;
+    else delete doc.groups;
+  }
+
   // Drop keys that do not apply to the target layout. Unknown (custom)
   // layouts are left untouched so their specific keys survive the save.
   var KNOWN_LAYOUTS = {
     "list": 1, "master-detail": 1, "document": 1, "form": 1, "wizard": 1,
+    "menu": 1,
     "calendar": 1, "dashboard": 1, "tree-detail": 1, "matrix": 1, "assign": 1,
     "workflow": 1, "settings": 1, "audit": 1, "import": 1, "period": 1, "context": 1,
     "report-list": 1
@@ -4522,6 +4667,7 @@ function saveFormDesigner() {
       delete doc.steps;
       if (layout !== "workflow") delete doc.keyField;
     }
+    if (layout !== "menu") delete doc.groups;
     if (layout !== "workflow") {
       delete doc.statusField;
       delete doc.transitions;
@@ -5846,6 +5992,7 @@ function renderSpecialLayout(scr) {
   var layout = String(scr.layout || "");
   if (layout === "form") return xfRenderForm(scr);
   if (layout === "wizard") return xfRenderWizard(scr);
+  if (layout === "menu") return xfRenderMenuPainel(scr);
   if (layout === "calendar") return xfRenderCalendar(scr);
   if (layout === "dashboard") return xfRenderDashboard(scr);
   if (layout === "tree-detail") return xfRenderTree(scr);
@@ -5859,6 +6006,99 @@ function renderSpecialLayout(scr) {
   if (layout === "context") return xfRenderContext(scr);
   if (layout === "report-list") return xfRenderReportList(scr);
   host.innerHTML = "<p style='color:var(--danger)'>Unknown layout: " + esc(layout) + "</p>";
+}
+
+/* ---------- Layout "menu" — SisaNG content-painel (groups of actions) ---------- */
+function menuPainelNormalizeGroups(scr) {
+  var groups = [], i, g, flat;
+  if (scr && Array.isArray(scr.groups) && scr.groups.length) {
+    for (i = 0; i < scr.groups.length; i++) {
+      g = scr.groups[i] || {};
+      groups.push({
+        id: g.id || ("g" + (i + 1)),
+        label: g.label || g.title || g.id || ("Group " + (i + 1)),
+        items: Array.isArray(g.items) ? g.items.slice() : []
+      });
+    }
+    return groups;
+  }
+  // Flat items[] → one column
+  flat = (scr && Array.isArray(scr.items)) ? scr.items : [];
+  if (flat.length) {
+    groups.push({ id: "main", label: (scr && scr.title) || "Options", items: flat.slice() });
+  }
+  return groups;
+}
+
+function launchMenuPainelItem(it) {
+  if (!it) return;
+  var menuId = it.menuId || "";
+  var screen = it.screen || "";
+  var mid;
+  if (menuId) {
+    mid = menuId;
+    if (typeof moduleById === "function" && moduleById(mid)) {
+      cmd("nav", mid);
+      return;
+    }
+  }
+  if (screen) {
+    mid = (typeof moduleIdByScreen === "function") ? moduleIdByScreen(screen) : "";
+    if (mid) { cmd("nav", mid); return; }
+    if (typeof showMetaScreen === "function") {
+      showMetaScreen(screen, it.label || screen);
+      return;
+    }
+  }
+  if (it.action === "nav" && it.target) {
+    cmd("nav", it.target);
+    return;
+  }
+  toast("No target for: " + (it.label || it.id || "item"));
+}
+
+function xfRenderMenuPainel(scr) {
+  var host = xfHost();
+  var groups = menuPainelNormalizeGroups(scr);
+  var html = "", i, g, j, it, tip;
+  if (!host) return;
+  html += "<div class='content-painel' id='content-painel'>";
+  html += "<div class='painel-wrap'>";
+  if (scr.subtitle)
+    html += "<p class='painel-intro'>" + esc(scr.subtitle) + "</p>";
+  if (!groups.length) {
+    html += "<div class='painel-empty'>No menu groups. In Design form choose layout <b>menu</b> and define groups (id|Label / id|Label|screen.xxx).</div>";
+  } else {
+    html += "<div class='painel-grid' id='painel-grid'>";
+    for (i = 0; i < groups.length; i++) {
+      g = groups[i];
+      html += "<div class='painel-grupo' data-gid='" + esc(g.id) + "'>";
+      html += "<div class='grupo-titulo'>" + esc(g.label) + "</div>";
+      for (j = 0; j < (g.items || []).length; j++) {
+        it = g.items[j] || {};
+        tip = it.tooltip || it.title || it.screen || it.menuId || "";
+        html += "<div class='grupo-item' data-gi='" + i + "' data-ii='" + j + "'" +
+          (tip ? (" title='" + esc(tip) + "'") : "") + ">" +
+          esc(it.label || it.id || ("Item " + (j + 1)));
+        if (it.hint)
+          html += "<span class='gi-hint'>" + esc(it.hint) + "</span>";
+        html += "</div>";
+      }
+      html += "</div>";
+    }
+    html += "</div>";
+  }
+  html += "</div></div>";
+  host.innerHTML = html;
+  host.onclick = function (e) {
+    var el = e.target && e.target.closest ? e.target.closest(".grupo-item") : null;
+    var gi, ii, item;
+    if (!el) return;
+    gi = parseInt(el.getAttribute("data-gi"), 10);
+    ii = parseInt(el.getAttribute("data-ii"), 10);
+    item = groups[gi] && groups[gi].items ? groups[gi].items[ii] : null;
+    launchMenuPainelItem(item);
+  };
 }
 
 /* ---------- Reports sketch (meta report.* definitions) ---------- */

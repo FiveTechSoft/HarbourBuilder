@@ -1,0 +1,68 @@
+{
+  "id": "screen.cadastros_menu",
+  "kind": "screen",
+  "layout": "menu",
+  "title": "Cadastros",
+  "subtitle": "Layout menu (painel): groups of options that open other screens — same pattern as SisaNG content-painel.",
+  "toolbar": ["refresh"],
+  "groups": [
+    {
+      "id": "tabelas",
+      "label": "Tabelas",
+      "items": [
+        { "id": "pessoas", "label": "Cadastro de Pessoas", "screen": "screen.parties", "tooltip": "CRM parties" },
+        { "id": "party_card", "label": "Ficha de Party", "screen": "screen.party_card" },
+        { "id": "contas", "label": "Cadastro de Conta", "menuId": "accounts" },
+        { "id": "accounts_list", "label": "Accounts (list)", "screen": "screen.accounts" },
+        { "id": "params", "label": "Parâmetros", "screen": "screen.params" }
+      ]
+    },
+    {
+      "id": "empresas",
+      "label": "Cadastro de Empresas",
+      "items": [
+        { "id": "context", "label": "Company context", "screen": "screen.context" },
+        { "id": "org", "label": "Org tree", "screen": "screen.org" },
+        { "id": "user_roles", "label": "Users ↔ roles", "screen": "screen.user_roles" }
+      ]
+    },
+    {
+      "id": "rel_gerais",
+      "label": "Relatórios Gerais",
+      "items": [
+        { "id": "reports", "label": "Catálogo de relatórios", "screen": "screen.reports" },
+        { "id": "audit", "label": "Audit log", "screen": "screen.audit_log" },
+        { "id": "kpis", "label": "Dashboard KPIs", "screen": "screen.kpis" },
+        { "id": "stats", "label": "Statistics list", "screen": "screen.stats" }
+      ]
+    },
+    {
+      "id": "rel_contas",
+      "label": "Relatórios de Contas",
+      "items": [
+        { "id": "activities", "label": "Activities", "screen": "screen.activities" },
+        { "id": "opportunities", "label": "Opportunities", "screen": "screen.opportunities" },
+        { "id": "pipeline", "label": "Pipeline board", "screen": "screen.pipeline" }
+      ]
+    },
+    {
+      "id": "clinic_grp",
+      "label": "Clínica",
+      "items": [
+        { "id": "patients", "label": "Patients", "menuId": "patients" },
+        { "id": "balance", "label": "Patient balance", "menuId": "balance" },
+        { "id": "invoices", "label": "Invoices (M/D)", "screen": "screen.invoices" },
+        { "id": "quotes", "label": "Quotes (document)", "screen": "screen.quotes" }
+      ]
+    },
+    {
+      "id": "planilhas",
+      "label": "Planilhas",
+      "items": [
+        { "id": "import", "label": "CSV import", "screen": "screen.import_csv" },
+        { "id": "catalog", "label": "Service catalog", "screen": "screen.catalog" },
+        { "id": "tasks", "label": "Work orders", "screen": "screen.tasks" }
+      ]
+    }
+  ]
+}
