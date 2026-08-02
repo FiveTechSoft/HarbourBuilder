@@ -178,6 +178,7 @@
     background: var(--side); border-top: 1px solid var(--line);
     display: flex; align-items: center; padding: 0 12px 0 16px;
     font-size: 11px; color: var(--text-3); user-select: none; overflow: hidden;
+    position: relative; z-index: 100; pointer-events: auto;
   }
   #status-bar .sb-item {
     display: flex; align-items: center; gap: 5px;
@@ -220,28 +221,51 @@
     background: transparent; color: #fff; cursor: pointer; font-size: 15px;
   }
   #workdate-box .wd-head button:hover { background: rgba(255,255,255,.16); }
-  #workdate-box .wd-body { padding: 18px 20px 8px; }
+  #workdate-box .wd-body { padding: 16px 18px 8px; }
   #workdate-box .wd-body p {
     margin: 0 0 12px; font-size: .82rem; color: var(--muted); line-height: 1.4;
   }
-  #workdate-box .wd-body label {
-    display: block; font-size: .72rem; font-weight: 700; color: var(--muted);
-    text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px;
+  #workdate-box .wd-nav {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
   }
-  #workdate-box input[type="date"] {
-    width: 100%; height: 42px; padding: 0 12px;
-    border: 1px solid var(--line); border-radius: 8px;
-    background: var(--input-bg); color: var(--text);
-    font: inherit; font-size: 1rem; outline: none;
-    color-scheme: inherit;
+  #workdate-box .wd-nav .wd-month {
+    flex: 1; text-align: center; font-weight: 700; font-size: .95rem; color: var(--text);
   }
-  #workdate-box input[type="date"]:focus {
-    border-color: var(--blue); box-shadow: 0 0 0 3px var(--focus-ring);
+  #workdate-box .wd-nav button {
+    width: 34px; height: 32px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--surface-2); color: var(--text); cursor: pointer; font-size: 1rem;
   }
+  #workdate-box .wd-nav button:hover { border-color: var(--blue); color: var(--blue); }
+  #workdate-box .wd-week {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 4px;
+  }
+  #workdate-box .wd-week span {
+    text-align: center; font-size: .68rem; font-weight: 700; color: var(--muted);
+    text-transform: uppercase; padding: 4px 0;
+  }
+  #workdate-box .wd-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px;
+  }
+  #workdate-box .wd-grid button {
+    height: 36px; border: 0; border-radius: 8px; background: transparent;
+    color: var(--text); cursor: pointer; font: inherit; font-size: .88rem;
+  }
+  #workdate-box .wd-grid button:hover:not(:disabled) { background: var(--nav-hover); }
+  #workdate-box .wd-grid button.muted { color: var(--muted); opacity: .55; }
+  #workdate-box .wd-grid button.today { box-shadow: inset 0 0 0 1px var(--blue); }
+  #workdate-box .wd-grid button.sel {
+    background: var(--blue); color: #fff; font-weight: 700;
+  }
+  #workdate-box .wd-grid button:disabled { cursor: default; opacity: .25; }
+  #workdate-box .wd-iso {
+    margin-top: 10px; font-size: .78rem; color: var(--muted); text-align: center;
+  }
+  #workdate-box .wd-iso b { color: var(--text); }
   #workdate-box .wd-foot {
     display: flex; justify-content: flex-end; gap: 8px;
     padding: 12px 16px 16px;
   }
+  #status-bar .sb-clic { pointer-events: auto; }
   .topbar {
     display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 12px; padding: 0 4px; flex-shrink: 0;
@@ -1476,7 +1500,10 @@
     </svg>
     <span class="sb-txt" id="sb-db">—</span>
   </div>
-  <div class="sb-item sb-clic" id="sb-date-item" title="Fecha de trabajo">
+  <div class="sb-item sb-clic" id="sb-date-item" title="Fecha de trabajo — clic para abrir calendario"
+    role="button" tabindex="0"
+    onclick="openWorkDatePicker()"
+    onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openWorkDatePicker();}">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
       <rect x="3" y="4" width="18" height="18" rx="2"/>
       <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
@@ -1502,19 +1529,27 @@
 </footer>
 </div><!-- /.shell -->
 
-<!-- Work date calendar (status bar) -->
+<!-- Work date calendar (status bar) — custom grid (works in WebView2) -->
 <div id="workdate-scrim" role="presentation">
   <div id="workdate-box" role="dialog" aria-modal="true" aria-labelledby="workdate-title">
     <div class="wd-head">
       <span class="tit" id="workdate-title">Fecha de trabajo</span>
-      <button type="button" id="workdate-x" title="Cerrar">&#10005;</button>
+      <button type="button" id="workdate-x" title="Cerrar" aria-label="Cerrar">&#10005;</button>
     </div>
     <div class="wd-body">
-      <p>Seleccione la fecha de trabajo de la sesión. Se usa en listados, documentos y filtros.</p>
-      <label for="workdate-input">Calendario</label>
-      <input type="date" id="workdate-input" autocomplete="off">
+      <p>Seleccione el día en el calendario y pulse <b>Aplicar</b>.</p>
+      <div class="wd-nav">
+        <button type="button" id="workdate-prev" title="Mes anterior" aria-label="Mes anterior">&#8249;</button>
+        <div class="wd-month" id="workdate-month">—</div>
+        <button type="button" id="workdate-next" title="Mes siguiente" aria-label="Mes siguiente">&#8250;</button>
+      </div>
+      <div class="wd-week" id="workdate-week" aria-hidden="true"></div>
+      <div class="wd-grid" id="workdate-grid" role="grid" aria-label="Calendario"></div>
+      <div class="wd-iso">Selección: <b id="workdate-sel-label">—</b></div>
+      <input type="hidden" id="workdate-input" value="">
     </div>
     <div class="wd-foot">
+      <button type="button" class="btn-ghost" id="workdate-today">Hoy</button>
       <button type="button" class="btn-ghost" id="workdate-cancel">Cancelar</button>
       <button type="button" class="btn-blue" id="workdate-ok">Aplicar</button>
     </div>
@@ -2563,65 +2598,177 @@ function applyWorkDate(displayDate, isoDate) {
     }).catch(function () {});
   } catch (e2) {}
 }
+/* Custom month calendar (reliable in Edge WebView2; no native date popup needed) */
+var WD_PICK = { viewY: 0, viewM: 0, selIso: "", wired: false };
+var WD_MONTHS_ES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+];
+var WD_DOW_ES = ["L", "M", "X", "J", "V", "S", "D"]; // Monday-first labels
+
+function workDateFirstDow() {
+  try {
+    var L = (typeof appLocale === "function") ? appLocale() : null;
+    if (L && L.firstDayOfWeek != null) return Number(L.firstDayOfWeek) || 0;
+  } catch (e) {}
+  try {
+    if (APP_META && APP_META.locale && APP_META.locale.firstDayOfWeek != null)
+      return Number(APP_META.locale.firstDayOfWeek) || 0;
+  } catch (e2) {}
+  return 1; // Monday default
+}
+function isoToParts(iso) {
+  var m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  return { y: parseInt(m[1], 10), m: parseInt(m[2], 10), d: parseInt(m[3], 10) };
+}
+function partsToIso(y, m, d) {
+  return y + "-" + pad2(m) + "-" + pad2(d);
+}
+function paintWorkDateCalendar() {
+  var monthEl = document.getElementById("workdate-month");
+  var weekEl = document.getElementById("workdate-week");
+  var grid = document.getElementById("workdate-grid");
+  var inp = document.getElementById("workdate-input");
+  var lab = document.getElementById("workdate-sel-label");
+  var y = WD_PICK.viewY, m = WD_PICK.viewM; // 1-12
+  var firstDow = workDateFirstDow(); // 0=Sun … 1=Mon
+  var first = new Date(y, m - 1, 1);
+  var startPad = (first.getDay() - firstDow + 7) % 7;
+  var daysInMonth = new Date(y, m, 0).getDate();
+  var prevDays = new Date(y, m - 1, 0).getDate();
+  var today = new Date();
+  var todayIso = partsToIso(today.getFullYear(), today.getMonth() + 1, today.getDate());
+  var html = "", i, day, iso, cls, cellY, cellM, cellD, dowLabels = [], di;
+  if (monthEl) monthEl.textContent = (WD_MONTHS_ES[m - 1] || m) + " " + y;
+  // week headers: rotate WD_DOW_ES (Mon-first) if firstDow is Sunday
+  if (firstDow === 0) dowLabels = ["D", "L", "M", "X", "J", "V", "S"];
+  else dowLabels = WD_DOW_ES.slice();
+  if (weekEl) {
+    html = "";
+    for (i = 0; i < 7; i++) html += "<span>" + dowLabels[i] + "</span>";
+    weekEl.innerHTML = html;
+  }
+  html = "";
+  for (i = 0; i < 42; i++) {
+    if (i < startPad) {
+      cellD = prevDays - startPad + i + 1;
+      cellM = m - 1; cellY = y;
+      if (cellM < 1) { cellM = 12; cellY--; }
+      cls = "muted";
+    } else if (i >= startPad + daysInMonth) {
+      cellD = i - startPad - daysInMonth + 1;
+      cellM = m + 1; cellY = y;
+      if (cellM > 12) { cellM = 1; cellY++; }
+      cls = "muted";
+    } else {
+      cellD = i - startPad + 1;
+      cellM = m; cellY = y;
+      cls = "";
+    }
+    iso = partsToIso(cellY, cellM, cellD);
+    if (iso === todayIso) cls += (cls ? " " : "") + "today";
+    if (iso === WD_PICK.selIso) cls += (cls ? " " : "") + "sel";
+    html += "<button type='button' data-iso='" + iso + "'" +
+      (cls ? (" class='" + cls + "'") : "") + ">" + cellD + "</button>";
+  }
+  if (grid) {
+    grid.innerHTML = html;
+    grid.onclick = function (e) {
+      var b = e.target && e.target.closest ? e.target.closest("button[data-iso]") : null;
+      if (!b) return;
+      WD_PICK.selIso = b.getAttribute("data-iso") || "";
+      if (inp) inp.value = WD_PICK.selIso;
+      if (lab) lab.textContent = workDateFromIso(WD_PICK.selIso);
+      paintWorkDateCalendar();
+    };
+  }
+  if (inp) inp.value = WD_PICK.selIso || "";
+  if (lab) lab.textContent = WD_PICK.selIso ? workDateFromIso(WD_PICK.selIso) : "—";
+}
 function closeWorkDatePicker() {
   var scrim = document.getElementById("workdate-scrim");
   if (scrim) scrim.classList.remove("is-open");
 }
 function openWorkDatePicker() {
   var scrim = document.getElementById("workdate-scrim");
-  var inp = document.getElementById("workdate-input");
-  if (!scrim || !inp) return;
-  inp.value = workDateToIso(WORK_DATE);
-  scrim.classList.add("is-open");
-  setTimeout(function () {
-    try {
-      inp.focus();
-      if (typeof inp.showPicker === "function") inp.showPicker();
-    } catch (e) {}
-  }, 40);
-}
-function confirmWorkDatePicker() {
-  var inp = document.getElementById("workdate-input");
-  var iso, disp;
-  if (!inp || !inp.value) {
-    toast("Seleccione una fecha en el calendario");
+  var p;
+  if (!scrim) {
+    try { toast("Calendario no disponible en esta página"); } catch (e0) {}
     return;
   }
-  iso = inp.value;
+  try { wireWorkDatePicker(); } catch (e1) {}
+  WD_PICK.selIso = workDateToIso(WORK_DATE);
+  p = isoToParts(WD_PICK.selIso);
+  if (!p) {
+    var n = new Date();
+    p = { y: n.getFullYear(), m: n.getMonth() + 1, d: n.getDate() };
+    WD_PICK.selIso = partsToIso(p.y, p.m, p.d);
+  }
+  WD_PICK.viewY = p.y;
+  WD_PICK.viewM = p.m;
+  paintWorkDateCalendar();
+  scrim.classList.add("is-open");
+  try { setStatusMsg("Elija fecha de trabajo…"); } catch (e2) {}
+}
+function confirmWorkDatePicker() {
+  var iso = WD_PICK.selIso || (document.getElementById("workdate-input") || {}).value;
+  var disp;
+  if (!iso) {
+    toast("Seleccione un día en el calendario");
+    return;
+  }
   disp = workDateFromIso(iso);
   applyWorkDate(disp, iso);
   closeWorkDatePicker();
 }
+function workDateShiftMonth(delta) {
+  var m = WD_PICK.viewM + delta, y = WD_PICK.viewY;
+  if (m < 1) { m = 12; y--; }
+  if (m > 12) { m = 1; y++; }
+  WD_PICK.viewM = m;
+  WD_PICK.viewY = y;
+  paintWorkDateCalendar();
+}
+function workDatePickToday() {
+  var n = new Date();
+  WD_PICK.selIso = partsToIso(n.getFullYear(), n.getMonth() + 1, n.getDate());
+  WD_PICK.viewY = n.getFullYear();
+  WD_PICK.viewM = n.getMonth() + 1;
+  paintWorkDateCalendar();
+}
 function wireWorkDatePicker() {
-  var scrim = document.getElementById("workdate-scrim");
-  var ok = document.getElementById("workdate-ok");
-  var cancel = document.getElementById("workdate-cancel");
-  var x = document.getElementById("workdate-x");
-  var inp = document.getElementById("workdate-input");
-  if (ok) ok.onclick = confirmWorkDatePicker;
-  if (cancel) cancel.onclick = closeWorkDatePicker;
-  if (x) x.onclick = closeWorkDatePicker;
+  var scrim, ok, cancel, x, prev, next, today;
+  if (WD_PICK.wired) return;
+  WD_PICK.wired = true;
+  scrim = document.getElementById("workdate-scrim");
+  ok = document.getElementById("workdate-ok");
+  cancel = document.getElementById("workdate-cancel");
+  x = document.getElementById("workdate-x");
+  prev = document.getElementById("workdate-prev");
+  next = document.getElementById("workdate-next");
+  today = document.getElementById("workdate-today");
+  if (ok) ok.onclick = function (e) { e.preventDefault(); confirmWorkDatePicker(); };
+  if (cancel) cancel.onclick = function (e) { e.preventDefault(); closeWorkDatePicker(); };
+  if (x) x.onclick = function (e) { e.preventDefault(); closeWorkDatePicker(); };
+  if (prev) prev.onclick = function (e) { e.preventDefault(); workDateShiftMonth(-1); };
+  if (next) next.onclick = function (e) { e.preventDefault(); workDateShiftMonth(1); };
+  if (today) today.onclick = function (e) { e.preventDefault(); workDatePickToday(); };
   if (scrim) {
     scrim.onclick = function (e) {
       if (e.target === scrim) closeWorkDatePicker();
     };
   }
-  if (inp) {
-    inp.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") { e.preventDefault(); confirmWorkDatePicker(); }
-      if (e.key === "Escape") { e.preventDefault(); closeWorkDatePicker(); }
-    });
-    // Double-click / change then Enter on some browsers
-    inp.addEventListener("change", function () {
-      // keep selection; user still hits Aplicar (or Enter)
-    });
-  }
   document.addEventListener("keydown", function (e) {
-    if (e.key !== "Escape") return;
     var s = document.getElementById("workdate-scrim");
-    if (s && s.classList.contains("is-open")) closeWorkDatePicker();
+    if (!s || !s.classList.contains("is-open")) return;
+    if (e.key === "Escape") { e.preventDefault(); closeWorkDatePicker(); }
+    if (e.key === "Enter") { e.preventDefault(); confirmWorkDatePicker(); }
   });
 }
+// Expose for inline onclick on status bar
+window.openWorkDatePicker = openWorkDatePicker;
+window.closeWorkDatePicker = closeWorkDatePicker;
 
 function initStatusBar() {
   var ver = APP_VER;
