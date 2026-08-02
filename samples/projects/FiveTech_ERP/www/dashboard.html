@@ -1114,7 +1114,9 @@
     </div>
     <nav class="nav" id="nav"><!-- filled from meta modules.json --></nav>
     <div class="side-foot">
-      <button type="button" class="btn-menu-edit admin-only" id="btn-menu-edit" title="Edit app branding and menu (admin)">
+      <button type="button" class="btn-menu-edit admin-only" id="btn-menu-edit"
+        title="Edit app branding and menu (admin)"
+        onclick="openMenuDesigner()">
         &#9998; Edit app
       </button>
       <button class="btn-logout" onclick="salirSistema()" title="Salir del sistema">
@@ -4370,11 +4372,19 @@ function openMenuDesigner() {
   if (!requireAdmin("App designer")) return;
   var scrim = document.getElementById("menu-designer-scrim");
   var box = document.getElementById("menu-designer");
-  if (scrim) scrim.classList.add("is-open");
-  if (box) box.classList.add("is-open");
-  document.getElementById("menu-des-title").textContent = "Edit app";
-  document.getElementById("menu-des-hint").textContent = "Loading app + modules...";
-  fillAppBrandFields(APP_META || {});
+  if (!scrim || !box) {
+    toast("Edit app UI missing in this build");
+    return;
+  }
+  scrim.classList.add("is-open");
+  box.classList.add("is-open");
+  try {
+    document.getElementById("menu-des-title").textContent = "Edit app";
+    document.getElementById("menu-des-hint").textContent = "Loading app + modules...";
+    fillAppBrandFields(APP_META || {});
+  } catch (e0) {
+    document.getElementById("menu-des-hint").textContent = "UI init: " + e0;
+  }
   MENU_DES.screens = [];
   fetch("/api/meta", { credentials: "same-origin", cache: "no-store" })
     .then(function (r) { return r.json(); })
@@ -4394,7 +4404,7 @@ function openMenuDesigner() {
     })
     .then(function (pair) {
       var jApp = pair[0], j = pair[1], jVert = pair[2];
-      var verts = ["clinic"];
+      var verts = ["clinic", "demo", "services", "retail"];
       if (jVert && jVert.ok && Array.isArray(jVert.items) && jVert.items.length)
         verts = jVert.items;
       if (jApp && jApp.ok && jApp.doc) {
@@ -4433,7 +4443,9 @@ function openMenuDesigner() {
         ", and sidebar menu.";
     })
     .catch(function (e) {
-      document.getElementById("menu-des-hint").textContent = String(e);
+      var h = document.getElementById("menu-des-hint");
+      if (h) h.textContent = String(e);
+      toast("Edit app: " + e);
     });
 }
 
