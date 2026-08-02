@@ -229,25 +229,33 @@
     background: #7f1d1d; color: #fecaca; border-color: #991b1b;
   }
   #status-bar #sb-db-item .sb-txt { max-width: 160px; }
-  /* Work date picker modal (status bar) */
+  /* Work date picker modal (status bar) — draggable by title bar */
   #workdate-scrim {
     display: none; position: fixed; inset: 0; z-index: 3200;
-    background: var(--scrim); align-items: center; justify-content: center;
+    background: var(--scrim);
   }
-  #workdate-scrim.is-open { display: flex; }
+  #workdate-scrim.is-open { display: block; }
   #workdate-box {
+    position: fixed; z-index: 3210;
     width: min(380px, calc(100vw - 28px));
     background: var(--painel-bg); color: var(--text);
     border: 1px solid var(--line); border-radius: 12px;
     box-shadow: 0 20px 50px rgba(0,0,0,.4); overflow: hidden;
+    left: 50%; top: 50%; transform: translate(-50%, -50%);
+  }
+  #workdate-box.dragging {
+    box-shadow: 0 24px 56px rgba(0,0,0,.5);
+    opacity: 0.98;
+    user-select: none;
   }
   #workdate-box .wd-head {
     display: flex; align-items: center; gap: 8px;
     padding: 0 10px 0 16px; height: 42px;
     background: linear-gradient(90deg, var(--blue), var(--blue-deep));
     color: #fff; font-weight: 600; font-size: .92rem;
+    cursor: move; user-select: none;
   }
-  #workdate-box .wd-head .tit { flex: 1; }
+  #workdate-box .wd-head .tit { flex: 1; cursor: move; }
   #workdate-box .wd-head button {
     width: 34px; height: 28px; border: 0; border-radius: 6px;
     background: transparent; color: #fff; cursor: pointer; font-size: 15px;
@@ -1629,7 +1637,7 @@
 <!-- Work date calendar (status bar) — custom grid (works in WebView2) -->
 <div id="workdate-scrim" role="presentation">
   <div id="workdate-box" role="dialog" aria-modal="true" aria-labelledby="workdate-title">
-    <div class="wd-head">
+    <div class="wd-head" title="Arrastre para mover">
       <span class="tit" id="workdate-title">Fecha de trabajo</span>
       <button type="button" id="workdate-x" title="Cerrar" aria-label="Cerrar">&#10005;</button>
     </div>
@@ -2787,7 +2795,7 @@ function applyWorkDate(displayDate, isoDate) {
   } catch (e2) {}
 }
 /* Custom month calendar (reliable in Edge WebView2; no native date popup needed) */
-var WD_PICK = { viewY: 0, viewM: 0, selIso: "", wired: false };
+var WD_PICK = { viewY: 0, viewM: 0, selIso: "", wired: false, drag: false, dx: 0, dy: 0 };
 var WD_MONTHS_ES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
@@ -2876,16 +2884,37 @@ function paintWorkDateCalendar() {
 }
 function closeWorkDatePicker() {
   var scrim = document.getElementById("workdate-scrim");
+  var box = document.getElementById("workdate-box");
   if (scrim) scrim.classList.remove("is-open");
+  if (box) box.classList.remove("dragging");
+  WD_PICK.drag = false;
+}
+function centerWorkDateBox() {
+  var box = document.getElementById("workdate-box");
+  if (!box) return;
+  // Force layout so offsetWidth/Height are valid while visible
+  var w = box.offsetWidth || 360;
+  var h = box.offsetHeight || 420;
+  var left = Math.max(8, Math.round((window.innerWidth - w) / 2));
+  var top = Math.max(8, Math.round((window.innerHeight - h) / 2));
+  box.style.left = left + "px";
+  box.style.top = top + "px";
+  box.style.transform = "none";
 }
 function openWorkDatePicker() {
   var scrim = document.getElementById("workdate-scrim");
+  var box = document.getElementById("workdate-box");
   var p;
-  if (!scrim) {
+  if (!scrim || !box) {
     try { toast("Calendario no disponible en esta página"); } catch (e0) {}
     return;
   }
   try { wireWorkDatePicker(); } catch (e1) {}
+  // Keep box under body so fixed coords are viewport-relative
+  try {
+    if (scrim.parentNode !== document.body) document.body.appendChild(scrim);
+    if (box.parentNode !== document.body) document.body.appendChild(box);
+  } catch (eMove) {}
   WD_PICK.selIso = workDateToIso(WORK_DATE);
   p = isoToParts(WD_PICK.selIso);
   if (!p) {
@@ -2897,6 +2926,9 @@ function openWorkDatePicker() {
   WD_PICK.viewM = p.m;
   paintWorkDateCalendar();
   scrim.classList.add("is-open");
+  box.style.display = "block";
+  // Center after paint (size known)
+  setTimeout(function () { centerWorkDateBox(); }, 0);
   try { setStatusMsg("Elija fecha de trabajo…"); } catch (e2) {}
 }
 function confirmWorkDatePicker() {
@@ -2925,9 +2957,61 @@ function workDatePickToday() {
   WD_PICK.viewM = n.getMonth() + 1;
   paintWorkDateCalendar();
 }
+function wireWorkDateDrag() {
+  var box = document.getElementById("workdate-box");
+  var bar = box ? box.querySelector(".wd-head") : null;
+  if (!box || !bar || bar._dragWired) return;
+  bar._dragWired = true;
+
+  function onMove(e) {
+    var x, y, maxX, maxY;
+    if (!WD_PICK.drag) return;
+    x = e.clientX - WD_PICK.dx;
+    y = e.clientY - WD_PICK.dy;
+    maxX = Math.max(0, window.innerWidth - box.offsetWidth);
+    maxY = Math.max(0, window.innerHeight - 40);
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    if (x > maxX) x = maxX;
+    if (y > maxY) y = maxY;
+    box.style.left = x + "px";
+    box.style.top = y + "px";
+    box.style.transform = "none";
+  }
+  function onUp() {
+    if (!WD_PICK.drag) return;
+    WD_PICK.drag = false;
+    box.classList.remove("dragging");
+    document.removeEventListener("mousemove", onMove);
+    document.removeEventListener("mouseup", onUp);
+  }
+
+  bar.addEventListener("mousedown", function (e) {
+    var rect;
+    if (e.button !== 0) return;
+    // Do not start drag from the close button
+    if (e.target.closest && e.target.closest("button")) return;
+    if (e.target.tagName === "BUTTON") return;
+    rect = box.getBoundingClientRect();
+    WD_PICK.drag = true;
+    WD_PICK.dx = e.clientX - rect.left;
+    WD_PICK.dy = e.clientY - rect.top;
+    box.style.left = rect.left + "px";
+    box.style.top = rect.top + "px";
+    box.style.transform = "none";
+    box.classList.add("dragging");
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    e.preventDefault();
+  });
+}
+
 function wireWorkDatePicker() {
   var scrim, ok, cancel, x, prev, next, today;
-  if (WD_PICK.wired) return;
+  if (WD_PICK.wired) {
+    try { wireWorkDateDrag(); } catch (e0) {}
+    return;
+  }
   WD_PICK.wired = true;
   scrim = document.getElementById("workdate-scrim");
   ok = document.getElementById("workdate-ok");
@@ -2944,6 +3028,8 @@ function wireWorkDatePicker() {
   if (today) today.onclick = function (e) { e.preventDefault(); workDatePickToday(); };
   if (scrim) {
     scrim.onclick = function (e) {
+      // Do not close while dragging the window
+      if (WD_PICK.drag) return;
       if (e.target === scrim) closeWorkDatePicker();
     };
   }
@@ -2953,6 +3039,7 @@ function wireWorkDatePicker() {
     if (e.key === "Escape") { e.preventDefault(); closeWorkDatePicker(); }
     if (e.key === "Enter") { e.preventDefault(); confirmWorkDatePicker(); }
   });
+  try { wireWorkDateDrag(); } catch (e1) {}
 }
 // Expose for inline onclick on status bar
 window.openWorkDatePicker = openWorkDatePicker;
