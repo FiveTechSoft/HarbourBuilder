@@ -197,6 +197,38 @@
   #status-bar .sb-spacer { flex: 1 1 auto; min-width: 8px; border: 0; margin: 0; padding: 0; }
   #status-bar .sb-msg { max-width: 280px; color: var(--muted); font-style: italic; }
   #status-bar .sb-warn .sb-txt { color: #d97706; }
+  /* DB type badge next to status-bar database icon */
+  #status-bar .sb-db-type {
+    display: inline-flex; align-items: center; height: 16px; padding: 0 6px;
+    border-radius: 999px; font-size: 9px; font-weight: 800; letter-spacing: .04em;
+    text-transform: uppercase; line-height: 1; flex-shrink: 0;
+    border: 1px solid var(--line); background: var(--surface-2); color: var(--text-2);
+  }
+  #status-bar .sb-db-type.db-json {
+    background: #e0e7ff; color: #3730a3; border-color: #c7d2fe;
+  }
+  #status-bar .sb-db-type.db-dbf {
+    background: #dcfce7; color: #166534; border-color: #bbf7d0;
+  }
+  #status-bar .sb-db-type.db-ads {
+    background: #ffedd5; color: #9a3412; border-color: #fed7aa;
+  }
+  #status-bar .sb-db-type.db-err {
+    background: #fee2e2; color: #991b1b; border-color: #fecaca;
+  }
+  html.dark #status-bar .sb-db-type.db-json {
+    background: #312e81; color: #c7d2fe; border-color: #4338ca;
+  }
+  html.dark #status-bar .sb-db-type.db-dbf {
+    background: #14532d; color: #86efac; border-color: #166534;
+  }
+  html.dark #status-bar .sb-db-type.db-ads {
+    background: #7c2d12; color: #fdba74; border-color: #9a3412;
+  }
+  html.dark #status-bar .sb-db-type.db-err {
+    background: #7f1d1d; color: #fecaca; border-color: #991b1b;
+  }
+  #status-bar #sb-db-item .sb-txt { max-width: 160px; }
   /* Work date picker modal (status bar) */
   #workdate-scrim {
     display: none; position: fixed; inset: 0; z-index: 3200;
@@ -1557,11 +1589,12 @@
     </svg>
     <span class="sb-txt" id="sb-company">—</span>
   </div>
-  <div class="sb-item" id="sb-db-item" title="Base de datos">
+  <div class="sb-item" id="sb-db-item" title="Base de datos en uso">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
       <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
       <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
     </svg>
+    <span class="sb-db-type" id="sb-db-type" title="Tipo de base de datos">—</span>
     <span class="sb-txt" id="sb-db">—</span>
   </div>
   <div class="sb-item sb-clic" id="sb-date-item" title="Fecha de trabajo — clic para abrir calendario"
@@ -2580,21 +2613,95 @@ function refreshStatusClock() {
   var n = new Date(), h = n.getHours(), m = n.getMinutes(), s = n.getSeconds();
   el.textContent = (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
 }
+/** Short label + CSS class for DB driver used in the status bar. */
+function dbTypeBadge(driver, backend) {
+  var d = String(driver || "json").toLowerCase();
+  var b = String(backend || "").toLowerCase();
+  if (d === "openads" || d === "ads")
+    return { label: "OpenADS", cls: "db-ads", full: "OpenADS" + (b ? (" / " + b) : "") };
+  if (d === "dbfcdx" || d === "dbf" || d === "cdx")
+    return { label: "DbfCdx", cls: "db-dbf", full: "DbfCdx (local .dbf/.cdx)" };
+  if (d === "sqlite")
+    return { label: "SQLite", cls: "db-json", full: "SQLite" };
+  return { label: "JSON", cls: "db-json", full: "JSON files (meta/data)" };
+}
+function setStatusDbUi(typeLabel, typeCls, detail, title) {
+  var badge = document.getElementById("sb-db-type");
+  var item = document.getElementById("sb-db-item");
+  if (badge) {
+    badge.textContent = typeLabel || "—";
+    badge.className = "sb-db-type" + (typeCls ? (" " + typeCls) : "");
+    badge.title = title || typeLabel || "Tipo de base de datos";
+  }
+  sbSetText("sb-db", detail || "—");
+  if (item) item.title = title || ((typeLabel || "DB") + (detail ? (" — " + detail) : ""));
+}
+function dbStatusFromAppMeta() {
+  var db = {}, driver = "json", backend = "";
+  try {
+    if (APP_META && APP_META.database && typeof APP_META.database === "object")
+      db = APP_META.database;
+  } catch (e) {}
+  driver = String(db.driver || "json").toLowerCase();
+  backend = String(db.backend || "").toLowerCase();
+  return {
+    ok: true,
+    driver: driver,
+    backend: backend,
+    host: db.host || "",
+    port: db.port,
+    dataPath: db.dataPath || "",
+    dbfDir: "",
+    lastError: "",
+    _fromMeta: true
+  };
+}
+function applyDbStatus(j) {
+  var badge, host, detail, title, driver, backend;
+  if (!j || !j.ok) {
+    setStatusDbUi("?", "db-err", "sin datos", "No se pudo leer el estado de la base de datos");
+    return;
+  }
+  driver = String(j.driver || "json").toLowerCase();
+  backend = String(j.backend || "").toLowerCase();
+  badge = dbTypeBadge(driver, backend);
+  host = j.host ? (String(j.host) + (j.port ? (":" + j.port) : "")) : "";
+  detail = "";
+  if (driver === "openads" || driver === "ads") {
+    if (backend && backend !== "dbfcdx") detail = backend;
+    if (host) detail = (detail ? detail + " · " : "") + host;
+    else if (j.dataPath) detail = (detail ? detail + " · " : "") + String(j.dataPath);
+    if (!detail) detail = "remoto";
+  } else if (driver === "dbfcdx" || driver === "dbf" || driver === "cdx") {
+    detail = j.dbfDir || j.dataPath || "local data\\";
+  } else if (driver === "sqlite") {
+    detail = j.dataPath || "sqlite";
+  } else {
+    detail = "meta/data";
+  }
+  if (j.lastError) detail = (detail ? detail + " " : "") + "!";
+  if (j._fromMeta || j.fromApp) detail = (detail ? detail + " " : "") + "(app)";
+  title = badge.full;
+  if (host) title += " @ " + host;
+  else if (j.dbfDir) title += " — " + j.dbfDir;
+  else if (j.dataPath) title += " — " + j.dataPath;
+  if (j.openadsAvailable != null && (driver === "openads" || driver === "ads"))
+    title += j.openadsAvailable ? " · ACE OK" : " · ACE no cargado";
+  if (j.lastError) title += " · Error: " + j.lastError;
+  if (j._fromMeta || j.fromApp) title += " (desde app.json)";
+  setStatusDbUi(badge.label, j.lastError ? "db-err" : badge.cls, detail, title);
+}
 function refreshStatusDb() {
   fetch("/api/db/status", { credentials: "same-origin", cache: "no-store" })
     .then(function (r) { return r.json(); })
     .then(function (j) {
-      var txt, host;
-      if (!j || !j.ok) { sbSetText("sb-db", "DB ?"); return; }
-      host = j.host ? (String(j.host) + (j.port ? (":" + j.port) : "")) : "";
-      if (j.driver === "dbfcdx" || j.backend === "dbfcdx")
-        txt = "DBF " + (j.dbfDir || j.dataPath || "local");
-      else if (host) txt = String(j.backend || j.driver || "db") + " @ " + host;
-      else txt = String(j.backend || j.driver || "json");
-      if (j.lastError) txt += " !";
-      sbSetText("sb-db", txt);
+      if (j && j.ok) applyDbStatus(j);
+      else applyDbStatus(dbStatusFromAppMeta());
     })
-    .catch(function () { sbSetText("sb-db", "DB offline"); });
+    .catch(function () {
+      // Fallback: show driver from loaded app meta so the badge is never empty
+      applyDbStatus(dbStatusFromAppMeta());
+    });
 }
 function refreshStatusCompany() {
   var c = "";

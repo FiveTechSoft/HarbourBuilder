@@ -330,7 +330,7 @@ return ErpHttpOk( cOut, "application/json; charset=utf-8" )
 // meta/data/<x>.json and invalidates the meta cache.
 static function ErpApiDatasetPost( cBody, hSess )
 
-   local hReq := { => }, cKey, cAction, cKeyField, cKeyValue, hRow
+   local hReq := { => }, cKey, cAction, cKeyField, cKeyValue, hRow, cOut
    local cRaw, hDoc := { => }, aRows, n, lFound := .F.
    local cFull, cJson, lOk
 
@@ -376,8 +376,11 @@ static function ErpApiDatasetPost( cBody, hSess )
             "msg" => "keyField required" } ), "application/json; charset=utf-8" )
       endif
       if ! ErpDbApply( cKey, cAction, cBody )
-         return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
-            "msg" => "DB apply failed: " + cAction + " " + cKey } ), ;
+         cOut := "DB apply failed: " + cAction + " " + cKey
+         if ! Empty( ErpDbLastError() )
+            cOut += " — " + ErpDbLastError()
+         endif
+         return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => cOut } ), ;
             "application/json; charset=utf-8" )
       endif
       return ErpHttpOk( hb_jsonEncode( { "ok" => .T., "key" => cKey, ;
@@ -655,7 +658,15 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
          return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Not authenticated" } ), ;
             "application/json; charset=utf-8" )
       endif
-      return ErpHttpOk( hb_jsonEncode( ErpDbStatus() ), ;
+      // Prefer live data-layer status; fall back to app.database so the UI
+      // always knows which driver is configured.
+      BEGIN SEQUENCE
+         return ErpHttpOk( hb_jsonEncode( ErpDbStatus() ), ;
+            "application/json; charset=utf-8" )
+      RECOVER
+         // erp_db not linked or driver error — still report app.json driver
+      END SEQUENCE
+      return ErpHttpOk( hb_jsonEncode( ErpDbStatusFromApp() ), ;
          "application/json; charset=utf-8" )
    endif
 
@@ -928,6 +939,39 @@ static function ErpAppVersion()
       cVer := "1.0.0"
    endif
 return cVer
+
+//--------------------------------------------------------------------
+// Minimal DB status from app.database when ErpDbStatus() is unavailable
+static function ErpDbStatusFromApp()
+
+   local hApp := ErpMetaGet( "app" )
+   local hDb := { => }
+   local cDriver := "json", cBackend := "", cHost := "", cPath := ""
+   local nPort := 0
+
+   if ValType( hApp ) == "H" .and. hb_HHasKey( hApp, "database" ) .and. ;
+         ValType( hApp[ "database" ] ) == "H"
+      hDb := hApp[ "database" ]
+      cDriver := Lower( AllTrim( ErpToStr( hb_HGetDef( hDb, "driver", "json" ) ) ) )
+      cBackend := Lower( AllTrim( ErpToStr( hb_HGetDef( hDb, "backend", "" ) ) ) )
+      cHost := AllTrim( ErpToStr( hb_HGetDef( hDb, "host", "" ) ) )
+      nPort := Val( ErpToStr( hb_HGetDef( hDb, "port", "0" ) ) )
+      cPath := AllTrim( ErpToStr( hb_HGetDef( hDb, "dataPath", "" ) ) )
+   endif
+   if Empty( cDriver )
+      cDriver := "json"
+   endif
+return { "ok" => .T., ;
+   "driver"   => cDriver, ;
+   "backend"  => cBackend, ;
+   "host"     => cHost, ;
+   "port"     => nPort, ;
+   "dataPath" => cPath, ;
+   "dbfDir"   => "", ;
+   "tables"   => {}, ;
+   "openadsAvailable" => .F., ;
+   "lastError" => "", ;
+   "fromApp"  => .T. }
 
 //--------------------------------------------------------------------
 // FWH dashboard.html + same placeholders as DesktopWeb DashboardHtml()
