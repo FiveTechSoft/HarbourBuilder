@@ -63,3 +63,7 @@ Write-Host "Wrote $out ($($sb.Length) chars)"
 
 Copy-Item (Join-Path $ProjDir "erp_meta.prg") (Join-Path $BuildDir "erp_meta.prg") -Force
 Copy-Item (Join-Path $ProjDir "erp_http.prg") (Join-Path $BuildDir "erp_http.prg") -Force
+Copy-Item (Join-Path $ProjDir "erp_proc.prg") (Join-Path $BuildDir "erp_proc.prg") -Force
+if (Test-Path (Join-Path $ProjDir "erp_db.prg")) {
+  Copy-Item (Join-Path $ProjDir "erp_db.prg") (Join-Path $BuildDir "erp_db.prg") -Force
+}

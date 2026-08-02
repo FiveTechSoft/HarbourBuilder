@@ -163,9 +163,21 @@ Seleccionables con `app.vertical` o **Edit app → Vertical pack** (se aplican a
 
 - Branding (logo, nombre, subtítulo, título de ventana)
 - Puerto HTTP (hace falta reiniciar para el bind)
-- **Vertical pack** activar / desactivar
+- **Database** driver / conexión OpenADS
 - **Locale y números** (ver abajo)
-- **Editor completo del menú lateral** (secciones, ítems, iconos, pantallas, sub/activo)
+- **Catálogo Screens**: listar / nueva / editar (→ form designer) / abrir / borrar `screen.*`
+- **Catálogo Processes**: listar / nueva / ejecutar / borrar `process.*` (enlaza handlers Harbour compilados)
+- **Editor completo del menú lateral** (secciones, ítems, iconos, pantallas **o procesos**, sub/activo)
+
+Borrar screen/process: `POST /api/meta` con `{ "key":"screen.x"|"process.x", "action":"delete" }` (admin; no `app` / `modules` / `screen.login`).
+
+### Procesos (Harbour en servidor)
+
+- Meta en `meta/processes/*.json` → clave `process.*`
+- Cada proceso nombra un **handler de lista blanca** en `erp_proc.prg` (nunca código en el browser)
+- Ejecutar: `POST /api/process` `{ "key":"process.hello", "params":{}, "row":{...} }`
+- Desde **menú**, **toolbar** o Edit app → Processes → Run
+- Handlers demo: `Hello`, `EchoContext`, `PingStatus`
 
 ---
 

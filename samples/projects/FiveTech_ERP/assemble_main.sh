@@ -37,7 +37,9 @@ fi
 
 cp -f "$PROJDIR/erp_meta.prg" "$BUILDDIR/erp_meta.prg"
 cp -f "$PROJDIR/erp_http.prg" "$BUILDDIR/erp_http.prg"
+cp -f "$PROJDIR/erp_proc.prg" "$BUILDDIR/erp_proc.prg"
+[ -f "$PROJDIR/erp_db.prg" ] && cp -f "$PROJDIR/erp_db.prg" "$BUILDDIR/erp_db.prg" || true
 cp -f "$HBROOT/source/core/classes.prg" "$BUILDDIR/classes.prg" 2>/dev/null || \
   cp -f "$(cd "$PROJDIR/../../.." && pwd)/source/core/classes.prg" "$BUILDDIR/classes.prg"
 
-echo "Assembled $BUILDDIR/main.prg ($GT_REQ) + erp_meta.prg erp_http.prg classes.prg"
+echo "Assembled $BUILDDIR/main.prg ($GT_REQ) + erp_meta/http/proc classes.prg"

@@ -1,0 +1,9 @@
+{
+  "id": "process.echo_context",
+  "kind": "process",
+  "title": "Echo context",
+  "handler": "EchoContext",
+  "confirm": "Echo current screen and selected row context?",
+  "description": "Debug process: returns user, work date, screenKey, dataRef and row field names.",
+  "onSuccess": { "toast": true }
+}

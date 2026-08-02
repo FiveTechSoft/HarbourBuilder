@@ -1,0 +1,8 @@
+{
+  "id": "process.ping",
+  "kind": "process",
+  "title": "Ping process engine",
+  "handler": "PingStatus",
+  "description": "Health check of the process engine (handler count + timestamp).",
+  "onSuccess": { "toast": true }
+}

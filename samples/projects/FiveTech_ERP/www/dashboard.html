@@ -1172,7 +1172,7 @@
     color: var(--text-2); cursor: pointer; font-weight: 500; text-transform: none; letter-spacing: 0;
   }
   .designer-toolbar-opts input { accent-color: var(--blue); }
-  /* Runtime form designer */
+  /* Runtime form designer (above Edit app when both open) */
   .designer-scrim {
     display: none; position: fixed; inset: 0; z-index: 3000;
     background: var(--scrim);
@@ -1189,6 +1189,11 @@
     flex-direction: column; overflow: hidden;
   }
   .designer.is-open { display: flex; }
+  /* Form designer stacks above Edit app (menu-designer uses same classes) */
+  #designer-scrim { z-index: 3110; }
+  #designer { z-index: 3120; }
+  #menu-designer-scrim { z-index: 3000; }
+  #menu-designer { z-index: 3010; }
   .designer-bar {
     flex: 0 0 42px; display: flex; align-items: center; gap: 8px;
     padding: 0 10px 0 16px;
@@ -1347,6 +1352,51 @@
   .menu-des-panel .menu-des-intro {
     font-size: .82rem; color: var(--muted); margin: 0 0 12px; line-height: 1.45;
   }
+  /* Edit app → Screens catalog */
+  .scr-cat-toolbar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px;
+  }
+  .scr-cat-toolbar input[type="search"] {
+    height: 32px; min-width: 160px; flex: 1; max-width: 260px;
+    border: 1px solid var(--line); border-radius: 8px; padding: 0 10px;
+    background: var(--input-bg); color: var(--text); font-size: .82rem;
+  }
+  .scr-cat-newbox {
+    display: none; margin-bottom: 12px; border: 1px solid var(--line);
+    border-radius: 10px; background: var(--surface-2); padding: 12px;
+  }
+  .scr-cat-newbox.is-open { display: block; }
+  .scr-cat-newbox .designer-grid { margin-bottom: 10px; }
+  .scr-cat-newbox .acts { display: flex; gap: 8px; justify-content: flex-end; }
+  .scr-cat-table-wrap {
+    overflow: auto; max-height: min(48vh, 480px);
+    border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2);
+  }
+  .scr-cat-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+  .scr-cat-table th {
+    text-align: left; padding: 8px 8px; font-size: .68rem; text-transform: uppercase;
+    color: var(--muted); border-bottom: 1px solid var(--line); background: var(--th-bg);
+    position: sticky; top: 0; z-index: 1;
+  }
+  .scr-cat-table td {
+    padding: 6px 8px; border-bottom: 1px solid var(--td-line); vertical-align: middle;
+  }
+  .scr-cat-table tr:hover td { background: var(--nav-hover); }
+  .scr-cat-table code { font-size: .75rem; color: var(--text-2); }
+  .scr-cat-table .act { white-space: nowrap; width: 1%; }
+  .scr-cat-table .act button {
+    height: 26px; min-width: 28px; padding: 0 7px; margin-right: 3px;
+    border: 1px solid var(--line); border-radius: 6px; background: var(--surface);
+    color: var(--text); cursor: pointer; font-size: .72rem;
+  }
+  .scr-cat-table .act button:hover { border-color: var(--blue); color: var(--blue); }
+  .scr-cat-table .act button.danger:hover { border-color: var(--danger); color: var(--danger); }
+  .scr-cat-badge {
+    display: inline-block; min-width: 1.4em; padding: 1px 6px; border-radius: 999px;
+    font-size: .7rem; font-weight: 700; text-align: center;
+    background: var(--blue-soft); color: var(--blue);
+  }
+  .scr-cat-badge.off { background: var(--surface); color: var(--muted); border: 1px solid var(--line); }
 </style>
 </head>
 <body class="__BODY_ADMIN_CLASS__">
@@ -2009,6 +2059,10 @@
         aria-selected="false" aria-controls="menu-panel-db">Database</button>
       <button type="button" role="tab" id="menu-tab-locale" data-tab="locale"
         aria-selected="false" aria-controls="menu-panel-locale">Locale</button>
+      <button type="button" role="tab" id="menu-tab-screens" data-tab="screens"
+        aria-selected="false" aria-controls="menu-panel-screens">Screens</button>
+      <button type="button" role="tab" id="menu-tab-processes" data-tab="processes"
+        aria-selected="false" aria-controls="menu-panel-processes">Processes</button>
       <button type="button" role="tab" id="menu-tab-menu" data-tab="menu"
         aria-selected="false" aria-controls="menu-panel-menu">Menu</button>
     </div>
@@ -2211,12 +2265,141 @@
         </div>
       </div>
 
+      <!-- Screens catalog -->
+      <div class="menu-des-panel" id="menu-panel-screens" role="tabpanel" data-panel="screens"
+        aria-labelledby="menu-tab-screens" hidden>
+        <p class="menu-des-intro">
+          Meta screens (<code>screen.*</code>). Create or delete definitions here;
+          use <b>Edit</b> for the full form designer (layout, columns, tabs).
+          Link them to the sidebar in the <b>Menu</b> tab.
+        </p>
+        <div class="scr-cat-toolbar">
+          <button type="button" class="btn-blue" id="scr-cat-new" style="height:32px">+ New screen</button>
+          <button type="button" class="btn-ghost" id="scr-cat-refresh" style="height:32px">Refresh</button>
+          <input type="search" id="scr-cat-q" placeholder="Filter key or title…" autocomplete="off">
+          <span class="hint" id="scr-cat-count">—</span>
+        </div>
+        <div class="scr-cat-newbox" id="scr-cat-newbox">
+          <div class="designer-grid">
+            <div class="designer-field">
+              <label for="scr-new-id">Key (screen.xxx)</label>
+              <input type="text" id="scr-new-id" placeholder="my_list" autocomplete="off">
+            </div>
+            <div class="designer-field">
+              <label for="scr-new-title">Title</label>
+              <input type="text" id="scr-new-title" placeholder="My list" autocomplete="off">
+            </div>
+            <div class="designer-field">
+              <label for="scr-new-layout">Layout</label>
+              <select id="scr-new-layout">
+                <option value="list">list</option>
+                <option value="master-detail">master-detail</option>
+                <option value="document">document</option>
+                <option value="form">form</option>
+                <option value="wizard">wizard</option>
+                <option value="folder">folder</option>
+                <option value="menu">menu</option>
+                <option value="calendar">calendar</option>
+                <option value="dashboard">dashboard</option>
+                <option value="workflow">workflow</option>
+                <option value="settings">settings</option>
+                <option value="report-list">report-list</option>
+              </select>
+            </div>
+            <div class="designer-field">
+              <label for="scr-new-dataref">dataRef (optional)</label>
+              <input type="text" id="scr-new-dataref" placeholder="data.parties" autocomplete="off">
+            </div>
+          </div>
+          <p style="margin:0 0 10px;font-size:.72rem;color:var(--muted)">
+            Key letters, digits and <code>_</code> only. Prefix <code>screen.</code> is added if missing.
+          </p>
+          <div class="acts">
+            <button type="button" class="btn-ghost" id="scr-new-cancel" style="height:32px">Cancel</button>
+            <button type="button" class="btn-blue" id="scr-new-create" style="height:32px">Create</button>
+          </div>
+        </div>
+        <div class="scr-cat-table-wrap">
+          <table class="scr-cat-table">
+            <thead>
+              <tr>
+                <th>Key</th>
+                <th>Title</th>
+                <th>Layout</th>
+                <th>dataRef</th>
+                <th title="References in current menu designer">Menu</th>
+                <th class="act">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="scr-cat-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Processes catalog -->
+      <div class="menu-des-panel" id="menu-panel-processes" role="tabpanel" data-panel="processes"
+        aria-labelledby="menu-tab-processes" hidden>
+        <p class="menu-des-intro">
+          Server processes (<code>process.*</code>). Meta names a compiled Harbour
+          <b>handler</b> (whitelist). Call from menu, toolbar buttons, or
+          <code>POST /api/process</code>. No code runs in the browser.
+        </p>
+        <div class="scr-cat-toolbar">
+          <button type="button" class="btn-blue" id="proc-cat-new" style="height:32px">+ New process</button>
+          <button type="button" class="btn-ghost" id="proc-cat-refresh" style="height:32px">Refresh</button>
+          <input type="search" id="proc-cat-q" placeholder="Filter key or title…" autocomplete="off">
+          <span class="hint" id="proc-cat-count">—</span>
+        </div>
+        <div class="scr-cat-newbox" id="proc-cat-newbox">
+          <div class="designer-grid">
+            <div class="designer-field">
+              <label for="proc-new-id">Key (process.xxx)</label>
+              <input type="text" id="proc-new-id" placeholder="my_job" autocomplete="off">
+            </div>
+            <div class="designer-field">
+              <label for="proc-new-title">Title</label>
+              <input type="text" id="proc-new-title" placeholder="My job" autocomplete="off">
+            </div>
+            <div class="designer-field">
+              <label for="proc-new-handler">Handler (Harbour)</label>
+              <select id="proc-new-handler"></select>
+            </div>
+            <div class="designer-field">
+              <label for="proc-new-confirm">Confirm message (optional)</label>
+              <input type="text" id="proc-new-confirm" placeholder="Run this process?" autocomplete="off">
+            </div>
+          </div>
+          <p style="margin:0 0 10px;font-size:.72rem;color:var(--muted)">
+            Handlers are registered in <code>erp_proc.prg</code> and recompiled with the app.
+            This UI only binds a meta key to a handler.
+          </p>
+          <div class="acts">
+            <button type="button" class="btn-ghost" id="proc-new-cancel" style="height:32px">Cancel</button>
+            <button type="button" class="btn-blue" id="proc-new-create" style="height:32px">Create</button>
+          </div>
+        </div>
+        <div class="scr-cat-table-wrap">
+          <table class="scr-cat-table">
+            <thead>
+              <tr>
+                <th>Key</th>
+                <th>Title</th>
+                <th>Handler</th>
+                <th>Menu</th>
+                <th class="act">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="proc-cat-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- Sidebar menu -->
       <div class="menu-des-panel" id="menu-panel-menu" role="tabpanel" data-panel="menu"
         aria-labelledby="menu-tab-menu" hidden>
         <p class="menu-des-intro">
-          Sidebar menu sections and items. Screen must be a meta key such as
-          <code>screen.patients</code> or <code>screen.appointments</code>.
+          Sidebar menu sections and items. Target can be a screen
+          (<code>screen.patients</code>) or a process (<code>process.hello</code>).
           With a vertical active, Save writes the menu into that pack folder.
         </p>
         <div id="menu-des-sections"></div>
@@ -2507,7 +2690,7 @@ var ICONS = {
   file: "&#128196;", grid: "&#128202;", calendar: "&#128197;"
 };
 var ICON_KEYS = ["users", "chart", "user", "money", "file", "grid", "calendar"];
-var MENU_DES = { sections: [], screens: [] };
+var MENU_DES = { sections: [], screens: [], processes: [], catalog: [], procCatalog: [], filter: "", procFilter: "", handlers: [] };
 
 function toast(msg) {
   try { dashToast(msg); } catch (e) {
@@ -3432,7 +3615,8 @@ function renderSidebarFromMeta() {
         if (it.active) hasActive = true;
         label = esc(it.label || it.id);
         itemsHtml += "<button type='button' class='" + cls + "' data-id='" + esc(it.id) +
-          "' data-screen='" + esc(it.screen || "") + "'>";
+          "' data-screen='" + esc(it.screen || "") +
+          "' data-process='" + esc(it.process || "") + "'>";
         if (ico && !it.sub) itemsHtml += "<span class='ico'>" + ico + "</span>";
         itemsHtml += "<span class='lbl'>" + (ico && !it.sub ? " " : "") + label + "</span></button>";
       }
@@ -4036,14 +4220,32 @@ function recomputeDocumentTotals(save) {
   }
 }
 
-function toolbarHas(id, scope) {
-  var t, i;
+function toolbarEntries(scope) {
+  var t;
   if (scope === "detail" && META_VIEW.detail)
     t = META_VIEW.detail.toolbar || [];
   else
     t = META_VIEW.toolbar || [];
-  for (i = 0; i < t.length; i++) if (String(t[i]) === id) return true;
+  return Array.isArray(t) ? t : [];
+}
+
+function toolbarHas(id, scope) {
+  var t = toolbarEntries(scope === "detail" ? "detail" : "master"), i, e;
+  for (i = 0; i < t.length; i++) {
+    e = t[i];
+    if (typeof e === "string" && e === id) return true;
+    if (e && typeof e === "object" && String(e.id || "") === id) return true;
+  }
   return false;
+}
+
+function toolbarDefById(id) {
+  var i, def;
+  for (i = 0; i < TOOLBAR_DEFS.length; i++) {
+    def = TOOLBAR_DEFS[i];
+    if (def.id === id) return def;
+  }
+  return null;
 }
 
 function renderMetaToolbar(scope) {
@@ -4052,24 +4254,110 @@ function renderMetaToolbar(scope) {
   else if (scope === "detail") hostId = "md-detail-toolbar";
   else if (scope === "list") hostId = "meta-toolbar-single";
   var host = document.getElementById(hostId);
-  var html = "", i, def, id, cls, tbScope = (scope === "detail") ? "detail" : "master";
+  var html = "", i, e, def, id, cls, lab, proc, tbScope = (scope === "detail") ? "detail" : "master";
+  var entries = toolbarEntries(tbScope);
   if (!host) return;
-  for (i = 0; i < TOOLBAR_DEFS.length; i++) {
-    def = TOOLBAR_DEFS[i];
-    id = def.id;
-    if (!toolbarHas(id, tbScope === "detail" ? "detail" : "master")) continue;
+  for (i = 0; i < entries.length; i++) {
+    e = entries[i];
+    if (e && typeof e === "object" && e.process) {
+      id = String(e.id || e.process || ("proc" + i));
+      lab = String(e.label || e.title || e.process);
+      proc = String(e.process);
+      if (scope === "detail" && (id === "print" || id === "pdf" || id === "excel" || id === "close")) continue;
+      html += "<button type='button' class='btn' data-process='" + esc(proc) +
+        "' data-scope='" + tbScope + "' title='" + esc(e.title || lab) + "'>" +
+        "<span class='btn-ico'>&#9881;</span> " + esc(lab) + "</button>";
+      continue;
+    }
+    id = (typeof e === "string") ? e : (e && e.id ? String(e.id) : "");
+    if (!id) continue;
     if (scope === "detail" && (id === "print" || id === "pdf" || id === "excel" || id === "close")) continue;
+    def = toolbarDefById(id) || { id: id, label: id, ico: "" };
     cls = "btn";
     if (def.primary) cls += " primary";
     if (def.danger) cls += " danger";
-    html += "<button type='button' class='" + cls + "' data-meta-act='" + id +
+    html += "<button type='button' class='" + cls + "' data-meta-act='" + esc(id) +
       "' data-scope='" + tbScope + "' title='" + esc(def.label) + "'>" +
-      "<span class='btn-ico'>" + (def.ico || "") + "</span> " + def.label + "</button>";
+      "<span class='btn-ico'>" + (def.ico || "") + "</span> " + esc(def.label) + "</button>";
   }
   if (!html)
     html = "<button type='button' class='btn' data-meta-act='refresh' data-scope='" + tbScope +
       "' title='Refresh'><span class='btn-ico'>&#8635;</span> Refresh</button>";
   host.innerHTML = html;
+}
+
+/** Run a server-side process.* (whitelist Harbour handler via POST /api/process). */
+function runProcess(key, opts) {
+  opts = opts || {};
+  key = String(key || "").trim();
+  if (!key) {
+    toast("Process key required");
+    return Promise.reject(new Error("Process key required"));
+  }
+  if (key.indexOf("process.") !== 0) key = "process." + key.replace(/^process\./, "");
+
+  function doRun(meta) {
+    var confirmMsg = (meta && meta.confirm) ? String(meta.confirm) : (opts.confirm || "");
+    var row = opts.row;
+    if (row === undefined) {
+      if (META_VIEW && META_VIEW.selected >= 0 && META_VIEW.rows)
+        row = META_VIEW.rows[META_VIEW.selected] || null;
+      else row = null;
+    }
+    if (confirmMsg && !window.confirm(confirmMsg)) {
+      return Promise.resolve({ ok: false, cancelled: true, msg: "Cancelled" });
+    }
+    try { setStatusMsg("Running " + key + "…"); } catch (e0) {}
+    return fetch("/api/process", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      cache: "no-store",
+      body: JSON.stringify({
+        key: key,
+        params: opts.params || {},
+        screenKey: opts.screenKey || (META_VIEW && META_VIEW.screenKey) || "",
+        dataRef: opts.dataRef || (META_VIEW && META_VIEW.dataRef) || "",
+        row: row
+      })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j) throw new Error("Empty process response");
+        if (j.cancelled) return j;
+        if (!j.ok) {
+          toast((j.msg || j.error || "Process failed") + "");
+          try { setStatusMsg(String(j.msg || "Process failed"), "warn"); } catch (e1) {}
+          return j;
+        }
+        var msg = j.msg || ("OK: " + key);
+        var os = j.onSuccess || (meta && meta.onSuccess) || {};
+        if (os.toast !== false) toast(msg);
+        try { setStatusMsg(msg, "ok"); } catch (e2) {}
+        if (os.refresh && typeof loadMetaDataset === "function" && META_VIEW && META_VIEW.dataRef) {
+          try { loadMetaDataset(META_VIEW.q || ""); } catch (e3) {}
+        }
+        if (opts.onDone) opts.onDone(j);
+        return j;
+      })
+      .catch(function (e) {
+        toast("Process error: " + (e.message || e));
+        try { setStatusMsg("Process error", "warn"); } catch (e4) {}
+        throw e;
+      });
+  }
+
+  // Optional: load confirm from meta first (cache-friendly single POST if no need)
+  if (opts.skipMetaFetch) return doRun(null);
+  return fetch("/api/process?key=" + encodeURIComponent(key), {
+    credentials: "same-origin", cache: "no-store"
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      var meta = (j && j.ok && j.doc) ? j.doc : null;
+      return doRun(meta);
+    })
+    .catch(function () { return doRun(null); });
 }
 
 function updateMetaSelHint() {
@@ -5360,6 +5648,12 @@ function setMenuDesTab(tabId) {
     if (on) p.removeAttribute("hidden");
     else p.setAttribute("hidden", "");
   }
+  // Refresh usage badges when opening Screens / Processes
+  if (tabId === "screens" || tabId === "processes") {
+    try { syncMenuDesignerFromDom(); } catch (e0) {}
+    try { if (tabId === "screens") renderScreenCatalog(); } catch (e1) {}
+    try { if (tabId === "processes") renderProcessCatalog(); } catch (e2) {}
+  }
 }
 
 function wireMenuDesTabs() {
@@ -5373,7 +5667,7 @@ function wireMenuDesTabs() {
     setMenuDesTab(btn.getAttribute("data-tab") || "brand");
   });
   bar.addEventListener("keydown", function (e) {
-    var order = ["brand", "db", "locale", "menu"];
+    var order = ["brand", "db", "locale", "screens", "processes", "menu"];
     var cur = document.querySelector("#menu-des-tabs button.on");
     var idx = cur ? order.indexOf(cur.getAttribute("data-tab") || "brand") : 0;
     var next = idx;
@@ -5389,6 +5683,544 @@ function wireMenuDesTabs() {
   });
 }
 
+/* ---------- Edit app → Screens catalog (lifecycle) ---------- */
+function screenMenuUsageMap() {
+  var map = {}, si, s, ii, it, k;
+  var secs = MENU_DES.sections || [];
+  for (si = 0; si < secs.length; si++) {
+    s = secs[si] || {};
+    for (ii = 0; ii < (s.items || []).length; ii++) {
+      it = s.items[ii] || {};
+      k = String(it.screen || "").trim();
+      if (!k) continue;
+      if (k.indexOf("screen.") !== 0) k = "screen." + k;
+      map[k] = (map[k] || 0) + 1;
+    }
+  }
+  return map;
+}
+
+function normalizeScreenKey(raw) {
+  var k = String(raw || "").trim().toLowerCase().replace(/\s+/g, "_");
+  if (!k) return "";
+  if (k.indexOf("screen.") === 0) k = k.slice(7);
+  k = k.replace(/[^a-z0-9_]/g, "");
+  if (!k) return "";
+  return "screen." + k;
+}
+
+function setScreenNewBoxOpen(on) {
+  var box = document.getElementById("scr-cat-newbox");
+  if (!box) return;
+  box.classList.toggle("is-open", !!on);
+  if (on) {
+    var idEl = document.getElementById("scr-new-id");
+    if (idEl) { idEl.value = ""; idEl.focus(); }
+    var tEl = document.getElementById("scr-new-title");
+    if (tEl) tEl.value = "";
+    var dEl = document.getElementById("scr-new-dataref");
+    if (dEl) dEl.value = "";
+    var lEl = document.getElementById("scr-new-layout");
+    if (lEl) lEl.value = "list";
+  }
+}
+
+function renderScreenCatalog() {
+  var tb = document.getElementById("scr-cat-tbody");
+  var cnt = document.getElementById("scr-cat-count");
+  var q = String(MENU_DES.filter || "").toLowerCase();
+  var usage = screenMenuUsageMap();
+  var list = MENU_DES.catalog || [];
+  var html = "", i, it, key, title, layout, dataRef, nUse, show, n = 0;
+  if (!tb) return;
+  for (i = 0; i < list.length; i++) {
+    it = list[i] || {};
+    key = String(it.key || "");
+    title = String(it.title || "");
+    layout = String(it.layout || "list") || "list";
+    dataRef = String(it.dataRef || "");
+    if (q) {
+      show = (key.toLowerCase().indexOf(q) >= 0) || (title.toLowerCase().indexOf(q) >= 0) ||
+        (layout.toLowerCase().indexOf(q) >= 0) || (dataRef.toLowerCase().indexOf(q) >= 0);
+      if (!show) continue;
+    }
+    nUse = usage[key] || 0;
+    n++;
+    html += "<tr data-key='" + esc(key) + "'>";
+    html += "<td><code>" + esc(key) + "</code></td>";
+    html += "<td>" + esc(title || "—") + "</td>";
+    html += "<td>" + esc(layout) + "</td>";
+    html += "<td><code>" + esc(dataRef || "—") + "</code></td>";
+    html += "<td><span class='scr-cat-badge" + (nUse ? "" : " off") + "' title='Menu item references'>" +
+      nUse + "</span></td>";
+    html += "<td class='act'>";
+    html += "<button type='button' data-act='edit' title='Design form'>Edit</button>";
+    html += "<button type='button' data-act='open' title='Open screen'>Open</button>";
+    html += "<button type='button' data-act='del' class='danger' title='Delete'>Del</button>";
+    html += "</td></tr>";
+  }
+  if (!html) {
+    html = "<tr><td colspan='6' style='padding:20px;text-align:center;color:var(--muted)'>" +
+      (list.length ? "No screens match the filter." : "No screens in catalog.") + "</td></tr>";
+  }
+  tb.innerHTML = html;
+  if (cnt) cnt.textContent = n + " screen" + (n === 1 ? "" : "s") +
+    (q && list.length ? (" (of " + list.length + ")") : "");
+}
+
+function loadScreenCatalog(done) {
+  fetch("/api/meta", { credentials: "same-origin", cache: "no-store" })
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      var items = (j && j.items) || [], list = [], i, it, keys = [];
+      for (i = 0; i < items.length; i++) {
+        it = items[i] || {};
+        if (String(it.key || "").indexOf("screen.") !== 0) continue;
+        list.push({
+          key: String(it.key),
+          title: String(it.title || ""),
+          layout: String(it.layout || "") || "list",
+          dataRef: String(it.dataRef || "")
+        });
+        keys.push(String(it.key));
+      }
+      list.sort(function (a, b) { return a.key.localeCompare(b.key); });
+      keys.sort();
+      MENU_DES.catalog = list;
+      MENU_DES.screens = keys;
+      renderScreenCatalog();
+      if (done) done(null, list);
+    })
+    .catch(function (e) {
+      if (done) done(e);
+      else toast("Screens catalog: " + e);
+    });
+}
+
+function createScreenFromCatalog() {
+  var key = normalizeScreenKey((document.getElementById("scr-new-id") || {}).value);
+  var title = String(((document.getElementById("scr-new-title") || {}).value) || "").trim();
+  var layout = String(((document.getElementById("scr-new-layout") || {}).value) || "list").trim() || "list";
+  var dataRef = String(((document.getElementById("scr-new-dataref") || {}).value) || "").trim();
+  var doc, i;
+  if (!key) {
+    toast("Enter a valid screen key");
+    return;
+  }
+  if (key === "screen.login") {
+    toast("screen.login is reserved");
+    return;
+  }
+  for (i = 0; i < (MENU_DES.catalog || []).length; i++) {
+    if (MENU_DES.catalog[i].key === key) {
+      toast("Screen already exists: " + key);
+      return;
+    }
+  }
+  if (!title) title = key.replace(/^screen\./, "").replace(/_/g, " ");
+  doc = {
+    id: key,
+    kind: "screen",
+    layout: layout,
+    title: title,
+    toolbar: ["add", "edit", "delete", "refresh"]
+  };
+  if (dataRef) doc.dataRef = dataRef;
+  if (layout === "list" || layout === "master-detail" || layout === "document") {
+    doc.grid = { columns: [] };
+  }
+  if (layout === "folder") doc.tabs = [];
+  if (layout === "menu") doc.groups = [];
+  if (layout === "form" || layout === "wizard") {
+    doc.fields = [];
+    doc.keyField = "code";
+    if (layout === "form") doc.tabs = [];
+    else doc.steps = [];
+  }
+  document.getElementById("menu-des-hint").textContent = "Creating " + key + "...";
+  fetch("/api/meta", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify({ key: key, doc: doc, writeFile: true })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      if (!j || !j.ok) throw new Error((j && (j.msg || j.error)) || "Create failed");
+      toast("Screen created: " + key);
+      setScreenNewBoxOpen(false);
+      document.getElementById("menu-des-hint").textContent = "Created " + key;
+      loadScreenCatalog(function () {
+        try {
+          syncMenuDesignerFromDom();
+          renderMenuDesigner();
+        } catch (e1) {}
+        openFormDesigner(key);
+      });
+    })
+    .catch(function (e) {
+      document.getElementById("menu-des-hint").textContent = String(e.message || e);
+      toast("Create error: " + (e.message || e));
+    });
+}
+
+function deleteScreenFromCatalog(key) {
+  var usage = screenMenuUsageMap();
+  var nUse = usage[key] || 0;
+  var msg;
+  if (!key) return;
+  if (key === "screen.login") {
+    toast("Cannot delete screen.login");
+    return;
+  }
+  msg = "Delete " + key + "?\nThis removes the meta JSON file.";
+  if (nUse) msg += "\n\nWarning: used " + nUse + " time(s) in the current menu designer.";
+  if (!window.confirm(msg)) return;
+  document.getElementById("menu-des-hint").textContent = "Deleting " + key + "...";
+  fetch("/api/meta", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify({ key: key, action: "delete" })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      if (!j || !j.ok) throw new Error((j && (j.msg || j.error)) || "Delete failed");
+      toast("Deleted " + key);
+      document.getElementById("menu-des-hint").textContent = "Deleted " + key +
+        (nUse ? " — remove menu links if needed" : "");
+      if (META_VIEW.screenKey === key) {
+        try { hideAllWorkspaces(); } catch (e0) {}
+      }
+      loadScreenCatalog(function () {
+        try {
+          syncMenuDesignerFromDom();
+          renderMenuDesigner();
+        } catch (e1) {}
+      });
+    })
+    .catch(function (e) {
+      document.getElementById("menu-des-hint").textContent = String(e.message || e);
+      toast("Delete error: " + (e.message || e));
+    });
+}
+
+function wireScreenCatalogUi() {
+  var btnNew = document.getElementById("scr-cat-new");
+  var btnRef = document.getElementById("scr-cat-refresh");
+  var btnCancel = document.getElementById("scr-new-cancel");
+  var btnCreate = document.getElementById("scr-new-create");
+  var q = document.getElementById("scr-cat-q");
+  var tb = document.getElementById("scr-cat-tbody");
+  if (btnNew && !btnNew._wired) {
+    btnNew._wired = true;
+    btnNew.onclick = function () {
+      var box = document.getElementById("scr-cat-newbox");
+      setScreenNewBoxOpen(!(box && box.classList.contains("is-open")));
+    };
+  }
+  if (btnRef && !btnRef._wired) {
+    btnRef._wired = true;
+    btnRef.onclick = function () { loadScreenCatalog(); };
+  }
+  if (btnCancel && !btnCancel._wired) {
+    btnCancel._wired = true;
+    btnCancel.onclick = function () { setScreenNewBoxOpen(false); };
+  }
+  if (btnCreate && !btnCreate._wired) {
+    btnCreate._wired = true;
+    btnCreate.onclick = createScreenFromCatalog;
+  }
+  if (q && !q._wired) {
+    q._wired = true;
+    q.oninput = function () {
+      MENU_DES.filter = q.value || "";
+      renderScreenCatalog();
+    };
+  }
+  if (tb && !tb._wired) {
+    tb._wired = true;
+    tb.onclick = function (e) {
+      var btn = e.target && e.target.closest ? e.target.closest("button[data-act]") : null;
+      var tr, key, act;
+      if (!btn) return;
+      tr = btn.closest("tr");
+      key = tr ? tr.getAttribute("data-key") : "";
+      act = btn.getAttribute("data-act");
+      if (!key) return;
+      if (act === "edit") {
+        openFormDesigner(key);
+        return;
+      }
+      if (act === "open") {
+        closeMenuDesigner();
+        showMetaScreen(key, key);
+        return;
+      }
+      if (act === "del") deleteScreenFromCatalog(key);
+    };
+  }
+}
+
+/* ---------- Edit app → Processes catalog ---------- */
+function processMenuUsageMap() {
+  var map = {}, si, s, ii, it, k;
+  var secs = MENU_DES.sections || [];
+  for (si = 0; si < secs.length; si++) {
+    s = secs[si] || {};
+    for (ii = 0; ii < (s.items || []).length; ii++) {
+      it = s.items[ii] || {};
+      k = String(it.process || "").trim();
+      if (!k) continue;
+      if (k.indexOf("process.") !== 0) k = "process." + k;
+      map[k] = (map[k] || 0) + 1;
+    }
+  }
+  return map;
+}
+
+function normalizeProcessKey(raw) {
+  var k = String(raw || "").trim().toLowerCase().replace(/\s+/g, "_");
+  if (!k) return "";
+  if (k.indexOf("process.") === 0) k = k.slice(8);
+  k = k.replace(/[^a-z0-9_]/g, "");
+  if (!k) return "";
+  return "process." + k;
+}
+
+function fillProcessHandlerSelect(sel, current) {
+  var list = MENU_DES.handlers || [], i, h, html = "";
+  if (!sel) return;
+  if (!list.length) html = "<option value='Hello'>Hello</option>";
+  for (i = 0; i < list.length; i++) {
+    h = list[i] || {};
+    html += "<option value='" + esc(h.id || "") + "'" +
+      ((h.id === current) ? " selected" : "") + ">" +
+      esc((h.id || "") + (h.title ? (" — " + h.title) : "")) + "</option>";
+  }
+  sel.innerHTML = html;
+  if (current) sel.value = current;
+}
+
+function setProcessNewBoxOpen(on) {
+  var box = document.getElementById("proc-cat-newbox");
+  if (!box) return;
+  box.classList.toggle("is-open", !!on);
+  if (on) {
+    fillProcessHandlerSelect(document.getElementById("proc-new-handler"), "Hello");
+    var idEl = document.getElementById("proc-new-id");
+    if (idEl) { idEl.value = ""; idEl.focus(); }
+    var tEl = document.getElementById("proc-new-title");
+    if (tEl) tEl.value = "";
+    var cEl = document.getElementById("proc-new-confirm");
+    if (cEl) cEl.value = "";
+  }
+}
+
+function renderProcessCatalog() {
+  var tb = document.getElementById("proc-cat-tbody");
+  var cnt = document.getElementById("proc-cat-count");
+  var q = String(MENU_DES.procFilter || "").toLowerCase();
+  var usage = processMenuUsageMap();
+  var list = MENU_DES.procCatalog || [];
+  var html = "", i, it, key, title, handler, nUse, show, n = 0;
+  if (!tb) return;
+  for (i = 0; i < list.length; i++) {
+    it = list[i] || {};
+    key = String(it.key || "");
+    title = String(it.title || "");
+    handler = String(it.handler || "");
+    if (q) {
+      show = (key.toLowerCase().indexOf(q) >= 0) || (title.toLowerCase().indexOf(q) >= 0) ||
+        (handler.toLowerCase().indexOf(q) >= 0);
+      if (!show) continue;
+    }
+    nUse = usage[key] || 0;
+    n++;
+    html += "<tr data-key='" + esc(key) + "'>";
+    html += "<td><code>" + esc(key) + "</code></td>";
+    html += "<td>" + esc(title || "—") + "</td>";
+    html += "<td><code>" + esc(handler || "—") + "</code></td>";
+    html += "<td><span class='scr-cat-badge" + (nUse ? "" : " off") + "'>" + nUse + "</span></td>";
+    html += "<td class='act'>";
+    html += "<button type='button' data-act='run' title='Test process'>Run</button>";
+    html += "<button type='button' data-act='del' class='danger' title='Delete'>Del</button>";
+    html += "</td></tr>";
+  }
+  if (!html) {
+    html = "<tr><td colspan='5' style='padding:20px;text-align:center;color:var(--muted)'>" +
+      (list.length ? "No processes match the filter." : "No processes yet. Create one or add meta/processes/*.json.") +
+      "</td></tr>";
+  }
+  tb.innerHTML = html;
+  if (cnt) cnt.textContent = n + " process" + (n === 1 ? "" : "es") +
+    (q && list.length ? (" (of " + list.length + ")") : "");
+}
+
+function loadProcessCatalog(done) {
+  fetch("/api/process", { credentials: "same-origin", cache: "no-store" })
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      var items = (j && j.items) || [], list = [], keys = [], i, it;
+      MENU_DES.handlers = (j && j.handlers) ? j.handlers : [];
+      for (i = 0; i < items.length; i++) {
+        it = items[i] || {};
+        list.push({
+          key: String(it.key || ""),
+          title: String(it.title || ""),
+          handler: String(it.handler || "")
+        });
+        keys.push(String(it.key || ""));
+      }
+      list.sort(function (a, b) { return a.key.localeCompare(b.key); });
+      keys.sort();
+      MENU_DES.procCatalog = list;
+      MENU_DES.processes = keys;
+      fillProcessHandlerSelect(document.getElementById("proc-new-handler"),
+        ((document.getElementById("proc-new-handler") || {}).value) || "Hello");
+      renderProcessCatalog();
+      if (done) done(null, list);
+    })
+    .catch(function (e) {
+      if (done) done(e);
+      else toast("Processes: " + e);
+    });
+}
+
+function createProcessFromCatalog() {
+  var key = normalizeProcessKey((document.getElementById("proc-new-id") || {}).value);
+  var title = String(((document.getElementById("proc-new-title") || {}).value) || "").trim();
+  var handler = String(((document.getElementById("proc-new-handler") || {}).value) || "").trim();
+  var confirm = String(((document.getElementById("proc-new-confirm") || {}).value) || "").trim();
+  var doc, i;
+  if (!key) { toast("Enter a valid process key"); return; }
+  if (!handler) { toast("Select a handler"); return; }
+  for (i = 0; i < (MENU_DES.procCatalog || []).length; i++) {
+    if (MENU_DES.procCatalog[i].key === key) {
+      toast("Process already exists: " + key);
+      return;
+    }
+  }
+  if (!title) title = key.replace(/^process\./, "").replace(/_/g, " ");
+  doc = {
+    id: key,
+    kind: "process",
+    title: title,
+    handler: handler,
+    onSuccess: { toast: true }
+  };
+  if (confirm) doc.confirm = confirm;
+  document.getElementById("menu-des-hint").textContent = "Creating " + key + "...";
+  fetch("/api/meta", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify({ key: key, doc: doc, writeFile: true })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      if (!j || !j.ok) throw new Error((j && (j.msg || j.error)) || "Create failed");
+      toast("Process created: " + key);
+      setProcessNewBoxOpen(false);
+      document.getElementById("menu-des-hint").textContent = "Created " + key;
+      loadProcessCatalog(function () {
+        try {
+          syncMenuDesignerFromDom();
+          renderMenuDesigner();
+        } catch (e1) {}
+      });
+    })
+    .catch(function (e) {
+      document.getElementById("menu-des-hint").textContent = String(e.message || e);
+      toast("Create error: " + (e.message || e));
+    });
+}
+
+function deleteProcessFromCatalog(key) {
+  var usage = processMenuUsageMap();
+  var nUse = usage[key] || 0;
+  var msg;
+  if (!key) return;
+  msg = "Delete " + key + "?\nRemoves the process meta JSON (handler code stays in the binary).";
+  if (nUse) msg += "\n\nWarning: used " + nUse + " time(s) in the current menu.";
+  if (!window.confirm(msg)) return;
+  document.getElementById("menu-des-hint").textContent = "Deleting " + key + "...";
+  fetch("/api/meta", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify({ key: key, action: "delete" })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      if (!j || !j.ok) throw new Error((j && (j.msg || j.error)) || "Delete failed");
+      toast("Deleted " + key);
+      document.getElementById("menu-des-hint").textContent = "Deleted " + key;
+      loadProcessCatalog(function () {
+        try {
+          syncMenuDesignerFromDom();
+          renderMenuDesigner();
+        } catch (e1) {}
+      });
+    })
+    .catch(function (e) {
+      document.getElementById("menu-des-hint").textContent = String(e.message || e);
+      toast("Delete error: " + (e.message || e));
+    });
+}
+
+function wireProcessCatalogUi() {
+  var btnNew = document.getElementById("proc-cat-new");
+  var btnRef = document.getElementById("proc-cat-refresh");
+  var btnCancel = document.getElementById("proc-new-cancel");
+  var btnCreate = document.getElementById("proc-new-create");
+  var q = document.getElementById("proc-cat-q");
+  var tb = document.getElementById("proc-cat-tbody");
+  if (btnNew && !btnNew._wired) {
+    btnNew._wired = true;
+    btnNew.onclick = function () {
+      var box = document.getElementById("proc-cat-newbox");
+      setProcessNewBoxOpen(!(box && box.classList.contains("is-open")));
+    };
+  }
+  if (btnRef && !btnRef._wired) {
+    btnRef._wired = true;
+    btnRef.onclick = function () { loadProcessCatalog(); };
+  }
+  if (btnCancel && !btnCancel._wired) {
+    btnCancel._wired = true;
+    btnCancel.onclick = function () { setProcessNewBoxOpen(false); };
+  }
+  if (btnCreate && !btnCreate._wired) {
+    btnCreate._wired = true;
+    btnCreate.onclick = createProcessFromCatalog;
+  }
+  if (q && !q._wired) {
+    q._wired = true;
+    q.oninput = function () {
+      MENU_DES.procFilter = q.value || "";
+      renderProcessCatalog();
+    };
+  }
+  if (tb && !tb._wired) {
+    tb._wired = true;
+    tb.onclick = function (e) {
+      var btn = e.target && e.target.closest ? e.target.closest("button[data-act]") : null;
+      var tr, key, act;
+      if (!btn) return;
+      tr = btn.closest("tr");
+      key = tr ? tr.getAttribute("data-key") : "";
+      act = btn.getAttribute("data-act");
+      if (!key) return;
+      if (act === "run") {
+        runProcess(key, {});
+        return;
+      }
+      if (act === "del") deleteProcessFromCatalog(key);
+    };
+  }
+}
+
 function openMenuDesigner() {
   if (!requireAdmin("App designer")) return;
   var scrim = document.getElementById("menu-designer-scrim");
@@ -5401,7 +6233,11 @@ function openMenuDesigner() {
   box.classList.add("is-open");
   try {
     wireMenuDesTabs();
+    wireScreenCatalogUi();
+    wireProcessCatalogUi();
     setMenuDesTab("brand");
+    setScreenNewBoxOpen(false);
+    setProcessNewBoxOpen(false);
     document.getElementById("menu-des-title").textContent = "Edit app";
     document.getElementById("menu-des-hint").textContent = "Loading app + modules...";
     fillAppBrandFields(APP_META || {});
@@ -5409,25 +6245,39 @@ function openMenuDesigner() {
     document.getElementById("menu-des-hint").textContent = "UI init: " + e0;
   }
   MENU_DES.screens = [];
+  MENU_DES.catalog = [];
+  MENU_DES.processes = [];
+  MENU_DES.procCatalog = [];
   fetch("/api/meta", { credentials: "same-origin", cache: "no-store" })
     .then(function (r) { return r.json(); })
     .then(function (j) {
-      var items = (j && j.items) || [], i, it;
+      var items = (j && j.items) || [], i, it, list = [], keys = [];
       for (i = 0; i < items.length; i++) {
-        it = items[i];
-        if (String(it.key || "").indexOf("screen.") === 0)
-          MENU_DES.screens.push(String(it.key));
+        it = items[i] || {};
+        if (String(it.key || "").indexOf("screen.") !== 0) continue;
+        list.push({
+          key: String(it.key),
+          title: String(it.title || ""),
+          layout: String(it.layout || "") || "list",
+          dataRef: String(it.dataRef || "")
+        });
+        keys.push(String(it.key));
       }
-      MENU_DES.screens.sort();
+      list.sort(function (a, b) { return a.key.localeCompare(b.key); });
+      keys.sort();
+      MENU_DES.catalog = list;
+      MENU_DES.screens = keys;
       return Promise.all([
         fetch("/api/meta?key=app", { credentials: "same-origin", cache: "no-store" }).then(function (r) { return r.json(); }),
         fetch("/api/meta?key=modules", { credentials: "same-origin", cache: "no-store" }).then(function (r) { return r.json(); }),
-        fetch("/api/verticals", { credentials: "same-origin", cache: "no-store" }).then(function (r) { return r.json(); }).catch(function () { return null; })
+        fetch("/api/verticals", { credentials: "same-origin", cache: "no-store" }).then(function (r) { return r.json(); }).catch(function () { return null; }),
+        fetch("/api/process", { credentials: "same-origin", cache: "no-store" }).then(function (r) { return r.json(); }).catch(function () { return null; })
       ]);
     })
     .then(function (pair) {
-      var jApp = pair[0], j = pair[1], jVert = pair[2];
+      var jApp = pair[0], j = pair[1], jVert = pair[2], jProc = pair[3];
       var verts = ["clinic", "demo", "services", "retail"];
+      var pi, pit, plist = [], pkeys = [];
       if (jVert && jVert.ok && Array.isArray(jVert.items) && jVert.items.length)
         verts = jVert.items;
       if (jApp && jApp.ok && jApp.doc) {
@@ -5436,6 +6286,22 @@ function openMenuDesigner() {
         fillAppBrandFields(APP_META);
       } else {
         fillVerticalSelect("", verts);
+      }
+      if (jProc && jProc.ok) {
+        MENU_DES.handlers = jProc.handlers || [];
+        for (pi = 0; pi < (jProc.items || []).length; pi++) {
+          pit = jProc.items[pi] || {};
+          plist.push({
+            key: String(pit.key || ""),
+            title: String(pit.title || ""),
+            handler: String(pit.handler || "")
+          });
+          pkeys.push(String(pit.key || ""));
+        }
+        plist.sort(function (a, b) { return a.key.localeCompare(b.key); });
+        pkeys.sort();
+        MENU_DES.procCatalog = plist;
+        MENU_DES.processes = pkeys;
       }
       var doc = (j && j.ok && j.doc) ? j.doc : (MODULES || { id: "modules", sections: [] });
       var secs = doc.sections || [], i, s, items, k, it, copy, secCopy;
@@ -5451,6 +6317,7 @@ function openMenuDesigner() {
             label: it.label || it.id || "",
             icon: it.icon || "",
             screen: it.screen || "",
+            process: it.process || "",
             sub: !!it.sub,
             active: !!it.active
           };
@@ -5459,10 +6326,12 @@ function openMenuDesigner() {
         MENU_DES.sections.push(secCopy);
       }
       renderMenuDesigner();
+      renderScreenCatalog();
+      renderProcessCatalog();
       var vNow = (APP_META && APP_META.vertical) ? String(APP_META.vertical) : "";
       document.getElementById("menu-des-hint").textContent =
-        "Admin only. Branding, vertical pack" +
-        (vNow ? (" (" + vNow + ")") : " (none)") +
+        "Admin only. Branding, database, locale, screens, processes" +
+        (vNow ? (", vertical " + vNow) : "") +
         ", and sidebar menu.";
     })
     .catch(function (e) {
@@ -5490,14 +6359,23 @@ function iconSelectHtml(val) {
 
 function screenSelectHtml(val) {
   var html = "<option value=''>—</option>", i, k, list = MENU_DES.screens || [], found = false;
+  var procs = MENU_DES.processes || [];
   for (i = 0; i < list.length; i++) {
     k = list[i];
     if (k === val) found = true;
     html += "<option value='" + esc(k) + "'" + (val === k ? " selected" : "") + ">" + esc(k) + "</option>";
   }
+  if (procs.length) {
+    html += "<option value='' disabled>—— processes ——</option>";
+    for (i = 0; i < procs.length; i++) {
+      k = procs[i];
+      if (k === val) found = true;
+      html += "<option value='" + esc(k) + "'" + (val === k ? " selected" : "") + ">" +
+        esc(k) + "</option>";
+    }
+  }
   if (val && !found)
     html += "<option value='" + esc(val) + "' selected>" + esc(val) + "</option>";
-  // allow free typing via custom option placeholder — also add common ones
   return html;
 }
 
@@ -5520,7 +6398,7 @@ function renderMenuDesigner() {
       "<button type='button' class='btn-ghost' data-sact='del' style='height:28px;font-size:.72rem'>Remove</button>" +
       "</div></div>";
     html += "<table class='menu-des-items'><thead><tr>" +
-      "<th>Id</th><th>Label</th><th>Icon</th><th>Screen</th><th class='chk'>Sub</th><th class='chk'>Active</th><th class='act'>Order</th>" +
+      "<th>Id</th><th>Label</th><th>Icon</th><th>Screen / process</th><th class='chk'>Sub</th><th class='chk'>Active</th><th class='act'>Order</th>" +
       "</tr></thead><tbody>";
     for (ii = 0; ii < sec.items.length; ii++) {
       it = sec.items[ii];
@@ -5528,7 +6406,8 @@ function renderMenuDesigner() {
         "<td><input type='text' data-if='id' value='" + esc(it.id || "") + "'></td>" +
         "<td><input type='text' data-if='label' value='" + esc(it.label || "") + "'></td>" +
         "<td><select data-if='icon'>" + iconSelectHtml(it.icon || "") + "</select></td>" +
-        "<td><select data-if='screen'>" + screenSelectHtml(it.screen || "") + "</select></td>" +
+        "<td><select data-if='target'>" +
+          screenSelectHtml(it.process || it.screen || "") + "</select></td>" +
         "<td class='chk'><input type='checkbox' data-if='sub'" + (it.sub ? " checked" : "") + "></td>" +
         "<td class='chk'><input type='checkbox' data-if='active'" + (it.active ? " checked" : "") + "></td>" +
         "<td class='act'>" +
@@ -5568,8 +6447,17 @@ function syncMenuDesignerFromDom() {
       if (titEl) it.label = titEl.value.trim();
       idEl = tr.querySelector("[data-if='icon']");
       if (idEl) it.icon = idEl.value || "";
-      idEl = tr.querySelector("[data-if='screen']");
-      if (idEl) it.screen = idEl.value || "";
+      idEl = tr.querySelector("[data-if='target']") || tr.querySelector("[data-if='screen']");
+      if (idEl) {
+        var tgt = idEl.value || "";
+        if (tgt.indexOf("process.") === 0) {
+          it.process = tgt;
+          it.screen = "";
+        } else {
+          it.screen = tgt;
+          it.process = "";
+        }
+      }
       idEl = tr.querySelector("[data-if='sub']");
       if (idEl) it.sub = !!idEl.checked;
       idEl = tr.querySelector("[data-if='active']");
@@ -5598,9 +6486,10 @@ function saveMenuDesigner() {
       o = {
         id: it.id || ("item" + (ii + 1)),
         label: it.label || it.id || ("Item " + (ii + 1)),
-        icon: it.icon || null,
-        screen: it.screen || null
+        icon: it.icon || null
       };
+      if (it.process) o.process = it.process;
+      else if (it.screen) o.screen = it.screen;
       if (it.sub) o.sub = true;
       if (it.active) o.active = true;
       sOut.items.push(o);
@@ -7896,6 +8785,7 @@ function showBalanceScreen(label) {
 function dashNav(id) {
   var item = moduleById(id);
   var screen = item && item.screen ? String(item.screen) : "";
+  var process = item && item.process ? String(item.process) : "";
   var label = (item && item.label) ? item.label : id;
 
   var activeEl = null;
@@ -7906,6 +8796,12 @@ function dashNav(id) {
     if (on) activeEl = el;
   });
   if (activeEl && typeof openNavBranchForItem === "function") openNavBranchForItem(activeEl);
+
+  // Process-only menu items (no screen navigation)
+  if (process && process.indexOf("process.") === 0) {
+    runProcess(process, { screenKey: screen || (META_VIEW && META_VIEW.screenKey) || "" });
+    return;
+  }
 
   // Any screen.* from modules.json (patients, group, budget, balance, exams, ...)
   // F2 on appointments still uses openPatientsFromMeta / lookup.patients modal.
@@ -8385,10 +9281,17 @@ document.getElementById("modsearch").addEventListener("input", function (e) {
     var tb = document.getElementById(id);
     if (!tb) return;
     tb.onclick = function (e) {
-      var btn = e.target && e.target.closest ? e.target.closest("[data-meta-act]") : e.target;
+      var btn = e.target && e.target.closest
+        ? e.target.closest("[data-meta-act], [data-process]")
+        : e.target;
       if (!btn || !btn.getAttribute) return;
-      var act = btn.getAttribute("data-meta-act");
+      var proc = btn.getAttribute("data-process");
       var scope = btn.getAttribute("data-scope") || "master";
+      if (proc) {
+        runProcess(proc, {});
+        return;
+      }
+      var act = btn.getAttribute("data-meta-act");
       if (act) metaToolbarAction(act, scope);
     };
   }

@@ -36,5 +36,20 @@
       { "id": "active", "label": "Active", "type": "checkbox" }
     ]
   },
-  "toolbar": ["add", "edit", "delete", "print", "pdf", "excel", "refresh"]
+  "toolbar": [
+    "add",
+    "edit",
+    "delete",
+    "print",
+    "pdf",
+    "excel",
+    "refresh",
+    {
+      "id": "echo_ctx",
+      "label": "Echo context",
+      "process": "process.echo_context",
+      "title": "Run process.echo_context with selected party row"
+    }
+  ]
 }
+

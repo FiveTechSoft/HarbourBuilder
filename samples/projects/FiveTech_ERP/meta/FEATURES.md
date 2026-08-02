@@ -163,9 +163,21 @@ Selectable via `app.vertical` or **Edit app → Vertical pack** (applies immedia
 
 - Branding (logo, name, subtitle, window title)
 - HTTP port (restart required to bind)
-- **Vertical pack** on/off
+- **Database** driver / OpenADS connection
 - **Locale & numbers** (see below)
-- Full **sidebar menu editor** (sections, items, icons, screens, sub/active)
+- **Screens catalog**: list / new / edit (→ form designer) / open / delete `screen.*`
+- **Processes catalog**: list / new / run / delete `process.*` (binds to compiled Harbour handlers)
+- Full **sidebar menu editor** (sections, items, icons, screens **or processes**, sub/active)
+
+Delete screen/process: `POST /api/meta` with `{ "key":"screen.x"|"process.x", "action":"delete" }` (admin; not `app` / `modules` / `screen.login`).
+
+### Processes (server-side Harbour)
+
+- Meta under `meta/processes/*.json` → key `process.*`
+- Each process names a **whitelist handler** from `erp_proc.prg` (never browser-executed code)
+- Run: `POST /api/process` `{ "key":"process.hello", "params":{}, "row":{...} }`
+- Call from **menu** (`"process":"process.hello"`), **toolbar** object entries, or Edit app → Processes → Run
+- Demo handlers: `Hello`, `EchoContext`, `PingStatus`
 
 ---
 

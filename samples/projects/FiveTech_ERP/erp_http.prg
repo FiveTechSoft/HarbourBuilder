@@ -236,12 +236,14 @@ return cOut
 
 //--------------------------------------------------------------------
 // POST /api/meta — runtime form designer (admin only).
-// Body: { "key":"app"|"modules"|"screen.x"|"lookup.x"|"report.x", "doc":{...}, "writeFile":true|false }
+// Body: { "key":"app"|"modules"|"screen.x"|"lookup.x"|"report.x",
+//         "doc":{...}, "writeFile":true|false }
+//   or: { "key":"screen.x"|"lookup.x"|"report.x", "action":"delete" }
 // Resp: { "ok":true, "key":..., "path":... } or { "ok":false, "msg"/"error":... }
 static function ErpApiMetaPost( cBody, hSess )
 
-   local hReq := { => }, cKey, hDoc, lWrite, xW
-   local cFull, cJson, lOk, cOut
+   local hReq := { => }, cKey, hDoc, lWrite, xW, cAction
+   local cFull, cJson, lOk, cOut, cDir, nEr
 
    if Empty( hSess )
       return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Not authenticated", ;
@@ -262,11 +264,59 @@ static function ErpApiMetaPost( cBody, hSess )
 
    cKey := AllTrim( ErpToStr( hb_HGetDef( hReq, "key", "" ) ) )
    if cKey != "app" .and. cKey != "modules" .and. ;
-      ! ErpKeySafe( cKey, "screen." ) .and. ! ErpKeySafe( cKey, "lookup." ) .and. ! ErpKeySafe( cKey, "report." )
+      ! ErpKeySafe( cKey, "screen." ) .and. ! ErpKeySafe( cKey, "lookup." ) .and. ;
+      ! ErpKeySafe( cKey, "report." ) .and. ! ErpKeySafe( cKey, "process." )
       return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
-         "msg" => "Invalid key (only app / modules / screen.* / lookup.* / report.*)", ;
-         "error" => "Invalid key (only app / modules / screen.* / lookup.* / report.*)" } ), ;
+         "msg" => "Invalid key (only app / modules / screen.* / lookup.* / report.* / process.*)", ;
+         "error" => "Invalid key (only app / modules / screen.* / lookup.* / report.* / process.*)" } ), ;
          "application/json; charset=utf-8" )
+   endif
+
+   cAction := Lower( AllTrim( ErpToStr( hb_HGetDef( hReq, "action", "" ) ) ) )
+   if cAction == "delete"
+      // Lifecycle delete: only screen / lookup / report / process JSON (never app/modules)
+      if cKey == "app" .or. cKey == "modules"
+         return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
+            "msg" => "Cannot delete app or modules", ;
+            "error" => "Cannot delete app or modules" } ), ;
+            "application/json; charset=utf-8" )
+      endif
+      if cKey == "screen.login"
+         return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
+            "msg" => "Cannot delete screen.login", ;
+            "error" => "Cannot delete screen.login" } ), ;
+            "application/json; charset=utf-8" )
+      endif
+      if ! ErpKeySafe( cKey, "screen." ) .and. ! ErpKeySafe( cKey, "lookup." ) .and. ;
+            ! ErpKeySafe( cKey, "report." ) .and. ! ErpKeySafe( cKey, "process." )
+         return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
+            "msg" => "Delete only allowed for screen.* / lookup.* / report.* / process.*", ;
+            "error" => "Delete only allowed for screen.* / lookup.* / report.* / process.*" } ), ;
+            "application/json; charset=utf-8" )
+      endif
+      cFull := ErpMetaPathForKey( cKey )
+      if Empty( cFull )
+         return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Unknown meta key", ;
+            "error" => "Unknown meta key" } ), "application/json; charset=utf-8" )
+      endif
+      if s_mtx != NIL
+         hb_mutexLock( s_mtx )
+      endif
+      lOk := .T.
+      if File( cFull )
+         nEr := FErase( cFull )
+         lOk := ( nEr == 0 )
+      endif
+      if s_mtx != NIL
+         hb_mutexUnlock( s_mtx )
+      endif
+      if ! lOk
+         return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Delete failed", ;
+            "error" => "Delete failed" } ), "application/json; charset=utf-8" )
+      endif
+      ErpMetaInvalidate( cKey )
+      return ErpHttpOk( hb_jsonEncode( { "ok" => .T., "key" => cKey, "action" => "delete", ;
+         "path" => cFull } ), "application/json; charset=utf-8" )
    endif
 
    hDoc := hb_HGetDef( hReq, "doc", NIL )
@@ -298,6 +348,12 @@ static function ErpApiMetaPost( cBody, hSess )
          "error" => "Unknown meta key" } ), "application/json; charset=utf-8" )
    endif
 
+   // Ensure parent folder exists (new screens under meta/screens/)
+   cDir := hb_FNameDir( cFull )
+   if ! Empty( cDir ) .and. ! hb_DirExists( cDir )
+      hb_DirCreate( cDir )
+   endif
+
    cJson := hb_jsonEncode( hDoc ) + Chr( 10 )
    if s_mtx != NIL
       hb_mutexLock( s_mtx )
@@ -318,6 +374,118 @@ static function ErpApiMetaPost( cBody, hSess )
    endif
    cOut := hb_jsonEncode( { "ok" => .T., "key" => cKey, "path" => cFull } )
 return ErpHttpOk( cOut, "application/json; charset=utf-8" )
+
+//--------------------------------------------------------------------
+// GET /api/process — list process.* meta + registered handlers
+// GET /api/process?key=process.xxx — one process doc
+// GET /api/process?handlers=1 — handlers only
+static function ErpApiProcessGet( cQuery )
+
+   local hQ := ErpQuery( cQuery ), cKey, aItems := {}, aAll, h, aOut := {}
+   local lHandlersOnly
+
+   cKey := AllTrim( ErpToStr( hb_HGetDef( hQ, "key", "" ) ) )
+   lHandlersOnly := ! Empty( hb_HGetDef( hQ, "handlers", "" ) )
+
+   if lHandlersOnly
+      return ErpHttpOk( hb_jsonEncode( { "ok" => .T., "handlers" => ErpProcHandlers() } ), ;
+         "application/json; charset=utf-8" )
+   endif
+
+   if ! Empty( cKey )
+      if ! ErpKeySafe( cKey, "process." )
+         return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Invalid process key" } ), ;
+            "application/json; charset=utf-8" )
+      endif
+      return ErpHttpOk( ErpMetaApiEnvelope( cKey ), "application/json; charset=utf-8" )
+   endif
+
+   aAll := ErpMetaCatalog()
+   for each h in aAll
+      if ValType( h ) == "H" .and. Left( AllTrim( ErpToStr( hb_HGetDef( h, "key", "" ) ) ), 8 ) == "process."
+         AAdd( aItems, h )
+      endif
+   next
+return ErpHttpOk( hb_jsonEncode( { "ok" => .T., "count" => Len( aItems ), ;
+   "items" => aItems, "handlers" => ErpProcHandlers() } ), ;
+   "application/json; charset=utf-8" )
+
+//--------------------------------------------------------------------
+// POST /api/process — run a process (any logged user; roles checked later)
+// Body: { "key":"process.xxx", "params":{...}, "screenKey":"...",
+//         "dataRef":"...", "row":{...} }
+static function ErpApiProcessPost( cBody, hSess )
+
+   local hReq := { => }, cKey, hDoc, cHandler, hCtx, hOut, hParams, hRow
+   local cUser, cWd, cConfirm
+
+   if "{" $ cBody
+      hb_jsonDecode( cBody, @hReq )
+   endif
+   if ValType( hReq ) != "H" .or. Empty( hb_HKeys( hReq ) )
+      return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Bad JSON body" } ), ;
+         "application/json; charset=utf-8" )
+   endif
+
+   cKey := AllTrim( ErpToStr( hb_HGetDef( hReq, "key", "" ) ) )
+   if ! ErpKeySafe( cKey, "process." )
+      return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Invalid process key" } ), ;
+         "application/json; charset=utf-8" )
+   endif
+
+   hDoc := ErpMetaGet( cKey )
+   if ValType( hDoc ) != "H" .or. Empty( hb_HKeys( hDoc ) )
+      return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Process not found: " + cKey } ), ;
+         "application/json; charset=utf-8" )
+   endif
+
+   cHandler := AllTrim( ErpToStr( hb_HGetDef( hDoc, "handler", "" ) ) )
+   if Empty( cHandler )
+      return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Process has no handler" } ), ;
+         "application/json; charset=utf-8" )
+   endif
+   if ! ErpProcHandlerOk( cHandler )
+      return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
+         "msg" => "Handler not registered: " + cHandler } ), ;
+         "application/json; charset=utf-8" )
+   endif
+
+   cUser := AllTrim( ErpToStr( hb_HGetDef( hSess, "user", "" ) ) )
+   cWd := AllTrim( ErpToStr( hb_HGetDef( hSess, "workDate", "" ) ) )
+   hParams := hb_HGetDef( hReq, "params", { => } )
+   if ValType( hParams ) != "H"
+      hParams := { => }
+   endif
+   hRow := hb_HGetDef( hReq, "row", NIL )
+   if ValType( hRow ) != "H"
+      hRow := NIL
+   endif
+
+   // Optional client-side confirm string is informational only (already confirmed in UI)
+   cConfirm := AllTrim( ErpToStr( hb_HGetDef( hDoc, "confirm", "" ) ) )
+   HB_SYMBOL_UNUSED( cConfirm )
+
+   hCtx := { ;
+      "user" => cUser, ;
+      "workDate" => cWd, ;
+      "processKey" => cKey, ;
+      "processTitle" => ErpToStr( hb_HGetDef( hDoc, "title", cKey ) ), ;
+      "screenKey" => AllTrim( ErpToStr( hb_HGetDef( hReq, "screenKey", "" ) ) ), ;
+      "dataRef" => AllTrim( ErpToStr( hb_HGetDef( hReq, "dataRef", "" ) ) ), ;
+      "params" => hParams, ;
+      "row" => hRow }
+
+   hOut := ErpProcRun( cHandler, hCtx )
+   if ValType( hOut ) != "H"
+      hOut := { "ok" => .F., "msg" => "Invalid process result" }
+   endif
+   hOut[ "key" ] := cKey
+   hOut[ "handler" ] := cHandler
+   // Surface process onSuccess hints for the client (optional)
+   if hb_HHasKey( hDoc, "onSuccess" ) .and. ValType( hDoc[ "onSuccess" ] ) == "H"
+      hOut[ "onSuccess" ] := hDoc[ "onSuccess" ]
+   endif
+return ErpHttpOk( hb_jsonEncode( hOut ), "application/json; charset=utf-8" )
 
 //--------------------------------------------------------------------
 // POST /api/dataset — row CRUD on data.* docs (any logged user).
@@ -595,9 +763,25 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
       return ErpHttpOk( cOut, "application/json; charset=utf-8" )
    endif
 
-   // Runtime form designer save (admin only, screen.* / lookup.* keys)
+   // Runtime form designer save (admin only, screen.* / lookup.* / process.* keys)
    if cMethod == "POST" .and. cPath == "/api/meta"
       return ErpApiMetaPost( cBody, hSess )
+   endif
+
+   // Business processes (whitelist Harbour handlers; meta process.* configures them)
+   if cMethod == "GET" .and. cPath == "/api/process"
+      if Empty( hSess )
+         return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Not authenticated" } ), ;
+            "application/json; charset=utf-8" )
+      endif
+      return ErpApiProcessGet( cQuery )
+   endif
+   if cMethod == "POST" .and. cPath == "/api/process"
+      if Empty( hSess )
+         return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Not authenticated" } ), ;
+            "application/json; charset=utf-8" )
+      endif
+      return ErpApiProcessPost( cBody, hSess )
    endif
 
    if cMethod == "GET" .and. cPath == "/api/meta/fields"

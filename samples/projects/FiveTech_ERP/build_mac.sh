@@ -101,10 +101,11 @@ cp -f "$HBROOT/source/core/classes.prg" .
 # On Cocoa, UI is native — use GT_NUL to avoid forcing a GUI GT symbol
 bash "$PROJDIR/assemble_main.sh" "$PROJDIR" "$BUILDDIR" mac
 
-echo "[1] Harbour compile (main + erp_meta + erp_http + classes)"
+echo "[1] Harbour compile (main + erp_meta + erp_http + erp_proc + classes)"
 "$HBBIN/harbour" main.prg     -n -w -q -I"$HBINC" -I"$BUILDDIR" -I"$HBROOT/include" -omain.c
 "$HBBIN/harbour" erp_meta.prg -n -w -q -I"$HBINC" -I"$BUILDDIR" -I"$HBROOT/include" -oerp_meta.c
 "$HBBIN/harbour" erp_http.prg -n -w -q -I"$HBINC" -I"$BUILDDIR" -I"$HBROOT/include" -oerp_http.c
+"$HBBIN/harbour" erp_proc.prg -n -w -q -I"$HBINC" -I"$BUILDDIR" -I"$HBROOT/include" -oerp_proc.c
 "$HBBIN/harbour" classes.prg  -n -w -q -I"$HBINC" -I"$BUILDDIR" -I"$HBROOT/include" -oclasses.c
 
 echo "[2] clang $ARCH_FLAG"
@@ -116,6 +117,7 @@ OBJCFLAGS="$CFLAGS -fobjc-arc"
 clang $CFLAGS -c main.c -o main.o
 clang $CFLAGS -c erp_meta.c -o erp_meta.o
 clang $CFLAGS -c erp_http.c -o erp_http.o
+clang $CFLAGS -c erp_proc.c -o erp_proc.o
 clang $CFLAGS -c classes.c -o classes.o
 clang $CFLAGS -c "$PROJDIR/mac_stubs.c" -o mac_stubs.o
 clang $OBJCFLAGS -c "$HBROOT/source/backends/cocoa/cocoa_core.m" -o cocoa_core.o
@@ -133,7 +135,7 @@ hblib() {
   fi
 }
 
-OBJS="main.o erp_meta.o erp_http.o classes.o cocoa_core.o mac_stubs.o"
+OBJS="main.o erp_meta.o erp_http.o erp_proc.o classes.o cocoa_core.o mac_stubs.o"
 [ -f cocoa_webserver.o ] && OBJS="$OBJS cocoa_webserver.o"
 
 FRAMEWORKS="-framework Cocoa -framework WebKit -framework Foundation -framework AppKit \

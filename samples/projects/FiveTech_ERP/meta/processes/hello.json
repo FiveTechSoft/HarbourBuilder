@@ -1,0 +1,9 @@
+{
+  "id": "process.hello",
+  "kind": "process",
+  "title": "Hello process",
+  "handler": "Hello",
+  "confirm": "",
+  "description": "Demo process: greets the current user and work date. Handler is compiled Harbour (ErpProc_Hello).",
+  "onSuccess": { "toast": true }
+}

@@ -36,10 +36,11 @@ cp -f "$HBROOT/source/core/classes.prg" .
 
 bash "$PROJDIR/assemble_main.sh" "$PROJDIR" "$BUILDDIR"
 
-echo "[1] Harbour compile (main + erp_meta + erp_http + classes)"
+echo "[1] Harbour compile (main + erp_meta + erp_http + erp_proc + classes)"
 "$HBBIN/harbour" main.prg     -n -w -q -I"$HBINC" -I"$BUILDDIR" -I"$HBROOT/include" -omain.c
 "$HBBIN/harbour" erp_meta.prg -n -w -q -I"$HBINC" -I"$BUILDDIR" -I"$HBROOT/include" -oerp_meta.c
 "$HBBIN/harbour" erp_http.prg -n -w -q -I"$HBINC" -I"$BUILDDIR" -I"$HBROOT/include" -oerp_http.c
+"$HBBIN/harbour" erp_proc.prg -n -w -q -I"$HBINC" -I"$BUILDDIR" -I"$HBROOT/include" -oerp_proc.c
 "$HBBIN/harbour" classes.prg  -n -w -q -I"$HBINC" -I"$BUILDDIR" -I"$HBROOT/include" -oclasses.c
 
 echo "[2] gcc"
@@ -58,6 +59,7 @@ CFLAGS="-O2 -Wno-unused-value $GTK_CFLAGS -I$HBINC -I$HBROOT/include -I$BUILDDIR
 gcc $CFLAGS -c main.c -o main.o
 gcc $CFLAGS -c erp_meta.c -o erp_meta.o
 gcc $CFLAGS -c erp_http.c -o erp_http.o
+gcc $CFLAGS -c erp_proc.c -o erp_proc.o
 gcc $CFLAGS -c classes.c -o classes.o
 gcc $CFLAGS -c "$HBROOT/source/backends/gtk3/gtk3_core.c" -o gtk3_core.o
 gcc $CFLAGS -c "$PROJDIR/linux_stubs.c" -o linux_stubs.o
@@ -66,7 +68,7 @@ VMLIB="-lhbvm"
 [ -f "$HBLIB/libhbvmmt.a" ] || [ -f "$HBLIB/hbvmmt.a" ] && VMLIB="-lhbvmmt"
 
 echo "[3] link"
-gcc main.o erp_meta.o erp_http.o classes.o gtk3_core.o linux_stubs.o -O2 -o "$OUT" \
+gcc main.o erp_meta.o erp_http.o erp_proc.o classes.o gtk3_core.o linux_stubs.o -O2 -o "$OUT" \
   -L"$HBLIB" \
   -Wl,--start-group \
   -lhbcommon $VMLIB -lhbrtl -lhbrdd -lhbmacro -lhblang -lhbcpage -lhbpp \

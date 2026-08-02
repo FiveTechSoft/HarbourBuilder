@@ -77,7 +77,7 @@ if not exist "%BUILDDIR%\main.prg" (
   exit /b 1
 )
 
-echo [2] Harbour compile main + erp_meta + erp_http + erp_db + classes
+echo [2] Harbour compile main + erp_meta + erp_http + erp_db + erp_proc + classes
 "%HBBIN%\harbour.exe" main.prg -n -w -q -i"%HBINC%" -i"%BUILDDIR%" -i"%HBROOT%\include" -omain.c
 if errorlevel 1 (
   echo HARBOUR FAILED on main.prg
@@ -99,6 +99,12 @@ if errorlevel 1 (
   echo HARBOUR FAILED on erp_db.prg
   exit /b 1
 )
+copy /y "%PROJDIR%\erp_proc.prg" "%BUILDDIR%\erp_proc.prg" >nul
+"%HBBIN%\harbour.exe" erp_proc.prg -n -w -q -i"%HBINC%" -i"%BUILDDIR%" -i"%HBROOT%\include" -oerp_proc.c
+if errorlevel 1 (
+  echo HARBOUR FAILED on erp_proc.prg
+  exit /b 1
+)
 "%HBBIN%\harbour.exe" classes.prg -n -w -q -i"%HBINC%" -i"%BUILDDIR%" -i"%HBROOT%\include" -oclasses.c
 if errorlevel 1 (
   echo HARBOUR FAILED on classes.prg
@@ -114,6 +120,8 @@ if errorlevel 1 exit /b 1
 cl.exe %CL_BASE% erp_http.c /Foerp_http.obj
 if errorlevel 1 exit /b 1
 cl.exe %CL_BASE% erp_db.c /Foerp_db.obj
+if errorlevel 1 exit /b 1
+cl.exe %CL_BASE% erp_proc.c /Foerp_proc.obj
 if errorlevel 1 exit /b 1
 cl.exe %CL_BASE% classes.c /Foclasses.obj
 if errorlevel 1 exit /b 1
@@ -149,7 +157,7 @@ if errorlevel 1 (
 )
 
 echo [4] Link FiveTech_ERP.exe  (hbvmmt)
-set "OBJS=main.obj erp_meta.obj erp_http.obj erp_db.obj classes.obj tcontrol.obj tform.obj tcontrols.obj hbbridge.obj hb_db_real.obj fwh_webview2.obj fte_errdlg.obj"
+set "OBJS=main.obj erp_meta.obj erp_http.obj erp_db.obj erp_proc.obj classes.obj tcontrol.obj tform.obj tcontrols.obj hbbridge.obj hb_db_real.obj fwh_webview2.obj fte_errdlg.obj"
 if exist stddlgs.obj set "OBJS=%OBJS% stddlgs.obj"
 
 set "HBLIBS=hbvmmt.lib hbrtl.lib hbcommon.lib hblang.lib hbrdd.lib hbmacro.lib hbpp.lib hbcplr.lib hbct.lib hbhsx.lib hbsix.lib hbusrrdd.lib rddntx.lib rddnsx.lib rddcdx.lib rddfpt.lib hbcpage.lib hbpcre.lib hbzlib.lib hbdebug.lib hbsqlit3.lib sqlite3.lib gtgui.lib gtwin.lib gtwvt.lib hbmainwin.lib"

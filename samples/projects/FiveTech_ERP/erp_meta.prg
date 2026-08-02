@@ -113,11 +113,12 @@ static function MetaDefaultPath( cKey )
    case cKey == "modules" ; return "modules.json"
    case cKey == "theme"   ; return "theme.json"
    case cKey == "demo.main" ; return "demo.json"
-   case Left( cKey, 7 ) == "screen." ; return "screens" + hb_ps() + SubStr( cKey, 8 ) + ".json"
-   case Left( cKey, 5 ) == "data."   ; return "data" + hb_ps() + SubStr( cKey, 6 ) + ".json"
-   case Left( cKey, 7 ) == "lookup." ; return "lookups" + hb_ps() + SubStr( cKey, 8 ) + ".json"
-   case Left( cKey, 7 ) == "report." ; return "reports" + hb_ps() + SubStr( cKey, 8 ) + ".json"
-   case Left( cKey, 5 ) == "demo."   ; return "demo" + hb_ps() + SubStr( cKey, 6 ) + ".json"
+   case Left( cKey, 7 ) == "screen."  ; return "screens" + hb_ps() + SubStr( cKey, 8 ) + ".json"
+   case Left( cKey, 8 ) == "process." ; return "processes" + hb_ps() + SubStr( cKey, 9 ) + ".json"
+   case Left( cKey, 5 ) == "data."    ; return "data" + hb_ps() + SubStr( cKey, 6 ) + ".json"
+   case Left( cKey, 7 ) == "lookup."  ; return "lookups" + hb_ps() + SubStr( cKey, 8 ) + ".json"
+   case Left( cKey, 7 ) == "report."  ; return "reports" + hb_ps() + SubStr( cKey, 8 ) + ".json"
+   case Left( cKey, 5 ) == "demo."    ; return "demo" + hb_ps() + SubStr( cKey, 6 ) + ".json"
    endcase
 return ""
 
@@ -261,6 +262,7 @@ function ErpMetaCatalog()
    local cRoot := ErpMetaRoot()
    local aPairs := { ;
       { "screens" + hb_ps(), "screen." }, ;
+      { "processes" + hb_ps(), "process." }, ;
       { "data" + hb_ps(), "data." }, ;
       { "lookups" + hb_ps(), "lookup." }, ;
       { "reports" + hb_ps(), "report." } }
@@ -293,7 +295,10 @@ function ErpMetaCatalog()
          if ValType( h ) == "H" .and. ! Empty( hb_HKeys( h ) )
             AAdd( aList, { "key" => cKey, ;
                "kind" => iif( hb_HHasKey( h, "kind" ), ErpToStr( h[ "kind" ] ), Left( aP[ 2 ], Len( aP[ 2 ] ) - 1 ) ), ;
-               "title" => iif( hb_HHasKey( h, "title" ), ErpToStr( h[ "title" ] ), cKey ) } )
+               "title" => iif( hb_HHasKey( h, "title" ), ErpToStr( h[ "title" ] ), cKey ), ;
+               "layout" => iif( hb_HHasKey( h, "layout" ), ErpToStr( h[ "layout" ] ), "" ), ;
+               "dataRef" => iif( hb_HHasKey( h, "dataRef" ), ErpToStr( h[ "dataRef" ] ), "" ), ;
+               "handler" => iif( hb_HHasKey( h, "handler" ), ErpToStr( h[ "handler" ] ), "" ) } )
          endif
       next
    next
