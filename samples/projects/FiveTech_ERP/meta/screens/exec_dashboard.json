@@ -1,0 +1,7 @@
+{
+  "id": "screen.exec_dashboard",
+  "kind": "screen",
+  "layout": "dashboard",
+  "title": "Executive dashboard",
+  "dataRef": "data.exec_kpis"
+}

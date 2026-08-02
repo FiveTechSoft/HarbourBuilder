@@ -1,0 +1,13 @@
+{
+  "id": "data.cons_approvals",
+  "kind": "data",
+  "entity": "workflow_item",
+  "rows": [
+    {"code":"WF-101","type":"Contract","subject":"ENG-0002 retainer renewal — NORTH INSURANCE","requestedBy":"demo","status":"Pending","priority":"High","created":"2026-07-28"},
+    {"code":"WF-102","type":"Discount","subject":"10% discount on CQ-0002","requestedBy":"admin","status":"In review","priority":"Normal","created":"2026-07-30"},
+    {"code":"WF-103","type":"Expense","subject":"Travel to ACME HQ — Madrid","requestedBy":"demo","status":"Pending","priority":"Normal","created":"2026-07-31"},
+    {"code":"WF-104","type":"Subcontracting","subject":"UX contractor for PRJ-100","requestedBy":"admin","status":"Approved","priority":"Low","created":"2026-07-20"},
+    {"code":"WF-105","type":"Contract","subject":"CQ-0001 signature — ACME HEALTH","requestedBy":"demo","status":"Approved","priority":"High","created":"2026-07-02"},
+    {"code":"WF-106","type":"Expense","subject":"Conference tickets Q3","requestedBy":"nurse","status":"Pending","priority":"Low","created":"2026-08-01"}
+  ]
+}

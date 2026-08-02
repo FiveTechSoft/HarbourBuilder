@@ -1,0 +1,16 @@
+{
+  "id": "lookup.parties",
+  "kind": "lookup",
+  "title": "Clients & contacts",
+  "dataRef": "data.parties",
+  "valueField": "code",
+  "labelField": "name",
+  "pageSize": 10,
+  "minChars": 1,
+  "columns": [
+    { "id": "code", "label": "Code", "width": 110 },
+    { "id": "name", "label": "Name", "flex": 1 },
+    { "id": "city", "label": "City", "width": 120 }
+  ],
+  "searchFields": ["code", "name", "city"]
+}

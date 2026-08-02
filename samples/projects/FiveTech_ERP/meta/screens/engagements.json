@@ -1,0 +1,23 @@
+{
+  "id": "screen.engagements",
+  "kind": "screen",
+  "layout": "list",
+  "title": "Engagements",
+  "dataRef": "data.engagements",
+  "keyField": "code",
+  "searchFields": ["code", "name", "client", "status"],
+  "grid": {
+    "columns": [
+      { "id": "code", "label": "Code", "type": "text", "required": true, "pattern": "^ENG-\\d{4}$", "msg": "Code must look like ENG-0000" },
+      { "id": "name", "label": "Engagement", "type": "text", "required": true, "minLength": 5 },
+      { "id": "client", "label": "Client", "type": "lookup", "lookup": "lookup.parties", "required": true },
+      { "id": "manager", "label": "Manager", "type": "lookup", "lookup": "lookup.consultants" },
+      { "id": "status", "label": "Status", "type": "select", "options": ["Draft", "Active", "On hold", "Closed"] },
+      { "id": "billingType", "label": "Billing", "type": "select", "options": ["Fixed price", "Time & materials", "Retainer"] },
+      { "id": "amount", "label": "Amount", "type": "money", "format": "money", "align": "right", "min": 0 },
+      { "id": "startDate", "label": "Start", "type": "text", "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "msg": "Use ISO date YYYY-MM-DD" },
+      { "id": "endDate", "label": "End", "type": "text", "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "msg": "Use ISO date YYYY-MM-DD", "when": "status != 'Draft'" }
+    ]
+  },
+  "toolbar": ["add", "edit", "delete", "print", "pdf", "excel", "refresh"]
+}

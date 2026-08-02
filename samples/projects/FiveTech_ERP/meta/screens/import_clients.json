@@ -1,0 +1,8 @@
+{
+  "id": "screen.import_clients",
+  "kind": "screen",
+  "layout": "import",
+  "title": "Client CSV import",
+  "targetDataRef": "data.parties",
+  "sampleHeaders": ["code", "name", "email", "phone", "city"]
+}

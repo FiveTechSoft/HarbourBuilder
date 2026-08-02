@@ -1,0 +1,12 @@
+{
+  "id": "data.cons_invoices",
+  "kind": "data",
+  "entity": "invoice",
+  "rows": [
+    { "code": "CINV-0001", "date": "2026-07-05", "client": "C-ACME", "project": "PRJ-100", "status": "Posted", "currency": "EUR", "total": 9680.00, "notes": "Portal phase 2 — June hours" },
+    { "code": "CINV-0002", "date": "2026-07-12", "client": "C-INS", "project": "PRJ-101", "status": "Open", "currency": "EUR", "total": 6000.00, "notes": "Retainer July–August" },
+    { "code": "CINV-0003", "date": "2026-07-18", "client": "P0004", "project": "PRJ-103", "status": "Open", "currency": "EUR", "total": 1870.00, "notes": "UX review + training" },
+    { "code": "CINV-0004", "date": "2026-07-25", "client": "C-ACME", "project": "PRJ-102", "status": "Settled", "currency": "EUR", "total": 4250.00, "notes": "CRM code audit" },
+    { "code": "CINV-0005", "date": "2026-08-01", "client": "C-INS", "project": "", "status": "Open", "currency": "EUR", "total": 3400.00, "notes": "API hotfixes" }
+  ]
+}

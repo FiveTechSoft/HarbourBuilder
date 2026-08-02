@@ -1,0 +1,16 @@
+{
+  "id": "lookup.projects",
+  "kind": "lookup",
+  "title": "Projects",
+  "dataRef": "data.projects",
+  "valueField": "code",
+  "labelField": "name",
+  "pageSize": 10,
+  "minChars": 1,
+  "columns": [
+    { "id": "code", "label": "Code", "width": 110 },
+    { "id": "name", "label": "Name", "flex": 1 },
+    { "id": "status", "label": "Status", "width": 90 }
+  ],
+  "searchFields": ["code", "name"]
+}

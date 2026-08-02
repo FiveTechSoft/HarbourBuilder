@@ -1,0 +1,13 @@
+{
+  "id": "screen.cons_agenda",
+  "kind": "screen",
+  "layout": "calendar",
+  "title": "Consultants agenda",
+  "dataRef": "data.cons_agenda",
+  "resources": [
+    {"id":"consult1","label":"A. Rivera (Senior)"},
+    {"id":"consult2","label":"J. Blake (PM)"},
+    {"id":"consult3","label":"C. Morgan (Consultant)"}
+  ],
+  "timeField": "time"
+}

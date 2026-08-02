@@ -4,6 +4,7 @@
   "layout": "wizard",
   "title": "Admission wizard",
   "dataRef": "data.patient_cards",
+  "keyField": "code",
   "steps": [
     {"id":"s1","label":"Patient","fields":["code","name","dob"]},
     {"id":"s2","label":"Contact","fields":["phone","email","city"]},

@@ -1,0 +1,14 @@
+{
+  "id": "data.cons_invoice_lines",
+  "kind": "data",
+  "entity": "invoice_line",
+  "rows": [
+    { "code": "L-01", "invoice": "CINV-0001", "article": "CONSULT-DEV", "description": "Senior development", "qty": 80, "price": 96.00, "amount": 7680.00 },
+    { "code": "L-02", "invoice": "CINV-0001", "article": "CONSULT-PM", "description": "Project management", "qty": 20, "price": 100.00, "amount": 2000.00 },
+    { "code": "L-01", "invoice": "CINV-0002", "article": "SUPPORT", "description": "Monthly retainer (2 months)", "qty": 2, "price": 3000.00, "amount": 6000.00 },
+    { "code": "L-01", "invoice": "CINV-0003", "article": "CONSULT-UX", "description": "UX review workshop", "qty": 10, "price": 85.00, "amount": 850.00 },
+    { "code": "L-02", "invoice": "CINV-0003", "article": "TRAINING", "description": "Team training day", "qty": 8, "price": 127.50, "amount": 1020.00 },
+    { "code": "L-01", "invoice": "CINV-0004", "article": "AUDIT", "description": "Code audit", "qty": 25, "price": 170.00, "amount": 4250.00 },
+    { "code": "L-01", "invoice": "CINV-0005", "article": "CONSULT-DEV", "description": "API hotfixes", "qty": 40, "price": 85.00, "amount": 3400.00 }
+  ]
+}

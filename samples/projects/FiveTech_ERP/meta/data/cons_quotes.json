@@ -1,0 +1,11 @@
+{
+  "id": "data.cons_quotes",
+  "kind": "data",
+  "entity": "quote",
+  "rows": [
+    { "code": "CQ-0001", "date": "2026-07-02", "client": "C-ACME", "status": "Accepted", "currency": "EUR", "subtotal": 24000.00, "tax": 5040.00, "total": 29040.00 },
+    { "code": "CQ-0002", "date": "2026-07-15", "client": "C-INS", "status": "Sent", "currency": "EUR", "subtotal": 9000.00, "tax": 1890.00, "total": 10890.00 },
+    { "code": "CQ-0003", "date": "2026-07-21", "client": "P0004", "status": "Draft", "currency": "EUR", "subtotal": 3400.00, "tax": 714.00, "total": 4114.00 },
+    { "code": "CQ-0004", "date": "2026-06-30", "client": "C-ACME", "status": "Rejected", "currency": "EUR", "subtotal": 5100.00, "tax": 1071.00, "total": 6171.00 }
+  ]
+}

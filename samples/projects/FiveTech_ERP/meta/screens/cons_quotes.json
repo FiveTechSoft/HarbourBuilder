@@ -1,0 +1,43 @@
+{
+  "id": "screen.cons_quotes",
+  "kind": "screen",
+  "layout": "document",
+  "title": "Quotes (document + totals)",
+  "dataRef": "data.cons_quotes",
+  "keyField": "code",
+  "taxRate": 21,
+  "amountField": "amount",
+  "totalFields": {"subtotal": "subtotal", "tax": "tax", "total": "total"},
+  "searchFields": ["code", "client", "status"],
+  "grid": {
+    "columns": [
+      {"id":"code","label":"Quote #","type":"text","required":true},
+      {"id":"date","label":"Date","type":"text","pattern":"^\\d{4}-\\d{2}-\\d{2}$","msg":"Use ISO date YYYY-MM-DD"},
+      {"id":"client","label":"Client","type":"lookup","lookup":"lookup.parties","required":true},
+      {"id":"status","label":"Status","type":"select","options":["Draft","Sent","Accepted","Rejected"]},
+      {"id":"currency","label":"Cur.","type":"select","options":["EUR","USD","GBP"]},
+      {"id":"subtotal","label":"Subtotal","type":"money","format":"money","align":"right"},
+      {"id":"tax","label":"Tax","type":"money","format":"money","align":"right"},
+      {"id":"total","label":"Total","type":"money","format":"money","align":"right"}
+    ]
+  },
+  "toolbar": ["add","edit","delete","print","pdf","excel","refresh"],
+  "detail": {
+    "title": "Quote lines",
+    "dataRef": "data.cons_quote_lines",
+    "masterKey": "quote",
+    "keyField": "code",
+    "grid": {
+      "columns": [
+        {"id":"code","label":"Line","type":"text","required":true},
+        {"id":"quote","label":"Quote","type":"text"},
+        {"id":"article","label":"Article","type":"select","options":["CONSULT-DEV","CONSULT-PM","CONSULT-UX","AUDIT","TRAINING","SUPPORT","OTHER"]},
+        {"id":"description","label":"Description","type":"text","required":true},
+        {"id":"qty","label":"Qty","type":"text","align":"right","min":0},
+        {"id":"price","label":"Price","type":"money","format":"money","align":"right","min":0},
+        {"id":"amount","label":"Amount","type":"money","format":"money","align":"right","min":0}
+      ]
+    },
+    "toolbar": ["add","edit","delete","refresh"]
+  }
+}

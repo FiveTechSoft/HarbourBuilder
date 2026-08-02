@@ -75,10 +75,13 @@ Login: **admin/1234** or **demo/demo**
 sync_meta.bat
 ```
 
-`build_win64.bat` runs this automatically. Runtime order:
+`build_win64.bat` runs this automatically. Runtime order (`ErpMetaRoot()` in `erp_meta.prg`):
 
 1. `./meta/` (exact FWH copy)
-2. `C:\fwteam\samples\DesktopWeb\meta\` (live FWH if copy missing)
+2. `../Resources/meta/` (inside macOS .app bundle)
 3. `./meta_fwh/` (legacy junction)
+4. `C:\fwteam\samples\DesktopWeb\meta\` (live FWH, Windows dev only)
 
 > Looking different in the window is usually the **HTML shell** (`www\index.html` is a slim client). FWH serves the full dashboard HTML from `login.prg`. Meta JSON can be identical while the UI chrome still differs.
+
+> **Warning — generated files:** `sync_meta.bat` (run by every build) mirrors `./meta` from the FWH tree and **regenerates `www\login.html` / `www\dashboard.html`** from the TEXT blocks in `C:\fwteam\samples\DesktopWeb\login.prg` (`_extract_fwh_html.py`). Never edit `www\*.html` or `./meta` locally as the only copy — apply durable changes in the FWH source and re-sync, or they are lost on the next build.

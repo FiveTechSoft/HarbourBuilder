@@ -3,6 +3,8 @@
 
 static s_hMeta := { => }
 static s_cRoot := ""
+// MT HTTP server: protect s_hMeta (ErpMetaGet / ErpMetaClearCache / invalidate)
+static s_mtxMeta := hb_MutexCreate()
 
 //--------------------------------------------------------------------
 function ErpMetaRoot()
@@ -120,6 +122,60 @@ static function MetaDefaultPath( cKey )
 return ""
 
 //--------------------------------------------------------------------
+// Charset guard for vertical pack names (no traversal via app.vertical).
+static function MetaNameSafe( cName )
+
+   local n, cCh
+
+   cName := AllTrim( ErpToStr( cName ) )
+   if Empty( cName )
+      return .F.
+   endif
+   for n := 1 to Len( cName )
+      cCh := SubStr( cName, n, 1 )
+      if ! ( cCh >= "A" .and. cCh <= "Z" ) .and. ! ( cCh >= "a" .and. cCh <= "z" ) .and. ;
+         ! ( cCh >= "0" .and. cCh <= "9" ) .and. ! cCh $ "_-"
+         return .F.
+      endif
+   next
+return .T.
+
+//--------------------------------------------------------------------
+// Vertical-aware "modules" resolution: with app.vertical set and a pack file
+// present, the modules key reads/writes meta/verticals/<name>/modules.json;
+// otherwise the base meta/modules.json. Raw app read: no cache, no lock,
+// no recursion (only the "modules" key goes through here).
+static function MetaModulesRel()
+
+   local cJson, hApp := { => }, cVert := "", cTry
+
+   cJson := ErpMetaGetRaw( "app" )
+   if ! Empty( cJson )
+      hb_jsonDecode( cJson, @hApp )
+   endif
+   if ValType( hApp ) == "H"
+      cVert := AllTrim( ErpToStr( hb_HGetDef( hApp, "vertical", "" ) ) )
+   endif
+   if ! Empty( cVert ) .and. MetaNameSafe( cVert )
+      cTry := "verticals" + hb_ps() + cVert + hb_ps() + "modules.json"
+      if File( ErpMetaRoot() + cTry )
+         return cTry
+      endif
+   endif
+return "modules.json"
+
+//--------------------------------------------------------------------
+// MetaDefaultPath + vertical override for the "modules" key.
+static function MetaKeyRelPath( cKey )
+
+   local cRel := MetaDefaultPath( cKey )
+
+   if AllTrim( cKey ) == "modules"
+      cRel := MetaModulesRel()
+   endif
+return cRel
+
+//--------------------------------------------------------------------
 // Raw UTF-8 JSON text from disk (no decode/encode). Prefer for HTTP responses
 // so multi-byte chars (€, ↔, accents) stay valid for the browser JSON.parse.
 function ErpMetaGetRaw( cKey )
@@ -131,7 +187,7 @@ function ErpMetaGetRaw( cKey )
       return ""
    endif
 
-   cRel := MetaDefaultPath( cKey )
+   cRel := MetaKeyRelPath( cKey )
    if Empty( cRel )
       return ""
    endif
@@ -154,17 +210,25 @@ function ErpMetaGet( cKey )
 
    local h := { => }
    local cRel, cFull, cJson
+   local lCached := .F.
 
    cKey := AllTrim( cKey )
    if Empty( cKey )
       return h
    endif
 
+   // cache lookup under mutex (disk read stays outside the lock)
+   hb_MutexLock( s_mtxMeta )
    if hb_HHasKey( s_hMeta, cKey )
-      return s_hMeta[ cKey ]
+      h := s_hMeta[ cKey ]
+      lCached := .T.
+   endif
+   hb_MutexUnlock( s_mtxMeta )
+   if lCached
+      return h
    endif
 
-   cRel := MetaDefaultPath( cKey )
+   cRel := MetaKeyRelPath( cKey )
    if Empty( cRel )
       return h
    endif
@@ -184,7 +248,9 @@ function ErpMetaGet( cKey )
       return { => }
    endif
 
+   hb_MutexLock( s_mtxMeta )
    s_hMeta[ cKey ] := h
+   hb_MutexUnlock( s_mtxMeta )
 return h
 
 //--------------------------------------------------------------------
@@ -236,7 +302,51 @@ return aList
 
 //--------------------------------------------------------------------
 function ErpMetaClearCache()
+   hb_MutexLock( s_mtxMeta )
    s_hMeta := { => }
+   hb_MutexUnlock( s_mtxMeta )
+return nil
+
+//--------------------------------------------------------------------
+// Full path on disk for a meta key ("" if the key has no known mapping).
+// Public wrapper around MetaDefaultPath() for the HTTP POST handlers.
+function ErpMetaPathForKey( cKey )
+
+   local cRel := MetaKeyRelPath( cKey )
+
+   if Empty( cRel )
+      return ""
+   endif
+return ErpMetaRoot() + cRel
+
+//--------------------------------------------------------------------
+// Drop one key from the cache (POST /api/meta and /api/dataset use it
+// after writing the JSON file so the next GET re-reads from disk).
+function ErpMetaInvalidate( cKey )
+
+   cKey := AllTrim( ErpToStr( cKey ) )
+   if Empty( cKey )
+      return nil
+   endif
+   hb_MutexLock( s_mtxMeta )
+   if hb_HHasKey( s_hMeta, cKey )
+      hb_HDel( s_hMeta, cKey )
+   endif
+   hb_MutexUnlock( s_mtxMeta )
+return nil
+
+//--------------------------------------------------------------------
+// Put/replace one decoded doc in the cache (POST /api/meta writeFile:false —
+// memory-only designer save, no file write).
+function ErpMetaCachePut( cKey, hDoc )
+
+   cKey := AllTrim( ErpToStr( cKey ) )
+   if Empty( cKey ) .or. ValType( hDoc ) != "H"
+      return nil
+   endif
+   hb_MutexLock( s_mtxMeta )
+   s_hMeta[ cKey ] := hDoc
+   hb_MutexUnlock( s_mtxMeta )
 return nil
 
 //--------------------------------------------------------------------

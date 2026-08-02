@@ -44,6 +44,7 @@ At load, `MetaApplyVertical()` imports `meta/verticals/<name>/modules.json` over
 | clinic | `verticals/clinic/` | Clinic + CRM (patients, exams, admission) |
 | services | `verticals/services/` | Professional services (projects, timesheets) |
 | retail | `verticals/retail/` | Store / POS (products, stock, tickets) |
+| demo | `verticals/demo/` | Consulting group — full showcase: all 17 layouts + lookups/validations/whens |
 
 Switch pack: **Edit app → Vertical pack**, or set `"vertical"` in `app.json` and restart / save.
 
@@ -159,7 +160,7 @@ Why **several JSON files** + **one table**:
 - `GET /api/meta` — list of keys/kinds/titles (no big memos)
 - `GET /api/meta?key=lookup.patients` — one document
 - `POST /api/meta` — **runtime form designer**: body `{ "key":"screen.patients", "doc":{...}, "writeFile":true }`
-  (auth required; only `screen.*` / `lookup.*`). Updates memory cache, `appmeta.dbf`, and the JSON file under `meta\`.
+  (auth required, admin only; keys `app`, `modules`, `screen.*` / `lookup.*` / `report.*`). Updates memory cache and the JSON file under `meta\`. With `app.vertical` set, the `modules` key resolves to that pack's `verticals/<name>/modules.json` for both reads and writes.
 - `GET /api/meta/fields?key=data.patients` — field names from first data row (column picker)
 
 ## Product docs
@@ -215,7 +216,7 @@ Opens from **Design form**. Layout dropdown covers all ERP types. Specialized pa
 | Layout | Extra UI |
 |--------|----------|
 | `list` | Grid columns + control types (text/money/select/checklist/checkbox) |
-| `master-detail` / `document` | Detail dataRef, link key, master/detail columns |
+| `master-detail` / `document` | Detail dataRef, masterKey, master/detail columns |
 | `form` / `wizard` | Key field, tabs/steps (`id\|Label\|field1,field2`), field controls |
 | `workflow` | Status field, transitions (`Stage = Next1, Next2`), queue columns |
 | Other specialized | Layout is preserved; JSON extras kept on save |

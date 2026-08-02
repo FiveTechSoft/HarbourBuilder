@@ -1,0 +1,33 @@
+{
+  "id": "screen.engagement_form",
+  "kind": "screen",
+  "layout": "form",
+  "title": "Engagement card",
+  "dataRef": "data.engagements",
+  "keyField": "code",
+  "tabs": [
+    { "id": "general", "label": "General", "fields": ["code", "name", "client", "account", "status"] },
+    { "id": "delivery", "label": "Delivery", "fields": ["project", "manager", "startDate", "endDate"] },
+    { "id": "commercial", "label": "Commercial", "fields": ["billingType", "amount", "retainerFee", "probability", "currency", "autoRenew", "renewalDate", "notes"] }
+  ],
+  "fields": [
+    { "id": "code", "label": "Code", "type": "text", "required": true, "pattern": "^ENG-\\d{4}$", "msg": "Code must look like ENG-0000" },
+    { "id": "name", "label": "Engagement name", "type": "text", "required": true, "minLength": 5 },
+    { "id": "client", "label": "Client", "type": "lookup", "lookup": "lookup.parties", "required": true },
+    { "id": "account", "label": "Account", "type": "lookup", "lookup": "lookup.accounts" },
+    { "id": "status", "label": "Status", "type": "select", "options": ["Draft", "Active", "On hold", "Closed"], "required": true, "default": "Draft" },
+    { "id": "project", "label": "Project", "type": "lookup", "lookup": "lookup.projects" },
+    { "id": "manager", "label": "Manager", "type": "lookup", "lookup": "lookup.consultants", "required": true },
+    { "id": "startDate", "label": "Start date", "type": "text", "required": true, "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "msg": "Use ISO date YYYY-MM-DD" },
+    { "id": "endDate", "label": "End date", "type": "text", "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "msg": "Use ISO date YYYY-MM-DD", "when": "status != 'Draft'", "enableWhen": "status != 'Closed'" },
+    { "id": "billingType", "label": "Billing type", "type": "select", "options": ["Fixed price", "Time & materials", "Retainer"], "required": true },
+    { "id": "amount", "label": "Amount", "type": "money", "format": "money", "align": "right", "required": true, "min": 0 },
+    { "id": "retainerFee", "label": "Retainer fee / month", "type": "money", "format": "money", "align": "right", "required": true, "min": 0, "when": "billingType == 'Retainer'", "msg": "Retainer fee is required for retainer engagements" },
+    { "id": "probability", "label": "Probability %", "type": "text", "align": "right", "min": 0, "max": 100, "when": "status == 'Draft'" },
+    { "id": "currency", "label": "Currency", "type": "select", "options": ["EUR", "USD", "GBP"], "default": "EUR" },
+    { "id": "autoRenew", "label": "Auto-renew", "type": "checkbox", "when": "billingType == 'Retainer'" },
+    { "id": "renewalDate", "label": "Renewal date", "type": "text", "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "msg": "Use ISO date YYYY-MM-DD", "when": "billingType == 'Retainer'", "enableWhen": "autoRenew" },
+    { "id": "notes", "label": "Notes", "type": "text", "maxLength": 200 }
+  ],
+  "toolbar": ["add", "edit", "delete", "refresh"]
+}

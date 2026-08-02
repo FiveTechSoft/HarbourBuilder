@@ -1,0 +1,20 @@
+{
+  "id": "report.engagements",
+  "kind": "report",
+  "title": "Engagements by status",
+  "dataRef": "data.engagements",
+  "sourceScreen": "screen.engagements",
+  "orientation": "landscape",
+  "groupBy": "status",
+  "sumFields": ["amount"],
+  "columns": [
+    { "id": "code", "label": "Code" },
+    { "id": "name", "label": "Engagement" },
+    { "id": "client", "label": "Client" },
+    { "id": "billingType", "label": "Billing" },
+    { "id": "amount", "label": "Amount", "type": "money", "align": "right", "format": "money" },
+    { "id": "startDate", "label": "Start" },
+    { "id": "endDate", "label": "End" }
+  ],
+  "footerNote": "Amounts in EUR, before tax."
+}

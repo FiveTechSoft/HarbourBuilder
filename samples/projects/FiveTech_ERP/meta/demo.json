@@ -88,23 +88,27 @@
       "screenByVertical": {
         "clinic": "screen.patients",
         "services": "screen.projects",
-        "retail": "screen.products"
+        "retail": "screen.products",
+        "demo": "screen.engagements"
       },
       "screen": "screen.patients",
       "menuIdByVertical": {
         "clinic": "patients",
         "services": "projects",
-        "retail": "products"
+        "retail": "products",
+        "demo": "engagements"
       },
       "labelByVertical": {
         "clinic": "Patients",
         "services": "Projects",
-        "retail": "Products"
+        "retail": "Products",
+        "demo": "Engagements"
       },
       "captionByVertical": {
         "clinic": "Clinic pack: Patients master — clinic language on top of party codes. Lists are still meta grids with search, toolbar and CRUD.",
         "services": "Services pack: Projects — budget, spent, status and type. Delivery work sits next to CRM clients.",
-        "retail": "Retail pack: Products — SKU, barcode, tax and price. Store catalog ready for POS."
+        "retail": "Retail pack: Products — SKU, barcode, tax and price. Store catalog ready for POS.",
+        "demo": "Demo pack: Engagements — a full consulting list with F2 lookups, field validations and conditional (when) fields in the add/edit form."
       },
       "caption": "Active vertical showcase",
       "durationMs": 6000,
@@ -116,23 +120,27 @@
       "screenByVertical": {
         "clinic": "screen.admission",
         "services": "screen.timesheets",
-        "retail": "screen.pos_sales"
+        "retail": "screen.pos_sales",
+        "demo": "screen.onboarding"
       },
       "screen": "screen.admission",
       "menuIdByVertical": {
         "clinic": "admission",
         "services": "timesheets",
-        "retail": "pos_sales"
+        "retail": "pos_sales",
+        "demo": "onboarding"
       },
       "labelByVertical": {
         "clinic": "Admission",
         "services": "Timesheets",
-        "retail": "POS tickets"
+        "retail": "POS tickets",
+        "demo": "Client onboarding"
       },
       "captionByVertical": {
         "clinic": "Layout wizard: Admission — multi-step capture. Other layouts in the pack: form cards, calendars, invoices…",
         "services": "Timesheets: hours × rate, billable flag, approval status — classic professional-services loop.",
-        "retail": "POS tickets: register, cashier, tender and status — day sales without a full POS hardware stack."
+        "retail": "POS tickets: register, cashier, tender and status — day sales without a full POS hardware stack.",
+        "demo": "Client onboarding wizard: validated steps (code pattern, e-mail, required owner via F2 lookup) writing straight into the CRM parties master."
       },
       "caption": "Second vertical screen",
       "durationMs": 6000,
@@ -144,23 +152,27 @@
       "screenByVertical": {
         "clinic": "screen.invoices",
         "services": "screen.quotes",
-        "retail": "screen.stock"
+        "retail": "screen.stock",
+        "demo": "screen.cons_quotes"
       },
       "screen": "screen.invoices",
       "menuIdByVertical": {
         "clinic": "invoices",
         "services": "quotes",
-        "retail": "stock"
+        "retail": "stock",
+        "demo": "cons_quotes"
       },
       "labelByVertical": {
         "clinic": "Invoices",
         "services": "Quotes",
-        "retail": "Stock"
+        "retail": "Stock",
+        "demo": "Quotes"
       },
       "captionByVertical": {
         "clinic": "Layout master-detail: Invoices — header grid + linked lines. Toolbar: add/edit/delete, print, PDF, Excel.",
         "services": "Layout document: Quotes with line totals and default VAT from app.locale.taxRate. Recalc updates subtotal / tax / total.",
-        "retail": "Stock by warehouse: qty, min, reserved, bin and status — inventory sketch for the store."
+        "retail": "Stock by warehouse: qty, min, reserved, bin and status — inventory sketch for the store.",
+        "demo": "Consulting quotes: layout document with client F2 lookup, line totals and VAT from app.locale.taxRate. Recalc updates subtotal / tax / total."
       },
       "caption": "Documents or stock",
       "durationMs": 6000,

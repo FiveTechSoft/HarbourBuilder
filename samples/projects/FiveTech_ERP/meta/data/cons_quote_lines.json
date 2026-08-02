@@ -1,0 +1,12 @@
+{
+  "id": "data.cons_quote_lines",
+  "kind": "data",
+  "entity": "quote_line",
+  "rows": [
+    { "code": "L-01", "quote": "CQ-0001", "article": "CONSULT-DEV", "description": "Portal rebuild (fixed scope)", "qty": 200, "price": 96.00, "amount": 19200.00 },
+    { "code": "L-02", "quote": "CQ-0001", "article": "CONSULT-PM", "description": "Project management", "qty": 48, "price": 100.00, "amount": 4800.00 },
+    { "code": "L-01", "quote": "CQ-0002", "article": "SUPPORT", "description": "Q3 retainer", "qty": 3, "price": 3000.00, "amount": 9000.00 },
+    { "code": "L-01", "quote": "CQ-0003", "article": "CONSULT-UX", "description": "UX sprint", "qty": 40, "price": 85.00, "amount": 3400.00 },
+    { "code": "L-01", "quote": "CQ-0004", "article": "AUDIT", "description": "Security audit", "qty": 30, "price": 170.00, "amount": 5100.00 }
+  ]
+}

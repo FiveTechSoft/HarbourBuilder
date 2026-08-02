@@ -1,0 +1,13 @@
+{
+  "id": "data.exec_kpis",
+  "kind": "data",
+  "entity": "kpi",
+  "rows": [
+    {"id":"k1","label":"Active projects","value":14,"unit":"","trend":"+2","tone":"info"},
+    {"id":"k2","label":"Revenue (month)","value":86400,"unit":"EUR","trend":"+8%","tone":"ok"},
+    {"id":"k3","label":"Billable utilization","value":78,"unit":"%","trend":"+4%","tone":"ok"},
+    {"id":"k4","label":"Pipeline value","value":312000,"unit":"EUR","trend":"+12%","tone":"info"},
+    {"id":"k5","label":"Open invoices","value":6,"unit":"","trend":"-2","tone":"warn"},
+    {"id":"k6","label":"Avg. engagement margin","value":34,"unit":"%","trend":"+1pt","tone":"ok"}
+  ]
+}

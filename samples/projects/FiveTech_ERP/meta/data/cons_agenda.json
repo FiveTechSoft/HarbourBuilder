@@ -1,0 +1,14 @@
+{
+  "id": "data.cons_agenda",
+  "kind": "data",
+  "entity": "slot",
+  "rows": [
+    {"time":"08:30","consult1":"","consult2":"","consult3":"ACME — steering"},
+    {"time":"09:00","consult1":"C-ACME portal review","consult2":"","consult3":"Block"},
+    {"time":"09:30","consult1":"","consult2":"NORTH INSURANCE API","consult3":""},
+    {"time":"10:00","consult1":"Sprint planning","consult2":"","consult3":"C-INS workshop"},
+    {"time":"10:30","consult1":"","consult2":"RILEY QUINN advisory","consult3":""},
+    {"time":"11:00","consult1":"Block","consult2":"","consult3":""},
+    {"time":"11:30","consult1":"","consult2":"","consult3":"ACME — UAT"}
+  ]
+}

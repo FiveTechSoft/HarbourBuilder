@@ -1,0 +1,26 @@
+{
+  "id": "screen.onboarding",
+  "kind": "screen",
+  "layout": "wizard",
+  "title": "Client onboarding",
+  "dataRef": "data.parties",
+  "keyField": "code",
+  "steps": [
+    { "id": "general", "label": "General", "fields": ["code", "name", "kind"] },
+    { "id": "contact", "label": "Contact", "fields": ["email", "phone", "city"] },
+    { "id": "classification", "label": "Classification", "fields": ["account", "owner", "source", "roles", "active"] }
+  ],
+  "fields": [
+    { "id": "code", "label": "Client code", "type": "text", "required": true, "pattern": "^C-[A-Z0-9]+$", "msg": "Code must look like C-ACME" },
+    { "id": "name", "label": "Legal name", "type": "text", "required": true, "minLength": 3 },
+    { "id": "kind", "label": "Kind", "type": "select", "options": ["organization", "person"], "required": true, "default": "organization" },
+    { "id": "email", "label": "E-mail", "type": "text", "required": true, "email": true },
+    { "id": "phone", "label": "Phone", "type": "text", "pattern": "^[0-9+() .\\-]{6,20}$", "msg": "Invalid phone number" },
+    { "id": "city", "label": "City", "type": "text" },
+    { "id": "account", "label": "Account", "type": "lookup", "lookup": "lookup.accounts" },
+    { "id": "owner", "label": "Account owner", "type": "lookup", "lookup": "lookup.consultants", "required": true },
+    { "id": "source", "label": "Source", "type": "select", "options": ["Web", "Referral", "Campaign", "Partner", "Walk-in"] },
+    { "id": "roles", "label": "Roles", "type": "checklist", "options": ["Customer", "Lead", "VIP", "Supplier", "Partner"] },
+    { "id": "active", "label": "Active", "type": "checkbox", "default": true }
+  ]
+}

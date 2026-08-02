@@ -779,6 +779,18 @@
     display: inline-flex; align-items: center; gap: 8px; height: 34px;
     font-size: .9rem; font-weight: 500; text-transform: none; color: var(--text);
   }
+  .rec-lookup { display: flex; gap: 6px; align-items: center; }
+  .rec-lookup input { flex: 1; }
+  .rec-lookup .lkp-btn {
+    height: 34px; min-width: 38px; padding: 0 10px; border: 1px solid var(--line);
+    border-radius: 8px; background: var(--surface-2); color: var(--text);
+    cursor: pointer; font-size: .78rem; font-weight: 700;
+  }
+  .rec-lookup .lkp-btn:hover:not(:disabled) { background: var(--line); }
+  .rec-lookup .lkp-btn:disabled { opacity: .4; cursor: default; }
+  .rec-field.fld-error input, .rec-field.fld-error select,
+  .rec-field.fld-error .rec-check-list { border-color: #dc2626; }
+  .fld-err-msg { display: block; font-size: .72rem; color: #dc2626; margin-top: 3px; }
   .rec-foot {
     display: flex; justify-content: flex-end; gap: 8px; padding: 10px 14px;
     border-top: 1px solid var(--line); background: var(--surface-2);
@@ -1602,6 +1614,37 @@
   </div>
 </div>
 
+<!-- Generic meta lookup modal (F2 on lookup fields) -->
+<div class="painel-scrim" id="lookup-scrim"></div>
+<div class="painel-web" id="lookup-modal" role="dialog" aria-modal="true"
+     aria-labelledby="lookup-modal-title">
+  <div class="painel-bar" id="lookup-bar">
+    <span class="painel-tit" id="lookup-modal-title">Lookup</span>
+    <button type="button" class="painel-x" id="lookup-modal-close" title="Close">&#10005;</button>
+  </div>
+  <div class="painel-body">
+    <input type="search" class="f2-filter" id="lookup-modal-q"
+           placeholder="Type to filter..." autocomplete="off">
+    <div class="f2-list" id="lookup-modal-list">
+      <div class="f2-none">Loading...</div>
+    </div>
+    <div class="f2-nav" id="lookup-nav">
+      <button type="button" class="btn" id="lkp-first" title="First page">&laquo;</button>
+      <button type="button" class="btn" id="lkp-prev" title="Previous">&larr;</button>
+      <span class="pg" id="lkp-pg-label">Page 1 of 1</span>
+      <button type="button" class="btn" id="lkp-next" title="Next">&rarr;</button>
+      <button type="button" class="btn" id="lkp-last" title="Last page">&raquo;</button>
+    </div>
+  </div>
+  <div class="painel-foot">
+    <span class="hint" id="lookup-count">0 records</span>
+    <div class="actions">
+      <button type="button" class="btn" id="lkp-btn-cancel" title="Cancel">Cancel</button>
+      <button type="button" class="btn primary" id="lkp-btn-ok" title="Select highlighted row">Select</button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* Patient state + open/close MUST be first so onclick always works */
 var PAT = { q: "", page: 1, pages: 1, total: 0, rows: [], sel: -1, timer: null };
@@ -1855,6 +1898,19 @@ function moduleById(id) {
     }
   }
   return null;
+}
+
+function moduleIdByScreen(screenKey) {
+  var secs, items, i, j;
+  if (!screenKey || !MODULES || !MODULES.sections) return "";
+  secs = MODULES.sections;
+  for (i = 0; i < secs.length; i++) {
+    items = secs[i].items || [];
+    for (j = 0; j < items.length; j++) {
+      if (items[j].screen === screenKey) return items[j].id;
+    }
+  }
+  return "";
 }
 
 function applyAppBranding(app) {
@@ -2177,7 +2233,7 @@ function hideAllWorkspaces() {
 }
 
 var META_VIEW = {
-  screenKey: "", dataRef: "", columns: [], q: "", timer: null, doc: null,
+  screenKey: "", prevKey: "", dataRef: "", columns: [], q: "", timer: null, doc: null,
   toolbar: [], rows: [], selected: -1, keyField: "code",
   layout: "list",
   detail: null,
@@ -2188,7 +2244,7 @@ var META_VIEW = {
 };
 var DESIGNER = {
   key: "", doc: null, cols: [], detailCols: [], dirty: false,
-  toolbar: [], detailToolbar: [], layout: "list", colScope: "master"
+  toolbar: [], detailToolbar: [], layout: "list", colScope: "master", fromScreen: ""
 };
 var REC_EDIT = { mode: "add", keyValue: "", scope: "master" };
 var TOOLBAR_DEFS = [
@@ -2278,6 +2334,8 @@ function showMetaScreen(screenKey, label) {
   hideAllWorkspaces();
   var box = document.getElementById("ws-meta");
   if (box) box.style.display = "flex";
+  if (META_VIEW.screenKey && META_VIEW.screenKey !== screenKey)
+    META_VIEW.prevKey = META_VIEW.screenKey;
   META_VIEW.screenKey = screenKey;
   META_VIEW.q = "";
   META_VIEW.doc = null;
@@ -2357,7 +2415,7 @@ function applyMetaScreenDoc(scr, screenKey, label) {
   META_VIEW.detailSelected = -1;
   META_VIEW.masterKeyValue = "";
 
-  if (layout === "master-detail" && scr && scr.detail) {
+  if ((layout === "master-detail" || layout === "document") && scr && scr.detail) {
     d = scr.detail;
     dCols = (d.grid && d.grid.columns) ? d.grid.columns : [];
     dTb = Array.isArray(d.toolbar) ? d.toolbar.slice() : ["add", "edit", "delete", "refresh"];
@@ -2686,6 +2744,14 @@ function openRecordForm(mode, row, scope) {
       html += "<label class='rec-bool'><input type='checkbox' id='rec-f-" + esc(c.id) +
         "' data-fid='" + esc(c.id) + "' data-ctype='checkbox'" + checked +
         (ro ? " disabled" : "") + "> Yes</label>";
+    } else if (t === "lookup") {
+      html += "<div class='rec-lookup'>" +
+        "<input type='text' id='rec-f-" + esc(c.id) + "' data-fid='" + esc(c.id) +
+          "' data-lookup='" + esc(c.lookup || "") + "' value='" + esc(String(val)) + "'" +
+          (ro ? " readonly" : "") + ">" +
+        "<button type='button' class='lkp-btn' data-lkp-for='rec-f-" + esc(c.id) +
+          "' title='Lookup (F2)'" + (ro ? " disabled" : "") + ">F2</button>" +
+        "</div>";
     } else {
       html += "<input type='text' id='rec-f-" + esc(c.id) + "' data-fid='" + esc(c.id) +
         "' data-ctype='" + (t === "money" ? "money" : "text") + "'" +
@@ -2697,6 +2763,7 @@ function openRecordForm(mode, row, scope) {
   }
   if (!cols.length) html = "<p style='color:var(--muted)'>No columns defined.</p>";
   if (body) body.innerHTML = html;
+  applyWhens(body, cols, "rec-f");
   if (ov) ov.classList.add("is-open");
   setTimeout(function () {
     var first = document.querySelector("#rec-body input:not([readonly]):not([disabled]), #rec-body select:not([disabled])");
@@ -2737,6 +2804,14 @@ function saveRecordForm() {
   }
   if (isDet && META_VIEW.detail.masterKey && !row[META_VIEW.detail.masterKey]) {
     row[META_VIEW.detail.masterKey] = META_VIEW.masterKeyValue;
+  }
+  var recBody = document.getElementById("rec-body");
+  if (recBody) clearFieldErrors(recBody);
+  var vErrs = validateFields(cols, row);
+  if (vErrs.length) {
+    if (recBody) markFieldErrors(recBody, vErrs, "rec-f");
+    toast(vErrs[0].msg);
+    return;
   }
   if ((row[kf] === "" || row[kf] == null) && REC_EDIT.mode === "add") {
     toast("Field " + kf + " is required");
@@ -2923,6 +2998,7 @@ function csvCell(v) {
 function openFormDesigner(preferKey) {
   if (!requireAdmin("Form designer")) return;
   var key = preferKey || META_VIEW.screenKey || "screen.patients";
+  DESIGNER.fromScreen = META_VIEW.screenKey || "";
   var scrim = document.getElementById("designer-scrim");
   var box = document.getElementById("designer");
   if (scrim) scrim.classList.add("is-open");
@@ -2966,7 +3042,7 @@ function closeFormDesigner() {
   if (box) box.classList.remove("is-open");
   DESIGNER = {
     key: "", doc: null, cols: [], detailCols: [], dirty: false,
-    toolbar: [], detailToolbar: [], layout: "list", colScope: "master"
+    toolbar: [], detailToolbar: [], layout: "list", colScope: "master", fromScreen: ""
   };
 }
 
@@ -3120,14 +3196,10 @@ function loadDesignerKey(key) {
         DESIGNER.cols = [];
         DESIGNER.detailCols = [];
         DESIGNER.layout = j.doc.layout ? String(j.doc.layout) : "list";
-        var knownLayouts = {
-          "list": 1, "master-detail": 1, "document": 1, "form": 1, "wizard": 1,
-          "calendar": 1, "dashboard": 1, "tree-detail": 1, "matrix": 1, "assign": 1,
-          "workflow": 1, "settings": 1, "audit": 1, "import": 1, "period": 1, "context": 1,
-          "report-list": 1
-        };
-        if (!knownLayouts[DESIGNER.layout]) DESIGNER.layout = "list";
-        var colsSrc = (j.doc.grid && j.doc.grid.columns) ? j.doc.grid.columns : [];
+        // Unknown layouts are kept as-is (a temp option is added to the
+        // dropdown below) so saving never rewrites them to "list".
+        var colsSrc = (j.doc.grid && j.doc.grid.columns) ? j.doc.grid.columns :
+          (Array.isArray(j.doc.columns) ? j.doc.columns : []);
         // form/wizard: fields array is the control catalog
         if ((DESIGNER.layout === "form" || DESIGNER.layout === "wizard") &&
             Array.isArray(j.doc.fields) && j.doc.fields.length) {
@@ -3135,13 +3207,16 @@ function loadDesignerKey(key) {
         }
         var i, dcols;
         function copyCol(c) {
-          var copy = { id: c.id || "", label: c.label || c.id || "" };
+          // Merge strategy: keep every original prop (lookup, f2, required,
+          // password, default, autofocus, width, flex, ...) and normalize only
+          // the fields the designer edits.
+          var copy = {}, k;
+          for (k in c) {
+            if (Object.prototype.hasOwnProperty.call(c, k)) copy[k] = c[k];
+          }
+          copy.id = c.id || "";
+          copy.label = c.label || c.id || "";
           copy.type = colControlType(c);
-          if (c.align) copy.align = c.align;
-          if (c.format) copy.format = c.format;
-          if (c.width) copy.width = c.width;
-          if (c.flex) copy.flex = c.flex;
-          if (c.options) copy.options = c.options;
           return copy;
         }
         for (i = 0; i < colsSrc.length; i++) DESIGNER.cols.push(copyCol(colsSrc[i] || {}));
@@ -3217,21 +3292,36 @@ function renderDesignerCols() {
       opts = colOptionsList(c);
       optTxt = [];
       for (var k = 0; k < opts.length; k++) optTxt.push(opts[k].value);
-      html += "<tr data-i='" + i + "'>" +
+      // map original type to the select's value space; unknown types get a
+      // temporary option so saving does not rewrite them
+      var selType = t;
+      if (t === "combo" || t === "combobox") selType = "select";
+      else if (t === "multiselect") selType = "checklist";
+      else if (t === "bool" || t === "boolean") selType = "checkbox";
+      var knownType = (selType === "text" || selType === "money" || selType === "select" ||
+        selType === "checklist" || selType === "checkbox" || selType === "lookup");
+      var extraTypeOpt = knownType ? "" :
+        "<option value='" + esc(selType) + "' selected>" + esc(selType) + "</option>";
+      var selAlign = (c.align === "right" || c.align === "center") ? c.align : "";
+      html += "<tr data-i='" + i + "' data-otype='" + esc(selType) +
+        "' data-oalign='" + esc(selAlign) +
+        "' data-oopts='" + esc(optTxt.join(", ")) + "'>" +
         "<td><input type='text' data-f='id' value='" + esc(c.id || "") + "'></td>" +
         "<td><input type='text' data-f='label' value='" + esc(c.label || "") + "'></td>" +
-        "<td><select data-f='type'>" +
-          "<option value='text'" + (t === "text" ? " selected" : "") + ">text</option>" +
-          "<option value='money'" + (t === "money" ? " selected" : "") + ">money</option>" +
-          "<option value='select'" + (t === "select" || t === "combo" || t === "combobox" ? " selected" : "") + ">select</option>" +
-          "<option value='checklist'" + (t === "checklist" || t === "multiselect" ? " selected" : "") + ">checklist</option>" +
-          "<option value='checkbox'" + (t === "checkbox" || t === "bool" || t === "boolean" ? " selected" : "") + ">checkbox</option>" +
+        "<td><select data-f='type'>" + extraTypeOpt +
+          "<option value='text'" + (selType === "text" ? " selected" : "") + ">text</option>" +
+          "<option value='money'" + (selType === "money" ? " selected" : "") + ">money</option>" +
+          "<option value='select'" + (selType === "select" ? " selected" : "") + ">select</option>" +
+          "<option value='checklist'" + (selType === "checklist" ? " selected" : "") + ">checklist</option>" +
+          "<option value='checkbox'" + (selType === "checkbox" ? " selected" : "") + ">checkbox</option>" +
+          "<option value='lookup'" + (selType === "lookup" ? " selected" : "") + ">lookup</option>" +
         "</select></td>" +
         "<td><input type='text' data-f='options' value='" + esc(optTxt.join(", ")) +
           "' placeholder='opt1, opt2' title='Comma-separated options for select/checklist'></td>" +
         "<td><select data-f='align'>" +
-          "<option value=''" + (!c.align || c.align === "left" ? " selected" : "") + ">left</option>" +
-          "<option value='right'" + (c.align === "right" ? " selected" : "") + ">right</option>" +
+          "<option value=''" + (selAlign === "" ? " selected" : "") + ">left</option>" +
+          "<option value='center'" + (selAlign === "center" ? " selected" : "") + ">center</option>" +
+          "<option value='right'" + (selAlign === "right" ? " selected" : "") + ">right</option>" +
         "</select></td>" +
         "<td class='act'>" +
           "<button type='button' data-act='up' title='Up'>&#9650;</button>" +
@@ -3249,7 +3339,7 @@ function renderDesignerCols() {
 function syncDesignerColsFromDom() {
   var rows = document.querySelectorAll("#des-cols tr[data-i]");
   var list = designerActiveCols();
-  var i, tr, idEl, labEl, alEl, tyEl, opEl, idx, col, t, opts;
+  var i, tr, idEl, labEl, alEl, tyEl, opEl, idx, col, t, opts, otype, oalign, oopts;
   for (i = 0; i < rows.length; i++) {
     tr = rows[i];
     idx = parseInt(tr.getAttribute("data-i"), 10);
@@ -3264,18 +3354,30 @@ function syncDesignerColsFromDom() {
     if (labEl) col.label = labEl.value.trim() || col.id;
     if (tyEl) {
       t = tyEl.value || "text";
-      col.type = t;
-      if (t === "money") col.format = "money";
-      else if (col.format === "money") delete col.format;
+      otype = tr.getAttribute("data-otype") || "";
+      // only rewrite the type when the user actually changed the select;
+      // otherwise keep the original (possibly unknown) type untouched
+      if (t !== otype) {
+        col.type = t;
+        if (t === "money") col.format = "money";
+        else if (col.format === "money") delete col.format;
+      }
     }
     if (opEl) {
-      opts = parseOptionsText(opEl.value);
-      if (opts.length) col.options = opts;
-      else delete col.options;
+      oopts = tr.getAttribute("data-oopts");
+      // untouched field: keep original options as-is (may be {value,label} objects)
+      if (oopts === null || opEl.value !== oopts) {
+        opts = parseOptionsText(opEl.value);
+        if (opts.length) col.options = opts;
+        else delete col.options;
+      }
     }
     if (alEl) {
-      if (alEl.value === "right") col.align = "right";
-      else delete col.align;
+      oalign = tr.getAttribute("data-oalign");
+      if (oalign === null || alEl.value !== oalign) {
+        if (alEl.value) col.align = alEl.value;
+        else delete col.align;
+      }
     }
   }
   // persist toolbar for current scope
@@ -3333,20 +3435,24 @@ function saveFormDesigner() {
   if (dataRef) doc.dataRef = dataRef;
   else delete doc.dataRef;
   function packCols(list) {
-    var out = [], i, c, o;
+    // Merge strategy: start from a copy of each column so unknown props
+    // (lookup, f2, required, password, default, autofocus, format, ...)
+    // survive a designer round-trip; only normalize what the designer edits.
+    var out = [], i, c, o, k;
     for (i = 0; i < list.length; i++) {
       c = list[i];
       if (!c.id) continue;
-      o = { id: c.id, label: c.label || c.id };
+      o = {};
+      for (k in c) {
+        if (Object.prototype.hasOwnProperty.call(c, k)) o[k] = c[k];
+      }
+      o.id = c.id;
+      o.label = c.label || c.id;
       o.type = colControlType(c);
       if (o.type === "money") o.format = "money";
-      if (c.align === "right") o.align = "right";
-      if (c.width) o.width = c.width;
-      if (c.flex) o.flex = c.flex;
-      if ((o.type === "select" || o.type === "checklist" || o.type === "multiselect" ||
-           o.type === "combo" || o.type === "combobox") && c.options && c.options.length) {
-        o.options = Array.isArray(c.options) ? c.options : parseOptionsText(c.options);
-      }
+      if (c.align) o.align = c.align; else delete o.align;
+      if (c.width) o.width = c.width; else delete o.width;
+      if (c.flex) o.flex = c.flex; else delete o.flex;
       out.push(o);
     }
     return out;
@@ -3356,14 +3462,19 @@ function saveFormDesigner() {
   else DESIGNER.toolbar = getDesignerToolbarChecks();
 
   cols = packCols(DESIGNER.cols);
-  if (!doc.grid || typeof doc.grid !== "object") doc.grid = {};
-  doc.grid.columns = cols;
-  if (doc.kind === "lookup") doc.columns = cols;
+  if (doc.kind === "lookup") {
+    // lookups keep columns at top level (doc.columns); never create doc.grid
+    doc.columns = cols;
+  } else {
+    if (!doc.grid || typeof doc.grid !== "object") doc.grid = {};
+    doc.grid.columns = cols;
+  }
   doc.toolbar = DESIGNER.toolbar && DESIGNER.toolbar.length ? DESIGNER.toolbar : getDesignerToolbarChecks();
 
   var layEl = document.getElementById("des-layout");
   var layout = layEl ? layEl.value : "list";
   if (layout && layout !== "list") doc.layout = layout;
+  else if (DESIGNER.doc && DESIGNER.doc.layout === "list") doc.layout = "list";
   else delete doc.layout;
   if (layout === "master-detail" || layout === "document") {
     doc.detail = {
@@ -3375,16 +3486,16 @@ function saveFormDesigner() {
       toolbar: DESIGNER.detailToolbar && DESIGNER.detailToolbar.length
         ? DESIGNER.detailToolbar : ["add", "edit", "delete", "refresh"]
     };
-  } else if (layout === "list" || !layout) {
-    delete doc.detail;
   }
 
   // form / wizard: fields + tabs (or steps)
   if (layout === "form" || layout === "wizard") {
     doc.fields = packCols(DESIGNER.cols || []);
-    if (!doc.grid || typeof doc.grid !== "object") doc.grid = {};
-    // keep grid columns in sync for list fallback / designer reopen
-    doc.grid.columns = doc.fields.slice();
+    if (doc.kind !== "lookup") {
+      if (!doc.grid || typeof doc.grid !== "object") doc.grid = {};
+      // keep grid columns in sync for list fallback / designer reopen
+      doc.grid.columns = doc.fields.slice();
+    }
     var kf = ((document.getElementById("des-keyfield") || {}).value || "code").trim() || "code";
     doc.keyField = kf;
     var tabTxt = ((document.getElementById("des-tabs") || {}).value || "");
@@ -3414,6 +3525,28 @@ function saveFormDesigner() {
     else delete doc.transitions;
   }
 
+  // Drop keys that do not apply to the target layout. Unknown (custom)
+  // layouts are left untouched so their specific keys survive the save.
+  var KNOWN_LAYOUTS = {
+    "list": 1, "master-detail": 1, "document": 1, "form": 1, "wizard": 1,
+    "calendar": 1, "dashboard": 1, "tree-detail": 1, "matrix": 1, "assign": 1,
+    "workflow": 1, "settings": 1, "audit": 1, "import": 1, "period": 1, "context": 1,
+    "report-list": 1
+  };
+  if (KNOWN_LAYOUTS[layout]) {
+    if (layout !== "master-detail" && layout !== "document") delete doc.detail;
+    if (layout !== "form" && layout !== "wizard") {
+      delete doc.fields;
+      delete doc.tabs;
+      delete doc.steps;
+      if (layout !== "workflow") delete doc.keyField;
+    }
+    if (layout !== "workflow") {
+      delete doc.statusField;
+      delete doc.transitions;
+    }
+  }
+
   document.getElementById("des-hint").textContent = "Saving " + key + "...";
   document.getElementById("des-save").disabled = true;
   fetch("/api/meta", {
@@ -3441,8 +3574,8 @@ function saveFormDesigner() {
         document.getElementById("ws-meta").style.display = "flex";
         applyMetaScreenDoc(doc, key, doc.title);
       } else if (key.indexOf("screen.") === 0 && key !== "screen.appointments" &&
-                 key !== "screen.balance") {
-        // switch to designed screen
+                 key !== "screen.balance" && key === DESIGNER.fromScreen) {
+        // switch to designed screen only if the designer was opened from it
         showMetaScreen(key, doc.title);
       } else if (key === "screen.balance") {
         // dedicated balance UI — refresh title from saved meta
@@ -4065,6 +4198,13 @@ function xfFieldControl(f, val, idPrefix) {
       html += "<label><input type='checkbox' value='" + esc(o.value) + "'" + checked + "> " + esc(o.label) + "</label>";
     }
     html += "</div>";
+  } else if (t === "lookup") {
+    html += "<div class='rec-lookup'>" +
+      "<input type='text' id='" + id + "' data-fid='" + esc(f.id) + "'" +
+        " data-lookup='" + esc(f.lookup || "") + "'" +
+        " value='" + esc(String(val == null ? "" : val)) + "'>" +
+      "<button type='button' class='lkp-btn' data-lkp-for='" + id + "' title='Lookup (F2)'>F2</button>" +
+      "</div>";
   } else {
     html += "<input type='text' id='" + id + "' data-fid='" + esc(f.id) + "' value='" + esc(String(val == null ? "" : val)) + "'" +
       (t === "money" ? " class='n'" : "") + ">";
@@ -4098,6 +4238,553 @@ function xfReadFields(fields, idPrefix) {
   }
   return row;
 }
+
+/* ---------- Field framework: when expressions (no eval) ---------- */
+function evalWhen(expr, getVal) {
+  // Grammar: or := and (or and)* ; and := not (and not)* ; not := 'not' not | primary
+  // primary := '(' or ')' | 'empty' field | field [op value]
+  // op := == != > < >= <= contains ; value := 'string' | "string" | number | true | false
+  try {
+    var s = String(expr || ""), toks = [], i = 0, j, ch, m;
+    function isIdStart(c) { return /[A-Za-z_]/.test(c); }
+    function isIdChar(c) { return /[A-Za-z0-9_.]/.test(c); }
+    while (i < s.length) {
+      ch = s.charAt(i);
+      if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") { i++; continue; }
+      if (ch === "(" || ch === ")") { toks.push({ t: ch }); i++; continue; }
+      if (ch === "'" || ch === '"') {
+        var q = ch; j = i + 1; var lit = "";
+        while (j < s.length && s.charAt(j) !== q) { lit += s.charAt(j); j++; }
+        toks.push({ t: "str", v: lit });
+        i = j + 1;
+        continue;
+      }
+      if ((ch >= "0" && ch <= "9") ||
+          (ch === "-" && i + 1 < s.length && s.charAt(i + 1) >= "0" && s.charAt(i + 1) <= "9")) {
+        m = /^-?\d+(\.\d+)?/.exec(s.substring(i));
+        toks.push({ t: "num", v: parseFloat(m[0]) });
+        i += m[0].length;
+        continue;
+      }
+      if (ch === "=" && s.charAt(i + 1) === "=") { toks.push({ t: "op", v: "==" }); i += 2; continue; }
+      if (ch === "!" && s.charAt(i + 1) === "=") { toks.push({ t: "op", v: "!=" }); i += 2; continue; }
+      if (ch === ">" && s.charAt(i + 1) === "=") { toks.push({ t: "op", v: ">=" }); i += 2; continue; }
+      if (ch === "<" && s.charAt(i + 1) === "=") { toks.push({ t: "op", v: "<=" }); i += 2; continue; }
+      if (ch === ">") { toks.push({ t: "op", v: ">" }); i++; continue; }
+      if (ch === "<") { toks.push({ t: "op", v: "<" }); i++; continue; }
+      if (isIdStart(ch)) {
+        j = i;
+        while (j < s.length && isIdChar(s.charAt(j))) j++;
+        var w = s.substring(i, j), lw = w.toLowerCase();
+        if (lw === "and" || lw === "or" || lw === "not" || lw === "contains" || lw === "empty")
+          toks.push({ t: lw });
+        else if (lw === "true") toks.push({ t: "bool", v: true });
+        else if (lw === "false") toks.push({ t: "bool", v: false });
+        else toks.push({ t: "field", v: w });
+        i = j;
+        continue;
+      }
+      i++; // skip unknown char
+    }
+    var pos = 0;
+    function peek() { return toks[pos]; }
+    function nextTok() { return toks[pos++]; }
+    function asNum(v) {
+      if (typeof v === "number") return v;
+      if (v === null || v === undefined || v === "" || typeof v === "boolean") return NaN;
+      var n = parseFloat(String(v));
+      return isNaN(n) ? NaN : n;
+    }
+    function truthy(v) {
+      if (v === null || v === undefined || v === false) return false;
+      if (Array.isArray(v)) return v.length > 0;
+      if (typeof v === "number") return v !== 0;
+      return String(v) !== "";
+    }
+    function isEmptyVal(v) {
+      if (v === null || v === undefined) return true;
+      if (Array.isArray(v)) return v.length === 0;
+      return String(v) === "";
+    }
+    function cmpVals(fv, op, cv) {
+      var fn, cn, k;
+      if (op === "contains") {
+        if (Array.isArray(fv)) {
+          var cl = String(cv).toLowerCase();
+          for (k = 0; k < fv.length; k++) {
+            if (String(fv[k]).toLowerCase() === cl) return true;
+          }
+          return false;
+        }
+        return String(fv == null ? "" : fv).toLowerCase().indexOf(String(cv).toLowerCase()) >= 0;
+      }
+      fn = asNum(fv); cn = asNum(cv);
+      if (!isNaN(fn) && !isNaN(cn)) {
+        if (op === "==") return fn === cn;
+        if (op === "!=") return fn !== cn;
+        if (op === ">") return fn > cn;
+        if (op === "<") return fn < cn;
+        if (op === ">=") return fn >= cn;
+        if (op === "<=") return fn <= cn;
+        return false;
+      }
+      var fs = String(fv == null ? "" : fv), cs = String(cv == null ? "" : cv);
+      if (op === "==") return fs.toLowerCase() === cs.toLowerCase();
+      if (op === "!=") return fs.toLowerCase() !== cs.toLowerCase();
+      if (op === ">") return fs > cs;
+      if (op === "<") return fs < cs;
+      if (op === ">=") return fs >= cs;
+      if (op === "<=") return fs <= cs;
+      return false;
+    }
+    function parseOr() {
+      var v = parseAnd();
+      while (peek() && peek().t === "or") { nextTok(); v = parseAnd() || v; }
+      return v;
+    }
+    function parseAnd() {
+      var v = parseNot();
+      while (peek() && peek().t === "and") { nextTok(); v = parseNot() && v; }
+      return v;
+    }
+    function parseNot() {
+      if (peek() && peek().t === "not") { nextTok(); return !parseNot(); }
+      return parsePrimary();
+    }
+    function parsePrimary() {
+      var tk = peek();
+      if (!tk) return true;
+      if (tk.t === "(") {
+        nextTok();
+        var v = parseOr();
+        if (peek() && peek().t === ")") nextTok();
+        return v;
+      }
+      if (tk.t === "empty") {
+        nextTok();
+        var f1 = nextTok();
+        return (f1 && f1.t === "field") ? isEmptyVal(getVal(f1.v)) : true;
+      }
+      if (tk.t === "field") {
+        nextTok();
+        var fv = getVal(tk.v);
+        var nt = peek();
+        if (nt && (nt.t === "op" || nt.t === "contains")) {
+          nextTok();
+          var val = nextTok();
+          if (!val || (val.t !== "str" && val.t !== "num" && val.t !== "bool"))
+            throw new Error("bad comparison value");
+          return cmpVals(fv, nt.t === "contains" ? "contains" : nt.v, val.v);
+        }
+        return truthy(fv);
+      }
+      nextTok();
+      return true;
+    }
+    return !!parseOr();
+  } catch (e) {
+    return true; // broken expression: keep the field visible/enabled
+  }
+}
+
+/* ---------- Field framework: validation ---------- */
+function validateFields(fields, row) {
+  var errors = [], i, f, val, label, empty, visible, n, len, re;
+  row = row || {};
+  fields = fields || [];
+  for (i = 0; i < fields.length; i++) {
+    f = fields[i] || {};
+    if (!f.id) continue;
+    label = f.label || f.id;
+    val = row[f.id];
+    empty = (val === null || val === undefined || val === "" ||
+      (Array.isArray(val) && val.length === 0));
+    visible = true;
+    if (f.when) visible = evalWhen(f.when, function (fid) { return row[fid]; });
+    if (f.required && visible && empty) {
+      errors.push({ id: f.id, label: label, msg: f.msg || (label + " is required") });
+      continue;
+    }
+    if (empty) continue; // non-required empty values skip the rest of rules
+    if (f.min !== undefined || f.max !== undefined) {
+      n = (colControlType(f) === "money" || f.format === "money") ? parseMoney(val) : parseFloat(val);
+      if (!isNaN(n)) {
+        if (f.min !== undefined && n < Number(f.min)) {
+          errors.push({ id: f.id, label: label, msg: f.msg || (label + " must be >= " + f.min) });
+          continue;
+        }
+        if (f.max !== undefined && n > Number(f.max)) {
+          errors.push({ id: f.id, label: label, msg: f.msg || (label + " must be <= " + f.max) });
+          continue;
+        }
+      }
+    }
+    len = String(val).length;
+    if (f.minLength !== undefined && len < Number(f.minLength)) {
+      errors.push({ id: f.id, label: label,
+        msg: f.msg || (label + " must be at least " + f.minLength + " characters") });
+      continue;
+    }
+    if (f.maxLength !== undefined && len > Number(f.maxLength)) {
+      errors.push({ id: f.id, label: label,
+        msg: f.msg || (label + " must be at most " + f.maxLength + " characters") });
+      continue;
+    }
+    if (f.pattern) {
+      re = null;
+      try { re = new RegExp(f.pattern); } catch (e) {}
+      if (re && !re.test(String(val))) {
+        errors.push({ id: f.id, label: label, msg: f.msg || (label + " has invalid format") });
+        continue;
+      }
+    }
+    if (f.email) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(val))) {
+        errors.push({ id: f.id, label: label, msg: f.msg || (label + " must be a valid e-mail") });
+        continue;
+      }
+    }
+  }
+  return errors;
+}
+
+function clearFieldErrors(container) {
+  if (!container) return;
+  var els = container.querySelectorAll(".rec-field.fld-error"), i;
+  for (i = 0; i < els.length; i++) els[i].classList.remove("fld-error");
+  var msgs = container.querySelectorAll(".fld-err-msg");
+  for (i = 0; i < msgs.length; i++) {
+    if (msgs[i].parentNode) msgs[i].parentNode.removeChild(msgs[i]);
+  }
+}
+
+function markFieldErrors(container, errors, idPrefix) {
+  if (!container || !errors) return;
+  idPrefix = idPrefix || "xf";
+  for (var i = 0; i < errors.length; i++) {
+    var el = document.getElementById(idPrefix + "-" + errors[i].id);
+    if (!el) continue;
+    var box = el.closest(".rec-field");
+    if (!box) continue;
+    box.classList.add("fld-error");
+    var old = box.querySelector(".fld-err-msg");
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    var m = document.createElement("span");
+    m.className = "fld-err-msg";
+    m.textContent = errors[i].msg;
+    box.appendChild(m);
+  }
+}
+
+function clearFldError(el) {
+  var box = el && el.closest ? el.closest(".rec-field") : null;
+  if (!box || !box.classList.contains("fld-error")) return;
+  box.classList.remove("fld-error");
+  var m = box.querySelector(".fld-err-msg");
+  if (m && m.parentNode) m.parentNode.removeChild(m);
+}
+
+/* ---------- Field framework: whens wiring (visibility / enable) ---------- */
+function applyWhens(container, fields, idPrefix) {
+  if (!container || !fields) return;
+  idPrefix = idPrefix || "xf";
+  function getVal(fid) {
+    var el = document.getElementById(idPrefix + "-" + fid);
+    if (!el) return "";
+    var dt = el.getAttribute("data-ctype") || "";
+    if (dt === "checklist") {
+      var picked = [], boxes = el.querySelectorAll("input[type='checkbox']:checked"), j;
+      for (j = 0; j < boxes.length; j++) picked.push(boxes[j].value);
+      return picked;
+    }
+    if (el.type === "checkbox") return !!el.checked;
+    if (dt === "money" || (el.classList && el.classList.contains("n"))) return parseMoney(el.value);
+    return el.value;
+  }
+  function refresh() {
+    for (var i = 0; i < fields.length; i++) {
+      var f = fields[i];
+      if (!f || !f.id) continue;
+      var el = document.getElementById(idPrefix + "-" + f.id);
+      if (!el) continue;
+      var box = el.closest(".rec-field");
+      if (f.when && box) {
+        // hide only; the value is kept
+        box.style.display = evalWhen(f.when, getVal) ? "" : "none";
+      }
+      if (f.enableWhen) {
+        var en = !!evalWhen(f.enableWhen, getVal);
+        var ctrls = box ? box.querySelectorAll("input, select, button") : [el];
+        for (var k = 0; k < ctrls.length; k++) ctrls[k].disabled = !en;
+      }
+    }
+  }
+  container._whenRefresh = refresh;
+  if (!container._whenWired) {
+    container._whenWired = true;
+    var h = function (e) {
+      clearFldError(e.target);
+      if (container._whenRefresh) container._whenRefresh();
+    };
+    container.addEventListener("input", h);
+    container.addEventListener("change", h);
+  }
+  refresh();
+}
+
+/* ---------- Generic lookup modal (F2) ---------- */
+var LKP_DOCS = {};
+var LKP_ROWS = {};
+var LKP = { key: "", doc: null, rows: [], filtered: [], q: "", page: 1, sel: -1, input: null };
+
+function lookupListError(e) {
+  var list = document.getElementById("lookup-modal-list");
+  if (list) list.innerHTML = "<div class='f2-none'>Lookup error: " + esc(String(e)) + "</div>";
+}
+
+function loadLookupData(lookupKey, cb) {
+  function rowsReady(doc) {
+    var dr = doc.dataRef || "";
+    if (!dr) { LKP_ROWS[""] = []; cb(); return; }
+    if (LKP_ROWS[dr]) { cb(); return; }
+    fetch("/api/dataset?key=" + encodeURIComponent(dr) + "&q=", { credentials: "same-origin", cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        LKP_ROWS[dr] = (j && j.ok && j.rows) ? j.rows : [];
+        cb();
+      })
+      .catch(lookupListError);
+  }
+  if (LKP_DOCS[lookupKey]) { rowsReady(LKP_DOCS[lookupKey]); return; }
+  fetch("/api/meta?key=" + encodeURIComponent(lookupKey), { credentials: "same-origin", cache: "no-store" })
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      if (!j || !j.ok || !j.doc) {
+        lookupListError((j && j.msg) || ("Lookup meta not found: " + lookupKey));
+        return;
+      }
+      var doc = j.doc;
+      if (!doc.valueField) doc.valueField = "code";
+      if (!doc.labelField) doc.labelField = "name";
+      if (!doc.pageSize) doc.pageSize = 10;
+      if (!doc.minChars) doc.minChars = 0;
+      LKP_DOCS[lookupKey] = doc;
+      rowsReady(doc);
+    })
+    .catch(lookupListError);
+}
+
+function openLookupModal(lookupKey, inputEl) {
+  if (!lookupKey) { toast("No lookup defined for this field"); return; }
+  var modal = document.getElementById("lookup-modal");
+  var scrim = document.getElementById("lookup-scrim");
+  if (!modal) return;
+  LKP.key = lookupKey;
+  LKP.input = inputEl || null;
+  LKP.q = ""; LKP.page = 1; LKP.sel = -1;
+  LKP.doc = null; LKP.rows = []; LKP.filtered = [];
+  if (scrim) { scrim.classList.add("is-open"); scrim.style.display = "block"; }
+  modal.classList.add("ativo", "on");
+  modal.style.display = "flex";
+  centerPainel(modal);
+  var tit = document.getElementById("lookup-modal-title");
+  if (tit) tit.textContent = lookupKey;
+  var list = document.getElementById("lookup-modal-list");
+  if (list) list.innerHTML = "<div class='f2-none'>Loading lookup...</div>";
+  var inp = document.getElementById("lookup-modal-q");
+  if (inp) { inp.value = ""; setTimeout(function () { try { inp.focus(); } catch (e) {} }, 50); }
+  loadLookupData(lookupKey, function () {
+    if (LKP.key !== lookupKey) return;
+    var doc = LKP_DOCS[lookupKey];
+    LKP.doc = doc;
+    LKP.rows = LKP_ROWS[(doc && doc.dataRef) || ""] || [];
+    if (tit) tit.textContent = (doc && doc.title) || lookupKey;
+    lookupApplyFilter();
+  });
+}
+
+function closeLookupModal() {
+  var modal = document.getElementById("lookup-modal");
+  var scrim = document.getElementById("lookup-scrim");
+  if (modal) { modal.classList.remove("ativo", "on", "dragging"); modal.style.display = "none"; }
+  if (scrim) { scrim.classList.remove("is-open"); scrim.style.display = "none"; }
+}
+
+function lookupApplyFilter() {
+  var doc = LKP.doc || {};
+  var q = LKP.q || "";
+  var minChars = doc.minChars || 0;
+  var list = document.getElementById("lookup-modal-list");
+  if (minChars > 0 && q.length > 0 && q.length < minChars) {
+    LKP.filtered = [];
+    LKP.sel = -1;
+    if (list) list.innerHTML = "<div class='f2-none'>Type " + minChars + "+ characters to filter</div>";
+    lookupRenderNav();
+    return;
+  }
+  var rows = LKP.rows || [];
+  if (!q) {
+    LKP.filtered = rows.slice();
+  } else {
+    var sf = (Array.isArray(doc.searchFields) && doc.searchFields.length) ? doc.searchFields :
+      (Array.isArray(doc.columns) ? doc.columns.map(function (c) { return c.id; }) : []);
+    var lq = q.toLowerCase();
+    LKP.filtered = rows.filter(function (r) {
+      for (var i = 0; i < sf.length; i++) {
+        var v = r[sf[i]];
+        if (v !== null && v !== undefined && String(v).toLowerCase().indexOf(lq) >= 0) return true;
+      }
+      return false;
+    });
+  }
+  LKP.page = 1;
+  LKP.sel = LKP.filtered.length ? 0 : -1;
+  lookupRender();
+}
+
+function lookupRender() {
+  var doc = LKP.doc || {};
+  var pageSize = doc.pageSize || 10;
+  var list = document.getElementById("lookup-modal-list");
+  if (!list) return;
+  if (!LKP.filtered.length) {
+    list.innerHTML = "<div class='f2-none'>No rows found.</div>";
+  } else {
+    var cols = (Array.isArray(doc.columns) && doc.columns.length) ? doc.columns :
+      [{ id: doc.valueField || "code" }, { id: doc.labelField || "name" }];
+    var start = (LKP.page - 1) * pageSize;
+    var end = Math.min(start + pageSize, LKP.filtered.length);
+    var html = "", i, r, k;
+    for (i = start; i < end; i++) {
+      r = LKP.filtered[i];
+      html += "<div class='f2-item" + (i === LKP.sel ? " hl" : "") + "' data-i='" + i + "'>";
+      for (k = 0; k < cols.length; k++) {
+        html += "<span class='" + (k === 0 ? "c" : "n") + "'>" +
+          esc(String(r[cols[k].id] != null ? r[cols[k].id] : "")) + "</span>";
+      }
+      html += "</div>";
+    }
+    list.innerHTML = html;
+    var items = list.querySelectorAll(".f2-item");
+    for (i = 0; i < items.length; i++) {
+      (function (el) {
+        var idx = parseInt(el.getAttribute("data-i"), 10);
+        el.onclick = function () {
+          LKP.sel = idx;
+          var all = list.querySelectorAll(".f2-item");
+          for (var k2 = 0; k2 < all.length; k2++) {
+            if (parseInt(all[k2].getAttribute("data-i"), 10) === idx) all[k2].classList.add("hl");
+            else all[k2].classList.remove("hl");
+          }
+          lookupRenderNav();
+        };
+        el.ondblclick = function () { lookupPick(idx); };
+        el.onmouseenter = function () { el.onclick(); };
+      })(items[i]);
+    }
+  }
+  lookupRenderNav();
+}
+
+function lookupRenderNav() {
+  var doc = LKP.doc || {};
+  var pageSize = doc.pageSize || 10;
+  var total = (LKP.filtered || []).length;
+  var pages = Math.max(1, Math.ceil(total / pageSize));
+  var lab = document.getElementById("lkp-pg-label");
+  if (lab) lab.textContent = "Page " + LKP.page + " of " + pages;
+  var cnt = document.getElementById("lookup-count");
+  if (cnt) cnt.textContent = total + " record" + (total === 1 ? "" : "s");
+  var disF = LKP.page <= 1, disL = LKP.page >= pages, b;
+  b = document.getElementById("lkp-first"); if (b) b.disabled = disF;
+  b = document.getElementById("lkp-prev"); if (b) b.disabled = disF;
+  b = document.getElementById("lkp-next"); if (b) b.disabled = disL;
+  b = document.getElementById("lkp-last"); if (b) b.disabled = disL;
+  b = document.getElementById("lkp-btn-ok");
+  if (b) b.disabled = !(LKP.sel >= 0 && LKP.filtered && LKP.filtered[LKP.sel]);
+}
+
+function lookupPage(p) {
+  var doc = LKP.doc || {};
+  var pageSize = doc.pageSize || 10;
+  var pages = Math.max(1, Math.ceil((LKP.filtered || []).length / pageSize));
+  LKP.page = Math.min(Math.max(1, p), pages);
+  LKP.sel = LKP.filtered.length ? (LKP.page - 1) * pageSize : -1;
+  lookupRender();
+}
+
+function lookupPick(i) {
+  var r = (LKP.filtered || [])[i];
+  if (!r) return;
+  var doc = LKP.doc || {};
+  var vf = doc.valueField || "code";
+  var inp = LKP.input;
+  closeLookupModal();
+  if (inp) {
+    inp.value = String(r[vf] != null ? r[vf] : "");
+    try {
+      inp.dispatchEvent(new Event("change", { bubbles: true }));
+    } catch (e) {}
+  }
+}
+
+function wireLookupControls() {
+  if (document._lkpWired) return;
+  document._lkpWired = true;
+  // F2 buttons next to lookup inputs (works in every form context)
+  document.addEventListener("click", function (e) {
+    var b = e.target && e.target.closest ? e.target.closest(".lkp-btn") : null;
+    if (!b || b.disabled) return;
+    var inp = document.getElementById(b.getAttribute("data-lkp-for") || "");
+    if (inp) openLookupModal(inp.getAttribute("data-lookup") || "", inp);
+  });
+  // F2 / Enter directly on a lookup input
+  document.addEventListener("keydown", function (e) {
+    var el = e.target;
+    if (!el || !el.getAttribute || !el.getAttribute("data-lookup")) return;
+    if (e.key === "F2" || e.key === "Enter") {
+      e.preventDefault();
+      openLookupModal(el.getAttribute("data-lookup") || "", el);
+    }
+  });
+  // modal internals
+  var q = document.getElementById("lookup-modal-q");
+  if (q) {
+    q.addEventListener("input", function () {
+      LKP.q = q.value || "";
+      lookupApplyFilter();
+    });
+    q.addEventListener("keydown", function (e) {
+      var doc = LKP.doc || {}, ps = doc.pageSize || 10;
+      var start = (LKP.page - 1) * ps;
+      var end = Math.min(start + ps, LKP.filtered.length) - 1;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (LKP.sel < end) { LKP.sel++; lookupRender(); }
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (LKP.sel > start) { LKP.sel--; lookupRender(); }
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (LKP.sel >= 0) lookupPick(LKP.sel);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        closeLookupModal();
+      }
+    });
+  }
+  function on(id, fn) { var b = document.getElementById(id); if (b) b.onclick = fn; }
+  on("lkp-first", function () { lookupPage(1); });
+  on("lkp-prev", function () { lookupPage(LKP.page - 1); });
+  on("lkp-next", function () { lookupPage(LKP.page + 1); });
+  on("lkp-last", function () { lookupPage(1000000000); });
+  on("lkp-btn-cancel", closeLookupModal);
+  on("lookup-modal-close", closeLookupModal);
+  on("lkp-btn-ok", function () { if (LKP.sel >= 0) lookupPick(LKP.sel); });
+  var scrim = document.getElementById("lookup-scrim");
+  if (scrim) scrim.onclick = closeLookupModal;
+}
+wireLookupControls();
 
 function xfSaveRow(dataRef, keyField, row, mode, keyValue, cb) {
   fetch("/api/dataset", {
@@ -4494,6 +5181,8 @@ function xfRenderForm(scr) {
       }
       body += "</div>";
       document.getElementById("xf-form-body").innerHTML = body;
+      applyWhens(document.getElementById("xf-form-body"),
+        ids.map(function (fid) { return fmap[fid] || { id: fid, type: "text" }; }), "xff");
       var btns = document.querySelectorAll("#xf-form-tabs button");
       for (j = 0; j < btns.length; j++) btns[j].classList.toggle("on", j === ti);
     }
@@ -4521,18 +5210,38 @@ function xfRenderForm(scr) {
       var cur = xfReadFields(fields, "xff");
       Object.keys(cur).forEach(function (k) { XF.rows[XF.selected][k] = cur[k]; });
       var row = XF.rows[XF.selected];
+      var fb = document.getElementById("xf-form-body");
+      if (fb) clearFieldErrors(fb);
+      var vErrs = validateFields(fields, row);
+      if (vErrs.length) {
+        if (fb) markFieldErrors(fb, vErrs, "xff");
+        toast(vErrs[0].msg);
+        return;
+      }
       var kf = scr.keyField || "code";
       xfSaveRow(scr.dataRef, kf, row, "edit", String(row[kf] || ""), function () {
         xfRenderForm(scr);
       });
     };
     document.getElementById("xf-form-new").onclick = function () {
+      var kf = scr.keyField || "code";
+      var srcFields = fields.length ? fields : ((scr.grid && scr.grid.columns) || []);
       var blank = {};
-      fields.forEach(function (f) { blank[f.id] = (colControlType(f) === "checkbox") ? false : (colControlType(f) === "checklist" ? [] : ""); });
-      blank.code = "P" + String(1000 + rows.length);
-      blank.name = "NEW PATIENT";
-      blank.active = true;
-      xfSaveRow(scr.dataRef, scr.keyField || "code", blank, "add", "", function () { xfRenderForm(scr); });
+      srcFields.forEach(function (f) {
+        var ft = colControlType(f);
+        if (f["default"] !== undefined) blank[f.id] = f["default"];
+        else if (ft === "checkbox" || ft === "bool" || ft === "boolean") blank[f.id] = false;
+        else if (ft === "checklist" || ft === "multiselect") blank[f.id] = [];
+        else blank[f.id] = "";
+      });
+      if (!blank[kf]) blank[kf] = "";
+      var nErrs = validateFields(srcFields, blank);
+      if (nErrs.length) {
+        // blank has no form of its own; report only (fields shown belong to the selected row)
+        toast(nErrs[0].msg);
+        return;
+      }
+      xfSaveRow(scr.dataRef, kf, blank, "add", "", function () { xfRenderForm(scr); });
     };
   });
 }
@@ -4564,6 +5273,8 @@ function xfRenderWizard(scr) {
       html += "<button type='button' class='btn primary' id='xf-wiz-finish'>Finish</button>";
     html += "</div>";
     host.innerHTML = html;
+    applyWhens(document.getElementById("xf-wiz-body"),
+      ids.map(function (fid) { return fmap[fid] || { id: fid, type: "text" }; }), "xfw");
     function pull() {
       var cur = xfReadFields(ids.map(function (id) { return fmap[id] || { id: id, type: "text" }; }), "xfw");
       Object.keys(cur).forEach(function (k) { draft[k] = cur[k]; });
@@ -4571,14 +5282,37 @@ function xfRenderWizard(scr) {
     var prev = document.getElementById("xf-wiz-prev");
     if (prev) prev.onclick = function () { pull(); step--; paint(); };
     var next = document.getElementById("xf-wiz-next");
-    if (next) next.onclick = function () { pull(); step++; paint(); };
+    if (next) next.onclick = function () {
+      pull();
+      var wb = document.getElementById("xf-wiz-body");
+      if (wb) clearFieldErrors(wb);
+      var sErrs = validateFields(
+        ids.map(function (fid) { return fmap[fid] || { id: fid, type: "text" }; }), draft);
+      if (sErrs.length) {
+        if (wb) markFieldErrors(wb, sErrs, "xfw");
+        toast(sErrs[0].msg);
+        return;
+      }
+      step++; paint();
+    };
     var fin = document.getElementById("xf-wiz-finish");
     if (fin) fin.onclick = function () {
       pull();
-      if (!draft.code) draft.code = "W" + Date.now().toString().slice(-6);
-      xfSaveRow(scr.dataRef, "code", draft, "add", "", function () {
-        toast("Admission completed");
-        cmd("nav", "patient_card");
+      var wb2 = document.getElementById("xf-wiz-body");
+      if (wb2) clearFieldErrors(wb2);
+      var fErrs = validateFields(fields, draft);
+      if (fErrs.length) {
+        if (wb2) markFieldErrors(wb2, fErrs, "xfw");
+        toast(fErrs[0].msg);
+        return;
+      }
+      var kf = scr.keyField || "code";
+      if (!draft[kf]) draft[kf] = "W" + Date.now().toString().slice(-6);
+      xfSaveRow(scr.dataRef, kf, draft, "add", "", function () {
+        toast(((scr && scr.title) || "Wizard") + " completed");
+        // back to the screen we came from, when known
+        var backId = moduleIdByScreen(META_VIEW.prevKey || "");
+        if (backId) cmd("nav", backId);
       });
     };
   }

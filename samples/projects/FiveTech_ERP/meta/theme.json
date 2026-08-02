@@ -1,5 +1,6 @@
 {
   "id": "theme",
+  "kind": "theme",
   "default": "light",
   "storageKey": "dw-theme",
   "modes": ["light", "dark"],

@@ -126,7 +126,11 @@ static function ErpHttpClient( hSock )
                endif
                cBody += Left( cBuf, nLen )
             enddo
-            cBody := Left( cBody, nCL )
+            // Keep the real received length: Left() pads with spaces when the
+            // body arrived short (truncated POST), corrupting the JSON tail.
+            if Len( cBody ) > nCL
+               cBody := Left( cBody, nCL )
+            endif
             exit
          endif
       elseif nLen == 0
@@ -223,6 +227,260 @@ static function ErpDatasetApiEnvelope( cKey )
 return cOut
 
 //--------------------------------------------------------------------
+// POST /api/meta — runtime form designer (admin only).
+// Body: { "key":"app"|"modules"|"screen.x"|"lookup.x"|"report.x", "doc":{...}, "writeFile":true|false }
+// Resp: { "ok":true, "key":..., "path":... } or { "ok":false, "msg"/"error":... }
+static function ErpApiMetaPost( cBody, hSess )
+
+   local hReq := { => }, cKey, hDoc, lWrite, xW
+   local cFull, cJson, lOk, cOut
+
+   if Empty( hSess )
+      return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Not authenticated", ;
+         "error" => "Not authenticated" } ), "application/json; charset=utf-8" )
+   endif
+   if Upper( AllTrim( ErpToStr( hb_HGetDef( hSess, "user", "" ) ) ) ) != "ADMIN"
+      return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Admin only", ;
+         "error" => "Admin only" } ), "application/json; charset=utf-8" )
+   endif
+
+   if "{" $ cBody
+      hb_jsonDecode( cBody, @hReq )
+   endif
+   if ValType( hReq ) != "H" .or. Empty( hb_HKeys( hReq ) )
+      return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Bad JSON body", ;
+         "error" => "Bad JSON body" } ), "application/json; charset=utf-8" )
+   endif
+
+   cKey := AllTrim( ErpToStr( hb_HGetDef( hReq, "key", "" ) ) )
+   if cKey != "app" .and. cKey != "modules" .and. ;
+      ! ErpKeySafe( cKey, "screen." ) .and. ! ErpKeySafe( cKey, "lookup." ) .and. ! ErpKeySafe( cKey, "report." )
+      return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
+         "msg" => "Invalid key (only app / modules / screen.* / lookup.* / report.*)", ;
+         "error" => "Invalid key (only app / modules / screen.* / lookup.* / report.*)" } ), ;
+         "application/json; charset=utf-8" )
+   endif
+
+   hDoc := hb_HGetDef( hReq, "doc", NIL )
+   if ValType( hDoc ) != "H"
+      return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
+         "msg" => "doc must be a JSON object", ;
+         "error" => "doc must be a JSON object" } ), ;
+         "application/json; charset=utf-8" )
+   endif
+
+   xW := hb_HGetDef( hReq, "writeFile", .F. )
+   lWrite := ( ValType( xW ) == "L" .and. xW ) .or. ;
+      ( ValType( xW ) == "C" .and. Lower( AllTrim( xW ) ) == "true" )
+
+   if ! lWrite
+      // memory-only save: update the cache, no file write
+      ErpMetaCachePut( cKey, hDoc )
+      if cKey == "app"
+         ErpMetaInvalidate( "modules" )
+      endif
+      return ErpHttpOk( hb_jsonEncode( { "ok" => .T., "key" => cKey } ), ;
+         "application/json; charset=utf-8" )
+   endif
+
+   cFull := ErpMetaPathForKey( cKey )
+   if Empty( cFull )
+      return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Unknown meta key", ;
+         "error" => "Unknown meta key" } ), "application/json; charset=utf-8" )
+   endif
+
+   cJson := hb_jsonEncode( hDoc ) + Chr( 10 )
+   if s_mtx != NIL
+      hb_mutexLock( s_mtx )
+   endif
+   lOk := ErpWriteFileAtomic( cFull, cJson )
+   if s_mtx != NIL
+      hb_mutexUnlock( s_mtx )
+   endif
+   if ! lOk
+      return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Write failed", ;
+         "error" => "Write failed" } ), "application/json; charset=utf-8" )
+   endif
+   ErpMetaInvalidate( cKey )
+   if cKey == "app"
+      // vertical may have changed: the modules key resolves to another file now
+      ErpMetaInvalidate( "modules" )
+   endif
+   cOut := hb_jsonEncode( { "ok" => .T., "key" => cKey, "path" => cFull } )
+return ErpHttpOk( cOut, "application/json; charset=utf-8" )
+
+//--------------------------------------------------------------------
+// POST /api/dataset — row CRUD on data.* docs (any logged user).
+// Body: { "key":"data.x", "action":"add"|"update"|"delete",
+//         "row":{...}, "keyField":"code", "keyValue":"P0001" }
+// - add:    appends row
+// - update: replaces the row where row[keyField] == keyValue
+// - delete: removes that row (row not needed)
+// Persists the whole doc (other keys like id/kind/entity are kept) to
+// meta/data/<x>.json and invalidates the meta cache.
+static function ErpApiDatasetPost( cBody, hSess )
+
+   local hReq := { => }, cKey, cAction, cKeyField, cKeyValue, hRow
+   local cRaw, hDoc := { => }, aRows, n, lFound := .F.
+   local cFull, cJson, lOk
+
+   if Empty( hSess )
+      return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Not authenticated" } ), ;
+         "application/json; charset=utf-8" )
+   endif
+
+   if "{" $ cBody
+      hb_jsonDecode( cBody, @hReq )
+   endif
+   if ValType( hReq ) != "H" .or. Empty( hb_HKeys( hReq ) )
+      return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Bad JSON body" } ), ;
+         "application/json; charset=utf-8" )
+   endif
+
+   cKey := AllTrim( ErpToStr( hb_HGetDef( hReq, "key", "" ) ) )
+   if ! ErpKeySafe( cKey, "data." )
+      return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
+         "msg" => "Invalid key (only data.*)" } ), "application/json; charset=utf-8" )
+   endif
+
+   cAction := Lower( AllTrim( ErpToStr( hb_HGetDef( hReq, "action", "" ) ) ) )
+   if ! ( cAction == "add" .or. cAction == "update" .or. cAction == "delete" )
+      return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
+         "msg" => "Unknown action (add|update|delete)" } ), ;
+         "application/json; charset=utf-8" )
+   endif
+
+   // Fresh copy from disk — never mutate the ErpMetaGet() cached hash
+   cRaw := ErpMetaGetRaw( cKey )
+   if Empty( cRaw )
+      return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Dataset not found", ;
+         "key" => cKey } ), "application/json; charset=utf-8" )
+   endif
+   hb_jsonDecode( cRaw, @hDoc )
+   if ValType( hDoc ) != "H" .or. ! hb_HHasKey( hDoc, "rows" ) .or. ;
+         ValType( hDoc[ "rows" ] ) != "A"
+      return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Dataset has no rows", ;
+         "key" => cKey } ), "application/json; charset=utf-8" )
+   endif
+   aRows := hDoc[ "rows" ]
+
+   cKeyField := AllTrim( ErpToStr( hb_HGetDef( hReq, "keyField", "" ) ) )
+   cKeyValue := ErpToStr( hb_HGetDef( hReq, "keyValue", "" ) )
+   hRow := hb_HGetDef( hReq, "row", NIL )
+
+   if cAction == "add"
+      if ValType( hRow ) != "H"
+         return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
+            "msg" => "row must be a JSON object" } ), "application/json; charset=utf-8" )
+      endif
+      AAdd( aRows, hRow )
+   else
+      if Empty( cKeyField )
+         return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
+            "msg" => "keyField required" } ), "application/json; charset=utf-8" )
+      endif
+      for n := 1 to Len( aRows )
+         if ValType( aRows[ n ] ) == "H" .and. hb_HHasKey( aRows[ n ], cKeyField ) .and. ;
+               ErpToStr( aRows[ n ][ cKeyField ] ) == cKeyValue
+            lFound := .T.
+            exit
+         endif
+      next
+      if ! lFound
+         return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
+            "msg" => "Row not found: " + cKeyField + "=" + cKeyValue } ), ;
+            "application/json; charset=utf-8" )
+      endif
+      if cAction == "update"
+         if ValType( hRow ) != "H"
+            return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
+               "msg" => "row must be a JSON object" } ), "application/json; charset=utf-8" )
+         endif
+         aRows[ n ] := hRow
+      else
+         ADel( aRows, n )
+         ASize( aRows, Len( aRows ) - 1 )
+      endif
+   endif
+
+   cFull := ErpMetaPathForKey( cKey )
+   if Empty( cFull )
+      return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Unknown meta key" } ), ;
+         "application/json; charset=utf-8" )
+   endif
+   cJson := hb_jsonEncode( hDoc ) + Chr( 10 )
+   if s_mtx != NIL
+      hb_mutexLock( s_mtx )
+   endif
+   lOk := ErpWriteFileAtomic( cFull, cJson )
+   if s_mtx != NIL
+      hb_mutexUnlock( s_mtx )
+   endif
+   if ! lOk
+      return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Write failed" } ), ;
+         "application/json; charset=utf-8" )
+   endif
+   ErpMetaInvalidate( cKey )
+return ErpHttpOk( hb_jsonEncode( { "ok" => .T., "key" => cKey, ;
+   "action" => cAction, "rows" => Len( aRows ) } ), "application/json; charset=utf-8" )
+
+//--------------------------------------------------------------------
+// Strict meta key whitelist: prefix + [A-Za-z0-9_] only.
+// Rejects "..", "/", "\", spaces and any traversal attempt.
+static function ErpKeySafe( cKey, cPrefix )
+
+   local n, cCh
+
+   cKey := AllTrim( ErpToStr( cKey ) )
+   if Empty( cKey ) .or. Left( cKey, Len( cPrefix ) ) != cPrefix
+      return .F.
+   endif
+   if Len( cKey ) <= Len( cPrefix )
+      return .F.
+   endif
+   for n := Len( cPrefix ) + 1 to Len( cKey )
+      cCh := SubStr( cKey, n, 1 )
+      if ! ( ( cCh >= "A" .and. cCh <= "Z" ) .or. ;
+             ( cCh >= "a" .and. cCh <= "z" ) .or. ;
+             ( cCh >= "0" .and. cCh <= "9" ) .or. cCh == "_" )
+         return .F.
+      endif
+   next
+return .T.
+
+//--------------------------------------------------------------------
+// Atomic file write: write <file>.tmp then rename over the target.
+// Call with s_mtx held (meta writes are globally serialized).
+static function ErpWriteFileAtomic( cFull, cContent )
+
+   local cTmp := cFull + ".tmp"
+
+   if ! MemoWrit( cTmp, cContent )
+      return .F.
+   endif
+   if File( cFull )
+      if FErase( cFull ) != 0
+         FErase( cTmp )
+         return .F.
+      endif
+   endif
+   if FRename( cTmp, cFull ) == 0
+      return .T.
+   endif
+   FErase( cTmp )
+return .F.
+
+//--------------------------------------------------------------------
+static function ErpHttpForbidden( cPath )
+
+   local cOut := "<h1>403</h1><p>" + cPath + "</p>"
+
+return "HTTP/1.1 403 Forbidden" + Chr( 13 ) + Chr( 10 ) + ;
+       "Content-Type: text/html; charset=utf-8" + Chr( 13 ) + Chr( 10 ) + ;
+       "Content-Length: " + hb_ntos( hb_BLen( cOut ) ) + Chr( 13 ) + Chr( 10 ) + ;
+       "Connection: close" + Chr( 13 ) + Chr( 10 ) + Chr( 13 ) + Chr( 10 ) + cOut
+
+//--------------------------------------------------------------------
 static function ErpHttpOk( cBody, cType )
 
    local cHdr, nBody
@@ -248,7 +506,7 @@ return cHdr + cBody
 static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
 
    local cOut, hDoc, aItems, cKey, hQ, cUser, cPass, cTok, hSess
-   local cFile, cMime, cCookie, cDate, cAction, cArg, nSel
+   local cFile, cMime, cCookie, cDate, cAction, cArg, nSel, cRel
 
    cPath := Lower( AllTrim( cPath ) )
    if Empty( cPath )
@@ -289,6 +547,10 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
 
    // --- API (FWH-compatible) ---
    if cMethod == "GET" .and. cPath == "/api/meta"
+      if Empty( hSess )
+         return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Not authenticated" } ), ;
+            "application/json; charset=utf-8" )
+      endif
       hQ := ErpQuery( cQuery )
       cKey := AllTrim( hb_HGetDef( hQ, "key", "" ) )
       if Empty( cKey )
@@ -298,6 +560,11 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
          cOut := ErpMetaApiEnvelope( cKey )
       endif
       return ErpHttpOk( cOut, "application/json; charset=utf-8" )
+   endif
+
+   // Runtime form designer save (admin only, screen.* / lookup.* keys)
+   if cMethod == "POST" .and. cPath == "/api/meta"
+      return ErpApiMetaPost( cBody, hSess )
    endif
 
    if cMethod == "GET" .and. cPath == "/api/meta/fields"
@@ -320,6 +587,11 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
       cKey := AllTrim( hb_HGetDef( hQ, "key", "" ) )
       cOut := ErpDatasetApiEnvelope( cKey )
       return ErpHttpOk( cOut, "application/json; charset=utf-8" )
+   endif
+
+   // Dataset row CRUD (any logged user): add / update / delete by keyField
+   if cMethod == "POST" .and. cPath == "/api/dataset"
+      return ErpApiDatasetPost( cBody, hSess )
    endif
 
    if cMethod == "GET" .and. cPath == "/api/patients"
@@ -371,7 +643,8 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
          if s_mtx != NIL
             hb_mutexLock( s_mtx )
          endif
-         s_hSess[ cTok ] := { "user" => cUser, "workDate" => cDate, "sel" => 2 }
+         s_hSess[ cTok ] := { "user" => cUser, "workDate" => cDate, "sel" => 2, ;
+            "ts" => hb_DateTime() }
          if s_mtx != NIL
             hb_mutexUnlock( s_mtx )
          endif
@@ -414,14 +687,22 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
    endif
 
    if cMethod == "GET" .and. cPath == "/api/verticals"
+      if Empty( hSess )
+         return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Not authenticated" } ), ;
+            "application/json; charset=utf-8" )
+      endif
       cOut := hb_jsonEncode( { "ok" => .T., "items" => { "clinic", "services", "retail" }, ;
          "current" => ErpToStr( hb_HGetDef( ErpMetaGet( "app" ), "vertical", "" ) ) } )
       return ErpHttpOk( cOut, "application/json; charset=utf-8" )
    endif
 
-   // static www assets
+   // static www assets (path traversal guard: URL-decode first, reject "..")
    if Left( cPath, 1 ) == "/"
-      cFile := hb_DirBase() + "www" + StrTran( cPath, "/", hb_ps() )
+      cRel := ErpUrlDecode( cPath )
+      if ".." $ cRel
+         return ErpHttpForbidden( cPath )
+      endif
+      cFile := hb_DirBase() + "www" + StrTran( cRel, "/", hb_ps() )
       if File( cFile )
          cMime := "text/plain"
          if Right( Lower( cFile ), 5 ) == ".html" ; cMime := "text/html; charset=utf-8" ; endif
@@ -698,19 +979,47 @@ return ""
 static function ErpSessGet( cTok )
 
    local h := NIL
+   local nTtl
+
    if Empty( cTok )
       return NIL
    endif
+   nTtl := ErpSessTtlMin()
    if s_mtx != NIL
       hb_mutexLock( s_mtx )
    endif
    if hb_HHasKey( s_hSess, cTok )
       h := s_hSess[ cTok ]
+      if ValType( h ) == "H" .and. hb_HHasKey( h, "ts" ) .and. ;
+            ( hb_DateTime() - h[ "ts" ] ) * 1440 > nTtl
+         // expired (sessions.ttlMinutes in app.json) — destroy it
+         hb_HDel( s_hSess, cTok )
+         h := NIL
+      elseif ValType( h ) == "H"
+         h[ "ts" ] := hb_DateTime()  // sliding renewal on each valid hit
+      endif
    endif
    if s_mtx != NIL
       hb_mutexUnlock( s_mtx )
    endif
 return h
+
+//--------------------------------------------------------------------
+// sessions.ttlMinutes from app.json (fallback 480)
+static function ErpSessTtlMin()
+
+   local hApp := ErpMetaGet( "app" ), hSes, n := 480
+
+   if ValType( hApp ) == "H" .and. hb_HHasKey( hApp, "sessions" )
+      hSes := hApp[ "sessions" ]
+      if ValType( hSes ) == "H" .and. hb_HHasKey( hSes, "ttlMinutes" )
+         n := Val( ErpToStr( hSes[ "ttlMinutes" ] ) )
+      endif
+   endif
+   if n <= 0
+      n := 480
+   endif
+return n
 
 //--------------------------------------------------------------------
 static function ErpSessPut( cTok, h )
