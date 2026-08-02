@@ -36,8 +36,21 @@ login = extract_text_into("LoginHtml")
 dash = extract_text_into("DashboardHtml")
 
 (dst / "login.html").write_text(login, encoding="utf-8")
-(dst / "dashboard.html").write_text(dash, encoding="utf-8")
 print("login.html", len(login), "bytes", (dst / "login.html").stat().st_size)
+
+# FiveTech_ERP maintains its own dashboard UI (status bar, collapsible menu,
+# pagination, …). Never overwrite www/dashboard.html from FWH TEXT blocks.
+# Keep a reference copy only for diffs / re-import.
+ref = dst / "dashboard.fwh-ref.html"
+ref.write_text(dash, encoding="utf-8")
+print("dashboard.fwh-ref.html", len(dash), "bytes (reference only)")
+dash_path = dst / "dashboard.html"
+if dash_path.exists():
+    print("dashboard.html PRESERVED (not overwritten):", dash_path.stat().st_size, "bytes")
+else:
+    # First bootstrap only — seed from FWH when missing
+    dash_path.write_text(dash, encoding="utf-8")
+    print("dashboard.html seeded from FWH:", dash_path.stat().st_size, "bytes")
 print("dashboard.html", len(dash), "bytes", (dst / "dashboard.html").stat().st_size)
 # sample placeholders
 for ph in ["__USER__", "__APP_JSON__", "__MODULES_JSON__", "__APPTDATA__", "fetch("]:

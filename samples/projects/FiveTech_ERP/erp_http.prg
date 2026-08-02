@@ -47,6 +47,10 @@ function ErpHttpStart( nPort, cMsg )
       return .F.
    endif
 
+   // Selectable data layer: auto-generate missing DBF tables when
+   // database.driver is dbfcdx/openads (no-op for the default json driver)
+   ErpDbEnsureTables()
+
 return .T.
 
 //--------------------------------------------------------------------
@@ -107,6 +111,10 @@ static function ErpHttpClient( hSock )
    local cReq := "", cBuf, nLen, nTries := 0, nHdr, nCL
    local hHdr, cBody := "", cMethod, cPath, cQuery, cResp
    local cLine, aTok
+
+   // same codepage as the main thread (Project1): the DBF RDD translates
+   // field data with the THREAD codepage, and the meta JSON is UTF-8
+   hb_cdpSelect( "UTF8EX" )
 
    while nTries < 200
       cBuf := Space( 8192 )
@@ -278,6 +286,7 @@ static function ErpApiMetaPost( cBody, hSess )
       ErpMetaCachePut( cKey, hDoc )
       if cKey == "app"
          ErpMetaInvalidate( "modules" )
+         ErpDbEnsureTables()   // no-op unless database.driver is dbfcdx/openads
       endif
       return ErpHttpOk( hb_jsonEncode( { "ok" => .T., "key" => cKey } ), ;
          "application/json; charset=utf-8" )
@@ -305,6 +314,7 @@ static function ErpApiMetaPost( cBody, hSess )
    if cKey == "app"
       // vertical may have changed: the modules key resolves to another file now
       ErpMetaInvalidate( "modules" )
+      ErpDbEnsureTables()   // no-op unless database.driver is dbfcdx/openads
    endif
    cOut := hb_jsonEncode( { "ok" => .T., "key" => cKey, "path" => cFull } )
 return ErpHttpOk( cOut, "application/json; charset=utf-8" )
@@ -350,6 +360,30 @@ static function ErpApiDatasetPost( cBody, hSess )
          "application/json; charset=utf-8" )
    endif
 
+   cKeyField := AllTrim( ErpToStr( hb_HGetDef( hReq, "keyField", "" ) ) )
+   cKeyValue := ErpToStr( hb_HGetDef( hReq, "keyValue", "" ) )
+   hRow := hb_HGetDef( hReq, "row", NIL )
+
+   if ErpDbDriver() != "json"
+      // selectable data layer (dbfcdx / openads): apply on the DBF table,
+      // the meta/data/*.json files stay untouched
+      if cAction != "delete" .and. ValType( hRow ) != "H"
+         return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
+            "msg" => "row must be a JSON object" } ), "application/json; charset=utf-8" )
+      endif
+      if cAction != "add" .and. Empty( cKeyField )
+         return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
+            "msg" => "keyField required" } ), "application/json; charset=utf-8" )
+      endif
+      if ! ErpDbApply( cKey, cAction, cBody )
+         return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
+            "msg" => "DB apply failed: " + cAction + " " + cKey } ), ;
+            "application/json; charset=utf-8" )
+      endif
+      return ErpHttpOk( hb_jsonEncode( { "ok" => .T., "key" => cKey, ;
+         "action" => cAction } ), "application/json; charset=utf-8" )
+   endif
+
    // Fresh copy from disk — never mutate the ErpMetaGet() cached hash
    cRaw := ErpMetaGetRaw( cKey )
    if Empty( cRaw )
@@ -363,10 +397,6 @@ static function ErpApiDatasetPost( cBody, hSess )
          "key" => cKey } ), "application/json; charset=utf-8" )
    endif
    aRows := hDoc[ "rows" ]
-
-   cKeyField := AllTrim( ErpToStr( hb_HGetDef( hReq, "keyField", "" ) ) )
-   cKeyValue := ErpToStr( hb_HGetDef( hReq, "keyValue", "" ) )
-   hRow := hb_HGetDef( hReq, "row", NIL )
 
    if cAction == "add"
       if ValType( hRow ) != "H"
@@ -585,7 +615,13 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
       endif
       hQ := ErpQuery( cQuery )
       cKey := AllTrim( hb_HGetDef( hQ, "key", "" ) )
-      cOut := ErpDatasetApiEnvelope( cKey )
+      if ErpDbDriver() != "json"
+         // selectable data layer (dbfcdx / openads): rows from the DBF tables
+         cOut := hb_jsonEncode( { "ok" => .T., "key" => cKey, ;
+            "rows" => ErpDbReadRows( cKey ) } )
+      else
+         cOut := ErpDatasetApiEnvelope( cKey )
+      endif
       return ErpHttpOk( cOut, "application/json; charset=utf-8" )
    endif
 
@@ -611,6 +647,16 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
       endif
       cOut := ErpDatasetApiEnvelope( "data.balances" )
       return ErpHttpOk( cOut, "application/json; charset=utf-8" )
+   endif
+
+   // Selectable data layer status (driver/backend/tables/ADS availability)
+   if cMethod == "GET" .and. cPath == "/api/db/status"
+      if Empty( hSess )
+         return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Not authenticated" } ), ;
+            "application/json; charset=utf-8" )
+      endif
+      return ErpHttpOk( hb_jsonEncode( ErpDbStatus() ), ;
+         "application/json; charset=utf-8" )
    endif
 
    if cMethod == "POST" .and. cPath == "/api/login"
@@ -858,6 +904,21 @@ return "<!DOCTYPE html><html><body><h1>login.html missing</h1>" + ;
        "<p>Run _extract_fwh_html.py</p></body></html>"
 
 //--------------------------------------------------------------------
+// Version string for status bar (__APPVER__)
+static function ErpAppVersion()
+
+   local hApp := ErpMetaGet( "app" )
+   local cVer := ""
+
+   if ValType( hApp ) == "H"
+      cVer := AllTrim( ErpToStr( hb_HGetDef( hApp, "version", "" ) ) )
+   endif
+   if Empty( cVer )
+      cVer := "1.0.0"
+   endif
+return cVer
+
+//--------------------------------------------------------------------
 // FWH dashboard.html + same placeholders as DesktopWeb DashboardHtml()
 static function ErpFwhDashboardHtml( cUser, cWorkDate, nSel )
 
@@ -884,7 +945,8 @@ static function ErpFwhDashboardHtml( cUser, cWorkDate, nSel )
       cAv := "??"
    endif
 
-   cHtml := StrTran( cHtml, "__APPVER__", "1.0.0" )
+   // App version from meta/app.json when available
+   cHtml := StrTran( cHtml, "__APPVER__", ErpAppVersion() )
    cHtml := StrTran( cHtml, "__USER__", cUser )
    cHtml := StrTran( cHtml, "__WORKDATE__", cWorkDate )
    cHtml := StrTran( cHtml, "__AVATAR__", cAv )

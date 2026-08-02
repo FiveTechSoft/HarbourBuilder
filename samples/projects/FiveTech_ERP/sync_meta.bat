@@ -32,9 +32,10 @@ echo Meta sync OK ^(exact copy of FWH DesktopWeb meta^).
 fc /b "%SRC%\app.json" "%DST%\app.json" >nul && echo app.json: identical
 fc /b "%SRC%\modules.json" "%DST%\modules.json" >nul && echo modules.json: identical
 
-REM Also refresh FWH login/dashboard HTML extracted from login.prg
+REM Extract FWH login HTML only. www\dashboard.html is owned by FiveTech_ERP
+REM (status bar, collapsible menu, pagination) and must NOT be overwritten.
 if exist "%~dp0_extract_fwh_html.py" (
-  echo Syncing FWH HTML UI into www\...
+  echo Syncing FWH login HTML into www\ ^(dashboard.html preserved^)...
   python "%~dp0_extract_fwh_html.py"
 )
 endlocal
