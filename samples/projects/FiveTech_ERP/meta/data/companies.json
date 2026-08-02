@@ -5,12 +5,20 @@
   "rows": [
     {
       "code": "HQ",
-      "name": "FiveTech Clinic HQ",
+      "name": "FiveTech Software HQ",
       "currency": "EUR",
       "taxId": "B-00000001",
       "city": "Madrid",
       "country": "ES",
-      "active": true
+      "active": true,
+      "verticals": ["clinic", "demo", "services", "ferreteria"],
+      "defaultApp": "clinic",
+      "apps": [
+        { "id": "clinic", "label": "Clinic", "vertical": "clinic" },
+        { "id": "demo", "label": "Consulting demo", "vertical": "demo" },
+        { "id": "services", "label": "Professional services", "vertical": "services" },
+        { "id": "ferreteria", "label": "Ferretería", "vertical": "ferreteria" }
+      ]
     },
     {
       "code": "MAD",
@@ -19,7 +27,12 @@
       "taxId": "B-00000002",
       "city": "Madrid",
       "country": "ES",
-      "active": true
+      "active": true,
+      "verticals": ["clinic"],
+      "defaultApp": "clinic",
+      "apps": [
+        { "id": "clinic", "label": "Clinic", "vertical": "clinic" }
+      ]
     },
     {
       "code": "BCN",
@@ -28,7 +41,28 @@
       "taxId": "B-00000003",
       "city": "Barcelona",
       "country": "ES",
-      "active": true
+      "active": true,
+      "verticals": ["retail", "services", "ferreteria"],
+      "defaultApp": "retail",
+      "apps": [
+        { "id": "retail", "label": "Retail / POS", "vertical": "retail" },
+        { "id": "services", "label": "Professional services", "vertical": "services" },
+        { "id": "ferreteria", "label": "Ferretería", "vertical": "ferreteria" }
+      ]
+    },
+    {
+      "code": "FER",
+      "name": "Ferretería El Tornillo",
+      "currency": "EUR",
+      "taxId": "B-00000004",
+      "city": "Valencia",
+      "country": "ES",
+      "active": true,
+      "verticals": ["ferreteria"],
+      "defaultApp": "ferreteria",
+      "apps": [
+        { "id": "ferreteria", "label": "Ferretería", "vertical": "ferreteria" }
+      ]
     }
   ]
 }

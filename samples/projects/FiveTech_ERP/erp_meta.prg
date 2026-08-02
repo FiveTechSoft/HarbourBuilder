@@ -5,6 +5,8 @@ static s_hMeta := { => }
 static s_cRoot := ""
 // MT HTTP server: protect s_hMeta (ErpMetaGet / ErpMetaClearCache / invalidate)
 static s_mtxMeta := hb_MutexCreate()
+// Per-request vertical override (HTTP session company-app). Empty = use app.vertical.
+static s_cReqVertical := ""
 
 //--------------------------------------------------------------------
 function ErpMetaRoot()
@@ -142,20 +144,44 @@ static function MetaNameSafe( cName )
 return .T.
 
 //--------------------------------------------------------------------
-// Vertical-aware "modules" resolution: with app.vertical set and a pack file
-// present, the modules key reads/writes meta/verticals/<name>/modules.json;
-// otherwise the base meta/modules.json. Raw app read: no cache, no lock,
-// no recursion (only the "modules" key goes through here).
+// Set vertical pack for this request/thread (used by multi-company apps).
+// Clears modules cache so the next modules read uses the new path.
+function ErpMetaSetRequestVertical( cVert )
+
+   cVert := AllTrim( ErpToStr( cVert ) )
+   if ! Empty( cVert ) .and. ! MetaNameSafe( cVert )
+      cVert := ""
+   endif
+   if s_cReqVertical != cVert
+      s_cReqVertical := cVert
+      ErpMetaInvalidate( "modules" )
+   endif
+return s_cReqVertical
+
+//--------------------------------------------------------------------
+function ErpMetaRequestVertical()
+return s_cReqVertical
+
+//--------------------------------------------------------------------
+// Vertical-aware "modules" resolution:
+//  1) per-request vertical (session company-app)
+//  2) app.vertical in app.json
+//  3) base modules.json
+// With a pack file present: meta/verticals/<name>/modules.json
 static function MetaModulesRel()
 
    local cJson, hApp := { => }, cVert := "", cTry
 
-   cJson := ErpMetaGetRaw( "app" )
-   if ! Empty( cJson )
-      hb_jsonDecode( cJson, @hApp )
-   endif
-   if ValType( hApp ) == "H"
-      cVert := AllTrim( ErpToStr( hb_HGetDef( hApp, "vertical", "" ) ) )
+   // 1) request / session override (company → app vertical)
+   cVert := AllTrim( s_cReqVertical )
+   if Empty( cVert )
+      cJson := ErpMetaGetRaw( "app" )
+      if ! Empty( cJson )
+         hb_jsonDecode( cJson, @hApp )
+      endif
+      if ValType( hApp ) == "H"
+         cVert := AllTrim( ErpToStr( hb_HGetDef( hApp, "vertical", "" ) ) )
+      endif
    endif
    if ! Empty( cVert ) .and. MetaNameSafe( cVert )
       cTry := "verticals" + hb_ps() + cVert + hb_ps() + "modules.json"

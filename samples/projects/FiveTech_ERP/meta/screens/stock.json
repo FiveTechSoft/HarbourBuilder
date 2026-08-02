@@ -15,7 +15,7 @@
         "id": "warehouse",
         "label": "Warehouse",
         "type": "select",
-        "options": ["Main", "Shop", "Transit"]
+        "options": ["Main", "Shop", "Transit", "Tienda", "Almacén", "Recambios"]
       },
       { "id": "qty", "label": "Qty", "type": "text", "align": "right" },
       { "id": "minQty", "label": "Min", "type": "text", "align": "right" },

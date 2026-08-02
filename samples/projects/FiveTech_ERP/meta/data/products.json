@@ -68,6 +68,72 @@
       "tax": "0%",
       "uom": "Unit",
       "active": false
+    },
+    {
+      "code": "FER-200",
+      "name": "Tornillo M6x40 inox (caja 100)",
+      "category": "Tornillería",
+      "barcode": "8412345679200",
+      "price": 4.95,
+      "cost": 1.80,
+      "tax": "21%",
+      "uom": "Pack",
+      "active": true
+    },
+    {
+      "code": "FER-201",
+      "name": "Taladro percutor 750W",
+      "category": "Herramientas",
+      "barcode": "8412345679201",
+      "price": 79.90,
+      "cost": 42.00,
+      "tax": "21%",
+      "uom": "Unit",
+      "active": true
+    },
+    {
+      "code": "FER-202",
+      "name": "Cinta teflón 12m",
+      "category": "Fontanería",
+      "barcode": "8412345679202",
+      "price": 1.25,
+      "cost": 0.35,
+      "tax": "21%",
+      "uom": "Unit",
+      "active": true
+    },
+    {
+      "code": "FER-203",
+      "name": "Cable 2x1.5 mm² (rollo 100m)",
+      "category": "Electricidad",
+      "barcode": "8412345679203",
+      "price": 48.00,
+      "cost": 28.50,
+      "tax": "21%",
+      "uom": "Pack",
+      "active": true
+    },
+    {
+      "code": "FER-204",
+      "name": "Pintura plástica blanca 15L",
+      "category": "Pintura",
+      "barcode": "8412345679204",
+      "price": 32.50,
+      "cost": 18.00,
+      "tax": "21%",
+      "uom": "Unit",
+      "active": true
+    },
+    {
+      "code": "FER-205",
+      "name": "Taco nylon 8mm (caja 50)",
+      "category": "Fijación",
+      "barcode": "8412345679205",
+      "price": 3.40,
+      "cost": 1.10,
+      "tax": "21%",
+      "uom": "Pack",
+      "active": true
     }
   ]
 }

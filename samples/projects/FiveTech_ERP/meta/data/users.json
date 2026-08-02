@@ -10,7 +10,8 @@
       "role": "admin",
       "active": true,
       "password": "2615402659",
-      "defaultCompany": "HQ"
+      "defaultCompany": "HQ",
+      "defaultApp": "clinic"
     },
     {
       "code": "demo",
@@ -19,16 +20,18 @@
       "role": "user",
       "active": true,
       "password": "3594706848",
-      "defaultCompany": "MAD"
+      "defaultCompany": "MAD",
+      "defaultApp": "clinic"
     },
     {
-      "code": "nurse",
-      "name": "Nurse Lee",
-      "email": "nurse@example.com",
+      "code": "test",
+      "name": "test",
+      "email": "test@gmail.com",
       "role": "user",
       "active": true,
-      "password": "3531500867",
-      "defaultCompany": "BCN"
+      "defaultCompany": "FER",
+      "defaultApp": "ferreteria",
+      "password": "3632233996"
     }
   ]
 }

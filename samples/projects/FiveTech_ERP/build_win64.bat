@@ -193,10 +193,19 @@ REM Runtime next to exe: www + exact FWH meta JSON copy
 if not exist "%PROJDIR%\www\index.html" (
   echo WARNING: www\index.html missing
 )
-echo [5] Sync meta from FWH DesktopWeb (byte-identical JSON)
-call "%PROJDIR%\sync_meta.bat"
+REM Keep FWH DesktopWeb meta in sync with this project's meta (source of truth).
+echo [5] Push meta -^> FWH DesktopWeb
+call "%PROJDIR%\push_meta_to_fwh.bat"
 if errorlevel 1 (
-  echo WARNING: meta sync failed — using existing meta\ if present
+  echo WARNING: push_meta_to_fwh failed — FWH may be outdated
+)
+REM Optional reverse pull (FWH -^> here). Off by default; use only when FWH is newer.
+if /I "%SYNC_FWH_META%"=="1" (
+  echo [5b] Pull meta from FWH DesktopWeb (SYNC_FWH_META=1)
+  call "%PROJDIR%\sync_meta.bat"
+  if errorlevel 1 (
+    echo WARNING: meta pull failed — using existing meta\ if present
+  )
 )
 if exist "C:\fwteam\dll\webview64\WebView2Loader.dll" (
   copy /y "C:\fwteam\dll\webview64\WebView2Loader.dll" "%PROJDIR%\" >nul

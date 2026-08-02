@@ -582,6 +582,8 @@ static function ErpApiDatasetPost( cBody, hSess )
                "application/json; charset=utf-8" )
          endif
          ErpUsersNormalizeRow( hRow, NIL )
+      elseif cKey == "data.companies"
+         ErpCompanyNormalizeRow( hRow )
       else
          ErpCompanyStampRow( cKey, hRow, hSess )
       endif
@@ -610,6 +612,8 @@ static function ErpApiDatasetPost( cBody, hSess )
          endif
          if cKey == "data.users"
             ErpUsersNormalizeRow( hRow, aRows[ n ] )
+         elseif cKey == "data.companies"
+            ErpCompanyNormalizeRow( hRow )
          else
             ErpCompanyStampRow( cKey, hRow, hSess )
          endif
@@ -815,6 +819,32 @@ function ErpUserAuth( cUser, cPass )
 return NIL
 
 //--------------------------------------------------------------------
+// Find user row by code (no password check). Returns hash or NIL.
+function ErpUserFind( cUser )
+
+   local hDoc, aRows, h, cCode
+   cUser := AllTrim( ErpToStr( cUser ) )
+   if Empty( cUser )
+      return NIL
+   endif
+   hDoc := ErpMetaGet( "data.users" )
+   if ValType( hDoc ) != "H" .or. ! hb_HHasKey( hDoc, "rows" ) .or. ;
+         ValType( hDoc[ "rows" ] ) != "A"
+      return NIL
+   endif
+   aRows := hDoc[ "rows" ]
+   for each h in aRows
+      if ValType( h ) != "H"
+         loop
+      endif
+      cCode := AllTrim( ErpToStr( hb_HGetDef( h, "code", "" ) ) )
+      if Upper( cCode ) == Upper( cUser )
+         return h
+      endif
+   next
+return NIL
+
+//--------------------------------------------------------------------
 // Is this user code an admin (look up data.users, fallback to code name)
 function ErpUserCodeIsAdmin( cUser )
 
@@ -926,8 +956,214 @@ function ErpCompanyDefaultForUser( hUser )
 return "HQ"
 
 //--------------------------------------------------------------------
+// Friendly label for a vertical pack id (clinic, demo, …).
+static function ErpAppLabel( cId )
+
+   local c := Lower( AllTrim( ErpToStr( cId ) ) )
+   if c == "clinic"
+      return "Clinic"
+   elseif c == "demo"
+      return "Consulting demo"
+   elseif c == "services"
+      return "Professional services"
+   elseif c == "retail"
+      return "Retail / POS"
+   elseif c == "ferreteria"
+      return "Ferretería"
+   elseif c == "base" .or. Empty( c )
+      return "Base modules"
+   endif
+return AllTrim( ErpToStr( cId ) )
+
+//--------------------------------------------------------------------
+// Apps linked to a company. Each app maps to a vertical pack name.
+// Supported company fields (any combination):
+//   apps: [ { id, label, vertical } | "clinic" | ... ]
+//   verticals: [ "clinic", "demo" ]   (checklist from Admin → Companies)
+//   vertical: "clinic"               (single)
+// If none: fall back to app.vertical, then base (empty vertical = modules.json).
+//
+// Resolution at runtime (session):
+//   user.defaultApp → company.defaultApp → first linked app
+// Switching company reloads apps; switching app reloads modules (sidebar).
+function ErpCompanyApps( hCo )
+
+   local aOut := {}, xApps, x, hApp, cId, cLab, cVert, aVert, i, cAppVert
+
+   // From company.apps
+   if ValType( hCo ) == "H" .and. hb_HHasKey( hCo, "apps" )
+      xApps := hCo[ "apps" ]
+      if ValType( xApps ) == "A"
+         for each x in xApps
+            if ValType( x ) == "C"
+               cVert := AllTrim( ErpToStr( x ) )
+               if ! Empty( cVert )
+                  AAdd( aOut, { "id" => cVert, "label" => ErpAppLabel( cVert ), ;
+                     "vertical" => cVert } )
+               endif
+            elseif ValType( x ) == "H"
+               cVert := AllTrim( ErpToStr( hb_HGetDef( x, "vertical", ;
+                  hb_HGetDef( x, "id", "" ) ) ) )
+               cId := AllTrim( ErpToStr( hb_HGetDef( x, "id", cVert ) ) )
+               cLab := AllTrim( ErpToStr( hb_HGetDef( x, "label", ;
+                  hb_HGetDef( x, "name", "" ) ) ) )
+               if ! Empty( cVert ) .or. ! Empty( cId )
+                  if Empty( cVert )
+                     cVert := cId
+                  endif
+                  if Empty( cId )
+                     cId := cVert
+                  endif
+                  if Empty( cLab )
+                     cLab := ErpAppLabel( cId )
+                  endif
+                  AAdd( aOut, { "id" => cId, "label" => cLab, "vertical" => cVert } )
+               endif
+            endif
+         next
+      endif
+   endif
+
+   // From company.verticals (checklist of pack names)
+   if Empty( aOut ) .and. ValType( hCo ) == "H" .and. hb_HHasKey( hCo, "verticals" )
+      aVert := hCo[ "verticals" ]
+      if ValType( aVert ) == "A"
+         for each x in aVert
+            cVert := AllTrim( ErpToStr( x ) )
+            if ! Empty( cVert )
+               AAdd( aOut, { "id" => cVert, "label" => ErpAppLabel( cVert ), ;
+                  "vertical" => cVert } )
+            endif
+         next
+      elseif ValType( aVert ) == "C" .and. ! Empty( AllTrim( aVert ) )
+         // comma-separated
+         aVert := hb_ATokens( AllTrim( aVert ), "," )
+         for i := 1 to Len( aVert )
+            cVert := AllTrim( aVert[ i ] )
+            if ! Empty( cVert )
+               AAdd( aOut, { "id" => cVert, "label" => ErpAppLabel( cVert ), ;
+                  "vertical" => cVert } )
+            endif
+         next
+      endif
+   endif
+
+   // Single company.vertical
+   if Empty( aOut ) .and. ValType( hCo ) == "H"
+      cVert := AllTrim( ErpToStr( hb_HGetDef( hCo, "vertical", "" ) ) )
+      if ! Empty( cVert )
+         AAdd( aOut, { "id" => cVert, "label" => ErpAppLabel( cVert ), ;
+            "vertical" => cVert } )
+      endif
+   endif
+
+   // Fallback: global app.vertical
+   if Empty( aOut )
+      hApp := ErpMetaGet( "app" )
+      cAppVert := ""
+      if ValType( hApp ) == "H"
+         cAppVert := AllTrim( ErpToStr( hb_HGetDef( hApp, "vertical", "" ) ) )
+      endif
+      if ! Empty( cAppVert )
+         AAdd( aOut, { "id" => cAppVert, "label" => ErpAppLabel( cAppVert ), ;
+            "vertical" => cAppVert } )
+      else
+         AAdd( aOut, { "id" => "base", "label" => "Base modules", "vertical" => "" } )
+      endif
+   endif
+return aOut
+
+//--------------------------------------------------------------------
+// Pick default app for company (+ optional user preference).
+// Returns hash { id, label, vertical } or NIL.
+function ErpCompanyDefaultApp( hCo, hUser )
+
+   local aApps := ErpCompanyApps( hCo ), cWant := "", h, cId
+
+   if ValType( hUser ) == "H"
+      cWant := AllTrim( ErpToStr( hb_HGetDef( hUser, "defaultApp", ;
+         hb_HGetDef( hUser, "defaultVertical", "" ) ) ) )
+   endif
+   if Empty( cWant ) .and. ValType( hCo ) == "H"
+      cWant := AllTrim( ErpToStr( hb_HGetDef( hCo, "defaultApp", ;
+         hb_HGetDef( hCo, "defaultVertical", "" ) ) ) )
+   endif
+   if ! Empty( cWant )
+      for each h in aApps
+         cId := AllTrim( ErpToStr( hb_HGetDef( h, "id", "" ) ) )
+         if Upper( cId ) == Upper( cWant ) .or. ;
+               Upper( AllTrim( ErpToStr( hb_HGetDef( h, "vertical", "" ) ) ) ) == Upper( cWant )
+            return h
+         endif
+      next
+   endif
+   if ! Empty( aApps )
+      return aApps[ 1 ]
+   endif
+return { "id" => "base", "label" => "Base modules", "vertical" => "" }
+
+//--------------------------------------------------------------------
+function ErpCompanyFindApp( hCo, cAppId )
+
+   local aApps := ErpCompanyApps( hCo ), h, cId
+   cAppId := AllTrim( ErpToStr( cAppId ) )
+   if Empty( cAppId )
+      return NIL
+   endif
+   for each h in aApps
+      cId := AllTrim( ErpToStr( hb_HGetDef( h, "id", "" ) ) )
+      if Upper( cId ) == Upper( cAppId ) .or. ;
+            Upper( AllTrim( ErpToStr( hb_HGetDef( h, "vertical", "" ) ) ) ) == Upper( cAppId )
+         return h
+      endif
+   next
+return NIL
+
+//--------------------------------------------------------------------
 function ErpSessCompany( hSess )
 return AllTrim( ErpToStr( hb_HGetDef( hSess, "company", "" ) ) )
+
+//--------------------------------------------------------------------
+function ErpSessVertical( hSess )
+return AllTrim( ErpToStr( hb_HGetDef( hSess, "vertical", "" ) ) )
+
+//--------------------------------------------------------------------
+function ErpSessApp( hSess )
+return AllTrim( ErpToStr( hb_HGetDef( hSess, "app", "" ) ) )
+
+//--------------------------------------------------------------------
+// Normalize data.companies row: verticals checklist → apps array
+static function ErpCompanyNormalizeRow( hRow )
+
+   local aVert, aApps := {}, x, cVert, cDef
+   if ValType( hRow ) != "H"
+      return NIL
+   endif
+   // If verticals present (from checklist UI), rebuild apps from packs
+   if hb_HHasKey( hRow, "verticals" )
+      aVert := hRow[ "verticals" ]
+      if ValType( aVert ) == "A"
+         for each x in aVert
+            cVert := AllTrim( ErpToStr( x ) )
+            if ! Empty( cVert )
+               AAdd( aApps, { "id" => cVert, "label" => ErpAppLabel( cVert ), ;
+                  "vertical" => cVert } )
+            endif
+         next
+         hRow[ "apps" ] := aApps
+      endif
+   endif
+   // Keep defaultApp if set; if empty and apps exist, use first
+   if hb_HHasKey( hRow, "defaultApp" )
+      cDef := AllTrim( ErpToStr( hRow[ "defaultApp" ] ) )
+      hRow[ "defaultApp" ] := cDef
+   endif
+   if Empty( AllTrim( ErpToStr( hb_HGetDef( hRow, "defaultApp", "" ) ) ) ) .and. ;
+         ValType( hb_HGetDef( hRow, "apps", NIL ) ) == "A" .and. ;
+         ! Empty( hRow[ "apps" ] ) .and. ValType( hRow[ "apps" ][ 1 ] ) == "H"
+      hRow[ "defaultApp" ] := AllTrim( ErpToStr( hb_HGetDef( hRow[ "apps" ][ 1 ], "id", "" ) ) )
+   endif
+return NIL
 
 //--------------------------------------------------------------------
 // Filter rows by session company when dataset is multi-company scoped.
@@ -1088,7 +1324,7 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
 
    local cOut, hDoc, aItems, cKey, hQ, cUser, cPass, cTok, hSess
    local cFile, cMime, cCookie, cDate, cAction, cArg, nSel, cRel, bOld
-   local cCo, cCoName, cCur, hCo, aRows
+   local cCo, cCoName, cCur, hCo, aRows, hApp, cAppId, cAppLab
 
    cPath := Lower( AllTrim( cPath ) )
    if Empty( cPath )
@@ -1102,9 +1338,16 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
    endif
    cTok := ErpCookieGet( cCookie, "DWSESS" )
    hSess := ErpSessGet( cTok )
+   // Per-request modules path follows session company-app vertical
+   if ! Empty( hSess )
+      ErpMetaSetRequestVertical( ErpSessVertical( hSess ) )
+   else
+      ErpMetaSetRequestVertical( "" )
+   endif
 
    // --- pages (same routes as FWH DesktopWeb login.prg) ---
    if cMethod == "GET" .and. ( cPath == "/" .or. cPath == "/login" .or. cPath == "/index.html" )
+      ErpMetaSetRequestVertical( "" )
       return ErpHttpOk( ErpFwhLoginHtml(), "text/html; charset=utf-8" )
    endif
 
@@ -1116,6 +1359,8 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
       if nSel < 1
          nSel := 2
       endif
+      // Ensure modules embed uses session vertical
+      ErpMetaSetRequestVertical( ErpSessVertical( hSess ) )
       return ErpHttpOk( ErpFwhDashboardHtml( ;
          ErpToStr( hb_HGetDef( hSess, "user", "" ) ), ;
          ErpToStr( hb_HGetDef( hSess, "workDate", DToC( Date() ) ) ), ;
@@ -1275,6 +1520,11 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
             cCoName := AllTrim( ErpToStr( hb_HGetDef( hCo, "name", cCo ) ) )
             cCur := AllTrim( ErpToStr( hb_HGetDef( hCo, "currency", "" ) ) )
          endif
+         // Company → apps (vertical packs); pick default for user/company
+         hApp := ErpCompanyDefaultApp( hCo, hDoc )
+         cAppId := AllTrim( ErpToStr( hb_HGetDef( hApp, "id", "" ) ) )
+         cAppLab := AllTrim( ErpToStr( hb_HGetDef( hApp, "label", cAppId ) ) )
+         cRel := AllTrim( ErpToStr( hb_HGetDef( hApp, "vertical", "" ) ) )
          cTok := hb_MD5( cUser + cDate + Time() + hb_ntos( Seconds() ) )
          if s_mtx != NIL
             hb_mutexLock( s_mtx )
@@ -1283,7 +1533,10 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
             "ts" => hb_DateTime(), ;
             "role" => Lower( AllTrim( ErpToStr( hb_HGetDef( hDoc, "role", "user" ) ) ) ), ;
             "isAdmin" => ErpUserRowIsAdmin( hDoc ), ;
-            "company" => cCo }
+            "company" => cCo, ;
+            "app" => cAppId, ;
+            "appLabel" => cAppLab, ;
+            "vertical" => cRel }
          if s_mtx != NIL
             hb_mutexUnlock( s_mtx )
          endif
@@ -1291,7 +1544,9 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
             "user" => cUser, ;
             "role" => Lower( AllTrim( ErpToStr( hb_HGetDef( hDoc, "role", "user" ) ) ) ), ;
             "isAdmin" => ErpUserRowIsAdmin( hDoc ), ;
-            "company" => cCo, "companyName" => cCoName, "currency" => cCur } )
+            "company" => cCo, "companyName" => cCoName, "currency" => cCur, ;
+            "app" => cAppId, "appLabel" => cAppLab, "vertical" => cRel, ;
+            "apps" => ErpCompanyApps( hCo ) } )
          return ErpHttpOkCookie( cOut, "application/json; charset=utf-8", ;
             "DWSESS=" + cTok + "; Path=/; HttpOnly; SameSite=Lax" )
       endif
@@ -1337,7 +1592,7 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
          return ErpHttpOk( hb_jsonEncode( { "ok" => .T., "workDate" => cArg } ), ;
             "application/json; charset=utf-8" )
       elseif cAction == "company" .or. cAction == "setcompany" .or. cAction == "set_company"
-         // a1 = company code from data.companies
+         // a1 = company code; optional a2 = app id within that company
          if Empty( cArg )
             return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "company code required" } ), ;
                "application/json; charset=utf-8" )
@@ -1349,19 +1604,68 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
                "application/json; charset=utf-8" )
          endif
          cCo := AllTrim( ErpToStr( hb_HGetDef( hCo, "code", cArg ) ) )
+         cAppId := AllTrim( ErpToStr( hb_HGetDef( hQ, "a2", "" ) ) )
+         if ! Empty( cAppId )
+            hApp := ErpCompanyFindApp( hCo, cAppId )
+         else
+            // Prefer session user's defaultApp if linked on the new company
+            hApp := ErpCompanyDefaultApp( hCo, ;
+               ErpUserFind( ErpToStr( hb_HGetDef( hSess, "user", "" ) ) ) )
+         endif
+         if ValType( hApp ) != "H"
+            hApp := { "id" => "base", "label" => "Base modules", "vertical" => "" }
+         endif
+         cAppId := AllTrim( ErpToStr( hb_HGetDef( hApp, "id", "" ) ) )
+         cAppLab := AllTrim( ErpToStr( hb_HGetDef( hApp, "label", cAppId ) ) )
+         cRel := AllTrim( ErpToStr( hb_HGetDef( hApp, "vertical", "" ) ) )
          hSess[ "company" ] := cCo
+         hSess[ "app" ] := cAppId
+         hSess[ "appLabel" ] := cAppLab
+         hSess[ "vertical" ] := cRel
          ErpSessPut( cTok, hSess )
+         ErpMetaSetRequestVertical( cRel )
          return ErpHttpOk( hb_jsonEncode( { "ok" => .T., ;
             "company" => cCo, ;
             "companyName" => AllTrim( ErpToStr( hb_HGetDef( hCo, "name", cCo ) ) ), ;
-            "currency" => AllTrim( ErpToStr( hb_HGetDef( hCo, "currency", "" ) ) ) } ), ;
+            "currency" => AllTrim( ErpToStr( hb_HGetDef( hCo, "currency", "" ) ) ), ;
+            "app" => cAppId, "appLabel" => cAppLab, "vertical" => cRel, ;
+            "apps" => ErpCompanyApps( hCo ) } ), ;
+            "application/json; charset=utf-8" )
+      elseif cAction == "app" .or. cAction == "setapp" .or. cAction == "vertical"
+         // a1 = app id (or vertical name) within current company
+         if Empty( cArg )
+            return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "app id required" } ), ;
+               "application/json; charset=utf-8" )
+         endif
+         cCo := ErpSessCompany( hSess )
+         hCo := ErpCompanyFind( cCo )
+         hApp := ErpCompanyFindApp( hCo, cArg )
+         if ValType( hApp ) != "H"
+            return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
+               "msg" => "App not linked to company " + cCo + ": " + cArg } ), ;
+               "application/json; charset=utf-8" )
+         endif
+         cAppId := AllTrim( ErpToStr( hb_HGetDef( hApp, "id", cArg ) ) )
+         cAppLab := AllTrim( ErpToStr( hb_HGetDef( hApp, "label", cAppId ) ) )
+         cRel := AllTrim( ErpToStr( hb_HGetDef( hApp, "vertical", "" ) ) )
+         hSess[ "app" ] := cAppId
+         hSess[ "appLabel" ] := cAppLab
+         hSess[ "vertical" ] := cRel
+         ErpSessPut( cTok, hSess )
+         ErpMetaSetRequestVertical( cRel )
+         return ErpHttpOk( hb_jsonEncode( { "ok" => .T., ;
+            "company" => cCo, ;
+            "companyName" => iif( ValType( hCo ) == "H", ;
+               AllTrim( ErpToStr( hb_HGetDef( hCo, "name", cCo ) ) ), cCo ), ;
+            "app" => cAppId, "appLabel" => cAppLab, "vertical" => cRel, ;
+            "apps" => ErpCompanyApps( hCo ) } ), ;
             "application/json; charset=utf-8" )
       endif
       return ErpHttpOk( hb_jsonEncode( { "ok" => .T., "toast" => "Action: " + cArg } ), ;
          "application/json; charset=utf-8" )
    endif
 
-   // Multi-company context (active company + list)
+   // Multi-company + multi-app context
    if cMethod == "GET" .and. cPath == "/api/context"
       if Empty( hSess )
          return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Not authenticated" } ), ;
@@ -1371,7 +1675,6 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
       if Empty( cCo )
          cCo := ErpCompanyDefaultForUser( NIL )
          hSess[ "company" ] := cCo
-         ErpSessPut( cTok, hSess )
       endif
       hCo := ErpCompanyFind( cCo )
       cCoName := cCo
@@ -1380,11 +1683,38 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
          cCoName := AllTrim( ErpToStr( hb_HGetDef( hCo, "name", cCo ) ) )
          cCur := AllTrim( ErpToStr( hb_HGetDef( hCo, "currency", "" ) ) )
       endif
+      cAppId := ErpSessApp( hSess )
+      hApp := NIL
+      if ! Empty( cAppId )
+         hApp := ErpCompanyFindApp( hCo, cAppId )
+      endif
+      if ValType( hApp ) != "H"
+         hApp := ErpCompanyDefaultApp( hCo, NIL )
+         cAppId := AllTrim( ErpToStr( hb_HGetDef( hApp, "id", "" ) ) )
+         hSess[ "app" ] := cAppId
+         hSess[ "appLabel" ] := AllTrim( ErpToStr( hb_HGetDef( hApp, "label", cAppId ) ) )
+         hSess[ "vertical" ] := AllTrim( ErpToStr( hb_HGetDef( hApp, "vertical", "" ) ) )
+      endif
+      cAppLab := AllTrim( ErpToStr( hb_HGetDef( hSess, "appLabel", ;
+         hb_HGetDef( hApp, "label", cAppId ) ) ) )
+      cRel := AllTrim( ErpToStr( hb_HGetDef( hSess, "vertical", ;
+         hb_HGetDef( hApp, "vertical", "" ) ) ) )
+      hSess[ "company" ] := cCo
+      hSess[ "app" ] := cAppId
+      hSess[ "appLabel" ] := cAppLab
+      hSess[ "vertical" ] := cRel
+      ErpSessPut( cTok, hSess )
+      ErpMetaSetRequestVertical( cRel )
       return ErpHttpOk( hb_jsonEncode( { "ok" => .T., ;
          "company" => cCo, ;
          "companyName" => cCoName, ;
          "currency" => cCur, ;
-         "companies" => ErpCompanyList() } ), ;
+         "app" => cAppId, ;
+         "appLabel" => cAppLab, ;
+         "vertical" => cRel, ;
+         "apps" => ErpCompanyApps( hCo ), ;
+         "companies" => ErpCompanyList(), ;
+         "allVerticals" => ErpMetaVerticals() } ), ;
          "application/json; charset=utf-8" )
    endif
 
@@ -1394,7 +1724,8 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
             "application/json; charset=utf-8" )
       endif
       cOut := hb_jsonEncode( { "ok" => .T., "items" => ErpMetaVerticals(), ;
-         "current" => ErpToStr( hb_HGetDef( ErpMetaGet( "app" ), "vertical", "" ) ) } )
+         "current" => iif( ! Empty( ErpSessVertical( hSess ) ), ErpSessVertical( hSess ), ;
+            ErpToStr( hb_HGetDef( ErpMetaGet( "app" ), "vertical", "" ) ) ) } )
       return ErpHttpOk( cOut, "application/json; charset=utf-8" )
    endif
 

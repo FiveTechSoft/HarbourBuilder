@@ -14,7 +14,19 @@
         "id": "category",
         "label": "Category",
         "type": "select",
-        "options": ["Furniture", "Accessories", "Supplies", "F&B", "Gift"]
+        "options": [
+          "Furniture",
+          "Accessories",
+          "Supplies",
+          "F&B",
+          "Gift",
+          "Tornillería",
+          "Herramientas",
+          "Fontanería",
+          "Electricidad",
+          "Pintura",
+          "Fijación"
+        ]
       },
       { "id": "barcode", "label": "Barcode", "type": "text" },
       { "id": "price", "label": "Price", "type": "money", "format": "money", "align": "right" },

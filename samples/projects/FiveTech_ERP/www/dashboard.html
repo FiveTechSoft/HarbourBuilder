@@ -3092,79 +3092,135 @@ function refreshStatusDb() {
     });
 }
 function refreshStatusCompany() {
-  var c = "", n = "";
+  var c = "", n = "", a = "", al = "";
   try {
     c = (APP_CONTEXT && APP_CONTEXT.company) || localStorage.getItem("dw-company") || "";
     n = (APP_CONTEXT && APP_CONTEXT.companyName) || localStorage.getItem("dw-company-name") || "";
+    a = (APP_CONTEXT && APP_CONTEXT.app) || localStorage.getItem("dw-app") || "";
+    al = (APP_CONTEXT && APP_CONTEXT.appLabel) || localStorage.getItem("dw-app-label") || "";
   } catch (e) {}
-  sbSetText("sb-company", n || c || "(sin empresa)");
+  var label = n || c || "(sin empresa)";
+  if (al || a) label += " · " + (al || a);
+  sbSetText("sb-company", label);
   var item = document.getElementById("sb-company-item");
   if (item) {
     item.title = c
-      ? ("Empresa: " + (n || c) + (c && n ? (" (" + c + ")") : "") + " — clic para cambiar")
-      : "Seleccionar empresa";
+      ? ("Empresa: " + (n || c) + " · App: " + (al || a || "—") +
+        (APP_CONTEXT.vertical ? (" (vertical " + APP_CONTEXT.vertical + ")") : "") +
+        " — clic para cambiar")
+      : "Seleccionar empresa / app";
   }
 }
 
-/** Load / set multi-company context from server session */
+function applyContextPayload(j) {
+  if (!j || !j.ok) return;
+  APP_CONTEXT.company = j.company || "";
+  APP_CONTEXT.companyName = j.companyName || j.company || "";
+  APP_CONTEXT.currency = j.currency || "";
+  APP_CONTEXT.companies = Array.isArray(j.companies) ? j.companies : (APP_CONTEXT.companies || []);
+  APP_CONTEXT.app = j.app || "";
+  APP_CONTEXT.appLabel = j.appLabel || j.app || "";
+  APP_CONTEXT.vertical = j.vertical != null ? j.vertical : "";
+  APP_CONTEXT.apps = Array.isArray(j.apps) ? j.apps : [];
+  if (Array.isArray(j.allVerticals)) APP_CONTEXT.allVerticals = j.allVerticals;
+  try {
+    localStorage.setItem("dw-company", APP_CONTEXT.company);
+    localStorage.setItem("dw-company-name", APP_CONTEXT.companyName);
+    localStorage.setItem("dw-app", APP_CONTEXT.app);
+    localStorage.setItem("dw-app-label", APP_CONTEXT.appLabel);
+    localStorage.setItem("dw-vertical", APP_CONTEXT.vertical);
+  } catch (e0) {}
+  refreshStatusCompany();
+}
+
+/** Reload sidebar modules for the session vertical pack */
+function reloadModulesForSession() {
+  return fetch("/api/meta?key=modules", { credentials: "same-origin", cache: "no-store" })
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      if (j && j.ok && j.doc) {
+        MODULES = j.doc;
+        try { renderSidebarFromMeta(); } catch (e1) {}
+      }
+      return j;
+    })
+    .catch(function () { return null; });
+}
+
+function refreshOpenMetaForContext() {
+  try {
+    if (META_VIEW && META_VIEW.dataRef && typeof loadMetaDataset === "function") {
+      var q = isMasterDetail()
+        ? ((document.getElementById("meta-q-md") || {}).value || "")
+        : ((document.getElementById("meta-q") || {}).value || "");
+      loadMetaDataset(q || "");
+      if (isMasterDetail() && typeof loadDetailDatasetAll === "function")
+        loadDetailDatasetAll();
+    }
+    if (META_VIEW && META_VIEW.layout === "context" && META_VIEW.doc &&
+        typeof renderSpecialLayout === "function") {
+      renderSpecialLayout(META_VIEW.doc);
+    }
+  } catch (e2) {}
+}
+
+/** Load / set multi-company + multi-app context from server session */
 function loadCompanyContext(done) {
   fetch("/api/context", { credentials: "same-origin", cache: "no-store" })
     .then(function (r) { return r.json(); })
     .then(function (j) {
-      if (j && j.ok) {
-        APP_CONTEXT.company = j.company || "";
-        APP_CONTEXT.companyName = j.companyName || j.company || "";
-        APP_CONTEXT.currency = j.currency || "";
-        APP_CONTEXT.companies = Array.isArray(j.companies) ? j.companies : [];
-        try {
-          localStorage.setItem("dw-company", APP_CONTEXT.company);
-          localStorage.setItem("dw-company-name", APP_CONTEXT.companyName);
-        } catch (e0) {}
-        refreshStatusCompany();
-      }
+      applyContextPayload(j);
       if (done) done(j);
     })
     .catch(function (e) { if (done) done(null); });
 }
 
+/** Set active company; optional appId among company.apps */
 function setActiveCompany(code, opts) {
   opts = opts || {};
   code = String(code || "").trim();
+  var appId = opts.app != null ? String(opts.app).trim() : "";
   if (!code) {
     toast("Company code required");
     return Promise.reject(new Error("company required"));
   }
-  return cmd("company", code).then(function (j) {
+  return cmd("company", code, appId || undefined).then(function (j) {
     if (!j || !j.ok) {
       toast((j && j.msg) || "Could not set company");
       return j;
     }
-    APP_CONTEXT.company = j.company || code;
-    APP_CONTEXT.companyName = j.companyName || code;
-    APP_CONTEXT.currency = j.currency || "";
-    try {
-      localStorage.setItem("dw-company", APP_CONTEXT.company);
-      localStorage.setItem("dw-company-name", APP_CONTEXT.companyName);
-    } catch (e1) {}
-    refreshStatusCompany();
-    toast("Empresa: " + (APP_CONTEXT.companyName || APP_CONTEXT.company));
-    // Reload open list/meta views for the new company filter
-    try {
-      if (META_VIEW && META_VIEW.dataRef && typeof loadMetaDataset === "function") {
-        var q = isMasterDetail()
-          ? ((document.getElementById("meta-q-md") || {}).value || "")
-          : ((document.getElementById("meta-q") || {}).value || "");
-        loadMetaDataset(q || "");
-        if (isMasterDetail() && typeof loadDetailDatasetAll === "function")
-          loadDetailDatasetAll();
-      }
-      if (META_VIEW && META_VIEW.layout === "context" && META_VIEW.doc &&
-          typeof renderSpecialLayout === "function") {
-        renderSpecialLayout(META_VIEW.doc);
-      }
-    } catch (e2) {}
-    if (opts.onDone) opts.onDone(j);
-    return j;
+    applyContextPayload(j);
+    toast("Empresa: " + (APP_CONTEXT.companyName || APP_CONTEXT.company) +
+      (APP_CONTEXT.appLabel ? (" · " + APP_CONTEXT.appLabel) : ""));
+    return reloadModulesForSession().then(function () {
+      refreshOpenMetaForContext();
+      if (opts.onDone) opts.onDone(j);
+      return j;
+    });
+  });
+}
+
+/** Set app (vertical pack) within the current company */
+function setActiveApp(appId, opts) {
+  opts = opts || {};
+  appId = String(appId || "").trim();
+  if (!appId) {
+    toast("App required");
+    return Promise.reject(new Error("app required"));
+  }
+  return cmd("app", appId).then(function (j) {
+    if (!j || !j.ok) {
+      toast((j && j.msg) || "Could not set app");
+      return j;
+    }
+    applyContextPayload(j);
+    toast("App: " + (APP_CONTEXT.appLabel || APP_CONTEXT.app) +
+      (APP_CONTEXT.vertical ? (" (" + APP_CONTEXT.vertical + ")") : ""));
+    return reloadModulesForSession().then(function () {
+      refreshOpenMetaForContext();
+      if (opts.onDone) opts.onDone(j);
+      return j;
+    });
   });
 }
 /* ---- Work date: parse / format for calendar input ---- */
@@ -4099,10 +4155,16 @@ function isSpecialLayout(layout) {
 }
 
 var XF = { layout: "", rows: [], selected: -1, step: 0, treeSel: "", assignLeft: "", links: [], matrix: [] };
-var APP_CONTEXT = { company: "", companyName: "", currency: "", companies: [] };
+var APP_CONTEXT = {
+  company: "", companyName: "", currency: "", companies: [],
+  app: "", appLabel: "", vertical: "", apps: [], allVerticals: []
+};
 try {
   APP_CONTEXT.company = localStorage.getItem("dw-company") || "";
   APP_CONTEXT.companyName = localStorage.getItem("dw-company-name") || "";
+  APP_CONTEXT.app = localStorage.getItem("dw-app") || "";
+  APP_CONTEXT.appLabel = localStorage.getItem("dw-app-label") || "";
+  APP_CONTEXT.vertical = localStorage.getItem("dw-vertical") || "";
 } catch (e) {}
 
 function showMetaScreen(screenKey, label) {
@@ -9116,49 +9178,76 @@ function xfRenderContext(scr) {
   var host = xfHost();
   if (!host) return;
   host.innerHTML = "<p style='color:var(--muted);padding:12px'>Loading companies…</p>";
-  // Prefer server context list (active companies + current session company)
   loadCompanyContext(function () {
     var rows = APP_CONTEXT.companies || [];
-    function paint(list) {
-      var html = "", i, r, on, sub;
+    function paint() {
+      var list = APP_CONTEXT.companies || [];
+      var apps = APP_CONTEXT.apps || [];
+      var html = "", i, r, on, sub, a, aon;
       html += "<p class='xf-folder-intro' style='margin-top:0'>" +
-        esc(scr.subtitle || "Select the active company. Business lists and new records are filtered by this company on the server.") +
+        esc(scr.subtitle ||
+          "1) Elige empresa. 2) Si tiene varias apps, elige la app (cada app = un vertical pack de menú).") +
         "</p>";
-      html += "<div class='xf-context-cards'>";
+      html += "<h4 style='margin:0 0 8px;font-size:.9rem'>Empresa</h4>";
+      html += "<div class='xf-context-cards' id='xf-ctx-companies'>";
       for (i = 0; i < list.length; i++) {
         r = list[i] || {};
         on = String(r.code) === String(APP_CONTEXT.company) ? " on" : "";
         sub = esc(r.code || "") + (r.currency ? (" · " + esc(r.currency)) : "");
         if (r.city) sub += " · " + esc(r.city);
+        // show linked apps count
+        var nApps = 0;
+        if (Array.isArray(r.apps)) nApps = r.apps.length;
+        else if (Array.isArray(r.verticals)) nApps = r.verticals.length;
+        else if (r.vertical) nApps = 1;
+        if (nApps) sub += " · " + nApps + " app(s)";
         html += "<div class='card" + on + "' data-code='" + esc(r.code) + "' role='button' tabindex='0'>" +
           "<strong>" + esc(r.name || r.code) + "</strong>" +
           "<div style='font-size:.78rem;color:var(--muted);margin-top:4px'>" + sub + "</div></div>";
       }
       html += "</div>";
-      html += "<p style='margin-top:14px;font-size:.85rem'>Current: <b id='xf-ctx-cur'>" +
-        esc(APP_CONTEXT.companyName || APP_CONTEXT.company || "(none)") +
-        "</b>" +
-        (APP_CONTEXT.company ? (" <span style='color:var(--muted)'>(" + esc(APP_CONTEXT.company) + ")</span>") : "") +
+      html += "<h4 style='margin:16px 0 8px;font-size:.9rem'>App (vertical) de la empresa</h4>";
+      if (!apps.length) {
+        html += "<p style='color:var(--muted);font-size:.85rem'>Esta empresa no tiene apps. En Companies marque " +
+          "<b>verticals</b> (clinic, demo, services, retail).</p>";
+      } else {
+        html += "<div class='xf-context-cards' id='xf-ctx-apps'>";
+        for (i = 0; i < apps.length; i++) {
+          a = apps[i] || {};
+          aon = String(a.id) === String(APP_CONTEXT.app) ||
+            String(a.vertical) === String(APP_CONTEXT.vertical) ? " on" : "";
+          html += "<div class='card" + aon + "' data-app='" + esc(a.id || a.vertical) +
+            "' role='button' tabindex='0'><strong>" + esc(a.label || a.id || a.vertical) +
+            "</strong><div style='font-size:.78rem;color:var(--muted);margin-top:4px'>vertical: " +
+            esc(a.vertical || "(base)") + "</div></div>";
+        }
+        html += "</div>";
+      }
+      html += "<p style='margin-top:14px;font-size:.85rem'>Actual: <b>" +
+        esc(APP_CONTEXT.companyName || APP_CONTEXT.company || "(none)") + "</b>" +
+        (APP_CONTEXT.appLabel ? (" · <b>" + esc(APP_CONTEXT.appLabel) + "</b>") : "") +
+        (APP_CONTEXT.vertical ? (" <span style='color:var(--muted)'>(" + esc(APP_CONTEXT.vertical) + ")</span>") : "") +
         "</p>";
-      if (!list.length)
-        html += "<p style='color:var(--muted)'>No companies. Create them in Admin → Companies.</p>";
       host.innerHTML = html;
       host.onclick = function (e) {
         var c = e.target && e.target.closest ? e.target.closest(".card[data-code]") : null;
-        if (!c) return;
-        setActiveCompany(c.getAttribute("data-code")).then(function () {
-          paint(list);
-        });
+        var ap = e.target && e.target.closest ? e.target.closest(".card[data-app]") : null;
+        if (c) {
+          setActiveCompany(c.getAttribute("data-code")).then(function () { paint(); });
+          return;
+        }
+        if (ap) {
+          setActiveApp(ap.getAttribute("data-app")).then(function () { paint(); });
+        }
       };
     }
     if (rows.length) {
-      paint(rows);
+      paint();
       return;
     }
-    // Fallback: load dataRef if context API empty
     xfFetch(scr.dataRef || "data.companies", function (list) {
       APP_CONTEXT.companies = list || [];
-      paint(list || []);
+      paint();
     });
   });
 }

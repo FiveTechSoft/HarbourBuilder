@@ -44,6 +44,32 @@
         "type": "text"
       },
       {
+        "id": "verticals",
+        "label": "Apps (verticals)",
+        "type": "checklist",
+        "options": [
+          "clinic",
+          "demo",
+          "services",
+          "retail",
+          "ferreteria"
+        ],
+        "hint": "Each checked pack becomes an app linked to this company (meta/verticals/<name>/)."
+      },
+      {
+        "id": "defaultApp",
+        "label": "Default app",
+        "type": "select",
+        "options": [
+          "clinic",
+          "demo",
+          "services",
+          "retail",
+          "ferreteria"
+        ],
+        "hint": "App opened when the user switches to this company (must be one of the linked verticals)."
+      },
+      {
         "id": "active",
         "label": "Active",
         "type": "checkbox"

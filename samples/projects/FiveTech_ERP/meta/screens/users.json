@@ -49,8 +49,22 @@
         "options": [
           "HQ",
           "MAD",
-          "BCN"
+          "BCN",
+          "FER"
         ]
+      },
+      {
+        "id": "defaultApp",
+        "label": "Default app",
+        "type": "select",
+        "options": [
+          "clinic",
+          "demo",
+          "services",
+          "retail",
+          "ferreteria"
+        ],
+        "hint": "Preferred app at login if that company has it linked; otherwise company defaultApp."
       },
       {
         "id": "password",

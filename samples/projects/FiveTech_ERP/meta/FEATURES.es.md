@@ -13,7 +13,7 @@ Hoja de ruta: [ROADMAP.es.md](ROADMAP.es.md) · [ROADMAP.md](ROADMAP.md)
 - **Servidor HTTP multihilo embebido** (puerto por defecto **2222**, configurable)
 - **Login con sesión** y cookie (`DWSESS`); usuarios en `data.users` (Admin → Users)
 - Contraseñas guardadas solo como **CRC32** (nunca en claro); seed: `admin`/`1234`, `demo`/`demo`
-- **Multi-empresa**: empresa de sesión (`data.companies`), selector en barra de estado, filtro en servidor y sello en altas
+- **Multi-empresa + multi-app**: empresa de sesión (`data.companies`); cada empresa puede tener **N apps** (verticals: clinic, demo, services, retail, **ferreteria**); selector barra de estado / `screen.context`; menú = app activa
 - **Modelo de metadatos de la app**: archivos JSON en `meta/` → `data/appmeta.dbf` → caché en memoria
 - **APIs en vivo**: `/api/login`, `/api/meta`, `/api/dataset`, `/api/patients`, `/api/balances`, `/api/verticals`, …
 - **CRUD sobre datasets demo** (`data.*`) desde la UI (alta / edición / baja)

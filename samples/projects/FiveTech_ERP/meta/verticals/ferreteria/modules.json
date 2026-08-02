@@ -1,0 +1,52 @@
+{
+  "id": "modules",
+  "kind": "modules",
+  "vertical": "ferreteria",
+  "title": "Ferretería",
+  "sections": [
+    {
+      "id": "clientes",
+      "title": "Clientes",
+      "items": [
+        { "id": "parties", "label": "Clientes y contactos", "icon": "users", "screen": "screen.parties" },
+        { "id": "party_card", "label": "Ficha de cliente", "icon": "user", "screen": "screen.party_card", "sub": true },
+        { "id": "accounts", "label": "Cuentas / talleres", "icon": "grid", "screen": "screen.accounts" },
+        { "id": "activities", "label": "Seguimientos", "icon": "calendar", "screen": "screen.activities" }
+      ]
+    },
+    {
+      "id": "tienda",
+      "title": "Tienda y almacén",
+      "items": [
+        { "id": "products", "label": "Artículos", "icon": "file", "screen": "screen.products", "active": true },
+        { "id": "stock", "label": "Stock / almacén", "icon": "grid", "screen": "screen.stock" },
+        { "id": "pos_sales", "label": "TPV / tickets", "icon": "money", "screen": "screen.pos_sales" },
+        { "id": "catalog", "label": "Tarifa / catálogo", "icon": "file", "screen": "screen.catalog", "sub": true }
+      ]
+    },
+    {
+      "id": "comercial",
+      "title": "Comercial",
+      "items": [
+        { "id": "quotes", "label": "Presupuestos", "icon": "chart", "screen": "screen.quotes" },
+        { "id": "invoices", "label": "Facturas", "icon": "money", "screen": "screen.invoices" },
+        { "id": "import_csv", "label": "Importar catálogo", "icon": "file", "screen": "screen.import_csv", "sub": true }
+      ]
+    },
+    {
+      "id": "admin",
+      "title": "Administración",
+      "items": [
+        { "id": "kpis", "label": "Cuadro de mando", "icon": "chart", "screen": "screen.kpis" },
+        { "id": "day_agenda", "label": "Agenda del día", "icon": "calendar", "screen": "screen.day_agenda" },
+        { "id": "params", "label": "Parámetros", "icon": "file", "screen": "screen.params" },
+        { "id": "user_roles", "label": "Cajeros y roles", "icon": "users", "screen": "screen.user_roles" },
+        { "id": "companies", "label": "Empresas", "icon": "grid", "screen": "screen.companies", "sub": true },
+        { "id": "users", "label": "Usuarios", "icon": "users", "screen": "screen.users", "sub": true },
+        { "id": "context", "label": "Empresa / app", "icon": "grid", "screen": "screen.context" },
+        { "id": "audit_log", "label": "Auditoría", "icon": "file", "screen": "screen.audit_log" },
+        { "id": "reports", "label": "Informes", "icon": "file", "screen": "screen.reports" }
+      ]
+    }
+  ]
+}

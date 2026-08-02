@@ -68,6 +68,72 @@
       "reserved": 0,
       "location": "S-99",
       "status": "Out"
+    },
+    {
+      "code": "STK-200",
+      "sku": "FER-200",
+      "name": "Tornillo M6x40 inox (caja 100)",
+      "warehouse": "Tienda",
+      "qty": 120,
+      "minQty": 20,
+      "reserved": 0,
+      "location": "T-A1",
+      "status": "OK"
+    },
+    {
+      "code": "STK-201",
+      "sku": "FER-201",
+      "name": "Taladro percutor 750W",
+      "warehouse": "Tienda",
+      "qty": 6,
+      "minQty": 2,
+      "reserved": 1,
+      "location": "T-H3",
+      "status": "OK"
+    },
+    {
+      "code": "STK-202",
+      "sku": "FER-202",
+      "name": "Cinta teflón 12m",
+      "warehouse": "Almacén",
+      "qty": 4,
+      "minQty": 15,
+      "reserved": 0,
+      "location": "AL-F2",
+      "status": "Low"
+    },
+    {
+      "code": "STK-203",
+      "sku": "FER-203",
+      "name": "Cable 2x1.5 mm² (rollo 100m)",
+      "warehouse": "Almacén",
+      "qty": 18,
+      "minQty": 5,
+      "reserved": 2,
+      "location": "AL-E1",
+      "status": "OK"
+    },
+    {
+      "code": "STK-204",
+      "sku": "FER-204",
+      "name": "Pintura plástica blanca 15L",
+      "warehouse": "Tienda",
+      "qty": 9,
+      "minQty": 4,
+      "reserved": 0,
+      "location": "T-P1",
+      "status": "OK"
+    },
+    {
+      "code": "STK-205",
+      "sku": "FER-205",
+      "name": "Taco nylon 8mm (caja 50)",
+      "warehouse": "Recambios",
+      "qty": 0,
+      "minQty": 10,
+      "reserved": 0,
+      "location": "R-01",
+      "status": "Out"
     }
   ]
 }
