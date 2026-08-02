@@ -724,7 +724,17 @@ def main() -> None:
         flags=re.S,
     )
     if m:
-        t = t[: m.start()] + JS_SIDEBAR + "\nfunction openPatientsFromMeta" + t[m.end() - len("function openPatientsFromMeta") :]
+        # Keep the original "function openPatientsFromMeta" trailer intact
+        t = t[: m.start()] + JS_SIDEBAR + "\n\nfunction openPatientsFromMeta" + t[m.end() :]
+        # If the match already ended with openPatientsFromMeta name, avoid double prefix
+        t = t.replace(
+            "function openPatientsFromMeta\nfunction openPatientsFromMeta",
+            "function openPatientsFromMeta",
+        )
+        t = t.replace(
+            "function openPatientsFromMetafunction openPatientsFromMeta",
+            "function openPatientsFromMeta",
+        )
     elif "function fechaSubmenus" not in t:
         # insert before first renderSidebarFromMeta if present
         idx = t.find("function renderSidebarFromMeta()")

@@ -1044,7 +1044,9 @@
     background: transparent; color: var(--muted); padding: 10px 12px; border-radius: 10px;
     cursor: pointer; font-size: .88rem; margin-bottom: 4px;
   }
-  body.is-admin .btn-menu-edit { display: flex; }
+  /* Win over .admin-only { display:none !important } */
+  body.is-admin .btn-menu-edit,
+  body.is-admin .side-foot .btn-menu-edit.admin-only { display: flex !important; }
   .btn-menu-edit:hover { background: var(--blue-soft); color: var(--blue); }
   .menu-des-section {
     border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2);
@@ -2591,7 +2593,7 @@ function renderSidebarFromMeta() {
 }
 /* ---------- end shell UI ---------- */
 
-function openPatientsFromMetafunction openPatientsFromMeta(ev) {
+function openPatientsFromMeta(ev) {
   var title = "Patients";
   if (LOOKUP_PATIENTS && LOOKUP_PATIENTS.title) title = LOOKUP_PATIENTS.title;
   var tit = document.getElementById("patient-modal-title");
