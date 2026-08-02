@@ -191,6 +191,17 @@
   #status-bar .sb-txt {
     overflow: hidden; text-overflow: ellipsis; max-width: 220px; color: var(--text-2);
   }
+  #status-bar .sb-clock,
+  #status-bar #sb-clock {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    min-width: 4.8em;
+    max-width: none;
+    letter-spacing: 0.02em;
+  }
+  #status-bar #sb-clock-item {
+    flex-shrink: 0;
+  }
   #status-bar .sb-clic { cursor: pointer; }
   #status-bar .sb-clic:hover .sb-txt,
   #status-bar .sb-clic:hover svg { color: var(--blue); opacity: 1; }
@@ -1618,11 +1629,11 @@
   </div>
   <div class="sb-item sb-spacer" aria-hidden="true"></div>
   <div class="sb-item"><span class="sb-txt sb-msg" id="sb-msg">Listo</span></div>
-  <div class="sb-item" id="sb-clock-item">
+  <div class="sb-item" id="sb-clock-item" title="Hora local">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
       <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
     </svg>
-    <span class="sb-txt" id="sb-clock">—</span>
+    <span class="sb-txt sb-clock" id="sb-clock">--:--:--</span>
   </div>
   <div class="sb-item" title="Versión">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -8186,6 +8197,7 @@ try {
   var _tb = document.getElementById("btn-theme");
   if (_tb) _tb.onclick = toggleTheme;
 } catch (e) {}
+try { initStatusBar(); } catch (e) {}
 try { renderTable(); } catch (e) {}
 try { bindDemoPlayerUi(); } catch (e) {}
 try { maybeAutoStartDemo(); } catch (e) {}
