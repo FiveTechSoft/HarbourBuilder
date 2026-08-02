@@ -47,10 +47,10 @@ GTK_CFLAGS=$(pkg-config --cflags gtk+-3.0)
 GTK_LIBS=$(pkg-config --libs gtk+-3.0)
 # WebKitGTK if present (optional for TWebView)
 if pkg-config --exists webkit2gtk-4.0 2>/dev/null; then
-  GTK_CFLAGS="$GTK_CFLAGS $(pkg-config --cflags webkit2gtk-4.0)"
+  GTK_CFLAGS="$GTK_CFLAGS $(pkg-config --cflags webkit2gtk-4.0) -DHAVE_WEBKIT2GTK"
   GTK_LIBS="$GTK_LIBS $(pkg-config --libs webkit2gtk-4.0)"
 elif pkg-config --exists webkit2gtk-4.1 2>/dev/null; then
-  GTK_CFLAGS="$GTK_CFLAGS $(pkg-config --cflags webkit2gtk-4.1)"
+  GTK_CFLAGS="$GTK_CFLAGS $(pkg-config --cflags webkit2gtk-4.1) -DHAVE_WEBKIT2GTK"
   GTK_LIBS="$GTK_LIBS $(pkg-config --libs webkit2gtk-4.1)"
 fi
 
@@ -60,17 +60,18 @@ gcc $CFLAGS -c erp_meta.c -o erp_meta.o
 gcc $CFLAGS -c erp_http.c -o erp_http.o
 gcc $CFLAGS -c classes.c -o classes.o
 gcc $CFLAGS -c "$HBROOT/source/backends/gtk3/gtk3_core.c" -o gtk3_core.o
+gcc $CFLAGS -c "$PROJDIR/linux_stubs.c" -o linux_stubs.o
 
 VMLIB="-lhbvm"
 [ -f "$HBLIB/libhbvmmt.a" ] || [ -f "$HBLIB/hbvmmt.a" ] && VMLIB="-lhbvmmt"
 
 echo "[3] link"
-gcc main.o erp_meta.o erp_http.o classes.o gtk3_core.o -O2 -o "$OUT" \
+gcc main.o erp_meta.o erp_http.o classes.o gtk3_core.o linux_stubs.o -O2 -o "$OUT" \
   -L"$HBLIB" \
   -Wl,--start-group \
   -lhbcommon $VMLIB -lhbrtl -lhbrdd -lhbmacro -lhblang -lhbcpage -lhbpp \
   -lhbcplr -lrddntx -lrddcdx -lrddfpt -lhbsix -lhbusrrdd -lhbct \
-  -lhbsqlit3 -lgttrm -lhbdebug -lhbpcre -lhbzlib \
+  -lhbsqlit3 -lsqlite3 -lgttrm -lhbdebug -lhbpcre -lhbzlib \
   $GTK_LIBS -lm -lpthread -ldl \
   -Wl,--end-group
 
