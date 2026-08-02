@@ -27,6 +27,8 @@ source/backends/android/_generated.prg
 *.res
 source/*.o
 _shots/
+# Prebuilt sample binary for demos (FiveTech_ERP)
+!samples/projects/FiveTech_ERP/FiveTech_ERP.exe
 !core/*.prg
 !harbour/*.prg
 !backends/**/*.prg
