@@ -126,6 +126,18 @@
       "title": "ERP forms",
       "items": [
         {
+          "id": "companies",
+          "label": "Companies",
+          "icon": "grid",
+          "screen": "screen.companies"
+        },
+        {
+          "id": "users",
+          "label": "Users",
+          "icon": "users",
+          "screen": "screen.users"
+        },
+        {
           "id": "kpis",
           "label": "Dashboard KPIs",
           "icon": "chart",
@@ -142,12 +154,6 @@
           "label": "Roster matrix",
           "icon": "grid",
           "screen": "screen.roster"
-        },
-        {
-          "id": "users",
-          "label": "Users",
-          "icon": "users",
-          "screen": "screen.users"
         },
         {
           "id": "user_roles",

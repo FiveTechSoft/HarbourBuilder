@@ -9,7 +9,8 @@
       "email": "admin@example.com",
       "role": "admin",
       "active": true,
-      "password": "2615402659"
+      "password": "2615402659",
+      "defaultCompany": "HQ"
     },
     {
       "code": "demo",
@@ -17,7 +18,8 @@
       "email": "demo@example.com",
       "role": "user",
       "active": true,
-      "password": "3594706848"
+      "password": "3594706848",
+      "defaultCompany": "MAD"
     },
     {
       "code": "nurse",
@@ -25,7 +27,8 @@
       "email": "nurse@example.com",
       "role": "user",
       "active": true,
-      "password": "3531500867"
+      "password": "3531500867",
+      "defaultCompany": "BCN"
     }
   ]
 }

@@ -3,8 +3,32 @@
   "kind": "data",
   "entity": "company",
   "rows": [
-    {"code":"HQ","name":"FiveTech Clinic HQ","currency":"EUR"},
-    {"code":"MAD","name":"Madrid Center","currency":"EUR"},
-    {"code":"BCN","name":"Barcelona Center","currency":"EUR"}
+    {
+      "code": "HQ",
+      "name": "FiveTech Clinic HQ",
+      "currency": "EUR",
+      "taxId": "B-00000001",
+      "city": "Madrid",
+      "country": "ES",
+      "active": true
+    },
+    {
+      "code": "MAD",
+      "name": "Madrid Center",
+      "currency": "EUR",
+      "taxId": "B-00000002",
+      "city": "Madrid",
+      "country": "ES",
+      "active": true
+    },
+    {
+      "code": "BCN",
+      "name": "Barcelona Center",
+      "currency": "EUR",
+      "taxId": "B-00000003",
+      "city": "Barcelona",
+      "country": "ES",
+      "active": true
+    }
   ]
 }

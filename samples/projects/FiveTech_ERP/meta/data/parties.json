@@ -7,7 +7,10 @@
       "code": "P0001",
       "name": "ALEX RIVERA",
       "kind": "person",
-      "roles": ["Patient", "Customer"],
+      "roles": [
+        "Patient",
+        "Customer"
+      ],
       "email": "alex.rivera@example.com",
       "phone": "600-100-001",
       "city": "Madrid",
@@ -15,13 +18,16 @@
       "source": "Walk-in",
       "owner": "demo",
       "active": true,
-      "notes": "Prefers morning slots"
+      "notes": "Prefers morning slots",
+      "company": "MAD"
     },
     {
       "code": "P0002",
       "name": "JORDAN BLAKE",
       "kind": "person",
-      "roles": ["Patient"],
+      "roles": [
+        "Patient"
+      ],
       "email": "jordan.blake@example.com",
       "phone": "600-100-002",
       "city": "Barcelona",
@@ -29,13 +35,17 @@
       "source": "Web",
       "owner": "demo",
       "active": true,
-      "notes": ""
+      "notes": "",
+      "company": "BCN"
     },
     {
       "code": "P0003",
       "name": "CASEY MORGAN",
       "kind": "person",
-      "roles": ["Patient", "VIP"],
+      "roles": [
+        "Patient",
+        "VIP"
+      ],
       "email": "casey.morgan@example.com",
       "phone": "600-100-003",
       "city": "Valencia",
@@ -43,13 +53,17 @@
       "source": "Referral",
       "owner": "admin",
       "active": true,
-      "notes": "VIP follow-up"
+      "notes": "VIP follow-up",
+      "company": "HQ"
     },
     {
       "code": "P0004",
       "name": "RILEY QUINN",
       "kind": "person",
-      "roles": ["Lead", "Patient"],
+      "roles": [
+        "Lead",
+        "Patient"
+      ],
       "email": "riley.quinn@example.com",
       "phone": "600-100-004",
       "city": "Sevilla",
@@ -57,13 +71,17 @@
       "source": "Campaign",
       "owner": "demo",
       "active": true,
-      "notes": "Interested in check-up package"
+      "notes": "Interested in check-up package",
+      "company": "HQ"
     },
     {
       "code": "C-ACME",
       "name": "ACME HEALTH SL",
       "kind": "organization",
-      "roles": ["Customer", "Payer"],
+      "roles": [
+        "Customer",
+        "Payer"
+      ],
       "email": "billing@acme-health.example",
       "phone": "910-200-300",
       "city": "Madrid",
@@ -71,13 +89,16 @@
       "source": "Partner",
       "owner": "admin",
       "active": true,
-      "notes": "Corporate account"
+      "notes": "Corporate account",
+      "company": "MAD"
     },
     {
       "code": "C-INS",
       "name": "NORTH INSURANCE",
       "kind": "organization",
-      "roles": ["Payer"],
+      "roles": [
+        "Payer"
+      ],
       "email": "claims@north-ins.example",
       "phone": "900-111-222",
       "city": "Bilbao",
@@ -85,7 +106,8 @@
       "source": "Partner",
       "owner": "admin",
       "active": true,
-      "notes": ""
+      "notes": "",
+      "company": "HQ"
     }
   ]
 }

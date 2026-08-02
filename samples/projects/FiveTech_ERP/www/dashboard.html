@@ -3067,12 +3067,80 @@ function refreshStatusDb() {
     });
 }
 function refreshStatusCompany() {
-  var c = "";
+  var c = "", n = "";
   try {
-    c = (typeof APP_CONTEXT !== "undefined" && APP_CONTEXT.company) ||
-      localStorage.getItem("dw-company") || "";
+    c = (APP_CONTEXT && APP_CONTEXT.company) || localStorage.getItem("dw-company") || "";
+    n = (APP_CONTEXT && APP_CONTEXT.companyName) || localStorage.getItem("dw-company-name") || "";
   } catch (e) {}
-  sbSetText("sb-company", c || "(sin empresa)");
+  sbSetText("sb-company", n || c || "(sin empresa)");
+  var item = document.getElementById("sb-company-item");
+  if (item) {
+    item.title = c
+      ? ("Empresa: " + (n || c) + (c && n ? (" (" + c + ")") : "") + " — clic para cambiar")
+      : "Seleccionar empresa";
+  }
+}
+
+/** Load / set multi-company context from server session */
+function loadCompanyContext(done) {
+  fetch("/api/context", { credentials: "same-origin", cache: "no-store" })
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      if (j && j.ok) {
+        APP_CONTEXT.company = j.company || "";
+        APP_CONTEXT.companyName = j.companyName || j.company || "";
+        APP_CONTEXT.currency = j.currency || "";
+        APP_CONTEXT.companies = Array.isArray(j.companies) ? j.companies : [];
+        try {
+          localStorage.setItem("dw-company", APP_CONTEXT.company);
+          localStorage.setItem("dw-company-name", APP_CONTEXT.companyName);
+        } catch (e0) {}
+        refreshStatusCompany();
+      }
+      if (done) done(j);
+    })
+    .catch(function (e) { if (done) done(null); });
+}
+
+function setActiveCompany(code, opts) {
+  opts = opts || {};
+  code = String(code || "").trim();
+  if (!code) {
+    toast("Company code required");
+    return Promise.reject(new Error("company required"));
+  }
+  return cmd("company", code).then(function (j) {
+    if (!j || !j.ok) {
+      toast((j && j.msg) || "Could not set company");
+      return j;
+    }
+    APP_CONTEXT.company = j.company || code;
+    APP_CONTEXT.companyName = j.companyName || code;
+    APP_CONTEXT.currency = j.currency || "";
+    try {
+      localStorage.setItem("dw-company", APP_CONTEXT.company);
+      localStorage.setItem("dw-company-name", APP_CONTEXT.companyName);
+    } catch (e1) {}
+    refreshStatusCompany();
+    toast("Empresa: " + (APP_CONTEXT.companyName || APP_CONTEXT.company));
+    // Reload open list/meta views for the new company filter
+    try {
+      if (META_VIEW && META_VIEW.dataRef && typeof loadMetaDataset === "function") {
+        var q = isMasterDetail()
+          ? ((document.getElementById("meta-q-md") || {}).value || "")
+          : ((document.getElementById("meta-q") || {}).value || "");
+        loadMetaDataset(q || "");
+        if (isMasterDetail() && typeof loadDetailDatasetAll === "function")
+          loadDetailDatasetAll();
+      }
+      if (META_VIEW && META_VIEW.layout === "context" && META_VIEW.doc &&
+          typeof renderSpecialLayout === "function") {
+        renderSpecialLayout(META_VIEW.doc);
+      }
+    } catch (e2) {}
+    if (opts.onDone) opts.onDone(j);
+    return j;
+  });
 }
 /* ---- Work date: parse / format for calendar input ---- */
 function workDateFmtPref() {
@@ -3466,6 +3534,7 @@ function initStatusBar() {
   sbSetText("sb-data", WORK_DATE || "—");
   sbSetText("sb-versao", ver || "1.0.0");
   refreshStatusCompany();
+  try { loadCompanyContext(); } catch (eC) {}
   refreshStatusDb();
   refreshStatusClock();
   if (STATUS_BAR.clockTimer) clearInterval(STATUS_BAR.clockTimer);
@@ -3998,9 +4067,10 @@ function isSpecialLayout(layout) {
 }
 
 var XF = { layout: "", rows: [], selected: -1, step: 0, treeSel: "", assignLeft: "", links: [], matrix: [] };
-var APP_CONTEXT = { company: "" };
+var APP_CONTEXT = { company: "", companyName: "", currency: "", companies: [] };
 try {
   APP_CONTEXT.company = localStorage.getItem("dw-company") || "";
+  APP_CONTEXT.companyName = localStorage.getItem("dw-company-name") || "";
 } catch (e) {}
 
 function showMetaScreen(screenKey, label) {
@@ -8686,29 +8756,52 @@ function xfRenderPeriod(scr) {
 
 function xfRenderContext(scr) {
   var host = xfHost();
-  xfFetch(scr.dataRef, function (rows) {
-    var html = "<p style='font-size:.85rem;color:var(--muted);margin:0 0 12px'>Active company filters lists in a full ERP. Stored in this browser.</p>";
-    html += "<div class='xf-context-cards'>";
-    var i, r, on;
-    for (i = 0; i < rows.length; i++) {
-      r = rows[i];
-      on = String(r.code) === String(APP_CONTEXT.company) ? " on" : "";
-      html += "<div class='card" + on + "' data-code='" + esc(r.code) + "'><strong>" + esc(r.name) +
-        "</strong><div style='font-size:.78rem;color:var(--muted);margin-top:4px'>" + esc(r.code) +
-        " · " + esc(r.currency) + "</div></div>";
+  if (!host) return;
+  host.innerHTML = "<p style='color:var(--muted);padding:12px'>Loading companies…</p>";
+  // Prefer server context list (active companies + current session company)
+  loadCompanyContext(function () {
+    var rows = APP_CONTEXT.companies || [];
+    function paint(list) {
+      var html = "", i, r, on, sub;
+      html += "<p class='xf-folder-intro' style='margin-top:0'>" +
+        esc(scr.subtitle || "Select the active company. Business lists and new records are filtered by this company on the server.") +
+        "</p>";
+      html += "<div class='xf-context-cards'>";
+      for (i = 0; i < list.length; i++) {
+        r = list[i] || {};
+        on = String(r.code) === String(APP_CONTEXT.company) ? " on" : "";
+        sub = esc(r.code || "") + (r.currency ? (" · " + esc(r.currency)) : "");
+        if (r.city) sub += " · " + esc(r.city);
+        html += "<div class='card" + on + "' data-code='" + esc(r.code) + "' role='button' tabindex='0'>" +
+          "<strong>" + esc(r.name || r.code) + "</strong>" +
+          "<div style='font-size:.78rem;color:var(--muted);margin-top:4px'>" + sub + "</div></div>";
+      }
+      html += "</div>";
+      html += "<p style='margin-top:14px;font-size:.85rem'>Current: <b id='xf-ctx-cur'>" +
+        esc(APP_CONTEXT.companyName || APP_CONTEXT.company || "(none)") +
+        "</b>" +
+        (APP_CONTEXT.company ? (" <span style='color:var(--muted)'>(" + esc(APP_CONTEXT.company) + ")</span>") : "") +
+        "</p>";
+      if (!list.length)
+        html += "<p style='color:var(--muted)'>No companies. Create them in Admin → Companies.</p>";
+      host.innerHTML = html;
+      host.onclick = function (e) {
+        var c = e.target && e.target.closest ? e.target.closest(".card[data-code]") : null;
+        if (!c) return;
+        setActiveCompany(c.getAttribute("data-code")).then(function () {
+          paint(list);
+        });
+      };
     }
-    html += "</div>";
-    html += "<p style='margin-top:14px;font-size:.85rem'>Current: <b id='xf-ctx-cur'>" +
-      esc(APP_CONTEXT.company || "(none)") + "</b></p>";
-    host.innerHTML = html;
-    host.onclick = function (e) {
-      var c = e.target.closest(".card");
-      if (!c) return;
-      APP_CONTEXT.company = c.getAttribute("data-code");
-      try { localStorage.setItem("dw-company", APP_CONTEXT.company); } catch (err) {}
-      toast("Company: " + APP_CONTEXT.company);
-      xfRenderContext(scr);
-    };
+    if (rows.length) {
+      paint(rows);
+      return;
+    }
+    // Fallback: load dataRef if context API empty
+    xfFetch(scr.dataRef || "data.companies", function (list) {
+      APP_CONTEXT.companies = list || [];
+      paint(list || []);
+    });
   });
 }
 

@@ -43,6 +43,16 @@
         "type": "checkbox"
       },
       {
+        "id": "defaultCompany",
+        "label": "Default company",
+        "type": "select",
+        "options": [
+          "HQ",
+          "MAD",
+          "BCN"
+        ]
+      },
+      {
         "id": "password",
         "label": "Password",
         "type": "password",

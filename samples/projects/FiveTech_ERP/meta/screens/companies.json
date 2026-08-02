@@ -1,0 +1,59 @@
+{
+  "id": "screen.companies",
+  "kind": "screen",
+  "layout": "list",
+  "title": "Companies",
+  "dataRef": "data.companies",
+  "keyField": "code",
+  "searchFields": [
+    "code",
+    "name",
+    "city",
+    "taxId"
+  ],
+  "grid": {
+    "columns": [
+      {
+        "id": "code",
+        "label": "Code",
+        "type": "text"
+      },
+      {
+        "id": "name",
+        "label": "Name",
+        "type": "text"
+      },
+      {
+        "id": "currency",
+        "label": "Currency",
+        "type": "text"
+      },
+      {
+        "id": "taxId",
+        "label": "Tax ID",
+        "type": "text"
+      },
+      {
+        "id": "city",
+        "label": "City",
+        "type": "text"
+      },
+      {
+        "id": "country",
+        "label": "Country",
+        "type": "text"
+      },
+      {
+        "id": "active",
+        "label": "Active",
+        "type": "checkbox"
+      }
+    ]
+  },
+  "toolbar": [
+    "add",
+    "edit",
+    "delete",
+    "refresh"
+  ]
+}

@@ -3,6 +3,7 @@
   "kind": "screen",
   "layout": "context",
   "title": "Company context",
+  "subtitle": "Select the active company. Lists and new records are filtered by this company.",
   "dataRef": "data.companies",
   "keyField": "code"
 }

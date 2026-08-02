@@ -582,6 +582,8 @@ static function ErpApiDatasetPost( cBody, hSess )
                "application/json; charset=utf-8" )
          endif
          ErpUsersNormalizeRow( hRow, NIL )
+      else
+         ErpCompanyStampRow( cKey, hRow, hSess )
       endif
       AAdd( aRows, hRow )
    else
@@ -608,6 +610,8 @@ static function ErpApiDatasetPost( cBody, hSess )
          endif
          if cKey == "data.users"
             ErpUsersNormalizeRow( hRow, aRows[ n ] )
+         else
+            ErpCompanyStampRow( cKey, hRow, hSess )
          endif
          aRows[ n ] := hRow
       else
@@ -850,6 +854,158 @@ function ErpSessIsAdmin( hSess )
 return ErpUserCodeIsAdmin( hb_HGetDef( hSess, "user", "" ) )
 
 //--------------------------------------------------------------------
+// Multi-company: global (unfiltered) datasets
+function ErpCompanyIsGlobalKey( cKey )
+
+   cKey := Lower( AllTrim( ErpToStr( cKey ) ) )
+return cKey == "data.companies" .or. cKey == "data.users" .or. ;
+   cKey == "data.roles" .or. cKey == "data.user_roles" .or. ;
+   cKey == "data.settings" .or. cKey == "data.groups"
+
+//--------------------------------------------------------------------
+// Active companies from data.companies (array of hashes)
+function ErpCompanyList()
+
+   local hDoc := ErpMetaGet( "data.companies" ), aOut := {}, aRows, h, lAct
+
+   if ValType( hDoc ) != "H" .or. ! hb_HHasKey( hDoc, "rows" ) .or. ;
+         ValType( hDoc[ "rows" ] ) != "A"
+      return { { "code" => "HQ", "name" => "Default", "currency" => "EUR", "active" => .T. } }
+   endif
+   aRows := hDoc[ "rows" ]
+   for each h in aRows
+      if ValType( h ) != "H"
+         loop
+      endif
+      lAct := .T.
+      if hb_HHasKey( h, "active" )
+         lAct := ( h[ "active" ] == .T. ) .or. ;
+            Upper( AllTrim( ErpToStr( h[ "active" ] ) ) ) $ "1|Y|YES|TRUE|.T."
+      endif
+      if lAct
+         AAdd( aOut, h )
+      endif
+   next
+   if Empty( aOut )
+      AAdd( aOut, { "code" => "HQ", "name" => "Default", "currency" => "EUR", "active" => .T. } )
+   endif
+return aOut
+
+//--------------------------------------------------------------------
+function ErpCompanyFind( cCode )
+
+   local a := ErpCompanyList(), h
+   cCode := AllTrim( ErpToStr( cCode ) )
+   if Empty( cCode )
+      return NIL
+   endif
+   for each h in a
+      if Upper( AllTrim( ErpToStr( hb_HGetDef( h, "code", "" ) ) ) ) == Upper( cCode )
+         return h
+      endif
+   next
+return NIL
+
+//--------------------------------------------------------------------
+// Default company for a user row (defaultCompany field or first company)
+function ErpCompanyDefaultForUser( hUser )
+
+   local cDef := "", hCo, a
+
+   if ValType( hUser ) == "H"
+      cDef := AllTrim( ErpToStr( hb_HGetDef( hUser, "defaultCompany", ;
+         hb_HGetDef( hUser, "company", "" ) ) ) )
+   endif
+   if ! Empty( cDef ) .and. ValType( ErpCompanyFind( cDef ) ) == "H"
+      return cDef
+   endif
+   a := ErpCompanyList()
+   if ! Empty( a ) .and. ValType( a[ 1 ] ) == "H"
+      return AllTrim( ErpToStr( hb_HGetDef( a[ 1 ], "code", "HQ" ) ) )
+   endif
+return "HQ"
+
+//--------------------------------------------------------------------
+function ErpSessCompany( hSess )
+return AllTrim( ErpToStr( hb_HGetDef( hSess, "company", "" ) ) )
+
+//--------------------------------------------------------------------
+// Filter rows by session company when dataset is multi-company scoped.
+// Rows without a company field, or with empty company, are shared (visible to all).
+function ErpCompanyFilterRows( cKey, aRows, hSess )
+
+   local cCo, aOut := {}, h, cRowCo, lHasCompany := .F.
+
+   if ErpCompanyIsGlobalKey( cKey )
+      return aRows
+   endif
+   if ValType( aRows ) != "A"
+      return {}
+   endif
+   cCo := ErpSessCompany( hSess )
+   if Empty( cCo )
+      return aRows
+   endif
+   for each h in aRows
+      if ValType( h ) == "H" .and. hb_HHasKey( h, "company" )
+         lHasCompany := .T.
+         exit
+      endif
+   next
+   if ! lHasCompany
+      return aRows
+   endif
+   for each h in aRows
+      if ValType( h ) != "H"
+         loop
+      endif
+      if ! hb_HHasKey( h, "company" )
+         AAdd( aOut, h )
+         loop
+      endif
+      cRowCo := AllTrim( ErpToStr( h[ "company" ] ) )
+      if Empty( cRowCo ) .or. Upper( cRowCo ) == Upper( cCo )
+         AAdd( aOut, h )
+      endif
+   next
+return aOut
+
+//--------------------------------------------------------------------
+// Stamp company on new/updated business rows when session has a company
+function ErpCompanyStampRow( cKey, hRow, hSess )
+
+   local cCo
+   if ErpCompanyIsGlobalKey( cKey ) .or. ValType( hRow ) != "H"
+      return NIL
+   endif
+   cCo := ErpSessCompany( hSess )
+   if Empty( cCo )
+      return NIL
+   endif
+   // Only stamp if field missing or empty (allow explicit override)
+   if ! hb_HHasKey( hRow, "company" ) .or. ;
+         Empty( AllTrim( ErpToStr( hRow[ "company" ] ) ) )
+      hRow[ "company" ] := cCo
+   endif
+return NIL
+
+//--------------------------------------------------------------------
+// Decode dataset rows array from meta JSON
+function ErpDatasetRowsArray( cKey )
+
+   local cRaw := ErpMetaGetRaw( cKey ), hDoc := { => }
+
+   if Empty( cRaw )
+      return {}
+   endif
+   hb_jsonDecode( cRaw, @hDoc )
+   if ValType( hDoc ) == "H" .and. hb_HHasKey( hDoc, "rows" ) .and. ;
+         ValType( hDoc[ "rows" ] ) == "A"
+      return hDoc[ "rows" ]
+   endif
+return {}
+
+//--------------------------------------------------------------------
 // Strict meta key whitelist: prefix + [A-Za-z0-9_] only.
 // Rejects "..", "/", "\", spaces and any traversal attempt.
 static function ErpKeySafe( cKey, cPrefix )
@@ -932,6 +1088,7 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
 
    local cOut, hDoc, aItems, cKey, hQ, cUser, cPass, cTok, hSess
    local cFile, cMime, cCookie, cDate, cAction, cArg, nSel, cRel, bOld
+   local cCo, cCoName, cCur, hCo, aRows
 
    cPath := Lower( AllTrim( cPath ) )
    if Empty( cPath )
@@ -1027,12 +1184,14 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
       hQ := ErpQuery( cQuery )
       cKey := AllTrim( hb_HGetDef( hQ, "key", "" ) )
       if ErpDbDriver() != "json"
-         // selectable data layer (dbfcdx / openads): rows from the DBF tables
-         cOut := hb_jsonEncode( { "ok" => .T., "key" => cKey, ;
-            "rows" => ErpDbReadRows( cKey ) } )
+         aRows := ErpDbReadRows( cKey )
       else
-         cOut := ErpDatasetApiEnvelope( cKey )
+         aRows := ErpDatasetRowsArray( cKey )
       endif
+      aRows := ErpCompanyFilterRows( cKey, aRows, hSess )
+      cOut := hb_jsonEncode( { "ok" => .T., "key" => cKey, ;
+         "rows" => aRows, ;
+         "company" => ErpSessCompany( hSess ) } )
       return ErpHttpOk( cOut, "application/json; charset=utf-8" )
    endif
 
@@ -1108,6 +1267,14 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
       hDoc := ErpUserAuth( cUser, cPass )
       if ValType( hDoc ) == "H"
          cUser := AllTrim( ErpToStr( hb_HGetDef( hDoc, "code", cUser ) ) )
+         cCo := ErpCompanyDefaultForUser( hDoc )
+         cCoName := cCo
+         cCur := ""
+         hCo := ErpCompanyFind( cCo )
+         if ValType( hCo ) == "H"
+            cCoName := AllTrim( ErpToStr( hb_HGetDef( hCo, "name", cCo ) ) )
+            cCur := AllTrim( ErpToStr( hb_HGetDef( hCo, "currency", "" ) ) )
+         endif
          cTok := hb_MD5( cUser + cDate + Time() + hb_ntos( Seconds() ) )
          if s_mtx != NIL
             hb_mutexLock( s_mtx )
@@ -1115,13 +1282,16 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
          s_hSess[ cTok ] := { "user" => cUser, "workDate" => cDate, "sel" => 2, ;
             "ts" => hb_DateTime(), ;
             "role" => Lower( AllTrim( ErpToStr( hb_HGetDef( hDoc, "role", "user" ) ) ) ), ;
-            "isAdmin" => ErpUserRowIsAdmin( hDoc ) }
+            "isAdmin" => ErpUserRowIsAdmin( hDoc ), ;
+            "company" => cCo }
          if s_mtx != NIL
             hb_mutexUnlock( s_mtx )
          endif
          cOut := hb_jsonEncode( { "ok" => .T., "msg" => "Welcome, " + cUser, ;
-            "user" => cUser, "role" => hb_HGetDef( s_hSess[ cTok ], "role", "user" ), ;
-            "isAdmin" => hb_HGetDef( s_hSess[ cTok ], "isAdmin", .F. ) } )
+            "user" => cUser, ;
+            "role" => Lower( AllTrim( ErpToStr( hb_HGetDef( hDoc, "role", "user" ) ) ) ), ;
+            "isAdmin" => ErpUserRowIsAdmin( hDoc ), ;
+            "company" => cCo, "companyName" => cCoName, "currency" => cCur } )
          return ErpHttpOkCookie( cOut, "application/json; charset=utf-8", ;
             "DWSESS=" + cTok + "; Path=/; HttpOnly; SameSite=Lax" )
       endif
@@ -1166,8 +1336,55 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
          ErpSessPut( cTok, hSess )
          return ErpHttpOk( hb_jsonEncode( { "ok" => .T., "workDate" => cArg } ), ;
             "application/json; charset=utf-8" )
+      elseif cAction == "company" .or. cAction == "setcompany" .or. cAction == "set_company"
+         // a1 = company code from data.companies
+         if Empty( cArg )
+            return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "company code required" } ), ;
+               "application/json; charset=utf-8" )
+         endif
+         hCo := ErpCompanyFind( cArg )
+         if ValType( hCo ) != "H"
+            return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
+               "msg" => "Unknown company: " + cArg } ), ;
+               "application/json; charset=utf-8" )
+         endif
+         cCo := AllTrim( ErpToStr( hb_HGetDef( hCo, "code", cArg ) ) )
+         hSess[ "company" ] := cCo
+         ErpSessPut( cTok, hSess )
+         return ErpHttpOk( hb_jsonEncode( { "ok" => .T., ;
+            "company" => cCo, ;
+            "companyName" => AllTrim( ErpToStr( hb_HGetDef( hCo, "name", cCo ) ) ), ;
+            "currency" => AllTrim( ErpToStr( hb_HGetDef( hCo, "currency", "" ) ) ) } ), ;
+            "application/json; charset=utf-8" )
       endif
       return ErpHttpOk( hb_jsonEncode( { "ok" => .T., "toast" => "Action: " + cArg } ), ;
+         "application/json; charset=utf-8" )
+   endif
+
+   // Multi-company context (active company + list)
+   if cMethod == "GET" .and. cPath == "/api/context"
+      if Empty( hSess )
+         return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Not authenticated" } ), ;
+            "application/json; charset=utf-8" )
+      endif
+      cCo := ErpSessCompany( hSess )
+      if Empty( cCo )
+         cCo := ErpCompanyDefaultForUser( NIL )
+         hSess[ "company" ] := cCo
+         ErpSessPut( cTok, hSess )
+      endif
+      hCo := ErpCompanyFind( cCo )
+      cCoName := cCo
+      cCur := ""
+      if ValType( hCo ) == "H"
+         cCoName := AllTrim( ErpToStr( hb_HGetDef( hCo, "name", cCo ) ) )
+         cCur := AllTrim( ErpToStr( hb_HGetDef( hCo, "currency", "" ) ) )
+      endif
+      return ErpHttpOk( hb_jsonEncode( { "ok" => .T., ;
+         "company" => cCo, ;
+         "companyName" => cCoName, ;
+         "currency" => cCur, ;
+         "companies" => ErpCompanyList() } ), ;
          "application/json; charset=utf-8" )
    endif
 
