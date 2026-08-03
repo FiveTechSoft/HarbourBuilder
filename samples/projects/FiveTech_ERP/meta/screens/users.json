@@ -64,7 +64,7 @@
           "BCN",
           "FER"
         ],
-        "hint": "Non-admin: only these companies are visible/switchable. Leave empty = only default company (no switch). Admin always sees all."
+        "hint": "Non-admin: only these companies are visible/switchable. Empty = only default company (no switch). Default company is always included on save. Admin always sees all."
       },
       {
         "id": "defaultApp",
@@ -77,7 +77,20 @@
           "retail",
           "ferreteria"
         ],
-        "hint": "Preferred app at login if that company has it linked; otherwise company defaultApp."
+        "hint": "Preferred app at login if that company has it linked. Must exist on the default company (e.g. demo app on HQ)."
+      },
+      {
+        "id": "apps",
+        "label": "Allowed apps",
+        "type": "checklist",
+        "options": [
+          "clinic",
+          "demo",
+          "services",
+          "retail",
+          "ferreteria"
+        ],
+        "hint": "Non-admin: only these apps/verticals are selectable. Empty = only default app (no switch). Default app is always included on save. Admin always sees all company apps."
       },
       {
         "id": "password",

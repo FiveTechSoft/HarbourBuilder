@@ -687,44 +687,151 @@ static function ErpPassLooksLikeCrc( c )
 return .T.
 
 //--------------------------------------------------------------------
-// Normalize data.users row before save: password → CRC only.
-// Empty password on update keeps the previous CRC.
+// Normalize data.users row before save:
+//  - password → CRC only (empty on update keeps previous CRC)
+//  - companies → clean string array; always includes defaultCompany
+//  - defaultCompany / defaultApp trimmed
+// On update, preserve any keys the form did not send (merge from hOld).
 static function ErpUsersNormalizeRow( hRow, hOld )
 
-   local cP
+   local cP, cDef, aCo := {}, aIn, x, c, lHas := .F., aKeys, cKey
 
    if ValType( hRow ) != "H"
       return NIL
    endif
-   if ! hb_HHasKey( hRow, "password" )
-      if ValType( hOld ) == "H" .and. hb_HHasKey( hOld, "password" )
-         hRow[ "password" ] := hOld[ "password" ]
-      else
-         hRow[ "password" ] := ErpPassCrc( "" )
-      endif
-      return NIL
+
+   // Merge: keep old fields the client omitted (e.g. future extras)
+   if ValType( hOld ) == "H"
+      aKeys := hb_HKeys( hOld )
+      for each cKey in aKeys
+         if ! hb_HHasKey( hRow, cKey )
+            hRow[ cKey ] := hOld[ cKey ]
+         endif
+      next
    endif
-   cP := AllTrim( ErpToStr( hRow[ "password" ] ) )
-   if Empty( cP )
-      if ValType( hOld ) == "H" .and. hb_HHasKey( hOld, "password" )
+
+   // Password → CRC
+   if ! hb_HHasKey( hRow, "password" ) .or. ;
+         Empty( AllTrim( ErpToStr( hb_HGetDef( hRow, "password", "" ) ) ) )
+      if ValType( hOld ) == "H" .and. hb_HHasKey( hOld, "password" ) .and. ;
+            ! Empty( AllTrim( ErpToStr( hOld[ "password" ] ) ) )
          hRow[ "password" ] := hOld[ "password" ]
       else
          hRow[ "password" ] := ErpPassCrc( "" )
       endif
-   elseif ErpPassLooksLikeCrc( cP ) .and. ValType( hOld ) == "H" .and. ;
-         AllTrim( ErpToStr( hb_HGetDef( hOld, "password", "" ) ) ) == cP
-      // already CRC, leave as-is (e.g. re-save without changing password)
-      hRow[ "password" ] := cP
    else
-      hRow[ "password" ] := ErpPassCrc( cP )
+      cP := AllTrim( ErpToStr( hRow[ "password" ] ) )
+      if ErpPassLooksLikeCrc( cP ) .and. ValType( hOld ) == "H" .and. ;
+            AllTrim( ErpToStr( hb_HGetDef( hOld, "password", "" ) ) ) == cP
+         hRow[ "password" ] := cP
+      else
+         hRow[ "password" ] := ErpPassCrc( cP )
+      endif
    endif
-   // default role / active
+
+   // role / active
    if ! hb_HHasKey( hRow, "role" ) .or. Empty( AllTrim( ErpToStr( hRow[ "role" ] ) ) )
       hRow[ "role" ] := "user"
    endif
    if ! hb_HHasKey( hRow, "active" )
       hRow[ "active" ] := .T.
    endif
+
+   // defaultCompany / defaultApp as clean strings
+   cDef := AllTrim( ErpToStr( hb_HGetDef( hRow, "defaultCompany", ;
+      hb_HGetDef( hRow, "company", "" ) ) ) )
+   if ! Empty( cDef )
+      hRow[ "defaultCompany" ] := cDef
+   endif
+   if hb_HHasKey( hRow, "defaultApp" )
+      hRow[ "defaultApp" ] := AllTrim( ErpToStr( hRow[ "defaultApp" ] ) )
+   endif
+
+   // companies: accept array or comma-separated string → array of codes
+   if hb_HHasKey( hRow, "companies" )
+      aIn := hRow[ "companies" ]
+   elseif hb_HHasKey( hRow, "allowedCompanies" )
+      aIn := hRow[ "allowedCompanies" ]
+   else
+      aIn := NIL
+   endif
+   if ValType( aIn ) == "A"
+      for each x in aIn
+         c := AllTrim( ErpToStr( x ) )
+         if ! Empty( c ) .and. ;
+               AScan( aCo, {| z | Upper( z ) == Upper( c ) } ) == 0
+            AAdd( aCo, c )
+         endif
+      next
+   elseif ValType( aIn ) == "C" .and. ! Empty( AllTrim( aIn ) )
+      aIn := hb_ATokens( AllTrim( aIn ), "," )
+      for each x in aIn
+         c := AllTrim( ErpToStr( x ) )
+         if ! Empty( c ) .and. ;
+               AScan( aCo, {| z | Upper( z ) == Upper( c ) } ) == 0
+            AAdd( aCo, c )
+         endif
+      next
+   endif
+   // Always authorize defaultCompany (editing only defaultCompany used to leave
+   // companies=[MAD] while defaultCompany=HQ → login fell back to MAD/clinic)
+   if ! Empty( cDef )
+      lHas := .F.
+      for each c in aCo
+         if Upper( c ) == Upper( cDef )
+            lHas := .T.
+            exit
+         endif
+      next
+      if ! lHas
+         AAdd( aCo, cDef )
+      endif
+   endif
+   hRow[ "companies" ] := aCo
+
+   // apps / verticals: same rules as companies (empty = only defaultApp)
+   aCo := {}
+   if hb_HHasKey( hRow, "apps" )
+      aIn := hRow[ "apps" ]
+   elseif hb_HHasKey( hRow, "allowedApps" )
+      aIn := hRow[ "allowedApps" ]
+   elseif hb_HHasKey( hRow, "verticals" )
+      aIn := hRow[ "verticals" ]
+   else
+      aIn := NIL
+   endif
+   if ValType( aIn ) == "A"
+      for each x in aIn
+         c := AllTrim( ErpToStr( x ) )
+         if ! Empty( c ) .and. ;
+               AScan( aCo, {| z | Upper( z ) == Upper( c ) } ) == 0
+            AAdd( aCo, c )
+         endif
+      next
+   elseif ValType( aIn ) == "C" .and. ! Empty( AllTrim( aIn ) )
+      aIn := hb_ATokens( AllTrim( aIn ), "," )
+      for each x in aIn
+         c := AllTrim( ErpToStr( x ) )
+         if ! Empty( c ) .and. ;
+               AScan( aCo, {| z | Upper( z ) == Upper( c ) } ) == 0
+            AAdd( aCo, c )
+         endif
+      next
+   endif
+   cDef := AllTrim( ErpToStr( hb_HGetDef( hRow, "defaultApp", "" ) ) )
+   if ! Empty( cDef )
+      lHas := .F.
+      for each c in aCo
+         if Upper( c ) == Upper( cDef )
+            lHas := .T.
+            exit
+         endif
+      next
+      if ! lHas
+         AAdd( aCo, cDef )
+      endif
+   endif
+   hRow[ "apps" ] := aCo
 return NIL
 
 //--------------------------------------------------------------------
@@ -1084,11 +1191,15 @@ return .F.
 
 //--------------------------------------------------------------------
 // Companies visible/selectable for a user (admin = all active).
+// Unknown / missing user → empty list (never the full catalog).
 function ErpCompanyListForUser( hUser )
 
    local aAll := ErpCompanyList(), aOut := {}, h, cCode
 
-   if ValType( hUser ) != "H" .or. ErpUserRowIsAdmin( hUser )
+   if ValType( hUser ) != "H"
+      return aOut
+   endif
+   if ErpUserRowIsAdmin( hUser )
       return aAll
    endif
    for each h in aAll
@@ -1103,8 +1214,11 @@ function ErpCompanyListForUser( hUser )
 return aOut
 
 //--------------------------------------------------------------------
-// Non-admin may switch company only when authorized for 2+ companies.
+// Switch is allowed only when authorized for 2+ companies (admins always).
+// Single-company users (e.g. demo → MAD only) must NOT switch.
 function ErpUserCanSwitchCompany( hUser )
+
+   local a
 
    if ValType( hUser ) != "H"
       return .F.
@@ -1112,7 +1226,130 @@ function ErpUserCanSwitchCompany( hUser )
    if ErpUserRowIsAdmin( hUser )
       return .T.
    endif
-return Len( ErpCompanyListForUser( hUser ) ) > 1
+   a := ErpCompanyListForUser( hUser )
+return Len( a ) > 1
+
+//--------------------------------------------------------------------
+// App / vertical codes a non-admin may use (user.apps / allowedApps / verticals).
+// Empty list means "only defaultApp" — no app/vertical switch unless admin.
+static function ErpUserAppCodes( hUser )
+
+   local aOut := {}, x, a, i, c, cDef
+
+   if ValType( hUser ) != "H"
+      return aOut
+   endif
+   x := NIL
+   if hb_HHasKey( hUser, "apps" )
+      x := hUser[ "apps" ]
+   elseif hb_HHasKey( hUser, "allowedApps" )
+      x := hUser[ "allowedApps" ]
+   elseif hb_HHasKey( hUser, "verticals" )
+      x := hUser[ "verticals" ]
+   endif
+   if ValType( x ) == "A"
+      for each c in x
+         c := AllTrim( ErpToStr( c ) )
+         if ! Empty( c )
+            AAdd( aOut, c )
+         endif
+      next
+   elseif ValType( x ) == "C" .and. ! Empty( AllTrim( x ) )
+      a := hb_ATokens( AllTrim( x ), "," )
+      for i := 1 to Len( a )
+         c := AllTrim( a[ i ] )
+         if ! Empty( c )
+            AAdd( aOut, c )
+         endif
+      next
+   endif
+   cDef := AllTrim( ErpToStr( hb_HGetDef( hUser, "defaultApp", ;
+      hb_HGetDef( hUser, "defaultVertical", "" ) ) ) )
+   if ! Empty( cDef )
+      if AScan( aOut, {| z | Upper( AllTrim( ErpToStr( z ) ) ) == Upper( cDef ) } ) == 0
+         AAdd( aOut, cDef )
+      endif
+   endif
+return aOut
+
+//--------------------------------------------------------------------
+// .T. if user may use this app id / vertical (must also be linked on company).
+function ErpUserCanAccessApp( hUser, cAppId )
+
+   local aCodes, c
+
+   cAppId := AllTrim( ErpToStr( cAppId ) )
+   if Empty( cAppId ) .or. ValType( hUser ) != "H"
+      return .F.
+   endif
+   if ErpUserRowIsAdmin( hUser )
+      return .T.
+   endif
+   aCodes := ErpUserAppCodes( hUser )
+   if Empty( aCodes )
+      c := AllTrim( ErpToStr( hb_HGetDef( hUser, "defaultApp", ;
+         hb_HGetDef( hUser, "defaultVertical", "" ) ) ) )
+      return ! Empty( c ) .and. Upper( c ) == Upper( cAppId )
+   endif
+   for each c in aCodes
+      if Upper( AllTrim( ErpToStr( c ) ) ) == Upper( cAppId )
+         return .T.
+      endif
+   next
+return .F.
+
+//--------------------------------------------------------------------
+// Company apps filtered by user authorization (admin = all company apps).
+function ErpCompanyAppsForUser( hCo, hUser )
+
+   local aAll := ErpCompanyApps( hCo ), aOut := {}, h, cId, cVert
+
+   if ValType( hUser ) != "H" .or. ErpUserRowIsAdmin( hUser )
+      return aAll
+   endif
+   for each h in aAll
+      if ValType( h ) != "H"
+         loop
+      endif
+      cId := AllTrim( ErpToStr( hb_HGetDef( h, "id", "" ) ) )
+      cVert := AllTrim( ErpToStr( hb_HGetDef( h, "vertical", cId ) ) )
+      if ErpUserCanAccessApp( hUser, cId ) .or. ;
+            ( ! Empty( cVert ) .and. ErpUserCanAccessApp( hUser, cVert ) )
+         AAdd( aOut, h )
+      endif
+   next
+   // Never leave non-admin with zero apps if company has some and user has default
+   if Empty( aOut ) .and. ! Empty( aAll )
+      cId := AllTrim( ErpToStr( hb_HGetDef( hUser, "defaultApp", "" ) ) )
+      if ! Empty( cId )
+         for each h in aAll
+            if Upper( AllTrim( ErpToStr( hb_HGetDef( h, "id", "" ) ) ) ) == Upper( cId ) .or. ;
+                  Upper( AllTrim( ErpToStr( hb_HGetDef( h, "vertical", "" ) ) ) ) == Upper( cId )
+               AAdd( aOut, h )
+               exit
+            endif
+         next
+      endif
+      if Empty( aOut )
+         AAdd( aOut, aAll[ 1 ] )
+      endif
+   endif
+return aOut
+
+//--------------------------------------------------------------------
+// Switch app/vertical only when 2+ authorized apps exist on current company.
+function ErpUserCanSwitchApp( hUser, hCo )
+
+   local a
+
+   if ValType( hUser ) != "H"
+      return .F.
+   endif
+   if ErpUserRowIsAdmin( hUser )
+      return .T.
+   endif
+   a := ErpCompanyAppsForUser( hCo, hUser )
+return Len( a ) > 1
 
 //--------------------------------------------------------------------
 function ErpCompanyFind( cCode )
@@ -1272,12 +1509,13 @@ function ErpCompanyApps( hCo )
 return aOut
 
 //--------------------------------------------------------------------
-// Pick default app for company (+ optional user preference).
-// Order: user.defaultApp → company.defaultApp → app.vertical → first linked app.
+// Pick default app for company (+ optional user preference), filtered by
+// user.apps authorization. Order: user.defaultApp → company.defaultApp →
+// app.vertical → first authorized linked app.
 // Returns hash { id, label, vertical } or NIL.
 function ErpCompanyDefaultApp( hCo, hUser )
 
-   local aApps := ErpCompanyApps( hCo ), cWant := "", h, cId, hAppMeta
+   local aApps := ErpCompanyAppsForUser( hCo, hUser ), cWant := "", h, cId, hAppMeta
 
    if ValType( hUser ) == "H"
       cWant := AllTrim( ErpToStr( hb_HGetDef( hUser, "defaultApp", ;
@@ -1752,9 +1990,10 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
             "isAdmin" => ErpUserRowIsAdmin( hDoc ), ;
             "company" => cCo, "companyName" => cCoName, "currency" => cCur, ;
             "app" => cAppId, "appLabel" => cAppLab, "vertical" => cRel, ;
-            "apps" => ErpCompanyApps( hCo ), ;
+            "apps" => ErpCompanyAppsForUser( hCo, hDoc ), ;
             "companies" => ErpCompanyListForUser( hDoc ), ;
-            "canSwitchCompany" => ErpUserCanSwitchCompany( hDoc ) } )
+            "canSwitchCompany" => ErpUserCanSwitchCompany( hDoc ), ;
+            "canSwitchApp" => ErpUserCanSwitchApp( hDoc, hCo ) } )
          return ErpHttpOkCookie( cOut, "application/json; charset=utf-8", ;
             "DWSESS=" + cTok + "; Path=/; HttpOnly; SameSite=Lax" )
       endif
@@ -1829,8 +2068,17 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
          cAppId := AllTrim( ErpToStr( hb_HGetDef( hQ, "a2", "" ) ) )
          if ! Empty( cAppId )
             hApp := ErpCompanyFindApp( hCo, cAppId )
+            // App must be authorized for this user (and linked on company)
+            if ValType( hApp ) == "H" .and. ! ErpUserCanAccessApp( hDoc, ;
+                  AllTrim( ErpToStr( hb_HGetDef( hApp, "id", cAppId ) ) ) ) .and. ;
+                  ! ErpUserCanAccessApp( hDoc, cAppId )
+               hApp := NIL
+            endif
          else
-            // Prefer session user's defaultApp if linked on the new company
+            // Prefer session user's defaultApp if linked + authorized
+            hApp := ErpCompanyDefaultApp( hCo, hDoc )
+         endif
+         if ValType( hApp ) != "H"
             hApp := ErpCompanyDefaultApp( hCo, hDoc )
          endif
          if ValType( hApp ) != "H"
@@ -1852,9 +2100,10 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
             "companyName" => AllTrim( ErpToStr( hb_HGetDef( hCo, "name", cCo ) ) ), ;
             "currency" => AllTrim( ErpToStr( hb_HGetDef( hCo, "currency", "" ) ) ), ;
             "app" => cAppId, "appLabel" => cAppLab, "vertical" => cRel, ;
-            "apps" => ErpCompanyApps( hCo ), ;
+            "apps" => ErpCompanyAppsForUser( hCo, hDoc ), ;
             "companies" => ErpCompanyListForUser( hDoc ), ;
-            "canSwitchCompany" => ErpUserCanSwitchCompany( hDoc ) } ), ;
+            "canSwitchCompany" => ErpUserCanSwitchCompany( hDoc ), ;
+            "canSwitchApp" => ErpUserCanSwitchApp( hDoc, hCo ) } ), ;
             "application/json; charset=utf-8" )
       elseif cAction == "app" .or. cAction == "setapp" .or. cAction == "vertical"
          // a1 = app id (or vertical name) within current company
@@ -1862,6 +2111,7 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
             return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "app id required" } ), ;
                "application/json; charset=utf-8" )
          endif
+         hDoc := ErpUserFind( ErpToStr( hb_HGetDef( hSess, "user", "" ) ) )
          cCo := ErpSessCompany( hSess )
          hCo := ErpCompanyFind( cCo )
          hApp := ErpCompanyFindApp( hCo, cArg )
@@ -1871,6 +2121,22 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
                "application/json; charset=utf-8" )
          endif
          cAppId := AllTrim( ErpToStr( hb_HGetDef( hApp, "id", cArg ) ) )
+         // Non-admin: only apps granted in user.apps (+ defaultApp)
+         if ! ErpUserCanAccessApp( hDoc, cAppId ) .and. ;
+               ! ErpUserCanAccessApp( hDoc, AllTrim( ErpToStr( hb_HGetDef( hApp, "vertical", "" ) ) ) )
+            return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
+               "msg" => "Not authorized to switch to app " + cAppId } ), ;
+               "application/json; charset=utf-8" )
+         endif
+         // Switching away from current app requires multi-app grant (or admin)
+         if Upper( cAppId ) != Upper( ErpSessApp( hSess ) ) .and. ;
+               Upper( AllTrim( ErpToStr( hb_HGetDef( hApp, "vertical", "" ) ) ) ) != ;
+                  Upper( ErpSessVertical( hSess ) ) .and. ;
+               ! ErpUserCanSwitchApp( hDoc, hCo )
+            return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
+               "msg" => "App / vertical switch not authorized for this user" } ), ;
+               "application/json; charset=utf-8" )
+         endif
          cAppLab := AllTrim( ErpToStr( hb_HGetDef( hApp, "label", cAppId ) ) )
          cRel := AllTrim( ErpToStr( hb_HGetDef( hApp, "vertical", "" ) ) )
          hSess[ "app" ] := cAppId
@@ -1885,7 +2151,9 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
             "companyName" => iif( ValType( hCo ) == "H", ;
                AllTrim( ErpToStr( hb_HGetDef( hCo, "name", cCo ) ) ), cCo ), ;
             "app" => cAppId, "appLabel" => cAppLab, "vertical" => cRel, ;
-            "apps" => ErpCompanyApps( hCo ) } ), ;
+            "apps" => ErpCompanyAppsForUser( hCo, hDoc ), ;
+            "canSwitchApp" => ErpUserCanSwitchApp( hDoc, hCo ), ;
+            "canSwitchCompany" => ErpUserCanSwitchCompany( hDoc ) } ), ;
             "application/json; charset=utf-8" )
       endif
       return ErpHttpOk( hb_jsonEncode( { "ok" => .T., "toast" => "Action: " + cArg } ), ;
@@ -1915,6 +2183,12 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
       hApp := NIL
       if ! Empty( cAppId )
          hApp := ErpCompanyFindApp( hCo, cAppId )
+         // Drop session app if user is no longer authorized for it
+         if ValType( hApp ) == "H" .and. ! ErpUserCanAccessApp( hDoc, ;
+               AllTrim( ErpToStr( hb_HGetDef( hApp, "id", cAppId ) ) ) ) .and. ;
+               ! ErpUserCanAccessApp( hDoc, AllTrim( ErpToStr( hb_HGetDef( hApp, "vertical", "" ) ) ) )
+            hApp := NIL
+         endif
       endif
       if ValType( hApp ) != "H"
          hApp := ErpCompanyDefaultApp( hCo, hDoc )
@@ -1940,9 +2214,10 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
          "app" => cAppId, ;
          "appLabel" => cAppLab, ;
          "vertical" => cRel, ;
-         "apps" => ErpCompanyApps( hCo ), ;
+         "apps" => ErpCompanyAppsForUser( hCo, hDoc ), ;
          "companies" => ErpCompanyListForUser( hDoc ), ;
          "canSwitchCompany" => ErpUserCanSwitchCompany( hDoc ), ;
+         "canSwitchApp" => ErpUserCanSwitchApp( hDoc, hCo ), ;
          "isAdmin" => ErpSessIsAdmin( hSess ), ;
          "allVerticals" => ErpMetaVerticals() } ), ;
          "application/json; charset=utf-8" )

@@ -3453,10 +3453,20 @@ function applyContextPayload(j) {
   APP_CONTEXT.appLabel = j.appLabel || j.app || "";
   APP_CONTEXT.vertical = j.vertical != null ? j.vertical : "";
   APP_CONTEXT.apps = Array.isArray(j.apps) ? j.apps : [];
+  // Only the server decides who may switch company/app. Never infer "yes"
+  // from list length alone (missing flags used to unlock every company/app).
   if (j.canSwitchCompany != null) APP_CONTEXT.canSwitchCompany = !!j.canSwitchCompany;
-  else if (j.isAdmin != null) APP_CONTEXT.canSwitchCompany = !!j.isAdmin;
-  else APP_CONTEXT.canSwitchCompany = (APP_CONTEXT.companies || []).length > 1;
+  else if (j.isAdmin === true) APP_CONTEXT.canSwitchCompany = true;
+  else APP_CONTEXT.canSwitchCompany = false;
+  if (j.canSwitchApp != null) APP_CONTEXT.canSwitchApp = !!j.canSwitchApp;
+  else if (j.isAdmin === true) APP_CONTEXT.canSwitchApp = true;
+  else APP_CONTEXT.canSwitchApp = false;
   if (j.isAdmin != null) APP_CONTEXT.isAdmin = !!j.isAdmin;
+  // Extra guard: non-admin with 0–1 authorized company/app cannot switch
+  if (!APP_CONTEXT.isAdmin && (APP_CONTEXT.companies || []).length <= 1)
+    APP_CONTEXT.canSwitchCompany = false;
+  if (!APP_CONTEXT.isAdmin && (APP_CONTEXT.apps || []).length <= 1)
+    APP_CONTEXT.canSwitchApp = false;
   if (Array.isArray(j.allVerticals)) APP_CONTEXT.allVerticals = j.allVerticals;
   try {
     localStorage.setItem("dw-company", APP_CONTEXT.company);
@@ -3519,11 +3529,22 @@ function setActiveCompany(code, opts) {
     toast("Company code required");
     return Promise.reject(new Error("company required"));
   }
-  // Client-side guard (server also enforces)
-  if (APP_CONTEXT && !APP_CONTEXT.canSwitchCompany &&
-      String(code) !== String(APP_CONTEXT.company || "")) {
-    toast("No autorizado a cambiar de empresa");
-    return Promise.reject(new Error("company switch not authorized"));
+  // Client-side guard (server also enforces). Same company is a no-op refresh.
+  if (APP_CONTEXT && String(code) !== String(APP_CONTEXT.company || "")) {
+    if (!APP_CONTEXT.canSwitchCompany) {
+      toast("No autorizado a cambiar de empresa");
+      return Promise.reject(new Error("company switch not authorized"));
+    }
+    // Must be in the authorized list from /api/context
+    var allowed = APP_CONTEXT.companies || [];
+    var okList = false, ai;
+    for (ai = 0; ai < allowed.length; ai++) {
+      if (String((allowed[ai] && allowed[ai].code) || "") === code) { okList = true; break; }
+    }
+    if (!okList && !APP_CONTEXT.isAdmin) {
+      toast("Empresa no autorizada para este usuario");
+      return Promise.reject(new Error("company not in authorized list"));
+    }
   }
   return cmd("company", code, appId || undefined).then(function (j) {
     if (!j || !j.ok) {
@@ -3548,6 +3569,26 @@ function setActiveApp(appId, opts) {
   if (!appId) {
     toast("App required");
     return Promise.reject(new Error("app required"));
+  }
+  // Client-side guard (server also enforces)
+  if (APP_CONTEXT && String(appId) !== String(APP_CONTEXT.app || "") &&
+      String(appId) !== String(APP_CONTEXT.vertical || "")) {
+    if (!APP_CONTEXT.canSwitchApp) {
+      toast("No autorizado a cambiar de app / vertical");
+      return Promise.reject(new Error("app switch not authorized"));
+    }
+    var allowedApps = APP_CONTEXT.apps || [];
+    var okApp = false, ai, a;
+    for (ai = 0; ai < allowedApps.length; ai++) {
+      a = allowedApps[ai] || {};
+      if (String(a.id || "") === appId || String(a.vertical || "") === appId) {
+        okApp = true; break;
+      }
+    }
+    if (!okApp && !APP_CONTEXT.isAdmin) {
+      toast("App no autorizada para este usuario");
+      return Promise.reject(new Error("app not in authorized list"));
+    }
   }
   return cmd("app", appId).then(function (j) {
     if (!j || !j.ok) {
@@ -4515,7 +4556,7 @@ var XF = { layout: "", rows: [], selected: -1, step: 0, treeSel: "", assignLeft:
 var APP_CONTEXT = {
   company: "", companyName: "", currency: "", companies: [],
   app: "", appLabel: "", vertical: "", apps: [], allVerticals: [],
-  canSwitchCompany: false, isAdmin: false
+  canSwitchCompany: false, canSwitchApp: false, isAdmin: false
 };
 try {
   APP_CONTEXT.company = localStorage.getItem("dw-company") || "";
@@ -5448,6 +5489,25 @@ function openRecordForm(mode, row, scope) {
     body.innerHTML = html;
   }
   applyWhens(body, cols, "rec-f");
+  // Users form: default company/app auto-check in allowed lists
+  if (META_VIEW && META_VIEW.dataRef === "data.users") {
+    function wireDefaultCheck(selId, listId) {
+      var sel = document.getElementById(selId);
+      var list = document.getElementById(listId);
+      if (!sel || !list) return;
+      sel.onchange = function () {
+        var v = String(sel.value || "").trim();
+        var boxes, bi;
+        if (!v) return;
+        boxes = list.querySelectorAll("input[type='checkbox']");
+        for (bi = 0; bi < boxes.length; bi++) {
+          if (String(boxes[bi].value) === v) boxes[bi].checked = true;
+        }
+      };
+    }
+    wireDefaultCheck("rec-f-defaultCompany", "rec-f-companies");
+    wireDefaultCheck("rec-f-defaultApp", "rec-f-apps");
+  }
   if (ov) ov.classList.add("is-open");
   setTimeout(function () {
     var first = document.querySelector("#rec-body input:not([readonly]):not([disabled]), #rec-body select:not([disabled])");
@@ -5517,6 +5577,41 @@ function saveRecordForm() {
   if ((row[kf] === "" || row[kf] == null) && REC_EDIT.mode === "add") {
     toast("Field " + kf + " is required");
     return;
+  }
+  // Users: default company/app must be in the allowed lists, otherwise
+  // login falls back to the first authorized entry (wrong context).
+  if (dataRef === "data.users") {
+    var dCo = String(row.defaultCompany || row.company || "").trim();
+    var cos = Array.isArray(row.companies) ? row.companies.slice() : [];
+    if (!cos.length && typeof row.companies === "string" && row.companies.trim()) {
+      cos = row.companies.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+    }
+    if (dCo) {
+      var hasCo = false, ci;
+      for (ci = 0; ci < cos.length; ci++) {
+        if (String(cos[ci]).toUpperCase() === dCo.toUpperCase()) { hasCo = true; break; }
+      }
+      if (!hasCo) cos.push(dCo);
+    }
+    row.companies = cos;
+    if (dCo) row.defaultCompany = dCo;
+    if (row.defaultApp != null) row.defaultApp = String(row.defaultApp).trim();
+    var dApp = String(row.defaultApp || "").trim();
+    var apps = Array.isArray(row.apps) ? row.apps.slice() : [];
+    if (!apps.length && typeof row.apps === "string" && row.apps.trim()) {
+      apps = row.apps.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+    }
+    if (dApp) {
+      var hasApp = false, aj;
+      for (aj = 0; aj < apps.length; aj++) {
+        if (String(apps[aj]).toUpperCase() === dApp.toUpperCase()) { hasApp = true; break; }
+      }
+      if (!hasApp) apps.push(dApp);
+    }
+    row.apps = apps;
+    // Never send blank password on edit (server also keeps previous CRC)
+    if (REC_EDIT.mode === "edit" && (row.password == null || row.password === ""))
+      delete row.password;
   }
   var payload = {
     key: dataRef,
@@ -10188,22 +10283,42 @@ function xfRenderContext(scr) {
       var list = APP_CONTEXT.companies || [];
       var apps = APP_CONTEXT.apps || [];
       var canSw = !!APP_CONTEXT.canSwitchCompany;
+      var canSwApp = !!APP_CONTEXT.canSwitchApp;
       var html = "", i, r, on, sub, a, aon, cardCls;
       html += "<p class='xf-folder-intro' style='margin-top:0'>" +
         esc(scr.subtitle ||
-          "1) Elige empresa. 2) Si tiene varias apps, elige la app (cada app = un vertical pack de menú).") +
+          "1) Elige empresa. 2) Si tiene varias apps autorizadas, elige la app (vertical pack).") +
         "</p>";
-      if (!canSw && !APP_CONTEXT.isAdmin) {
-        html += "<p style='font-size:.85rem;color:var(--muted);margin:0 0 10px'>" +
-          "Tu usuario no puede cambiar de empresa (solo la asignada). " +
-          "Un admin puede autorizar más en <b>Users → Allowed companies</b>.</p>";
+      if (!canSw || !canSwApp) {
+        html += "<p style='font-size:.85rem;color:var(--muted);margin:0 0 10px'>";
+        if (!canSw && !canSwApp)
+          html += "Tu usuario tiene empresa y app fijas (solo lo autorizado). ";
+        else if (!canSw)
+          html += "Tu usuario no puede cambiar de empresa (solo la autorizada). ";
+        else
+          html += "Tu usuario no puede cambiar de app/vertical (solo la autorizada). ";
+        html += "Admin → <b>Users</b>: companies / apps.</p>";
       }
       html += "<h4 style='margin:0 0 8px;font-size:.9rem'>Empresa" +
         (canSw ? "" : " <span style='font-weight:500;color:var(--muted)'>(fija)</span>") +
         "</h4>";
       html += "<div class='xf-context-cards' id='xf-ctx-companies'>";
-      for (i = 0; i < list.length; i++) {
-        r = list[i] || {};
+      // Non-switch users: only show the current (authorized) company card
+      var showList = list;
+      if (!canSw && APP_CONTEXT.company) {
+        showList = list.filter(function (x) {
+          return String((x && x.code) || "") === String(APP_CONTEXT.company);
+        });
+        if (!showList.length && APP_CONTEXT.company) {
+          showList = [{
+            code: APP_CONTEXT.company,
+            name: APP_CONTEXT.companyName || APP_CONTEXT.company,
+            currency: APP_CONTEXT.currency || ""
+          }];
+        }
+      }
+      for (i = 0; i < showList.length; i++) {
+        r = showList[i] || {};
         on = String(r.code) === String(APP_CONTEXT.company) ? " on" : "";
         sub = esc(r.code || "") + (r.currency ? (" · " + esc(r.currency)) : "");
         if (r.city) sub += " · " + esc(r.city);
@@ -10221,18 +10336,22 @@ function xfRenderContext(scr) {
           "<div style='font-size:.78rem;color:var(--muted);margin-top:4px'>" + sub + "</div></div>";
       }
       html += "</div>";
-      html += "<h4 style='margin:16px 0 8px;font-size:.9rem'>App (vertical) de la empresa</h4>";
+      html += "<h4 style='margin:16px 0 8px;font-size:.9rem'>App (vertical)" +
+        (canSwApp ? "" : " <span style='font-weight:500;color:var(--muted)'>(fija)</span>") +
+        "</h4>";
       if (!apps.length) {
-        html += "<p style='color:var(--muted);font-size:.85rem'>Esta empresa no tiene apps. En Companies marque " +
-          "<b>verticals</b> (clinic, demo, services, retail).</p>";
+        html += "<p style='color:var(--muted);font-size:.85rem'>Sin apps autorizadas para este usuario " +
+          "en la empresa actual. Admin → Users → apps / defaultApp.</p>";
       } else {
         html += "<div class='xf-context-cards' id='xf-ctx-apps'>";
         for (i = 0; i < apps.length; i++) {
           a = apps[i] || {};
           aon = String(a.id) === String(APP_CONTEXT.app) ||
             String(a.vertical) === String(APP_CONTEXT.vertical) ? " on" : "";
-          html += "<div class='card" + aon + "' data-app='" + esc(a.id || a.vertical) +
-            "' role='button' tabindex='0'><strong>" + esc(a.label || a.id || a.vertical) +
+          cardCls = "card" + aon + (canSwApp ? "" : " locked");
+          html += "<div class='" + cardCls + "'" +
+            (canSwApp ? (" data-app='" + esc(a.id || a.vertical) + "' role='button' tabindex='0'") : "") +
+            "><strong>" + esc(a.label || a.id || a.vertical) +
             "</strong><div style='font-size:.78rem;color:var(--muted);margin-top:4px'>vertical: " +
             esc(a.vertical || "(base)") + "</div></div>";
         }
@@ -10256,6 +10375,10 @@ function xfRenderContext(scr) {
           return;
         }
         if (ap) {
+          if (!APP_CONTEXT.canSwitchApp) {
+            toast("No autorizado a cambiar de app / vertical");
+            return;
+          }
           setActiveApp(ap.getAttribute("data-app")).then(function () { paint(); });
         }
       };

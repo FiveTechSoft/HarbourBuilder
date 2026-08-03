@@ -20,9 +20,10 @@
       "role": "user",
       "active": true,
       "password": "3594706848",
-      "defaultCompany": "MAD",
-      "companies": ["MAD"],
-      "defaultApp": "clinic"
+      "defaultCompany": "HQ",
+      "companies": ["HQ"],
+      "defaultApp": "demo",
+      "apps": ["demo"]
     },
     {
       "code": "test",
@@ -33,6 +34,7 @@
       "defaultCompany": "FER",
       "companies": ["FER"],
       "defaultApp": "ferreteria",
+      "apps": ["ferreteria"],
       "password": "3632233996"
     }
   ]
