@@ -4155,9 +4155,24 @@ function salirSistema() {
   }).then(function (j) {
     var url = (j && j.redirect) ? String(j.redirect) : loginUrl;
     if (!url || url === "/" || url === "/index.html") url = loginUrl;
+    // Drop cached company/app so next login cannot flash a stale vertical
+    try {
+      localStorage.removeItem("dw-company");
+      localStorage.removeItem("dw-company-name");
+      localStorage.removeItem("dw-app");
+      localStorage.removeItem("dw-app-label");
+      localStorage.removeItem("dw-vertical");
+    } catch (e0) {}
     try { window.location.replace(url); } catch (e1) { window.location.href = url; }
   }).catch(function () {
     // Even if the API fails, leave the dashboard
+    try {
+      localStorage.removeItem("dw-company");
+      localStorage.removeItem("dw-company-name");
+      localStorage.removeItem("dw-app");
+      localStorage.removeItem("dw-app-label");
+      localStorage.removeItem("dw-vertical");
+    } catch (e3) {}
     try { window.location.replace(loginUrl); } catch (e2) { window.location.href = loginUrl; }
   });
 }

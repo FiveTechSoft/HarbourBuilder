@@ -200,7 +200,18 @@
     }).then(function (r) { return r.json(); })
       .then(function (j) {
         setBusy(false);
-        if (j && j.ok) window.location.href = "/dashboard";
+        if (j && j.ok) {
+          // Seed status-bar context before dashboard loads (avoids stale localStorage)
+          try {
+            if (j.company != null) localStorage.setItem("dw-company", String(j.company || ""));
+            if (j.companyName != null) localStorage.setItem("dw-company-name", String(j.companyName || j.company || ""));
+            if (j.app != null) localStorage.setItem("dw-app", String(j.app || ""));
+            if (j.appLabel != null) localStorage.setItem("dw-app-label", String(j.appLabel || j.app || ""));
+            if (j.vertical != null) localStorage.setItem("dw-vertical", String(j.vertical || ""));
+            if (j.user) localStorage.setItem("dw-user", String(j.user));
+          } catch (e0) {}
+          window.location.href = "/dashboard";
+        }
         else showMsg((j && j.msg) || "Login failed.");
       }).catch(function (e) {
         setBusy(false);

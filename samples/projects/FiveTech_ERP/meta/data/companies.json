@@ -11,11 +11,11 @@
       "city": "Madrid",
       "country": "ES",
       "active": true,
-      "verticals": ["clinic", "demo", "services", "ferreteria"],
-      "defaultApp": "clinic",
+      "verticals": ["demo", "clinic", "services", "ferreteria"],
+      "defaultApp": "demo",
       "apps": [
-        { "id": "clinic", "label": "Clinic", "vertical": "clinic" },
         { "id": "demo", "label": "Consulting demo", "vertical": "demo" },
+        { "id": "clinic", "label": "Clinic", "vertical": "clinic" },
         { "id": "services", "label": "Professional services", "vertical": "services" },
         { "id": "ferreteria", "label": "Ferretería", "vertical": "ferreteria" }
       ]

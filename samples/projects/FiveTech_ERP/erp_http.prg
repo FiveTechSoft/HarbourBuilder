@@ -1163,10 +1163,11 @@ return aOut
 
 //--------------------------------------------------------------------
 // Pick default app for company (+ optional user preference).
+// Order: user.defaultApp → company.defaultApp → app.vertical → first linked app.
 // Returns hash { id, label, vertical } or NIL.
 function ErpCompanyDefaultApp( hCo, hUser )
 
-   local aApps := ErpCompanyApps( hCo ), cWant := "", h, cId
+   local aApps := ErpCompanyApps( hCo ), cWant := "", h, cId, hAppMeta
 
    if ValType( hUser ) == "H"
       cWant := AllTrim( ErpToStr( hb_HGetDef( hUser, "defaultApp", ;
@@ -1175,6 +1176,13 @@ function ErpCompanyDefaultApp( hCo, hUser )
    if Empty( cWant ) .and. ValType( hCo ) == "H"
       cWant := AllTrim( ErpToStr( hb_HGetDef( hCo, "defaultApp", ;
          hb_HGetDef( hCo, "defaultVertical", "" ) ) ) )
+   endif
+   // Align with global Edit app → Vertical pack when no user/company pref
+   if Empty( cWant )
+      hAppMeta := ErpMetaGet( "app" )
+      if ValType( hAppMeta ) == "H"
+         cWant := AllTrim( ErpToStr( hb_HGetDef( hAppMeta, "vertical", "" ) ) )
+      endif
    endif
    if ! Empty( cWant )
       for each h in aApps
