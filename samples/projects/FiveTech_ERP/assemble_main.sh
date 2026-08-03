@@ -42,4 +42,4 @@ cp -f "$PROJDIR/erp_proc.prg" "$BUILDDIR/erp_proc.prg"
 cp -f "$HBROOT/source/core/classes.prg" "$BUILDDIR/classes.prg" 2>/dev/null || \
   cp -f "$(cd "$PROJDIR/../../.." && pwd)/source/core/classes.prg" "$BUILDDIR/classes.prg"
 
-echo "Assembled $BUILDDIR/main.prg ($GT_REQ) + erp_meta/http/proc classes.prg"
+echo "Assembled $BUILDDIR/main.prg ($GT_REQ) + erp_meta/http/db/proc classes.prg"

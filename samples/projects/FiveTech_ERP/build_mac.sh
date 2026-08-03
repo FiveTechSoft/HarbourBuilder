@@ -1,6 +1,6 @@
 #!/bin/bash
 # FiveTech_ERP — macOS (same PRG set as Windows/Linux)
-# Units: Project1.prg Form1.prg erp_meta.prg erp_http.prg + classes.prg
+# Units: Project1.prg Form1.prg erp_meta.prg erp_http.prg erp_db.prg erp_proc.prg + classes.prg
 # Backend: Cocoa + WKWebView
 #
 # Arch:
@@ -101,15 +101,23 @@ cp -f "$HBROOT/source/core/classes.prg" .
 # On Cocoa, UI is native — use GT_NUL to avoid forcing a GUI GT symbol
 bash "$PROJDIR/assemble_main.sh" "$PROJDIR" "$BUILDDIR" mac
 
-echo "[1] Harbour compile (main + erp_meta + erp_http + erp_proc + classes)"
+echo "[1] Harbour compile (main + erp_meta + erp_http + erp_db + erp_proc + classes)"
 "$HBBIN/harbour" main.prg     -n -w -q -I"$HBINC" -I"$BUILDDIR" -I"$HBROOT/include" -omain.c
 "$HBBIN/harbour" erp_meta.prg -n -w -q -I"$HBINC" -I"$BUILDDIR" -I"$HBROOT/include" -oerp_meta.c
 "$HBBIN/harbour" erp_http.prg -n -w -q -I"$HBINC" -I"$BUILDDIR" -I"$HBROOT/include" -oerp_http.c
+# Data layer (ErpDb*) — required by erp_http; assemble_main.sh already copies erp_db.prg
+if [ ! -f "$BUILDDIR/erp_db.prg" ]; then
+  echo "ERROR: erp_db.prg missing in $BUILDDIR (assemble_main should copy it)"
+  exit 1
+fi
+"$HBBIN/harbour" erp_db.prg   -n -w -q -I"$HBINC" -I"$BUILDDIR" -I"$HBROOT/include" -oerp_db.c
 "$HBBIN/harbour" erp_proc.prg -n -w -q -I"$HBINC" -I"$BUILDDIR" -I"$HBROOT/include" -oerp_proc.c
 "$HBBIN/harbour" classes.prg  -n -w -q -I"$HBINC" -I"$BUILDDIR" -I"$HBROOT/include" -oclasses.c
 
 echo "[2] clang $ARCH_FLAG"
-# Match CI/runtime macOS (runner is 14.x); avoid "built for newer macOS" warnings
+# Match CI/runtime macOS (runner is 14.x). If Harbour libs were built with a
+# higher deployment target you may see ld warnings; rebuild Harbour with
+# MACOSX_DEPLOYMENT_TARGET=$MACOSX_MIN or set MACOSX_MIN to match those libs.
 MACOSX_MIN="${MACOSX_MIN:-14.0}"
 CFLAGS="-O2 -Wno-unused-value -Wno-deprecated-declarations -mmacosx-version-min=$MACOSX_MIN $ARCH_FLAG -I$HBINC -I$HBROOT/include -I$BUILDDIR"
 OBJCFLAGS="$CFLAGS -fobjc-arc"
@@ -117,6 +125,7 @@ OBJCFLAGS="$CFLAGS -fobjc-arc"
 clang $CFLAGS -c main.c -o main.o
 clang $CFLAGS -c erp_meta.c -o erp_meta.o
 clang $CFLAGS -c erp_http.c -o erp_http.o
+clang $CFLAGS -c erp_db.c -o erp_db.o
 clang $CFLAGS -c erp_proc.c -o erp_proc.o
 clang $CFLAGS -c classes.c -o classes.o
 clang $CFLAGS -c "$PROJDIR/mac_stubs.c" -o mac_stubs.o
@@ -135,7 +144,7 @@ hblib() {
   fi
 }
 
-OBJS="main.o erp_meta.o erp_http.o erp_proc.o classes.o cocoa_core.o mac_stubs.o"
+OBJS="main.o erp_meta.o erp_http.o erp_db.o erp_proc.o classes.o cocoa_core.o mac_stubs.o"
 [ -f cocoa_webserver.o ] && OBJS="$OBJS cocoa_webserver.o"
 
 FRAMEWORKS="-framework Cocoa -framework WebKit -framework Foundation -framework AppKit \
@@ -148,6 +157,25 @@ HBLIBS="$(hblib hbcommon) $VMLIB $(hblib hbrtl) $(hblib hbrdd) $(hblib hbmacro) 
   $(hblib hbsix) $(hblib hbusrrdd) $(hblib hbct) $(hblib hbextern) \
   $(hblib hbsqlit3) $(hblib gtcgi) $(hblib gttrm) $(hblib gtstd) $(hblib gtnul) \
   $(hblib hbdebug) $(hblib hbpcre) $(hblib hbzlib) $(hblib hbhsx) $(hblib hbuddall)"
+
+# OpenADS / rddads (optional). erp_db REQUESTs ADS+ADSCDX and calls Ads*.
+# If librddads is missing, provide stubs so json/dbfcdx still link.
+if [ -f "$HBLIB/librddads.a" ] || [ -f "$HBLIB/rddads.a" ]; then
+  HBLIBS="$HBLIBS -lrddads"
+  echo "OpenADS: linking librddads"
+else
+  echo "WARNING: librddads not found — openads driver stubbed (json/dbfcdx OK)"
+  cat > ads_stubs.c <<'STUBS'
+#include "hbapi.h"
+/* Minimal stubs when rddads is not built into this Harbour install */
+HB_FUNC( ADS ) {}
+HB_FUNC( ADSCDX ) {}
+HB_FUNC( ADSSETFILETYPE ) {}
+HB_FUNC( ADSCONNECT60 ) { hb_retl( 0 ); }
+STUBS
+  clang $CFLAGS -c ads_stubs.c -o ads_stubs.o
+  OBJS="$OBJS ads_stubs.o"
+fi
 
 echo "[3] link"
 echo "HBLIBS=$HBLIBS"
