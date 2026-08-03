@@ -54,7 +54,7 @@ Generic screen engine driven by JSON. Supported **layouts**:
 | `folder` | Notebook tabs hosting child screens |
 | `menu` | Painel groups of actions |
 | `calendar` | Day / agenda style |
-| `dashboard` | KPI tiles |
+| `dashboard` | KPI tiles + bar/donut widgets (`dashboard.widgets`, Design form) |
 | `tree-detail` | Org tree + detail |
 | `matrix` | Roster / slot matrix |
 | `assign` | Dual-list assignment (users ↔ roles) |

@@ -1,0 +1,11 @@
+{
+  "id": "data.dash_portfolio",
+  "kind": "data",
+  "entity": "dash_portfolio",
+  "rows": [
+    { "id": "p1", "label": "Pessoal", "value": 45, "color": "#2563eb" },
+    { "id": "p2", "label": "Consignado", "value": 30, "color": "#16a34a" },
+    { "id": "p3", "label": "Emergencial", "value": 15, "color": "#f59e0b" },
+    { "id": "p4", "label": "Outros", "value": 10, "color": "#8b5cf6" }
+  ]
+}

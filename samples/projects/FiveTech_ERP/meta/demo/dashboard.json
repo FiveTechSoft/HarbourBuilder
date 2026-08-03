@@ -1,0 +1,140 @@
+{
+  "id": "demo.dashboard",
+  "kind": "demo",
+  "title": "Dashboard (KPIs + gráficos)",
+  "loop": false,
+  "returnToMenu": true,
+  "steps": [
+    {
+      "section": "T1 · ¿Qué es un dashboard?",
+      "caption": "layout \"dashboard\" pinta un lienzo de widgets (KPI, barras, donut, texto) definidos en JSON. Sin código: meta/screens/<nombre>.json + datasets en meta/data/. Ideal para home, dirección o indicadores de proceso.",
+      "durationMs": 7000,
+      "highlight": "#nav"
+    },
+    {
+      "section": "T2 · Abrir un dashboard real",
+      "action": "nav",
+      "screen": "screen.kpis",
+      "menuId": "kpis",
+      "label": "Dashboard",
+      "caption": "screen.kpis → layout dashboard → dataRef data.dashboard_kpis + widgets en dashboard.widgets. Lo que ves (tiles, esteira, barras, donut) sale de ese JSON.",
+      "durationMs": 7000,
+      "highlight": "#ws-meta",
+      "highlightDelayMs": 900
+    },
+    {
+      "section": "T3 · Cabecera y periodo",
+      "caption": "El título de la pantalla es screen.title. El subtítulo / periodo (p. ej. «Agosto 2026») es dashboard.subtitle (también screen.subtitle). Se muestra junto al título del painel.",
+      "durationMs": 6000,
+      "highlight": "#ws-meta .meta-head"
+    },
+    {
+      "section": "T4 · Tiles KPI",
+      "caption": "type \"kpi\": etiqueta + valor + pie (subtitle o trend). tone pinta el borde superior (info / ok / warn / danger / purple / teal). format money o percent formatea el número. Puede leer una fila del dataRef (row=id) o un valor estático.",
+      "durationMs": 7500,
+      "highlight": ".xf-dash-kpi",
+      "highlightDelayMs": 200
+    },
+    {
+      "section": "T5 · Grid 12 columnas · span",
+      "caption": "dashboard.columns (normalmente 12) + widget.span = ancho. Ej.: 4 KPIs con span 3 ocupan una fila; 3 contadores de esteira con span 4; gráfico de barras span 8 + donut span 4. En móvil el grid se apila solo.",
+      "durationMs": 7000,
+      "highlight": ".xf-dash-grid",
+      "highlightDelayMs": 200
+    },
+    {
+      "section": "T6 · Gráfico de barras",
+      "caption": "type \"bar\": dataRef con series temporales o categorías. Options: cat=month (eje X); series=campo:Etiqueta:#color,campo2:Etiqueta2:#hex; height=180. Cada fila del dataset es un grupo de barras.",
+      "durationMs": 7500,
+      "highlight": ".xf-bar-plot",
+      "highlightDelayMs": 200
+    },
+    {
+      "section": "T7 · Donut / participación",
+      "caption": "type \"donut\": una fila por sector. Options: label=label; value=value; color=color; center=Carteira. Si no hay color, se usa una paleta por defecto. Ideal para mix de cartera, pipeline, etc.",
+      "durationMs": 7000,
+      "highlight": ".xf-donut",
+      "highlightDelayMs": 200
+    },
+    {
+      "section": "T8 · Esqueleto del JSON",
+      "caption": "Mínimo: id, kind \"screen\", layout \"dashboard\", title, dataRef (legacy / default). Con widgets: dashboard: { subtitle, columns, gap, widgets:[{ type, id, title, span, tone, dataRef, … }] }. Sin widgets → un tile por cada fila de dataRef (modo legacy).",
+      "durationMs": 8000,
+      "highlight": "#ws-meta .xf-host",
+      "highlightDelayMs": 200
+    },
+    {
+      "section": "T9 · Varios dataRef",
+      "caption": "Cada widget puede tener su dataRef (p. ej. KPIs en data.dashboard_kpis, series en data.dash_monthly, mix en data.dash_portfolio). El runtime hace fetch de todos y rellena el lienzo. No hace falta un único dataset monstruo.",
+      "durationMs": 7000,
+      "highlight": "#ws-meta"
+    },
+    {
+      "section": "T10 · Design form (admin)",
+      "action": "openFormDesigner",
+      "screen": "screen.kpis",
+      "adminOnly": true,
+      "caption": "Admin → Design form sobre screen.kpis. Elige layout «Dashboard (KPIs + charts)». Aparece el bloque Dashboard widgets: subtítulo, columnas de grid, gap y la tabla de widgets.",
+      "durationMs": 7500,
+      "highlight": "#designer"
+    },
+    {
+      "section": "T11 · Bloque Dashboard widgets",
+      "adminOnly": true,
+      "caption": "Aquí configuras todo sin editar JSON a mano: Subtitle/period, Grid columns (12/6/4), Gap, y + Widget. Cada fila = un widget del lienzo.",
+      "durationMs": 7500,
+      "highlight": "#des-dash-block"
+    },
+    {
+      "section": "T12 · Tabla de widgets",
+      "adminOnly": true,
+      "caption": "Columnas: Type (kpi|bar|donut|text), Id, Title, Span (1–12), Tone, dataRef, Options. Sube/baja para reordenar; el orden de la tabla = orden de pintado (y de flujo en el grid).",
+      "durationMs": 7500,
+      "highlight": "#des-dash-widgets"
+    },
+    {
+      "section": "T13 · Options (kpi)",
+      "adminOnly": true,
+      "caption": "Ejemplos kpi: row=k1;format=money;subtitle=Atualizado agora · value=0;format=money (estático) · format=percent · valueField=value;trendField=trend. row debe coincidir con id/code de una fila del dataRef.",
+      "durationMs": 8000,
+      "highlight": "#des-dash-widgets"
+    },
+    {
+      "section": "T14 · Options (bar / donut)",
+      "adminOnly": true,
+      "caption": "Bar: cat=month;height=180;series=capital:Capital:#16a34a,loans:Empréstimos:#2563eb. Donut: label=label;value=value;color=color;center=Carteira. Text: text=Nota libre (o value=…). Separador de opciones: punto y coma (;).",
+      "durationMs": 8000,
+      "highlight": "#des-dash-block"
+    },
+    {
+      "section": "T15 · Qué escribe Save",
+      "adminOnly": true,
+      "caption": "Save → meta/screens/kpis.json (y appmeta). Clave dashboard: { subtitle, columns, gap, widgets:[…] }. El runtime recarga la pantalla abierta. Los no-admin ven el resultado; no necesitan el diseñador.",
+      "durationMs": 7000,
+      "highlight": "#des-save"
+    },
+    {
+      "section": "T16 · Cerrar diseñador",
+      "action": "closeOverlays",
+      "caption": "Cerramos Design form. El dashboard en vivo refleja el último Save. Puedes iterar: Design form → cambiar span/tone/options → Save.",
+      "durationMs": 5000,
+      "highlight": "#ws-meta"
+    },
+    {
+      "section": "T17 · Receta",
+      "action": "nav",
+      "screen": "screen.kpis",
+      "menuId": "kpis",
+      "label": "Dashboard",
+      "caption": "RECETA: 1) data.* con filas KPI / series / sectores  2) screen layout dashboard + dashboard.widgets  3) menú con screen.kpis  4) Design form para afinar span, tones y options  5) Save. Executive: screen.exec_dashboard es el mismo patrón con otro JSON.",
+      "durationMs": 8500,
+      "highlight": ".xf-dash"
+    },
+    {
+      "section": "T18 · Resumen",
+      "caption": "dashboard = widgets en grid 12. Tipos: kpi, bar, donut, text. Todo configurable en Design form. Sin widgets = tiles legacy del dataRef. Al terminar vuelves al menú Demo para otro tema.",
+      "durationMs": 6500,
+      "highlight": "#btn-demo"
+    }
+  ]
+}

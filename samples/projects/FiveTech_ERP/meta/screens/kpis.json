@@ -2,6 +2,112 @@
   "id": "screen.kpis",
   "kind": "screen",
   "layout": "dashboard",
-  "title": "Clinic dashboard",
-  "dataRef": "data.dashboard_kpis"
+  "title": "Dashboard",
+  "subtitle": "Agosto 2026",
+  "dataRef": "data.dashboard_kpis",
+  "dashboard": {
+    "subtitle": "Agosto 2026",
+    "columns": 12,
+    "gap": 12,
+    "widgets": [
+      {
+        "id": "capital",
+        "type": "kpi",
+        "title": "Capital total",
+        "span": 3,
+        "tone": "info",
+        "dataRef": "data.dashboard_kpis",
+        "rowId": "k1",
+        "format": "money",
+        "subtitle": "Atualizado agora"
+      },
+      {
+        "id": "loans",
+        "type": "kpi",
+        "title": "Empréstimos ativos",
+        "span": 3,
+        "tone": "ok",
+        "dataRef": "data.dashboard_kpis",
+        "rowId": "k2",
+        "format": "money",
+        "subtitle": "Atualizado agora"
+      },
+      {
+        "id": "receive",
+        "type": "kpi",
+        "title": "A receber (30d)",
+        "span": 3,
+        "tone": "warn",
+        "dataRef": "data.dashboard_kpis",
+        "rowId": "k3",
+        "format": "money",
+        "subtitle": "Atualizado agora"
+      },
+      {
+        "id": "default",
+        "type": "kpi",
+        "title": "Inadimplência",
+        "span": 3,
+        "tone": "danger",
+        "dataRef": "data.dashboard_kpis",
+        "rowId": "k4",
+        "format": "money",
+        "subtitle": "Monitorando"
+      },
+      {
+        "id": "pipe_analysis",
+        "type": "kpi",
+        "title": "Esteira — aguardando análise",
+        "span": 4,
+        "tone": "warn",
+        "dataRef": "data.dashboard_kpis",
+        "rowId": "k5",
+        "subtitle": "propostas solicitadas"
+      },
+      {
+        "id": "pipe_vote",
+        "type": "kpi",
+        "title": "Esteira — seu voto pendente",
+        "span": 4,
+        "tone": "purple",
+        "dataRef": "data.dashboard_kpis",
+        "rowId": "k6",
+        "subtitle": "propostas em votação aguardando você"
+      },
+      {
+        "id": "pipe_release",
+        "type": "kpi",
+        "title": "Esteira — a liberar",
+        "span": 4,
+        "tone": "info",
+        "dataRef": "data.dashboard_kpis",
+        "rowId": "k7",
+        "subtitle": "propostas deferidas pelo comitê"
+      },
+      {
+        "id": "evol",
+        "type": "bar",
+        "title": "Evolução mensal — capital x empréstimos",
+        "span": 8,
+        "height": 180,
+        "dataRef": "data.dash_monthly",
+        "categoryField": "month",
+        "series": [
+          { "field": "capital", "label": "Capital", "color": "#16a34a" },
+          { "field": "loans", "label": "Empréstimos", "color": "#2563eb" }
+        ]
+      },
+      {
+        "id": "portfolio",
+        "type": "donut",
+        "title": "Carteira por modalidade",
+        "span": 4,
+        "dataRef": "data.dash_portfolio",
+        "labelField": "label",
+        "valueField": "value",
+        "colorField": "color",
+        "centerLabel": "Carteira"
+      }
+    ]
+  }
 }

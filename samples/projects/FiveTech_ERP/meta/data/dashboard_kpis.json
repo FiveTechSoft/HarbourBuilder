@@ -3,9 +3,14 @@
   "kind": "data",
   "entity": "kpi",
   "rows": [
-    {"id":"k1","label":"Open appointments","value":12,"unit":"","trend":"+2","tone":"info"},
-    {"id":"k2","label":"Collections today","value":1840,"unit":"EUR","trend":"+8%","tone":"ok"},
-    {"id":"k3","label":"Pending authorizations","value":3,"unit":"","trend":"-1","tone":"warn"},
-    {"id":"k4","label":"Overdue balances","value":2,"unit":"","trend":"0","tone":"danger"}
+    { "id": "k1", "label": "Capital total", "value": 0, "unit": "EUR", "trend": "Atualizado agora", "tone": "info" },
+    { "id": "k2", "label": "Empréstimos ativos", "value": 0, "unit": "EUR", "trend": "Atualizado agora", "tone": "ok" },
+    { "id": "k3", "label": "A receber (30d)", "value": 0, "unit": "EUR", "trend": "Atualizado agora", "tone": "warn" },
+    { "id": "k4", "label": "Inadimplência", "value": 0, "unit": "EUR", "trend": "Monitorando", "tone": "danger" },
+    { "id": "k5", "label": "Aguardando análise", "value": 1, "unit": "", "trend": "propostas solicitadas", "tone": "warn" },
+    { "id": "k6", "label": "Seu voto pendente", "value": 22, "unit": "", "trend": "propostas em votação", "tone": "purple" },
+    { "id": "k7", "label": "A liberar", "value": 4, "unit": "", "trend": "propostas deferidas", "tone": "info" },
+    { "id": "k8", "label": "Open appointments", "value": 12, "unit": "", "trend": "+2", "tone": "info" },
+    { "id": "k9", "label": "Collections today", "value": 1840, "unit": "EUR", "trend": "+8%", "tone": "ok" }
   ]
 }

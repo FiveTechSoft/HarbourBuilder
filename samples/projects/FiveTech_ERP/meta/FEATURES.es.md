@@ -54,7 +54,7 @@ Motor genérico de pantallas impulsado por JSON. **Layouts** soportados:
 | `folder` | Carpeta con pestañas (pantallas hijas) |
 | `menu` | Painel de grupos de acciones |
 | `calendar` | Estilo día / agenda |
-| `dashboard` | Tiles de KPIs |
+| `dashboard` | Tiles de KPIs + widgets bar/donut (`dashboard.widgets`, Design form) |
 | `tree-detail` | Árbol organizativo + detalle |
 | `matrix` | Matriz de turnos / huecos |
 | `assign` | Asignación dual-list (usuarios ↔ roles) |

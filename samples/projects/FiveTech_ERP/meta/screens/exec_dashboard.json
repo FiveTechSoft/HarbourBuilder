@@ -3,5 +3,92 @@
   "kind": "screen",
   "layout": "dashboard",
   "title": "Executive dashboard",
-  "dataRef": "data.exec_kpis"
+  "subtitle": "Month to date",
+  "dataRef": "data.exec_kpis",
+  "dashboard": {
+    "subtitle": "Month to date",
+    "columns": 12,
+    "gap": 12,
+    "widgets": [
+      {
+        "id": "projects",
+        "type": "kpi",
+        "title": "Active projects",
+        "span": 3,
+        "tone": "info",
+        "dataRef": "data.exec_kpis",
+        "rowId": "k1"
+      },
+      {
+        "id": "revenue",
+        "type": "kpi",
+        "title": "Revenue (month)",
+        "span": 3,
+        "tone": "ok",
+        "dataRef": "data.exec_kpis",
+        "rowId": "k2",
+        "format": "money"
+      },
+      {
+        "id": "util",
+        "type": "kpi",
+        "title": "Billable utilization",
+        "span": 3,
+        "tone": "ok",
+        "dataRef": "data.exec_kpis",
+        "rowId": "k3",
+        "format": "percent"
+      },
+      {
+        "id": "pipeline",
+        "type": "kpi",
+        "title": "Pipeline value",
+        "span": 3,
+        "tone": "info",
+        "dataRef": "data.exec_kpis",
+        "rowId": "k4",
+        "format": "money"
+      },
+      {
+        "id": "invoices",
+        "type": "kpi",
+        "title": "Open invoices",
+        "span": 3,
+        "tone": "warn",
+        "dataRef": "data.exec_kpis",
+        "rowId": "k5"
+      },
+      {
+        "id": "margin",
+        "type": "kpi",
+        "title": "Avg. engagement margin",
+        "span": 3,
+        "tone": "ok",
+        "dataRef": "data.exec_kpis",
+        "rowId": "k6",
+        "format": "percent"
+      },
+      {
+        "id": "evol",
+        "type": "bar",
+        "title": "Monthly capital vs loans (demo series)",
+        "span": 8,
+        "height": 180,
+        "dataRef": "data.dash_monthly",
+        "categoryField": "month",
+        "series": [
+          { "field": "capital", "label": "Capital", "color": "#16a34a" },
+          { "field": "loans", "label": "Loans", "color": "#2563eb" }
+        ]
+      },
+      {
+        "id": "mix",
+        "type": "donut",
+        "title": "Portfolio mix",
+        "span": 4,
+        "dataRef": "data.dash_portfolio",
+        "centerLabel": "Mix"
+      }
+    ]
+  }
 }

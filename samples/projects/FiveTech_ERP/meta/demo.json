@@ -31,6 +31,13 @@
           "recommended": true
         },
         {
+          "id": "dashboard",
+          "label": "Dashboard (KPIs + gráficos)",
+          "ref": "demo.dashboard",
+          "description": "Layout dashboard: widgets KPI, barras y donut, grid 12 columnas, varios dataRef y cómo configurarlo todo en Design form.",
+          "durationHint": "~7 min"
+        },
+        {
           "id": "designers",
           "label": "Diseñadores (admin)",
           "ref": "demo.designers",

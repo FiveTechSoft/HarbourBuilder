@@ -121,7 +121,7 @@ Open a row with **Edit** / **New** to exercise select, checklist and checkbox.
 | `folder` | CRM folder (tabs) | `screen.crm_folder` |
 | `menu` | Cadastros / launch pad | (vertical packs) |
 | `calendar` | Day agenda | `screen.day_agenda` |
-| `dashboard` | Dashboard KPIs | `screen.kpis` |
+| `dashboard` | Dashboard KPIs + charts (bar/donut widgets) | `screen.kpis` |
 | `tree-detail` | Org tree | `screen.org` |
 | `matrix` | Roster matrix | `screen.roster` |
 | `assign` | Users ↔ roles | `screen.user_roles` |

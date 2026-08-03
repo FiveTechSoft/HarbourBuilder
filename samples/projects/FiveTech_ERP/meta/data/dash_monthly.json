@@ -1,0 +1,13 @@
+{
+  "id": "data.dash_monthly",
+  "kind": "data",
+  "entity": "dash_monthly",
+  "rows": [
+    { "id": "m1", "month": "Out", "capital": 62, "loans": 48 },
+    { "id": "m2", "month": "Nov", "capital": 78, "loans": 55 },
+    { "id": "m3", "month": "Dez", "capital": 70, "loans": 52 },
+    { "id": "m4", "month": "Jan", "capital": 88, "loans": 64 },
+    { "id": "m5", "month": "Fev", "capital": 92, "loans": 70 },
+    { "id": "m6", "month": "Mar", "capital": 105, "loans": 78 }
+  ]
+}

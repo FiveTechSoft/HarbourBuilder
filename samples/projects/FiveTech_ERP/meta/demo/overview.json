@@ -69,13 +69,13 @@
       "screen": "screen.kpis",
       "menuId": "kpis",
       "label": "Dashboard",
-      "caption": "layout dashboard: tiles desde data.dashboard_kpis. Todo sigue siendo meta + JSON.",
+      "caption": "layout dashboard: widgets KPI + bar + donut configurables desde Design form (dashboard.widgets).",
       "durationMs": 4500,
       "highlight": "#ws-meta"
     },
     {
       "section": "9 · Siguiente paso",
-      "caption": "Fin de la visita general. Vuelve al menú Demo y prueba «Listas + formulario de edición» para el tutorial de construcción de pantallas.",
+      "caption": "Fin de la visita general. Vuelve al menú Demo: «Listas + formulario de edición» o «Dashboard (KPIs + gráficos)» para construir pantallas.",
       "durationMs": 5500,
       "highlight": "#btn-demo"
     }
