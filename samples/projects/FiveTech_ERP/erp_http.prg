@@ -845,6 +845,93 @@ function ErpUserFind( cUser )
 return NIL
 
 //--------------------------------------------------------------------
+// Persist last company/app so the next login restores them via
+// ErpCompanyDefaultForUser / ErpCompanyDefaultApp (user.defaultCompany /
+// user.defaultApp). Empty cCompany or cAppId leaves that field unchanged.
+// Writes meta/data/users.json (what login reads); also syncs DBF when the
+// data driver is not json.
+static function ErpUserSavePrefs( cUser, cCompany, cAppId )
+
+   local hDoc := { => }, aRows, n, cRaw, cFull, cJson, lOk := .F., lChanged := .F.
+   local cOldCo, cOldApp, hRow, cBody
+
+   cUser := AllTrim( ErpToStr( cUser ) )
+   cCompany := AllTrim( ErpToStr( cCompany ) )
+   cAppId := AllTrim( ErpToStr( cAppId ) )
+   if Empty( cUser ) .or. ( Empty( cCompany ) .and. Empty( cAppId ) )
+      return .F.
+   endif
+
+   cRaw := ErpMetaGetRaw( "data.users" )
+   if Empty( cRaw )
+      return .F.
+   endif
+   hb_jsonDecode( cRaw, @hDoc )
+   if ValType( hDoc ) != "H" .or. ! hb_HHasKey( hDoc, "rows" ) .or. ;
+         ValType( hDoc[ "rows" ] ) != "A"
+      return .F.
+   endif
+   aRows := hDoc[ "rows" ]
+   hRow := NIL
+   for n := 1 to Len( aRows )
+      if ValType( aRows[ n ] ) != "H"
+         loop
+      endif
+      if Upper( AllTrim( ErpToStr( hb_HGetDef( aRows[ n ], "code", "" ) ) ) ) != Upper( cUser )
+         loop
+      endif
+      hRow := aRows[ n ]
+      if ! Empty( cCompany )
+         cOldCo := AllTrim( ErpToStr( hb_HGetDef( hRow, "defaultCompany", ;
+            hb_HGetDef( hRow, "company", "" ) ) ) )
+         if Upper( cOldCo ) != Upper( cCompany )
+            hRow[ "defaultCompany" ] := cCompany
+            lChanged := .T.
+         endif
+      endif
+      if ! Empty( cAppId )
+         cOldApp := AllTrim( ErpToStr( hb_HGetDef( hRow, "defaultApp", ;
+            hb_HGetDef( hRow, "defaultVertical", "" ) ) ) )
+         if Upper( cOldApp ) != Upper( cAppId )
+            hRow[ "defaultApp" ] := cAppId
+            lChanged := .T.
+         endif
+      endif
+      exit
+   next
+   if ValType( hRow ) != "H"
+      return .F.
+   endif
+   if ! lChanged
+      return .T.
+   endif
+
+   cFull := ErpMetaPathForKey( "data.users" )
+   if Empty( cFull )
+      return .F.
+   endif
+   cJson := hb_jsonEncode( hDoc ) + Chr( 10 )
+   if s_mtx != NIL
+      hb_mutexLock( s_mtx )
+   endif
+   lOk := ErpWriteFileAtomic( cFull, cJson )
+   if s_mtx != NIL
+      hb_mutexUnlock( s_mtx )
+   endif
+   if ! lOk
+      return .F.
+   endif
+   ErpMetaInvalidate( "data.users" )
+
+   // Keep DBF/OpenADS table in sync when that is the active driver
+   if ErpDbDriver() != "json"
+      cBody := hb_jsonEncode( { "key" => "data.users", "action" => "update", ;
+         "keyField" => "code", "keyValue" => cUser, "row" => hRow } )
+      ErpDbApply( "data.users", "update", cBody )
+   endif
+return .T.
+
+//--------------------------------------------------------------------
 // Is this user code an admin (look up data.users, fallback to code name)
 function ErpUserCodeIsAdmin( cUser )
 
@@ -983,9 +1070,10 @@ return AllTrim( ErpToStr( cId ) )
 //   vertical: "clinic"               (single)
 // If none: fall back to app.vertical, then base (empty vertical = modules.json).
 //
-// Resolution at runtime (session):
+// Resolution at runtime (session + next login):
 //   user.defaultApp → company.defaultApp → first linked app
-// Switching company reloads apps; switching app reloads modules (sidebar).
+// Switching company/app updates the session and persists user.default*
+// so logout → login restores the last choice.
 function ErpCompanyApps( hCo )
 
    local aOut := {}, xApps, x, hApp, cId, cLab, cVert, aVert, i, cAppVert
@@ -1624,6 +1712,8 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
          hSess[ "vertical" ] := cRel
          ErpSessPut( cTok, hSess )
          ErpMetaSetRequestVertical( cRel )
+         // Remember for next login (user.defaultCompany / user.defaultApp)
+         ErpUserSavePrefs( ErpToStr( hb_HGetDef( hSess, "user", "" ) ), cCo, cAppId )
          return ErpHttpOk( hb_jsonEncode( { "ok" => .T., ;
             "company" => cCo, ;
             "companyName" => AllTrim( ErpToStr( hb_HGetDef( hCo, "name", cCo ) ) ), ;
@@ -1653,6 +1743,8 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
          hSess[ "vertical" ] := cRel
          ErpSessPut( cTok, hSess )
          ErpMetaSetRequestVertical( cRel )
+         // Remember for next login (user.defaultApp + current company)
+         ErpUserSavePrefs( ErpToStr( hb_HGetDef( hSess, "user", "" ) ), cCo, cAppId )
          return ErpHttpOk( hb_jsonEncode( { "ok" => .T., ;
             "company" => cCo, ;
             "companyName" => iif( ValType( hCo ) == "H", ;
