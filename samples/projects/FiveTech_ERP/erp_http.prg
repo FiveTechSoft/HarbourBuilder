@@ -1009,6 +1009,112 @@ function ErpCompanyList()
 return aOut
 
 //--------------------------------------------------------------------
+// Company codes a non-admin user may use (from user.companies / allowedCompanies).
+// Empty list means "only defaultCompany" — no multi-company switch unless admin.
+static function ErpUserCompanyCodes( hUser )
+
+   local aOut := {}, x, a, i, c, cDef
+
+   if ValType( hUser ) != "H"
+      return aOut
+   endif
+   // Prefer explicit multi-company grant list
+   x := NIL
+   if hb_HHasKey( hUser, "companies" )
+      x := hUser[ "companies" ]
+   elseif hb_HHasKey( hUser, "allowedCompanies" )
+      x := hUser[ "allowedCompanies" ]
+   endif
+   if ValType( x ) == "A"
+      for each c in x
+         c := AllTrim( ErpToStr( c ) )
+         if ! Empty( c )
+            AAdd( aOut, c )
+         endif
+      next
+   elseif ValType( x ) == "C" .and. ! Empty( AllTrim( x ) )
+      a := hb_ATokens( AllTrim( x ), "," )
+      for i := 1 to Len( a )
+         c := AllTrim( a[ i ] )
+         if ! Empty( c )
+            AAdd( aOut, c )
+         endif
+      next
+   endif
+   // Always include default company so login never leaves the user stranded
+   cDef := AllTrim( ErpToStr( hb_HGetDef( hUser, "defaultCompany", ;
+      hb_HGetDef( hUser, "company", "" ) ) ) )
+   if ! Empty( cDef )
+      if AScan( aOut, {| z | Upper( AllTrim( ErpToStr( z ) ) ) == Upper( cDef ) } ) == 0
+         AAdd( aOut, cDef )
+      endif
+   endif
+return aOut
+
+//--------------------------------------------------------------------
+// .T. if this user may open / switch to company cCode.
+// Admins: always. Non-admins: only codes in user.companies (+ defaultCompany).
+// hUser NIL → deny (callers must pass the data.users row).
+function ErpUserCanAccessCompany( hUser, cCode )
+
+   local aCodes, c
+
+   cCode := AllTrim( ErpToStr( cCode ) )
+   if Empty( cCode ) .or. ValType( hUser ) != "H"
+      return .F.
+   endif
+   if ValType( ErpCompanyFind( cCode ) ) != "H"
+      return .F.
+   endif
+   if ErpUserRowIsAdmin( hUser )
+      return .T.
+   endif
+   aCodes := ErpUserCompanyCodes( hUser )
+   if Empty( aCodes )
+      c := AllTrim( ErpToStr( hb_HGetDef( hUser, "defaultCompany", ;
+         hb_HGetDef( hUser, "company", "" ) ) ) )
+      return ! Empty( c ) .and. Upper( c ) == Upper( cCode )
+   endif
+   for each c in aCodes
+      if Upper( AllTrim( ErpToStr( c ) ) ) == Upper( cCode )
+         return .T.
+      endif
+   next
+return .F.
+
+//--------------------------------------------------------------------
+// Companies visible/selectable for a user (admin = all active).
+function ErpCompanyListForUser( hUser )
+
+   local aAll := ErpCompanyList(), aOut := {}, h, cCode
+
+   if ValType( hUser ) != "H" .or. ErpUserRowIsAdmin( hUser )
+      return aAll
+   endif
+   for each h in aAll
+      if ValType( h ) != "H"
+         loop
+      endif
+      cCode := AllTrim( ErpToStr( hb_HGetDef( h, "code", "" ) ) )
+      if ErpUserCanAccessCompany( hUser, cCode )
+         AAdd( aOut, h )
+      endif
+   next
+return aOut
+
+//--------------------------------------------------------------------
+// Non-admin may switch company only when authorized for 2+ companies.
+function ErpUserCanSwitchCompany( hUser )
+
+   if ValType( hUser ) != "H"
+      return .F.
+   endif
+   if ErpUserRowIsAdmin( hUser )
+      return .T.
+   endif
+return Len( ErpCompanyListForUser( hUser ) ) > 1
+
+//--------------------------------------------------------------------
 function ErpCompanyFind( cCode )
 
    local a := ErpCompanyList(), h
@@ -1024,17 +1130,21 @@ function ErpCompanyFind( cCode )
 return NIL
 
 //--------------------------------------------------------------------
-// Default company for a user row (defaultCompany field or first company)
+// Default company for a user row (defaultCompany field or first allowed)
 function ErpCompanyDefaultForUser( hUser )
 
-   local cDef := "", hCo, a
+   local cDef := "", a
 
    if ValType( hUser ) == "H"
       cDef := AllTrim( ErpToStr( hb_HGetDef( hUser, "defaultCompany", ;
          hb_HGetDef( hUser, "company", "" ) ) ) )
-   endif
-   if ! Empty( cDef ) .and. ValType( ErpCompanyFind( cDef ) ) == "H"
-      return cDef
+      if ! Empty( cDef ) .and. ErpUserCanAccessCompany( hUser, cDef )
+         return cDef
+      endif
+      a := ErpCompanyListForUser( hUser )
+      if ! Empty( a ) .and. ValType( a[ 1 ] ) == "H"
+         return AllTrim( ErpToStr( hb_HGetDef( a[ 1 ], "code", "HQ" ) ) )
+      endif
    endif
    a := ErpCompanyList()
    if ! Empty( a ) .and. ValType( a[ 1 ] ) == "H"
@@ -1642,7 +1752,9 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
             "isAdmin" => ErpUserRowIsAdmin( hDoc ), ;
             "company" => cCo, "companyName" => cCoName, "currency" => cCur, ;
             "app" => cAppId, "appLabel" => cAppLab, "vertical" => cRel, ;
-            "apps" => ErpCompanyApps( hCo ) } )
+            "apps" => ErpCompanyApps( hCo ), ;
+            "companies" => ErpCompanyListForUser( hDoc ), ;
+            "canSwitchCompany" => ErpUserCanSwitchCompany( hDoc ) } )
          return ErpHttpOkCookie( cOut, "application/json; charset=utf-8", ;
             "DWSESS=" + cTok + "; Path=/; HttpOnly; SameSite=Lax" )
       endif
@@ -1693,6 +1805,7 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
             return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "company code required" } ), ;
                "application/json; charset=utf-8" )
          endif
+         hDoc := ErpUserFind( ErpToStr( hb_HGetDef( hSess, "user", "" ) ) )
          hCo := ErpCompanyFind( cArg )
          if ValType( hCo ) != "H"
             return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
@@ -1700,13 +1813,25 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
                "application/json; charset=utf-8" )
          endif
          cCo := AllTrim( ErpToStr( hb_HGetDef( hCo, "code", cArg ) ) )
+         // Non-admin: only companies granted in user.companies (+ defaultCompany)
+         if ! ErpUserCanAccessCompany( hDoc, cCo )
+            return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
+               "msg" => "Not authorized to switch to company " + cCo } ), ;
+               "application/json; charset=utf-8" )
+         endif
+         // Switching away from current company requires multi-company grant (or admin)
+         if Upper( cCo ) != Upper( ErpSessCompany( hSess ) ) .and. ;
+               ! ErpUserCanSwitchCompany( hDoc )
+            return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
+               "msg" => "Company switch not authorized for this user" } ), ;
+               "application/json; charset=utf-8" )
+         endif
          cAppId := AllTrim( ErpToStr( hb_HGetDef( hQ, "a2", "" ) ) )
          if ! Empty( cAppId )
             hApp := ErpCompanyFindApp( hCo, cAppId )
          else
             // Prefer session user's defaultApp if linked on the new company
-            hApp := ErpCompanyDefaultApp( hCo, ;
-               ErpUserFind( ErpToStr( hb_HGetDef( hSess, "user", "" ) ) ) )
+            hApp := ErpCompanyDefaultApp( hCo, hDoc )
          endif
          if ValType( hApp ) != "H"
             hApp := { "id" => "base", "label" => "Base modules", "vertical" => "" }
@@ -1727,7 +1852,9 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
             "companyName" => AllTrim( ErpToStr( hb_HGetDef( hCo, "name", cCo ) ) ), ;
             "currency" => AllTrim( ErpToStr( hb_HGetDef( hCo, "currency", "" ) ) ), ;
             "app" => cAppId, "appLabel" => cAppLab, "vertical" => cRel, ;
-            "apps" => ErpCompanyApps( hCo ) } ), ;
+            "apps" => ErpCompanyApps( hCo ), ;
+            "companies" => ErpCompanyListForUser( hDoc ), ;
+            "canSwitchCompany" => ErpUserCanSwitchCompany( hDoc ) } ), ;
             "application/json; charset=utf-8" )
       elseif cAction == "app" .or. cAction == "setapp" .or. cAction == "vertical"
          // a1 = app id (or vertical name) within current company
@@ -1771,9 +1898,10 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
          return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Not authenticated" } ), ;
             "application/json; charset=utf-8" )
       endif
+      hDoc := ErpUserFind( ErpToStr( hb_HGetDef( hSess, "user", "" ) ) )
       cCo := ErpSessCompany( hSess )
-      if Empty( cCo )
-         cCo := ErpCompanyDefaultForUser( NIL )
+      if Empty( cCo ) .or. ! ErpUserCanAccessCompany( hDoc, cCo )
+         cCo := ErpCompanyDefaultForUser( hDoc )
          hSess[ "company" ] := cCo
       endif
       hCo := ErpCompanyFind( cCo )
@@ -1789,7 +1917,7 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
          hApp := ErpCompanyFindApp( hCo, cAppId )
       endif
       if ValType( hApp ) != "H"
-         hApp := ErpCompanyDefaultApp( hCo, NIL )
+         hApp := ErpCompanyDefaultApp( hCo, hDoc )
          cAppId := AllTrim( ErpToStr( hb_HGetDef( hApp, "id", "" ) ) )
          hSess[ "app" ] := cAppId
          hSess[ "appLabel" ] := AllTrim( ErpToStr( hb_HGetDef( hApp, "label", cAppId ) ) )
@@ -1813,7 +1941,9 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
          "appLabel" => cAppLab, ;
          "vertical" => cRel, ;
          "apps" => ErpCompanyApps( hCo ), ;
-         "companies" => ErpCompanyList(), ;
+         "companies" => ErpCompanyListForUser( hDoc ), ;
+         "canSwitchCompany" => ErpUserCanSwitchCompany( hDoc ), ;
+         "isAdmin" => ErpSessIsAdmin( hSess ), ;
          "allVerticals" => ErpMetaVerticals() } ), ;
          "application/json; charset=utf-8" )
    endif

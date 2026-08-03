@@ -21,6 +21,7 @@
       "active": true,
       "password": "3594706848",
       "defaultCompany": "MAD",
+      "companies": ["MAD"],
       "defaultApp": "clinic"
     },
     {
@@ -30,6 +31,7 @@
       "role": "user",
       "active": true,
       "defaultCompany": "FER",
+      "companies": ["FER"],
       "defaultApp": "ferreteria",
       "password": "3632233996"
     }

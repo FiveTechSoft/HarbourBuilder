@@ -3434,10 +3434,11 @@ function refreshStatusCompany() {
   sbSetText("sb-company", label);
   var item = document.getElementById("sb-company-item");
   if (item) {
+    var canSw = !!(APP_CONTEXT && APP_CONTEXT.canSwitchCompany);
     item.title = c
       ? ("Empresa: " + (n || c) + " · App: " + (al || a || "—") +
         (APP_CONTEXT.vertical ? (" (vertical " + APP_CONTEXT.vertical + ")") : "") +
-        " — clic para cambiar")
+        (canSw ? " — clic para cambiar empresa/app" : " — clic para ver app (empresa fija)"))
       : "Seleccionar empresa / app";
   }
 }
@@ -3452,6 +3453,10 @@ function applyContextPayload(j) {
   APP_CONTEXT.appLabel = j.appLabel || j.app || "";
   APP_CONTEXT.vertical = j.vertical != null ? j.vertical : "";
   APP_CONTEXT.apps = Array.isArray(j.apps) ? j.apps : [];
+  if (j.canSwitchCompany != null) APP_CONTEXT.canSwitchCompany = !!j.canSwitchCompany;
+  else if (j.isAdmin != null) APP_CONTEXT.canSwitchCompany = !!j.isAdmin;
+  else APP_CONTEXT.canSwitchCompany = (APP_CONTEXT.companies || []).length > 1;
+  if (j.isAdmin != null) APP_CONTEXT.isAdmin = !!j.isAdmin;
   if (Array.isArray(j.allVerticals)) APP_CONTEXT.allVerticals = j.allVerticals;
   try {
     localStorage.setItem("dw-company", APP_CONTEXT.company);
@@ -3513,6 +3518,12 @@ function setActiveCompany(code, opts) {
   if (!code) {
     toast("Company code required");
     return Promise.reject(new Error("company required"));
+  }
+  // Client-side guard (server also enforces)
+  if (APP_CONTEXT && !APP_CONTEXT.canSwitchCompany &&
+      String(code) !== String(APP_CONTEXT.company || "")) {
+    toast("No autorizado a cambiar de empresa");
+    return Promise.reject(new Error("company switch not authorized"));
   }
   return cmd("company", code, appId || undefined).then(function (j) {
     if (!j || !j.ok) {
@@ -4503,7 +4514,8 @@ function isSpecialLayout(layout) {
 var XF = { layout: "", rows: [], selected: -1, step: 0, treeSel: "", assignLeft: "", links: [], matrix: [] };
 var APP_CONTEXT = {
   company: "", companyName: "", currency: "", companies: [],
-  app: "", appLabel: "", vertical: "", apps: [], allVerticals: []
+  app: "", appLabel: "", vertical: "", apps: [], allVerticals: [],
+  canSwitchCompany: false, isAdmin: false
 };
 try {
   APP_CONTEXT.company = localStorage.getItem("dw-company") || "";
@@ -10175,12 +10187,20 @@ function xfRenderContext(scr) {
     function paint() {
       var list = APP_CONTEXT.companies || [];
       var apps = APP_CONTEXT.apps || [];
-      var html = "", i, r, on, sub, a, aon;
+      var canSw = !!APP_CONTEXT.canSwitchCompany;
+      var html = "", i, r, on, sub, a, aon, cardCls;
       html += "<p class='xf-folder-intro' style='margin-top:0'>" +
         esc(scr.subtitle ||
           "1) Elige empresa. 2) Si tiene varias apps, elige la app (cada app = un vertical pack de menú).") +
         "</p>";
-      html += "<h4 style='margin:0 0 8px;font-size:.9rem'>Empresa</h4>";
+      if (!canSw && !APP_CONTEXT.isAdmin) {
+        html += "<p style='font-size:.85rem;color:var(--muted);margin:0 0 10px'>" +
+          "Tu usuario no puede cambiar de empresa (solo la asignada). " +
+          "Un admin puede autorizar más en <b>Users → Allowed companies</b>.</p>";
+      }
+      html += "<h4 style='margin:0 0 8px;font-size:.9rem'>Empresa" +
+        (canSw ? "" : " <span style='font-weight:500;color:var(--muted)'>(fija)</span>") +
+        "</h4>";
       html += "<div class='xf-context-cards' id='xf-ctx-companies'>";
       for (i = 0; i < list.length; i++) {
         r = list[i] || {};
@@ -10193,7 +10213,10 @@ function xfRenderContext(scr) {
         else if (Array.isArray(r.verticals)) nApps = r.verticals.length;
         else if (r.vertical) nApps = 1;
         if (nApps) sub += " · " + nApps + " app(s)";
-        html += "<div class='card" + on + "' data-code='" + esc(r.code) + "' role='button' tabindex='0'>" +
+        cardCls = "card" + on + (canSw ? "" : " locked");
+        html += "<div class='" + cardCls + "'" +
+          (canSw ? (" data-code='" + esc(r.code) + "' role='button' tabindex='0'") : "") +
+          ">" +
           "<strong>" + esc(r.name || r.code) + "</strong>" +
           "<div style='font-size:.78rem;color:var(--muted);margin-top:4px'>" + sub + "</div></div>";
       }
@@ -10225,6 +10248,10 @@ function xfRenderContext(scr) {
         var c = e.target && e.target.closest ? e.target.closest(".card[data-code]") : null;
         var ap = e.target && e.target.closest ? e.target.closest(".card[data-app]") : null;
         if (c) {
+          if (!APP_CONTEXT.canSwitchCompany) {
+            toast("No autorizado a cambiar de empresa");
+            return;
+          }
           setActiveCompany(c.getAttribute("data-code")).then(function () { paint(); });
           return;
         }
@@ -10233,14 +10260,8 @@ function xfRenderContext(scr) {
         }
       };
     }
-    if (rows.length) {
-      paint();
-      return;
-    }
-    xfFetch(scr.dataRef || "data.companies", function (list) {
-      APP_CONTEXT.companies = list || [];
-      paint();
-    });
+    // Always use server-filtered companies from /api/context (never full list for non-admin)
+    paint();
   });
 }
 

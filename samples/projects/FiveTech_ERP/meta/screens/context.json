@@ -3,7 +3,7 @@
   "kind": "screen",
   "layout": "context",
   "title": "Company & app context",
-  "subtitle": "1) Choose company. 2) If it has several apps, pick one (each app = a vertical menu pack under meta/verticals/). Lists and new records stay filtered by company.",
+  "subtitle": "1) Choose company (if your user is authorized for more than one). 2) Pick an app within that company (each app = meta/verticals/<name>/). Non-admins only see Allowed companies from Users.",
   "dataRef": "data.companies",
   "keyField": "code"
 }

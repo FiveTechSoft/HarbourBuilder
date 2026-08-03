@@ -51,7 +51,20 @@
           "MAD",
           "BCN",
           "FER"
-        ]
+        ],
+        "hint": "Company used at login."
+      },
+      {
+        "id": "companies",
+        "label": "Allowed companies",
+        "type": "checklist",
+        "options": [
+          "HQ",
+          "MAD",
+          "BCN",
+          "FER"
+        ],
+        "hint": "Non-admin: only these companies are visible/switchable. Leave empty = only default company (no switch). Admin always sees all."
       },
       {
         "id": "defaultApp",
