@@ -4525,6 +4525,14 @@ static function TBRun()
       if IsXHarbour()
          cCppBase += iif( cCompiler == "msvc", "/DHBIDE_XHARBOUR" + Chr(10), " -DHBIDE_XHARBOUR " )
       endif
+      // User apps always compile hix_runtime.prg, which implements
+      // HIX_SetRoot/HIX_ExecPrg/HIX_ServeStatic in Harbour; compiling
+      // hbbridge.cpp with HBIDE_WITH_HIX_RUNTIME drops its HIX_* link
+      // shims so the linker does not see duplicate HB_FUN_* (LNK2005).
+      // The IDE itself does not link hix_runtime, so its shims stay on.
+      if File( cBuildDir + "\hix_runtime.prg" )
+         cCppBase += iif( cCompiler == "msvc", "/DHBIDE_WITH_HIX_RUNTIME" + Chr(10), " -DHBIDE_WITH_HIX_RUNTIME " )
+      endif
       for k := 1 to Len( aCppFiles )
          if cCompiler == "msvc"
             cRsp := cBuildDir + "\cl_" + aCppFiles[k] + ".rsp"
@@ -5802,6 +5810,11 @@ static function TBDebugRun( lRunToBreak )
       // xHarbour lacks hbapicls.h — hbide.h falls back to classes.h
       if IsXHarbour()
          cCppBase += iif( cCompiler == "msvc", "/DHBIDE_XHARBOUR" + Chr(10), " -DHBIDE_XHARBOUR " )
+      endif
+      // hix_runtime.prg provides the Harbour HIX_* implementations in the
+      // debug app too — drop the hbbridge.cpp shims (see TBRun comment).
+      if File( cBuildDir + "\hix_runtime.prg" )
+         cCppBase += iif( cCompiler == "msvc", "/DHBIDE_WITH_HIX_RUNTIME" + Chr(10), " -DHBIDE_WITH_HIX_RUNTIME " )
       endif
       for k := 1 to Len( aCppFiles )
          if cCompiler == "msvc"

@@ -8359,13 +8359,38 @@ HB_FUNC( UI_SHOWPRINTPANEL )
  * (cocoa_webserver.m). Not ported to Windows yet — these let
  * classes.prg:TWebServer methods resolve at link time so the framework
  * builds. TWebServer on Windows is a no-op until the Winsock port.
+ *
+ * The UI_HIX_* accessors below are the native functions hix_runtime.prg
+ * reads/writes through (only SETSTATUS/WRITE were covered originally; the
+ * rest produced LNK2001 unresolved externals).
+ *
+ * HIX_SetRoot / HIX_ExecPrg / HIX_ServeStatic are implemented in Harbour
+ * by hix_runtime.prg, which user apps always compile — shimming them there
+ * would duplicate the HB_FUN_* symbols (LNK2005). The IDE itself does not
+ * link hix_runtime (it embeds classes.prg via #include "core/classes.prg"
+ * but not the HIX runtime), so the shims are guarded by
+ * HBIDE_WITH_HIX_RUNTIME, which the app build passes but the IDE build
+ * does not.
  * --------------------------------------------------------------------- */
 
-HB_FUNC( HIX_SETROOT )        { hb_retl( 0 ); }
+/* UI_HIX_* accessors — always compiled (hix_runtime.prg only calls them). */
 HB_FUNC( UI_HIX_SETSTATUS )   { hb_retl( 0 ); }
 HB_FUNC( UI_HIX_WRITE )       { hb_retl( 0 ); }
+HB_FUNC( UI_HIX_QUERY )       { hb_retc( "" ); }
+HB_FUNC( UI_HIX_BODY )        { hb_retc( "" ); }
+HB_FUNC( UI_HIX_METHOD )      { hb_retc( "" ); }
+HB_FUNC( UI_HIX_PATH )        { hb_retc( "" ); }
+HB_FUNC( UI_HIX_IP )          { hb_retc( "" ); }
+HB_FUNC( UI_HIX_SETCONTENTTYPE ) { hb_retl( 0 ); }
+
+/* HIX_* link shims — only for binaries that do NOT link hix_runtime.prg
+ * (the IDE). User apps define HBIDE_WITH_HIX_RUNTIME and get the Harbour
+ * implementations from hix_runtime.prg instead. */
+#ifndef HBIDE_WITH_HIX_RUNTIME
+HB_FUNC( HIX_SETROOT )        { hb_retl( 0 ); }
 HB_FUNC( HIX_EXECPRG )        { hb_retl( 0 ); }
 HB_FUNC( HIX_SERVESTATIC )    { hb_retl( 0 ); }
+#endif
 
 /* ---- Report PDF export — native PDF 1.4 writer (no external deps) ----
  * Coordinate contract (matches Linux/gtk3 backend):

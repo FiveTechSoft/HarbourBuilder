@@ -91,6 +91,14 @@ foreach ($f in $cppFiles) {
   if ($LASTEXITCODE -ne 0) { Write-Error "cl $f.cpp failed"; exit 1 }
 }
 
+# FWH WebView2 host (the IDE compiles it when present; tcontrols.obj
+# references webview2_* so the link fails without it)
+$wv2Dir = "$repo\source\backends\win32\webview2"
+if (Test-Path "$wv2Dir\fwh_webview2.cpp") {
+  & cl.exe @clFlags "/I$wv2Dir" "$wv2Dir\fwh_webview2.cpp" "/Fo$buildD\fwh_webview2.obj" 2>&1 | Out-Null
+  if ($LASTEXITCODE -ne 0) { Write-Error "cl fwh_webview2.cpp failed"; exit 1 }
+}
+
 # Compile stddlgs.c and generate/compile UI stubs
 & cl.exe @clFlags "$repo\resources\stddlgs.c" "/Fo$buildD\stddlgs.obj" 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) { Write-Error "cl stddlgs.c failed"; exit 1 }
@@ -121,6 +129,7 @@ if ($LASTEXITCODE -ne 0) { Write-Error "cl _stress_stubs.c failed"; exit 1 }
 "[4] link"
 $exePath = "$buildD\$Sample.exe"
 $cppObjs = $cppFiles | ForEach-Object { "$buildD\$_.obj" }
+if (Test-Path "$buildD\fwh_webview2.obj") { $cppObjs += "$buildD\fwh_webview2.obj" }
 $objs = $prgObjs + $cppObjs + "$buildD\stddlgs.obj" + "$buildD\_stress_stubs.obj"
 $hbLibs = "hbvm.lib hbrtl.lib hbcommon.lib hblang.lib hbrdd.lib hbmacro.lib hbpp.lib hbcplr.lib hbct.lib hbhsx.lib hbsix.lib hbusrrdd.lib rddntx.lib rddnsx.lib rddcdx.lib rddfpt.lib hbcpage.lib hbpcre.lib hbzlib.lib hbdebug.lib hbsqlit3.lib sqlite3.lib gtgui.lib gtwin.lib gtwvt.lib".Split(" ")
 $sysLibs = "user32.lib kernel32.lib gdi32.lib comctl32.lib comdlg32.lib shell32.lib ole32.lib oleaut32.lib advapi32.lib uuid.lib ws2_32.lib winmm.lib msimg32.lib gdiplus.lib winspool.lib dwmapi.lib iphlpapi.lib".Split(" ")
