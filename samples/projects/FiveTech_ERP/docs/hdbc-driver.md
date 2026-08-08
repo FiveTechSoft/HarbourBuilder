@@ -76,7 +76,12 @@ exe was actually built with `HB_WITH_HDBC`.
 - **Tables are not auto-created.** Unlike `dbfcdx`/`openads`,
   `ErpDbEnsureTables()` treats `hdbc` like a SQL backend and does nothing —
   provision your MariaDB schema yourself (RDDHDBC tables need its own
-  bookkeeping columns/metadata table; consult its docs).
+  bookkeeping columns/metadata table; consult its docs). This is a solved
+  problem in practice, not a blocker: DBF/JSON-to-MariaDB schema migration
+  is a well-trodden path (infer columns from `meta/data/*.json` the same
+  way `ErpDbInferSchema()` already does for `dbfcdx`, then `CREATE TABLE`
+  once per dataset) — just not something this sample auto-runs against a
+  live database on your behalf.
 - **Record locking (`RLock`) is process-local**, not database-wide — it
   correctly serializes the concurrent threads of a *single*
   `FiveTech_ERP.exe`, the model this sample already uses, but does not
