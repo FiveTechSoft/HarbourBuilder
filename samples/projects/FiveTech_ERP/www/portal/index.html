@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FiveTech ERP — Opciones de vista</title>
+<style>
+  :root { --bg:#0e1116; --bg2:#161b23; --line:#2a3342; --txt:#e6ebf2; --txt2:#8b98ab; --acc:#3b82f6; --ok:#22c55e; }
+  [data-theme="light"] { --bg:#f1f5f9; --bg2:#fff; --line:#cbd5e1; --txt:#0f172a; --txt2:#64748b; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--txt); font:15px/1.5 "Segoe UI", system-ui, sans-serif; min-height:100vh; }
+  .wrap { width:min(920px, 94vw); margin:0 auto; padding:36px 0 56px; }
+  h1 { font-size:22px; font-weight:700; }
+  .sub { color:var(--txt2); margin:8px 0 22px; max-width:54em; }
+  .opt { background:var(--bg2); border:1px solid var(--line); border-radius:14px; padding:18px 20px; margin-bottom:14px; }
+  .opt h2 { font-size:16px; font-weight:700; margin-bottom:6px; }
+  .opt .num { color:var(--acc); margin-right:6px; }
+  .opt p { color:var(--txt2); font-size:13.5px; margin-bottom:10px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px; margin-top:8px; }
+  a.card { display:block; background:var(--bg); border:1px solid var(--line); border-radius:10px; padding:14px; color:var(--txt); text-decoration:none; }
+  a.card:hover { border-color:var(--acc); }
+  a.card b { display:block; font-size:14px; }
+  a.card span { display:block; color:var(--txt2); font-size:12px; margin-top:4px; }
+  .btn { display:inline-block; background:var(--acc); color:#fff; border:0; border-radius:999px; padding:8px 16px; font-weight:600; font-size:13px; text-decoration:none; cursor:pointer; }
+  .btn-ghost { background:transparent; color:var(--acc); border:1px solid var(--line); }
+  .note { border-left:3px solid var(--acc); padding:12px 14px; margin-top:20px; background:var(--bg2); border-radius:0 10px 10px 0; color:var(--txt2); font-size:13px; }
+  .note b { color:var(--txt); }
+  .note code { background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:1px 7px; font-size:12px; }
+  .fab { position:fixed; top:14px; right:14px; background:var(--bg2); color:var(--txt); border:1px solid var(--line); border-radius:999px; padding:6px 14px; cursor:pointer; }
+  .badge { display:inline-block; font-size:11px; border:1px solid var(--ok); color:var(--ok); border-radius:999px; padding:1px 8px; margin-left:6px; vertical-align:middle; }
+</style>
+</head>
+<body>
+<button class="fab" type="button" onclick="t()">Claro</button>
+<div class="wrap">
+  <h1>FiveTech ERP — Opciones de vista</h1>
+  <p class="sub">Elija cómo quiere trabajar. En todos los casos son los <b>mismos datos</b> y el <b>mismo usuario</b>; solo cambia la forma de ver la pantalla.</p>
+
+  <section class="opt">
+    <h2><span class="num">1 ·</span> Login directo — versión PC</h2>
+    <p>
+      Entrada clásica en la <b>aplicación de este equipo</b> (ventana del programa).
+      Ideal si trabaja siempre en el mismo PC de la oficina.
+    </p>
+    <a class="btn" href="/login">Ir al login PC</a>
+  </section>
+
+  <section class="opt">
+    <h2><span class="num">2 ·</span> Opción WebView + HTTP</h2>
+    <p>
+      Combina la app de escritorio con el navegador: la ventana del programa
+      sigue activa y puede abrir el portal en Edge/Chrome
+      (igual que escribir <b>localhost:2222/portal</b>).
+      Útil cuando conviven pantallas de escritorio y pantallas web.
+    </p>
+    <a class="btn btn-ghost" href="/login">Login escritorio</a>
+    <a class="btn" href="/web-angular/index.html" style="margin-left:8px">Abrir vista web (Angular)</a>
+  </section>
+
+  <section class="opt">
+    <h2><span class="num">3 ·</span> Opción web 100% <span class="badge">solo navegador</span></h2>
+    <p>
+      Sin instalar nada en el puesto: abra el navegador y elija la vista.
+      Sirve en PC, tablet o celular (si la red lo permite).
+    </p>
+    <div class="grid">
+      <a class="card" href="/web-vanilla/index.html"><b>Vanilla</b><span>Pantalla simple, muy liviana</span></a>
+      <a class="card" href="/web-angular/index.html"><b>Angular</b><span>Vista completa (recomendada)</span></a>
+      <a class="card" href="/web-react/index.html"><b>React</b><span>Vista rápida</span></a>
+      <a class="card" href="/web-vue/index.html"><b>Vue</b><span>Vista ligera</span></a>
+    </div>
+  </section>
+
+  <div class="note">
+    <b>Acceso por la red</b><br><br>
+    <b>Intranet (oficina / red local):</b>
+    en otro PC o celular de la misma red abra el navegador y entre a
+    <code>http://&lt;IP-del-servidor&gt;:2222/portal/</code>
+    (por ejemplo <code>http://192.168.1.20:2222/portal/</code>).
+    Usuario y clave son los de siempre.<br><br>
+    <b>Remoto (internet):</b>
+    desde fuera de la oficina hace falta que el área de sistemas habilite
+    el acceso seguro (VPN, dirección pública o túnel con certificado).
+    Sin esa configuración, el sistema solo responde dentro de la red de la empresa.
+  </div>
+
+  <p style="margin-top:22px;color:var(--txt2);font-size:13px">
+    Prueba del prototipo: usuario <code style="background:var(--bg2);padding:2px 6px;border-radius:4px">admin</code>
+    / clave <code style="background:var(--bg2);padding:2px 6px;border-radius:4px">1234</code>
+  </p>
+</div>
+<script>
+function applyTheme(t){
+  t = t === 'light' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', t);
+  try { localStorage.setItem('dw-theme', t); } catch (e) {}
+  var fab = document.querySelector('.fab');
+  if (fab) fab.textContent = t === 'dark' ? 'Claro' : 'Oscuro';
+}
+function t(){ applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'); }
+applyTheme((function(){ try { return localStorage.getItem('dw-theme') || 'dark'; } catch(e){ return 'dark'; } })());
+</script>
+</body>
+</html>

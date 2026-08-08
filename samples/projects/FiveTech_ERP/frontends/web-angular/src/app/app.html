@@ -1,0 +1,379 @@
+@if (view() === 'login') {
+  <div class="login-wrap">
+    <button type="button" class="theme-fab" (click)="toggleTheme()">{{ theme() === 'dark' ? 'Dark' : 'Light' }}</button>
+    <div class="login-card">
+      <div class="login-brand">FiveTech ERP</div>
+      <div class="login-sub">Rama 100% web · frontend Angular 21 + PrimeNG</div>
+      <form (submit)="$event.preventDefault(); onLogin()">
+        <label>Usuario</label>
+        <input pInputText [(ngModel)]="user" name="user" autocomplete="username" />
+        <label>Clave</label>
+        <input pInputText type="password" [(ngModel)]="pass" name="pass" autocomplete="current-password" />
+        <label>Fecha de trabajo</label>
+        <input pInputText type="date" [(ngModel)]="workDate" name="workdate" />
+        <p-button type="submit" label="Entrar" [loading]="busy()" styleClass="w-full mt-4" />
+        <div class="login-error">{{ loginError() }}</div>
+      </form>
+      <button type="button" class="tool-toggle" (click)="toolOpen.set(!toolOpen())">Opciones de vista (ayuda)</button>
+      @if (toolOpen()) {
+        <div class="tool-panel">
+          <div class="tool-row"><span>Ahora está en:</span> <b>{{ ramaLabel() }}</b></div>
+          <div class="tool-row">
+            <span><b>1 · Login directo — versión PC</b></span>
+            <div class="tool-note">Aplicación de este equipo. Login clásico: <a href="/login" (click)="openMount($event, '/login')">/login</a></div>
+          </div>
+          <div class="tool-row">
+            <span><b>2 · WebView + HTTP</b></span>
+            <div class="tool-note">App de escritorio + navegador (como Edge con localhost:2222/portal).</div>
+            <nav class="tool-links">
+              <a href="/portal/" (click)="openLocal($event)">Abrir portal en el navegador</a>
+            </nav>
+          </div>
+          <div class="tool-row">
+            <span><b>3 · Web 100%</b> — elija la vista (mismos datos)</span>
+            <nav class="tool-links">
+              <a href="/web-vanilla/index.html" (click)="openMount($event, '/web-vanilla/index.html')">Vanilla</a>
+              <a href="/web-angular/index.html" (click)="openMount($event, '/web-angular/index.html')">Angular</a>
+              <a href="/web-react/index.html" (click)="openMount($event, '/web-react/index.html')">React</a>
+              <a href="/web-vue/index.html" (click)="openMount($event, '/web-vue/index.html')">Vue</a>
+              <a href="/portal/" (click)="openMount($event, '/portal/')">Menú…</a>
+            </nav>
+          </div>
+          <div class="tool-row">
+            <span><b>Acceso por la red</b></span>
+            <div class="tool-note"><b>Intranet:</b> en otro PC/celular de la oficina use la dirección de abajo.</div>
+            <nav class="tool-links">
+              <input class="tool-ip" [(ngModel)]="ip" name="toolip" placeholder="ej. 192.168.1.20" />
+              <button class="btn" type="button" (click)="openRemote()">Probar</button>
+              <button class="btn" type="button" (click)="copyRemote()">{{ copiedUrl() ? '¡Copiado!' : 'Copiar enlace' }}</button>
+            </nav>
+            <div class="tool-note">Enlace: {{ remoteUrl }}</div>
+            <div class="tool-note"><b>Remoto (internet):</b> solo si sistemas habilitó acceso seguro (VPN o túnel).</div>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+} @else {
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button type="button" class="btn-icon-bar"
+          [title]="sidebarCollapsed() ? 'Mostrar menú' : 'Ocultar menú'"
+          [attr.aria-expanded]="!sidebarCollapsed()"
+          (click)="toggleSidebar()">☰</button>
+        <span class="brand">FiveTech ERP</span>
+        <p-tag severity="info" value="rama {{ rama().branch }} · angular" />
+        <button type="button" class="btn-ghost btn-dash" title="Ir al dashboard FWH" (click)="goDashboard()">Dashboard</button>
+      </div>
+      <div class="topbar-right">
+        <p-select
+          [options]="companyOptions()"
+          [ngModel]="ctx()?.company"
+          (onChange)="onCompanyChange($event.value)"
+          [disabled]="ctx()?.canSwitchCompany === false"
+          placeholder="Empresa"
+        />
+        <p-select
+          [options]="appOptions()"
+          [ngModel]="ctx()?.app"
+          (onChange)="onAppChange($event.value)"
+          [disabled]="ctx()?.canSwitchApp === false"
+          placeholder="App"
+        />
+        <span class="user-chip">
+          {{ ctx()?.company }} · {{ ctx()?.appLabel || ctx()?.app }} · {{ ctx()?.isAdmin ? 'admin' : 'usuario' }}
+          @if (version()) { · v{{ version() }} }
+        </span>
+        <input type="date" class="wd" [value]="workDate" (change)="onWorkdate($any($event.target).value)" />
+        <p-button [label]="theme() === 'dark' ? 'Dark' : 'Light'" severity="secondary" [outlined]="true" (onClick)="toggleTheme()" />
+        <p-button label="Salir" severity="secondary" [outlined]="true" (onClick)="logout()" />
+      </div>
+    </header>
+
+    <div class="body" [class.sidebar-collapsed]="sidebarCollapsed()">
+      <nav class="sidebar" aria-label="Módulos">
+        <div class="nav-pin">
+          <button type="button" class="nav-item dash" (click)="goDashboard()">⊞ Dashboard</button>
+        </div>
+        @for (sec of modules(); track secId(sec)) {
+          <div class="nav-group" [class.collapsed]="isSecCollapsed(secId(sec))">
+            <button type="button" class="nav-section" (click)="toggleSec(secId(sec))">
+              <span>{{ sec.title }}</span><span class="chev">▼</span>
+            </button>
+            <div class="nav-group-body">
+              @for (it of sec.items; track it.id) {
+                @if (it.screen) {
+                  <button
+                    type="button"
+                    class="nav-item"
+                    [class.sub]="it.sub"
+                    [class.active]="activeScreenKey() === it.screen"
+                    (click)="openScreen(it.screen!)"
+                  >{{ it.label }}</button>
+                }
+              }
+            </div>
+          </div>
+        }
+        <div class="nav-group" [class.collapsed]="isSecCollapsed('__tools')">
+          <button type="button" class="nav-section" (click)="toggleSec('__tools')">
+            <span>Herramientas</span><span class="chev">▼</span>
+          </button>
+          <div class="nav-group-body">
+            <button type="button" class="nav-item" [class.active]="activeScreenKey() === '__procs'" (click)="openProcesses()">Procesos</button>
+          </div>
+        </div>
+      </nav>
+
+      <main class="main">
+        @if (procs(); as p) {
+          <div class="screen-head">
+            <div class="head-title"><h2>Procesos</h2></div>
+            <p-tag severity="contrast" value="handlers: {{ (p.handlers || []).length }}" />
+          </div>
+          <div class="proc-list">
+            @for (it of p.items || []; track it.key) {
+              <div class="proc-row">
+                <div><b>{{ it.title || it.key }}</b><div class="proc-sub">{{ it.key }} · handler: {{ it.handler || '—' }}</div></div>
+                <p-button label="Ejecutar" severity="secondary" [outlined]="true" (onClick)="runProcess(it)" />
+              </div>
+            }
+          </div>
+          <pre class="proc-out">{{ procOut() }}</pre>
+        } @else if (loading()) {
+          <div class="empty">Cargando…</div>
+        } @else if (screen(); as doc) {
+          <div class="screen-head">
+            <div class="head-title">
+              <h2>{{ doc.title }}</h2>
+              <p-tag severity="contrast" value="layout: {{ doc.layout || '—' }}" />
+            </div>
+            @if (isListScreen(doc)) {
+              <div class="toolbar">
+                <input pInputText class="search" placeholder="Buscar…" [ngModel]="search()" (ngModelChange)="search.set($event)" />
+                @if (hasTb('add')) {
+                  <p-button label="Nuevo" icon="pi pi-plus" (onClick)="openNew()" />
+                }
+                @if (hasTb('edit')) {
+                  <p-button label="Editar" icon="pi pi-pencil" severity="secondary" [outlined]="true" [disabled]="!selected()" (onClick)="openEdit()" />
+                }
+                @if (hasTb('delete')) {
+                  <p-button label="Eliminar" icon="pi pi-trash" severity="danger" [outlined]="true" [disabled]="!selected()" (onClick)="deleteSelected()" />
+                }
+                @if (hasTb('print')) {
+                  <p-button label="Imprimir" icon="pi pi-print" severity="secondary" [outlined]="true" (onClick)="printList()" />
+                }
+                @if (hasTb('pdf')) {
+                  <p-button label="PDF" icon="pi pi-file-pdf" severity="secondary" [outlined]="true" (onClick)="printList()" />
+                }
+                @if (hasTb('excel')) {
+                  <p-button label="Excel" icon="pi pi-file-excel" severity="secondary" [outlined]="true" (onClick)="exportExcel()" />
+                }
+                @if (hasTb('refresh')) {
+                  <p-button label="Refrescar" icon="pi pi-refresh" severity="secondary" [outlined]="true" (onClick)="openScreen(doc.id)" />
+                }
+                <span class="rowcount">{{ visibleRows().length }} / {{ rows().length }} filas</span>
+              </div>
+            }
+          </div>
+
+          @if (notice(); as n) {
+            <div class="notice">{{ n }}</div>
+          }
+
+          @if (isFormScreen(doc)) {
+            <div class="form-layout">
+              <aside class="form-nav">
+                <div class="form-nav-title">Registros</div>
+                @for (r of rows(); track $index) {
+                  <button type="button" class="form-nav-item" [class.active]="$index === formIdx() && !formNew()" (click)="selectFormRow($index)">
+                    {{ (r[keyFieldOf(doc)] ?? '') + (r.name ? ' · ' + r.name : '') }}
+                  </button>
+                }
+              </aside>
+              <div class="form-main">
+                <div class="toolbar" style="padding:8px 12px">
+                  @if (hasTb('add')) { <p-button label="Nuevo" icon="pi pi-plus" (onClick)="newFormRow()" /> }
+                  <p-button label="Guardar" icon="pi pi-check" (onClick)="saveForm()" />
+                  @if (hasTb('delete')) { <p-button label="Eliminar" severity="danger" [outlined]="true" [disabled]="formNew()" (onClick)="delForm()" /> }
+                  @if (hasTb('refresh')) { <p-button label="Refrescar" severity="secondary" [outlined]="true" (onClick)="openScreen(doc.id)" /> }
+                  <span class="rowcount">{{ formNew() ? 'Nuevo' : ((rows().length ? formIdx() + 1 : 0) + ' / ' + rows().length) }}</span>
+                </div>
+                <div class="form-tabs">
+                  @for (t of formTabs(); track t.id) {
+                    <button type="button" class="form-tab" [class.active]="formTab() === t.id" (click)="formTab.set(t.id)">{{ t.label || t.id }}</button>
+                  }
+                </div>
+                <div class="form form-body">
+                  @for (f of formFieldsVisible(); track f.id) {
+                    <div class="field" [class.chk]="f.type === 'checkbox'">
+                      <label>{{ f.label }}{{ f.required ? ' *' : '' }}</label>
+                      @if (f.type === 'checkbox') {
+                        <p-checkbox [binary]="true" [ngModel]="!!formDraft[f.id]" (ngModelChange)="setFormField(f.id, $event)" />
+                      } @else if (f.type === 'select') {
+                        <p-select [options]="optList(f.options)" [ngModel]="formDraft[f.id]" (onChange)="setFormField(f.id, $event.value)" />
+                      } @else if (f.type === 'lookup') {
+                        <p-select [options]="lookupOpts(f.lookup)" [ngModel]="formDraft[f.id]" (onChange)="setFormField(f.id, $event.value)" />
+                      } @else if (f.type === 'money' || f.format === 'money') {
+                        <p-inputnumber [ngModel]="formDraft[f.id]" (ngModelChange)="setFormField(f.id, $event)" mode="decimal" [minFractionDigits]="2" />
+                      } @else {
+                        <input pInputText [ngModel]="formDraft[f.id] ?? ''" (ngModelChange)="setFormField(f.id, $event)" [readonly]="!formNew() && keyFieldOf(doc) === f.id" />
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
+            </div>
+          } @else if (isMasterDetail(doc)) {
+            <div class="md-layout">
+              <section class="md-master">
+                <div class="md-head">
+                  <b>Maestro</b>
+                  <div class="toolbar">
+                    @if (hasTb('add')) { <p-button label="Nuevo" icon="pi pi-plus" (onClick)="openNew('master')" /> }
+                    @if (hasTb('edit')) { <p-button label="Editar" [outlined]="true" [disabled]="!selected()" (onClick)="openEdit()" /> }
+                    @if (hasTb('delete')) { <p-button label="Eliminar" severity="danger" [outlined]="true" [disabled]="!selected()" (onClick)="deleteSelected()" /> }
+                    @if (hasTb('refresh')) { <p-button label="Refrescar" [outlined]="true" severity="secondary" (onClick)="openScreen(doc.id)" /> }
+                    <input pInputText class="search" placeholder="Buscar…" [ngModel]="search()" (ngModelChange)="search.set($event)" />
+                  </div>
+                </div>
+                <p-table [value]="visibleRows()" selectionMode="single" [selection]="selected()" (selectionChange)="selected.set($event); selectedDetail.set(null)" [dataKey]="keyFieldOf(doc)" (onRowDblClick)="openEdit($any($event).data, 'master')" [scrollable]="true" scrollHeight="28vh">
+                  <ng-template #header><tr>@for (c of cols(); track c.id) { <th>{{ c.label }}</th> }</tr></ng-template>
+                  <ng-template #body let-row><tr [pSelectableRow]="row">@for (c of cols(); track c.id) { <td>{{ fmt(row[c.id], c) }}</td> }</tr></ng-template>
+                </p-table>
+              </section>
+              <section class="md-detail">
+                <div class="md-head">
+                  <b>{{ $any(doc).detail?.title || 'Detalle' }}</b>
+                  <div class="toolbar">
+                    <p-button label="Línea" icon="pi pi-plus" [disabled]="!selected()" (onClick)="openNew('detail')" />
+                    <p-button label="Editar" [outlined]="true" [disabled]="!selectedDetail()" (onClick)="openEditDetail()" />
+                    <p-button label="Eliminar" severity="danger" [outlined]="true" [disabled]="!selectedDetail()" (onClick)="deleteDetail()" />
+                  </div>
+                </div>
+                <p-table [value]="detailVisible()" selectionMode="single" [selection]="selectedDetail()" (selectionChange)="selectedDetail.set($event)" [dataKey]="$any(doc).detail?.keyField || 'code'" (onRowDblClick)="openEditDetail($any($event).data)" [scrollable]="true" scrollHeight="28vh">
+                  <ng-template #header><tr>@for (c of detailCols(); track c.id) { <th>{{ c.label }}</th> }</tr></ng-template>
+                  <ng-template #body let-row><tr [pSelectableRow]="row">@for (c of detailCols(); track c.id) { <td>{{ fmt(row[c.id], c) }}</td> }</tr></ng-template>
+                </p-table>
+              </section>
+            </div>
+          } @else if (isListScreen(doc)) {
+            @if (filterCols().length) {
+              <div class="list-filters">
+                @for (c of filterCols(); track c.id) {
+                  <label class="filter-chip">{{ c.label }}
+                    <select [ngModel]="colFilters()[c.id] || ''" (ngModelChange)="setColFilter(c.id, $event)">
+                      <option value="">(todos)</option>
+                      @for (o of c.options || []; track o) {
+                        <option [value]="o">{{ o }}</option>
+                      }
+                    </select>
+                  </label>
+                }
+                <button type="button" class="btn" (click)="clearListFilters()">Limpiar filtros</button>
+              </div>
+            }
+            <p-table
+              [value]="visibleRows()"
+              [rows]="pageSize"
+              [rowsPerPageOptions]="rowsPerPageOptions"
+              [paginator]="true"
+              [sortMode]="'single'"
+              [scrollable]="true"
+              scrollHeight="flex"
+              selectionMode="single"
+              [selection]="selected()"
+              (selectionChange)="selected.set($event)"
+              [dataKey]="keyFieldOf(doc)"
+              (onRowDblClick)="hasTb('edit') && openEdit($any($event).data)"
+              currentPageReportTemplate="{first}–{last} de {totalRecords}"
+              [showCurrentPageReport]="true"
+            >
+              <ng-template #header>
+                <tr>
+                  @for (c of cols(); track c.id) {
+                    <th
+                      [pSortableColumn]="c.id"
+                      [class.right]="c.align === 'right' || c.format === 'money' || c.type === 'money'"
+                    >
+                      {{ c.label }}
+                      <p-sortIcon [field]="c.id" />
+                    </th>
+                  }
+                </tr>
+              </ng-template>
+              <ng-template #body let-row>
+                <tr [pSelectableRow]="row">
+                  @for (c of cols(); track c.id) {
+                    <td [class.right]="c.align === 'right' || c.format === 'money' || c.type === 'money'">{{ fmt(row[c.id], c) }}</td>
+                  }
+                </tr>
+              </ng-template>
+              <ng-template #emptymessage>
+                <tr><td [attr.colspan]="cols().length || 1" class="empty-cell">Sin registros con los filtros actuales</td></tr>
+              </ng-template>
+            </p-table>
+          } @else {
+            <div class="empty">
+              Layout <b>{{ doc.layout || 'especial' }}</b>: lista, form y master-detail cubiertos en web 100%.
+              Dashboard, calendar, wizard y designers quedan en el shell HTTP FWH — ver docs/PROPUESTA y SUSTENTO.
+            </div>
+          }
+        } @else {
+          <div class="empty">Selecciona un módulo.</div>
+        }
+      </main>
+    </div>
+  </div>
+}
+
+@if (edit(); as e) {
+  <p-dialog
+    [visible]="true"
+    [modal]="true"
+    [header]="e.isNew ? 'Nuevo registro' : 'Editar ' + (e.row[editScope === 'detail' ? ($any(screen())?.detail?.keyField || 'code') : keyFieldOf(screen())] ?? '')"
+    [style]="{ width: '36rem' }"
+    (onHide)="closeEdit()"
+  >
+    <div class="form">
+      @for (c of (editScope === 'detail' ? detailCols() : cols()); track c.id) {
+        <div class="field" [class.chk]="c.type === 'checkbox'">
+          <label>{{ c.label }}</label>
+          @if (c.type === 'checkbox') {
+            <p-checkbox
+              [binary]="true"
+              [ngModel]="!!e.row[c.id]"
+              (ngModelChange)="setField(c.id, $event)"
+            />
+          } @else if (c.type === 'select') {
+            <p-select
+              [options]="(c.options ?? []).map((o) => ({ label: o, value: o }))"
+              [ngModel]="e.row[c.id]"
+              (onChange)="setField(c.id, $event.value)"
+            />
+          } @else if (c.type === 'money' || c.format === 'money') {
+            <p-inputnumber
+              [ngModel]="e.row[c.id]"
+              (ngModelChange)="setField(c.id, $event)"
+              mode="decimal"
+              [minFractionDigits]="2"
+              [maxFractionDigits]="2"
+            />
+          } @else {
+            <input
+              pInputText
+              [ngModel]="e.row[c.id] ?? ''"
+              (ngModelChange)="setField(c.id, $event)"
+              [readonly]="!e.isNew && keyFieldOf(screen()) === c.id"
+            />
+          }
+        </div>
+      }
+    </div>
+    <ng-template #footer>
+      <p-button label="Cancelar" severity="secondary" (onClick)="closeEdit()" />
+      <p-button label="Guardar" icon="pi pi-check" (onClick)="saveEdit()" />
+    </ng-template>
+  </p-dialog>
+}
