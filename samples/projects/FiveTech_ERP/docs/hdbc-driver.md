@@ -84,7 +84,10 @@ exe was actually built with `HB_WITH_HDBC`.
   dependency at all) — review it, then run it yourself, e.g.
   `curl -b cookies.txt http://127.0.0.1:2222/api/db/schema-sql > schema.sql && mysql -u ... < schema.sql`.
   RDDHDBC's own index-metadata table is **not** included — provision it per
-  RDDHDBC's docs.
+  RDDHDBC's docs. Calling this also writes each dataset's `<name>.map.json`
+  next to `./data` if it doesn't exist yet (same file `dbfcdx` relies on) —
+  `ErpDbReadRows`/`ErpDbApply` need it to know the column<->field mapping
+  once you actually switch `driver` to `"hdbc"`.
 - **Record locking (`RLock`) is process-local**, not database-wide — it
   correctly serializes the concurrent threads of a *single*
   `FiveTech_ERP.exe`, the model this sample already uses, but does not

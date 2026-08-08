@@ -674,6 +674,12 @@ function ErpDbHdbcSchemaSql()
       aMap := ErpDbLoadMap( cBase )
       if Empty( aMap )
          aMap := ErpDbInferSchema( aRows )
+         if ! Empty( aMap )
+            // Persist it now — ErpDbReadRows()/ErpDbApply() need this same
+            // <name>.map.json (column<->field mapping) once "hdbc" is
+            // selected as the driver, same file dbfcdx already relies on.
+            ErpDbSaveMap( cBase, aMap )
+         endif
       endif
       if Empty( aMap )
          loop
