@@ -6,6 +6,19 @@
 third-party Harbour RDD (by Manu Expósito) that maps standard xBase RDD
 calls onto MariaDB.
 
+## Heads up: this touches a generated file
+
+The FWH shell's own built-in "Edit app → Database" panel
+(`www/dashboard.html`) already has a driver dropdown + host/port/dataPath/
+user/password fields (shared with `openads`, which needs the same shape) —
+it just didn't list `hdbc` as an option. Added it here (`<option
+value="hdbc">` + the same visibility toggle `openads` already uses). Per
+this sample's own README warning, `www/dashboard.html` is normally
+regenerated from FWH's `login.prg` by `sync_meta.bat` — this diff only
+exists in the copy in this PR; **please mirror the same two small edits in
+the FWH source** so they survive the next sync (search for
+`app-db-driver` in both files).
+
 ## What this repo ships, and what it does not
 
 This repo ships only:

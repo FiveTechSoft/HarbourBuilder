@@ -2483,6 +2483,7 @@
                 <option value="json">JSON files (meta/data)</option>
                 <option value="dbfcdx">DbfCdx (local .dbf/.cdx)</option>
                 <option value="openads">OpenADS (client-server)</option>
+                <option value="hdbc">hdbc (RDDHDBC / MariaDB)</option>
               </select>
             </div>
           </div>
@@ -6714,7 +6715,7 @@ function updateDbSectionUi() {
   var drv = (document.getElementById("app-db-driver") || {}).value || "json";
   var oa = document.getElementById("app-db-openads");
   var dx = document.getElementById("app-db-dbfcdx");
-  if (oa) oa.style.display = (drv === "openads") ? "block" : "none";
+  if (oa) oa.style.display = (drv === "openads" || drv === "hdbc") ? "block" : "none";
   if (dx) dx.style.display = (drv === "dbfcdx") ? "block" : "none";
 }
 
