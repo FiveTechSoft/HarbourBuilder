@@ -67,7 +67,11 @@ Then set `meta/app.json -> "database"` either directly, or from
 reads the current config via `GET /api/meta?key=app`, lets you edit
 driver/host/port/dataPath/user/password, and saves it back with
 `POST /api/meta` (same admin-only write path the runtime form designer
-already uses):
+already uses). Reachable from a browser, from the web branch's `/portal/`
+(companion PR #24), or, on the "PC" branch, by starting the exe with
+`ZWEB_FRONT=db-config.html` — `Form1.prg`'s `ZWEB_FRONT` (see PR #24)
+already accepts a bare `.html` file, not just a bundle folder, so this
+loads directly inside the embedded WebView2:
 
 ```json
 "database": {

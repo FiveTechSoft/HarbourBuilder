@@ -55,6 +55,7 @@ return nil
 METHOD StartServer() CLASS TForm1
 
    local cMsg := ""
+   local cArg
 
    if ! ErpHttpStart( ::nPort, @cMsg )
       ::SetWinTitle( "HTTP failed: " + cMsg )
@@ -64,6 +65,19 @@ METHOD StartServer() CLASS TForm1
    endif
 
    ::cUrl := "http://127.0.0.1:" + hb_ntos( ::nPort ) + "/"
+   // Rama PC parametrizable: ZWEB_FRONT=<montura> FiveTech_ERP.exe carga ese
+   // bundle dentro del WebView2 (mismo contrato que el navegador). Acepta
+   // tanto una carpeta con index.html (ZWEB_FRONT=web-vainilla, =portal)
+   // como un archivo suelto ya terminado en .html (ZWEB_FRONT=db-config.html).
+   // Sin la variable, comportamiento 100% idéntico al de hoy.
+   cArg := AllTrim( hb_GetEnv( "ZWEB_FRONT" ) )
+   if ! Empty( cArg )
+      if Lower( Right( cArg, 5 ) ) == ".html"
+         ::cUrl += cArg
+      else
+         ::cUrl += cArg + "/index.html"
+      endif
+   endif
    ::SetWinTitle( ::cUrl + "   ·   meta: " + ErpMetaRoot() )
    if ::oWeb != nil
       ::oWeb:Navigate( ::cUrl )
