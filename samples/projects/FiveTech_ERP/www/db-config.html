@@ -141,11 +141,17 @@ function renderStatus(status) {
 
 var appDoc = null; // full app.json, needed to PATCH just "database" back
 
+function requireLogin() {
+  document.getElementById('form').style.display = 'none';
+  msgEl.innerHTML = 'No hay sesión activa. <a href="/login">Inicia sesión</a> y vuelve a esta página.';
+  msgEl.className = 'msg err';
+}
+
 function load() {
   fetch('/api/meta?key=app', { credentials: 'same-origin' })
     .then(function (r) { return r.json(); })
     .then(function (j) {
-      if (!j.ok) { showMsg('No se pudo leer meta/app.json — ¿sesión iniciada?', false); return; }
+      if (!j.ok) { requireLogin(); return; }
       appDoc = j.doc || {};
       fillForm(appDoc.database);
     })
@@ -153,13 +159,16 @@ function load() {
 
   fetch('/api/db/status', { credentials: 'same-origin' })
     .then(function (r) { return r.json(); })
-    .then(renderStatus)
+    .then(function (j) {
+      if (j && j.ok === false) { requireLogin(); return; }
+      renderStatus(j);
+    })
     .catch(function () { renderStatus(null); });
 }
 
 document.getElementById('form').addEventListener('submit', function (ev) {
   ev.preventDefault();
-  if (!appDoc) { showMsg('Todavía no cargó meta/app.json.', false); return; }
+  if (!appDoc) { requireLogin(); return; }
   var db = {
     driver: document.getElementById('driver').value,
     host: document.getElementById('host').value,
