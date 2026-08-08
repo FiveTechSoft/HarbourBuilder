@@ -55,7 +55,12 @@ compile, compiles+links your connector, and links `hdbctools.lib` (plus
 anything you list in `HDBC_EXTRA_LIBS`). Missing either one → the script
 prints an `HDBC: not configured` note and builds exactly as before.
 
-Then, in `meta/app.json`:
+Then set `meta/app.json -> "database"` either directly, or from
+`http://<host>:2222/db-config.html` (any admin session) — a small page that
+reads the current config via `GET /api/meta?key=app`, lets you edit
+driver/host/port/dataPath/user/password, and saves it back with
+`POST /api/meta` (same admin-only write path the runtime form designer
+already uses):
 
 ```json
 "database": {
@@ -68,8 +73,8 @@ Then, in `meta/app.json`:
 }
 ```
 
-Check `GET /api/db/status` — `hdbcAvailable` reflects whether the running
-exe was actually built with `HB_WITH_HDBC`.
+Check `GET /api/db/status` (also shown on `db-config.html`) — `hdbcAvailable`
+reflects whether the running exe was actually built with `HB_WITH_HDBC`.
 
 ## Known limits (verify before relying on this in production)
 

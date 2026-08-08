@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FiveTech ERP — Base de datos</title>
+<style>
+  :root { --bg:#0e1116; --bg2:#161b23; --line:#2a3342; --txt:#e6ebf2; --txt2:#8b98ab; --acc:#3b82f6; --ok:#22c55e; --err:#ef4444; }
+  [data-theme="light"] { --bg:#f1f5f9; --bg2:#fff; --line:#cbd5e1; --txt:#0f172a; --txt2:#64748b; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--txt); font:15px/1.5 "Segoe UI", system-ui, sans-serif; min-height:100vh; }
+  .wrap { width:min(720px, 94vw); margin:0 auto; padding:36px 0 56px; }
+  h1 { font-size:22px; font-weight:700; }
+  .sub { color:var(--txt2); margin:8px 0 22px; max-width:54em; }
+  .card { background:var(--bg2); border:1px solid var(--line); border-radius:14px; padding:20px 22px; margin-bottom:16px; }
+  label { display:block; font-size:12.5px; color:var(--txt2); margin:12px 0 4px; }
+  label:first-child { margin-top:0; }
+  select, input { width:100%; background:var(--bg); color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:9px 11px; font-size:14px; }
+  select:focus, input:focus { outline:none; border-color:var(--acc); }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .btn { display:inline-block; background:var(--acc); color:#fff; border:0; border-radius:999px; padding:9px 18px; font-weight:600; font-size:13px; cursor:pointer; margin-top:16px; }
+  .btn-ghost { background:transparent; color:var(--acc); border:1px solid var(--line); text-decoration:none; }
+  .msg { margin-top:12px; font-size:13px; }
+  .msg.ok { color:var(--ok); } .msg.err { color:var(--err); }
+  .kv { display:grid; grid-template-columns:auto 1fr; gap:4px 12px; font-size:13px; color:var(--txt2); }
+  .kv b { color:var(--txt); font-weight:600; }
+  .fab { position:fixed; top:14px; right:14px; background:var(--bg2); color:var(--txt); border:1px solid var(--line); border-radius:999px; padding:6px 14px; cursor:pointer; }
+  code { background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:1px 7px; font-size:12px; }
+  .hint { color:var(--txt2); font-size:12.5px; margin-top:6px; }
+</style>
+</head>
+<body>
+<button class="fab" type="button" onclick="toggleTheme()">Claro</button>
+<div class="wrap">
+  <h1>Base de datos</h1>
+  <p class="sub">
+    Elige de dónde lee y escribe FiveTech_ERP: JSON (por defecto), DBF local,
+    OpenADS remoto, o <b>hdbc</b> (RDDHDBC sobre MariaDB — solo disponible si
+    este exe fue compilado con soporte para eso; ver
+    <code>docs/hdbc-driver.md</code>).
+  </p>
+
+  <div class="card" id="status-card">
+    <div class="kv" id="status-kv"><b>Estado</b><span>cargando…</span></div>
+  </div>
+
+  <div class="card">
+    <form id="form">
+      <label for="driver">Driver</label>
+      <select id="driver" name="driver">
+        <option value="json">json (por defecto)</option>
+        <option value="dbfcdx">dbfcdx (DBF local)</option>
+        <option value="openads">openads (OpenADS remoto)</option>
+        <option value="hdbc">hdbc (RDDHDBC / MariaDB)</option>
+      </select>
+
+      <div class="row2">
+        <div>
+          <label for="host">Host</label>
+          <input id="host" name="host" placeholder="127.0.0.1">
+        </div>
+        <div>
+          <label for="port">Puerto</label>
+          <input id="port" name="port" type="number" placeholder="3307">
+        </div>
+      </div>
+
+      <label for="dataPath">Base de datos / dataPath</label>
+      <input id="dataPath" name="dataPath" placeholder="five_erp">
+      <p class="hint">openads: ruta del servidor. hdbc: nombre de la base MariaDB.</p>
+
+      <div class="row2">
+        <div>
+          <label for="user">Usuario</label>
+          <input id="user" name="user" autocomplete="off">
+        </div>
+        <div>
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="new-password">
+        </div>
+      </div>
+
+      <button class="btn" type="submit">Guardar</button>
+      <a class="btn btn-ghost" href="/api/db/schema-sql" target="_blank" style="margin-left:8px">Ver DDL (hdbc)</a>
+      <div id="msg" class="msg"></div>
+    </form>
+  </div>
+
+  <div class="card">
+    <p class="hint">
+      Guardar aquí escribe <code>meta/app.json → database</code> (mismo archivo
+      que usa <code>ErpDbConfig()</code>) — requiere sesión de administrador.
+      No reinicia el servidor: los datos ya cargados en memoria de una sesión
+      previa no cambian de driver hasta el próximo <code>ErpDbOpen()</code>.
+    </p>
+  </div>
+</div>
+<script>
+function applyTheme(t){
+  t = t === 'light' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', t);
+  try { localStorage.setItem('dw-theme', t); } catch (e) {}
+  var fab = document.querySelector('.fab');
+  if (fab) fab.textContent = t === 'dark' ? 'Claro' : 'Oscuro';
+}
+function toggleTheme(){ applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'); }
+applyTheme((function(){ try { return localStorage.getItem('dw-theme') || 'dark'; } catch(e){ return 'dark'; } })());
+
+var msgEl = document.getElementById('msg');
+function showMsg(text, ok) {
+  msgEl.textContent = text;
+  msgEl.className = 'msg ' + (ok ? 'ok' : 'err');
+}
+
+function fillForm(db) {
+  db = db || {};
+  document.getElementById('driver').value = db.driver || 'json';
+  document.getElementById('host').value = db.host || '';
+  document.getElementById('port').value = db.port || '';
+  document.getElementById('dataPath').value = db.dataPath || '';
+  document.getElementById('user').value = db.user || '';
+  document.getElementById('password').value = '';
+}
+
+function renderStatus(status) {
+  var kv = document.getElementById('status-kv');
+  if (!status) { kv.innerHTML = '<b>Estado</b><span>no disponible</span>'; return; }
+  var rows = [
+    ['Driver activo', status.driver],
+    ['Backend', status.backend || '-'],
+    ['Tablas (dbfcdx)', (status.tables || []).length],
+    ['OpenADS disponible', status.openadsAvailable ? 'sí' : 'no'],
+    ['hdbc disponible (build)', status.hdbcAvailable ? 'sí' : 'no'],
+    ['Último error', status.lastError || '-']
+  ];
+  if (status.remoteNote) rows.push(['Nota', status.remoteNote]);
+  kv.innerHTML = rows.map(function (r) {
+    return '<b>' + r[0] + '</b><span>' + String(r[1]) + '</span>';
+  }).join('');
+}
+
+var appDoc = null; // full app.json, needed to PATCH just "database" back
+
+function load() {
+  fetch('/api/meta?key=app', { credentials: 'same-origin' })
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      if (!j.ok) { showMsg('No se pudo leer meta/app.json — ¿sesión iniciada?', false); return; }
+      appDoc = j.doc || {};
+      fillForm(appDoc.database);
+    })
+    .catch(function (e) { showMsg('Error: ' + e, false); });
+
+  fetch('/api/db/status', { credentials: 'same-origin' })
+    .then(function (r) { return r.json(); })
+    .then(renderStatus)
+    .catch(function () { renderStatus(null); });
+}
+
+document.getElementById('form').addEventListener('submit', function (ev) {
+  ev.preventDefault();
+  if (!appDoc) { showMsg('Todavía no cargó meta/app.json.', false); return; }
+  var db = {
+    driver: document.getElementById('driver').value,
+    host: document.getElementById('host').value,
+    port: Number(document.getElementById('port').value) || 0,
+    dataPath: document.getElementById('dataPath').value,
+    user: document.getElementById('user').value,
+    password: document.getElementById('password').value
+  };
+  appDoc.database = db;
+  fetch('/api/meta', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key: 'app', doc: appDoc, writeFile: true })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      if (j.ok) { showMsg('Guardado. driver = ' + db.driver, true); load(); }
+      else { showMsg(j.msg || j.error || 'Error al guardar (¿sesión de administrador?)', false); }
+    })
+    .catch(function (e) { showMsg('Error: ' + e, false); });
+});
+
+load();
+</script>
+</body>
+</html>
