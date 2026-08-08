@@ -1,6 +1,27 @@
 HarbourBuilder - Cross-platform visual IDE for Harbour
 =======================================================
 
+2026-08-08
+
+  - feat(win): Tools > Editor Colors — font picker is now a combo box with the
+    system TrueType fonts (EnumFontFamiliesEx). The chosen font, size and the
+    9 syntax colors persist to hbbuilder.ini (FontName/FontSize/BgColor/
+    TextColor/KeywordColor/CommandColor/CommentColor/StringColor/PreProcColor/
+    NumberColor/SelBgColor) and are applied live to the code editor via the
+    new W32_EditorApplySettings, then re-applied on IDE startup. Dialog now
+    returns { font, size, 9 colors } on OK (NIL on cancel); color buttons are
+    seeded with the current colors instead of gray. Live preview in the dialog
+    updates font/size in real time (CBN_SELCHANGE/EN_CHANGE + CreateFont).
+  - fix(win): line-number margin turned white after applying editor settings —
+    STYLECLEARALL resets STYLE_LINENUMBER to a blank (white) style; it is now
+    re-applied explicitly (dark: 37,37,38 / light: 240,240,240), matching the
+    GTK backend pattern.
+  - feat(win): Editor Colors preset buttons (Dark/Light/Monokai/Solarized) now
+    apply their theme live to the color buttons and preview. Dark keeps the
+    existing colors untouched. Color buttons are owner-drawn: they show the
+    actual color swatch with the #RRGGBB text in contrast, and the preview
+    shows the selected background/text colors.
+
 2026-06-27
 
   - fix(win,linux): user-project build links hix_runtime.prg + hix_template.prg
