@@ -453,7 +453,7 @@ export default function App() {
               <div className="tool-row">
                 <span><b>3 · Web 100%</b> — elija la vista (mismos datos)</span>
                 <nav className="tool-links">
-                  <a href="/web-vanilla/index.html" onClick={(e) => onMountClick(e, '/web-vanilla/index.html')}>Vanilla</a>
+                  <a href="/web-vainilla/index.html" onClick={(e) => onMountClick(e, '/web-vainilla/index.html')}>Vainilla</a>
                   <a href="/web-angular/index.html" onClick={(e) => onMountClick(e, '/web-angular/index.html')}>Angular</a>
                   <a href="/web-react/index.html" onClick={(e) => onMountClick(e, '/web-react/index.html')}>React</a>
                   <a href="/web-vue/index.html" onClick={(e) => onMountClick(e, '/web-vue/index.html')}>Vue</a>

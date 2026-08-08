@@ -34,7 +34,7 @@ verificados.
 
 **Regla de oro:** el frontend es un parámetro del despliegue, no del código.
 Lo demostramos consumiendo el mismo contrato con **cuatro frontends distintos**
-sin adaptadores: vanilla (HTML/CSS/JS puro), **Angular 21 + PrimeNG**, React 19
+sin adaptadores: vainilla (HTML/CSS/JS puro), **Angular 21 + PrimeNG**, React 19
 y Vue 3 — login, multi-empresa/multi-app, grilla CRUD desde `screen.*`/`data.*`
 y ejecución de `process.*`.
 
@@ -62,7 +62,7 @@ Un usuario en WebView2 y otro en navegador no se distinguen del lado Harbour.
 
 ## 4. Lo que entregamos (para revisión / merge si lo aprueban)
 
-1. **Sample `FiveTech_ERP_Web`**: monturas `web-vanilla|angular|react|vue`
+1. **Sample `FiveTech_ERP_Web`**: monturas `web-vainilla|angular|react|vue`
    servidas como estáticos del propio backend + `/portal/` (selector de
    frontends con asistente de activación por rama) + `INICIAR.bat`
    (menú de usuario final: rama web / PC / híbrida + frontend por defecto).

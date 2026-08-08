@@ -457,7 +457,7 @@ function fmt(v, c) {
         <div class="tool-row">
           <span><b>3 · Web 100%</b> — elija la vista (mismos datos)</span>
           <nav class="tool-links">
-            <a href="/web-vanilla/index.html" @click="onMountClick($event, '/web-vanilla/index.html')">Vanilla</a>
+            <a href="/web-vainilla/index.html" @click="onMountClick($event, '/web-vainilla/index.html')">Vainilla</a>
             <a href="/web-angular/index.html" @click="onMountClick($event, '/web-angular/index.html')">Angular</a>
             <a href="/web-react/index.html" @click="onMountClick($event, '/web-react/index.html')">React</a>
             <a href="/web-vue/index.html" @click="onMountClick($event, '/web-vue/index.html')">Vue</a>

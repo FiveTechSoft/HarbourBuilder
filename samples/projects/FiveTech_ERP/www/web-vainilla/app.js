@@ -1,4 +1,4 @@
-// Rama 100% web — frontend vanilla (sin framework)
+// Rama 100% web — frontend vainilla (sin framework)
 // Consume el mismo contrato HTTP que el WebView de escritorio:
 //   POST /api/login · GET /api/context · GET /api/meta · GET/POST /api/dataset · POST /api/cmd
 // La sesión viaja en la cookie HttpOnly DWSESS que fija el servidor (nunca en JS).
@@ -87,7 +87,7 @@ $('btn-logout').addEventListener('click', async () => {
 // ---------------------------------------------------------------- shell
 async function enterApp() {
   showApp();
-  $('rama-tag').textContent = 'rama ' + (window.__RAMA__ ? window.__RAMA__.branch : 'web') + ' · vanilla';
+  $('rama-tag').textContent = 'rama ' + (window.__RAMA__ ? window.__RAMA__.branch : 'web') + ' · vainilla';
   $('user-chip').textContent = ctx.company + ' · ' + (ctx.appLabel || ctx.app) + ' · ' + (ctx.isAdmin ? 'admin' : 'usuario');
   const mApp = await api.meta('app');
   if (mApp.ok && mApp.doc.version) $('user-chip').textContent += ' · v' + mApp.doc.version;

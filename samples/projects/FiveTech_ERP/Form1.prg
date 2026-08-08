@@ -67,7 +67,7 @@ METHOD StartServer() CLASS TForm1
    ::cUrl := "http://127.0.0.1:" + hb_ntos( ::nPort ) + "/"
    // Rama PC parametrizable: ZWEB_FRONT=<montura> FiveTech_ERP_local.exe
    // carga ese bundle dentro del WebView2 (mismo contrato que el navegador).
-   // Ej.: set ZWEB_FRONT=web-vanilla
+   // Ej.: set ZWEB_FRONT=web-vainilla
    cArg := AllTrim( hb_GetEnv( "ZWEB_FRONT" ) )
    if ! Empty( cArg )
       ::cUrl += cArg + "/index.html"

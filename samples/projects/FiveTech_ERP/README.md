@@ -98,10 +98,10 @@ branches of the **same build** — nothing above changes for the default
 |---|---|---|
 | **PC** (native) | WebView2 inside the exe | `ZWEB_FRONT=<bundle>` makes `Form1.prg` navigate its embedded WebView2 to that bundle instead of the FWH shell. Unset → identical to today. |
 | **Hybrid** (native) | WebView2 per module, alongside native screens | Same URLs (`/web-*/`), module by module, from any native shell (pattern used in production by Zerus's `FW_DASHBOARD`). |
-| **Web** (ours) | Any real browser | `http://<host>:2222/web-vanilla/`, `/web-angular/`, `/web-react/`, `/web-vue/`, or `/portal/` to pick one. Same origin, same `DWSESS` cookie, no CORS. |
+| **Web** (ours) | Any real browser | `http://<host>:2222/web-vainilla/`, `/web-angular/`, `/web-react/`, `/web-vue/`, or `/portal/` to pick one. Same origin, same `DWSESS` cookie, no CORS. |
 
 ```
-frontends/     source of the 4 bundles (vanilla / Angular 21+PrimeNG / React / Vue)
+frontends/     source of the 4 bundles (vainilla / Angular 21+PrimeNG / React / Vue)
 www/web-*      built static output served by erp_http.prg (same as any other www/ asset)
 www/portal/    branch picker (login → choose frontend)
 scripts/       api-check.mjs · concurrency*.py · evidence.cjs (reproducible checks)
@@ -128,5 +128,5 @@ Rebuilding a frontend after editing its source:
 cd frontends\react  && npm install && npm run build
 cd frontends\vue    && npm install && npm run build
 cd frontends\web-angular && npm install && npx ng build --configuration=production
-:: copy each dist/ output into www\web-<name>\ (vanilla needs no build step)
+:: copy each dist/ output into www\web-<name>\ (vainilla needs no build step)
 ```

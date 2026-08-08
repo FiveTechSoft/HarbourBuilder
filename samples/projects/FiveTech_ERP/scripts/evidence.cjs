@@ -9,7 +9,7 @@ const OUT = path.join(__dirname, '..', 'docs', 'evidencia');
 
 const targets = [
   {
-    name: 'web-vanilla',
+    name: 'web-vainilla',
     user: '#login-user', pass: '#login-pass', submit: '#login-form button[type=submit]',
     appSelect: { kind: 'select', sel: '#sel-app' },
   },

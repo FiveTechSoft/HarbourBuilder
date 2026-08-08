@@ -25,7 +25,7 @@ Esta propuesta:
    el cliente.
 2. **Regala** un fix verificado de concurrencia en `POST /api/dataset`
    (race condition con pérdida de escrituras bajo clientes simultáneos).
-3. **Demuestra** con 4 frontends reales (vanilla, Angular 21+PrimeNG, React,
+3. **Demuestra** con 4 frontends reales (vainilla, Angular 21+PrimeNG, React,
    Vue) que el meta JSON de FWH DesktopWeb se renderiza fuera del WebView,
    con CRUD completo, multi-empresa y procesos.
 4. **No toca** el shell FWH, el contrato HTTP, los scripts de build ni el
@@ -63,7 +63,7 @@ declaración explícita de qué contenedor (WebView vs navegador) usa cada rama.
    Rama PC          Rama híbrida   Rama 100% web   Rama 100% web     Shell FWH
    WebView2 del     WebView2 por   navegador PC    navegador móvil   original
    exe (ZWEB_FRONT) módulo dentro  /portal/ →      (mismo URL)       /login
-                    del shell      web-vanilla |
+                    del shell      web-vainilla |
                     nativo         web-angular |
                     (FW_DASHBOARD) web-react   |
                                                web-vue
@@ -157,7 +157,7 @@ consumen sin adaptadores.
 | ERP legacy en modernización | ★ | ★★★ recomendada | ★★ para módulos nuevos |
 | SaaS multi-tenant | ✗ (scaling por puesto) | ✗ | ★★★ recomendada |
 | Usuarios remotos / móviles | ✗ | ✗ | ★★★ (o Android nativo del IDE) |
-| Sin equipo de frontend propio | ★★★ (HTML FWH listo) | ★★ | ★★ (vanilla listo) |
+| Sin equipo de frontend propio | ★★★ (HTML FWH listo) | ★★ | ★★ (vainilla listo) |
 | Operación intensiva de escritorio | ★★★ | ★★★ | ★★ |
 | Actualización centralizada | ★ (por exe) | ★★ | ★★★ |
 | Aislamiento / offline por puesto | ★★★ | ★★★ | ★ |
@@ -175,7 +175,7 @@ conviven y comparten backend y datos.)
 | 10 sesiones concurrentes (lectura) | 10/10, login 175 ms | `python scripts/concurrency.py 10` |
 | 10 sesiones × 3 filas CRUD concurrentes (con fix) | 10/10, integridad 12→12 | `python scripts/concurrency-write.py 10 3` |
 | 4 frontends: login → multi-app → grilla CRUD | 4/4, 697–784 ms | `node scripts/evidence.cjs` (Playwright) |
-| Rama PC con SPA dentro del WebView2 | captura OK | `ZWEB_FRONT=web-vanilla` + screenshot |
+| Rama PC con SPA dentro del WebView2 | captura OK | `ZWEB_FRONT=web-vainilla` + screenshot |
 | UTF-8/tilde/€ intactos por el canal | capturas | `docs/evidencia/*` |
 
 **Hallazgo incluido (regalo #1):** sin el fix, el estrés de escritura da
@@ -193,7 +193,7 @@ comportamiento por defecto.
 
 ## 7. Qué se entrega exactamente (para revisión)
 
-1. `samples/projects/FiveTech_ERP_Web/` — monturas `web-vanilla|angular|react|
+1. `samples/projects/FiveTech_ERP_Web/` — monturas `web-vainilla|angular|react|
    vue` + `portal/` + este documento + guiones de evidencia.
 2. Parche a `Form1.prg`: `ZWEB_FRONT` (3 líneas; sin la variable el exe es
    byte-a-byte el de hoy en comportamiento).

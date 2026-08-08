@@ -7,7 +7,7 @@ HarbourBuilder (repo, sin modificar) · **Máquina:** Windows x64 dev.
 
 | # | Criterio "100% web" | Evidencia (reproducible) |
 |---|---|---|
-| 1 | La UI es 100% HTML/CSS/JS servida por HTTP; ningún control nativo en el cliente | 4 bundles independientes (vanilla, Angular 21+PrimeNG, React 19, Vue 3) renderizados en Chromium real; capturas `docs/evidencia/*-app.png` |
+| 1 | La UI es 100% HTML/CSS/JS servida por HTTP; ningún control nativo en el cliente | 4 bundles independientes (vainilla, Angular 21+PrimeNG, React 19, Vue 3) renderizados en Chromium real; capturas `docs/evidencia/*-app.png` |
 | 2 | Todo dato y toda acción viajan por HTTP JSON; el negocio no depende del contenedor | `node scripts/api-check.mjs` → 8/8 OK (login, contexto, meta, dataset, CRUD add→update→delete, logout) en ~104 ms |
 | 3 | La sesión y la seguridad viven en el servidor, no en el cliente | Cookie `DWSESS` HttpOnly+SameSite=Lax fija por el servidor; sin cookie → `"Not authenticated"` (api-check prueba 8); logout invalida token |
 | 4 | Multiples usuarios reales concurrentes | `python scripts/concurrency.py 10` → 10/10 sesiones OK, login mediana 175 ms, datos mediana 11 ms, 0 errores |
@@ -23,7 +23,7 @@ HarbourBuilder (repo, sin modificar) · **Máquina:** Windows x64 dev.
 ```
 api-check.mjs        8 pruebas OK · 104 ms totales
 concurrency.py 10    10/10 OK · login 174/175/177 ms · datos 5/11/13 ms
-evidence.cjs         vanilla 719 ms · angular 780 ms · react 731 ms · vue 742 ms — 0 fallos
+evidence.cjs         vainilla 719 ms · angular 780 ms · react 731 ms · vue 742 ms — 0 fallos
 ```
 
 ## Por qué esto valida la rama web del ecosistema FiveTech
