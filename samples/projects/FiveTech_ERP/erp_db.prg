@@ -1,11 +1,21 @@
 // erp_db.prg — selectable data layer for FiveTech_ERP
 // driver: json (default, meta/data/*.json) | dbfcdx (local <exedir>/data) |
-//         openads (remote OpenADS server via rddads tcp://host:port/dataPath)
+//         openads (remote OpenADS server via rddads tcp://host:port/dataPath) |
+//         hdbc (RDDHDBC over MariaDB — opt-in, see docs/hdbc-driver.md)
 // Config lives in meta/app.json -> "database" (saved by the UI via POST /api/meta).
 //--------------------------------------------------------------------
 
 REQUEST DBFCDX
 REQUEST ADS, ADSCDX
+
+// HDBC (RDDHDBC, a third-party RDD) is opt-in at COMPILE time: it is only
+// requested when the build defines HB_WITH_HDBC (see build_win64.bat and
+// docs/hdbc-driver.md). Without that define this REQUEST — and every branch
+// below guarded by #ifdef HB_WITH_HDBC — compiles out entirely, so a normal
+// build has no dependency on, and links nothing from, that RDD.
+#ifdef HB_WITH_HDBC
+REQUEST HDBC
+#endif
 
 // ads.ch constants (avoid the extra include path — same values as
 // C:\harbour\contrib\rddads\ads.ch and the OpenADS smoke tests)
@@ -14,6 +24,7 @@ REQUEST ADS, ADSCDX
 
 static s_mtxDb := hb_MutexCreate()
 static s_hAdsConn := 0
+static s_lHdbcConn := .F.
 static s_cDbErr := ""        // last data-layer error (diagnostics via /api/db/status)
 
 //--------------------------------------------------------------------
@@ -75,6 +86,17 @@ function ErpDbAdsAvailable()
 return File( hb_DirBase() + "ace64.dll" )
 
 //--------------------------------------------------------------------
+// .T. only when this exe was compiled with HB_WITH_HDBC (i.e. the builder
+// had their own licensed RDDHDBC/hdbctools.lib — see docs/hdbc-driver.md).
+// A build without it simply cannot select the hdbc driver.
+function ErpDbHdbcAvailable()
+#ifdef HB_WITH_HDBC
+   return .T.
+#else
+   return .F.
+#endif
+
+//--------------------------------------------------------------------
 // Lazy one-time remote connection; the handle stays in s_hAdsConn and is
 // reused by every open. Call with s_mtxDb held.
 static function ErpDbAdsConnect()
@@ -107,6 +129,38 @@ static function ErpDbAdsConnect()
 return .T.
 
 //--------------------------------------------------------------------
+// Lazy one-time HDBC (RDDHDBC) connection — opt-in, third-party.
+//
+// This file NEVER calls into, links, or ships any RDDHDBC/HDBC code: it
+// only exists when the build defines HB_WITH_HDBC (docs/hdbc-driver.md),
+// and even then all it does is call ErpDbHdbcUserConnect( hCfg ), a
+// function YOU supply in your own extra .prg (added to your own build,
+// never part of this repo) using your own licensed HDBC package. Contract:
+//   - hCfg is the "database" hash from app.json (host/port/user/password/
+//     dataPath, dataPath holding the DB name for this driver).
+//   - build a connection with your licensed package and register it with
+//     the RDD via ITS OWN public entry point (documented by RDDHDBC, not
+//     reproduced here) so a later "dbUseArea(...,"HDBC",...)" can use it.
+//   - return .T. once ready; .F. to fail the open cleanly.
+// A build that defines HB_WITH_HDBC without also linking a .prg that
+// implements ErpDbHdbcUserConnect() fails at LINK time (unresolved
+// reference) — intentional: half-configured HDBC support should not
+// silently degrade the way a missing OpenADS DLL does.
+static function ErpDbHdbcConnect()
+#ifdef HB_WITH_HDBC
+   if s_lHdbcConn
+      return .T.
+   endif
+   if ErpDbHdbcUserConnect( ErpDbConfig() )
+      s_lHdbcConn := .T.
+      return .T.
+   endif
+   return .F.
+#else
+   return .F.
+#endif
+
+//--------------------------------------------------------------------
 // Open <cName> (dataset base name) in a NEW workarea with the RDD that
 // matches the active driver. Returns the alias or "" on failure.
 // Call with s_mtxDb held and a trapping ErrorBlock installed.
@@ -121,6 +175,12 @@ static function ErpDbOpen( cName )
       endif
       cRDD  := "ADSCDX"
       cFile := cName              // relative to the server dataPath
+   elseif cDriver == "hdbc"
+      if ! ErpDbHdbcConnect()
+         return ""
+      endif
+      cRDD  := "HDBC"
+      cFile := cName              // table name (or the driver's own query syntax)
    else
       cRDD  := "DBFCDX"
       cFile := ErpDbDataDir() + cName + ".dbf"
@@ -763,6 +823,7 @@ function ErpDbStatus()
       "dbfDir"   => cDir, ;
       "tables"   => aTables, ;
       "openadsAvailable" => ErpDbAdsAvailable(), ;
+      "hdbcAvailable" => ErpDbHdbcAvailable(), ;
       "lastError" => s_cDbErr }
 
    if hCfg[ "driver" ] == "openads"
@@ -770,5 +831,9 @@ function ErpDbStatus()
       // accepted but only live in the server session cache (not durable);
       // update/delete of on-disk rows are rejected server-side
       hOut[ "remoteNote" ] := "OpenADS server: read ok; add is session-cached (not durable); update/delete of existing rows not supported"
+   elseif hCfg[ "driver" ] == "hdbc"
+      hOut[ "remoteNote" ] := iif( ErpDbHdbcAvailable(), ;
+         "RDDHDBC over MariaDB: third-party, licensed driver — see docs/hdbc-driver.md. Tables are NOT auto-created; provision the schema yourself.", ;
+         "hdbc driver selected but this exe was not built with HB_WITH_HDBC — see docs/hdbc-driver.md" )
    endif
 return hOut
