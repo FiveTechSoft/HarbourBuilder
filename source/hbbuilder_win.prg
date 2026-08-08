@@ -488,6 +488,7 @@ function Main()
    // === Window 4: Code Editor (background, right of inspector, full area) ===
    // Created FIRST so it appears BEHIND the form
    hCodeEditor := CodeEditorCreate( nEditorX, nEditorTop, nEditorW, nEditorH )
+   ApplyEditorSettings()   // apply persisted font/colors from hbbuilder.ini
    hMessagesPanel := MessagesPanelCreate( nEditorX, nBottomY - nMsgH, nEditorW, nMsgH )
    IDE_RegisterMessagesPanel( hMessagesPanel )
    MessagesPanelRefreshTheme( hMessagesPanel )
@@ -5306,25 +5307,96 @@ static function ShowProjectInspector()
 return nil
 
 // === Editor Colors Dialog (C++Builder: Tools > Editor Options > Colors) ===
+// Persists settings to hbbuilder.ini so the chosen font/colors survive restarts.
 
 static function ShowEditorSettings()
 
-   static cFontName  := "Consolas"
-   static nFontSize  := 15
-   static nBgColor   := 1973790    // RGB(30,30,30) dark
-   static nTextColor := 13948116   // RGB(212,212,212) light gray
-   static nKeywordClr := 5668054   // RGB(86,156,214) blue
-   static nCommandClr := 5098318   // RGB(78,201,176) teal
-   static nCommentClr := 6985578   // RGB(0,200,0) green
-   static nStringClr  := 13538510  // RGB(255,150,50) orange
-   static nPreProcClr := 14530758  // RGB(255,100,255) purple
-   static nNumberClr  := 15185578  // RGB(170,170,120) yellow-gray
-   static nSelBgClr   := 4536632   // RGB(40,70,100) selection
+   static cFontName  := ""
+   static nFontSize  := 0
+   static nBgColor   := 0
+   static nTextColor := 0
+   static nKeywordClr := 0
+   static nCommandClr := 0
+   static nCommentClr := 0
+   static nStringClr  := 0
+   static nPreProcClr := 0
+   static nNumberClr  := 0
+   static nSelBgClr   := 0
+   local aRes
 
-   W32_EditorSettingsDialog( ;
+   if Empty( cFontName )
+      cFontName   := IniRead( "Editor", "FontName", "Consolas" )
+      nFontSize   := Val( IniRead( "Editor", "FontSize", "15" ) )
+      nBgColor    := Val( IniRead( "Editor", "BgColor", "1973790" ) )     // RGB(30,30,30) dark
+      nTextColor  := Val( IniRead( "Editor", "TextColor", "13948116" ) )  // RGB(212,212,212) gray
+      nKeywordClr := Val( IniRead( "Editor", "KeywordColor", "5668054" ) )// RGB(86,156,214) blue
+      nCommandClr := Val( IniRead( "Editor", "CommandColor", "5098318" ) )// RGB(78,201,176) teal
+      nCommentClr := Val( IniRead( "Editor", "CommentColor", "10658485" ) )// RGB(106,153,85) green
+      nStringClr  := Val( IniRead( "Editor", "StringColor", "13538510" ) )// RGB(206,145,120) orange
+      nPreProcClr := Val( IniRead( "Editor", "PreProcColor", "14530758" ) )// RGB(197,134,192) purple
+      nNumberClr  := Val( IniRead( "Editor", "NumberColor", "15185578" ) )// RGB(181,206,168) green-gray
+      nSelBgClr   := Val( IniRead( "Editor", "SelBgColor", "4536632" ) )  // RGB(38,79,120) selection
+      if nFontSize < 6; nFontSize := 15; endif
+   endif
+
+   aRes := W32_EditorSettingsDialog( ;
       cFontName, nFontSize, ;
       nBgColor, nTextColor, nKeywordClr, nCommandClr, ;
       nCommentClr, nStringClr, nPreProcClr, nNumberClr, nSelBgClr )
+
+   if aRes != nil .and. Len( aRes ) >= 11
+      // Persist the new choices
+      cFontName   := aRes[1]
+      nFontSize   := aRes[2]
+      nBgColor    := aRes[3]
+      nTextColor  := aRes[4]
+      nKeywordClr := aRes[5]
+      nCommandClr := aRes[6]
+      nCommentClr := aRes[7]
+      nStringClr  := aRes[8]
+      nPreProcClr := aRes[9]
+      nNumberClr  := aRes[10]
+      nSelBgClr   := aRes[11]
+
+      IniWrite( "Editor", "FontName", cFontName )
+      IniWrite( "Editor", "FontSize", LTrim( Str( nFontSize ) ) )
+      IniWrite( "Editor", "BgColor", LTrim( Str( nBgColor ) ) )
+      IniWrite( "Editor", "TextColor", LTrim( Str( nTextColor ) ) )
+      IniWrite( "Editor", "KeywordColor", LTrim( Str( nKeywordClr ) ) )
+      IniWrite( "Editor", "CommandColor", LTrim( Str( nCommandClr ) ) )
+      IniWrite( "Editor", "CommentColor", LTrim( Str( nCommentClr ) ) )
+      IniWrite( "Editor", "StringColor", LTrim( Str( nStringClr ) ) )
+      IniWrite( "Editor", "PreProcColor", LTrim( Str( nPreProcClr ) ) )
+      IniWrite( "Editor", "NumberColor", LTrim( Str( nNumberClr ) ) )
+      IniWrite( "Editor", "SelBgColor", LTrim( Str( nSelBgClr ) ) )
+
+      // Apply live to the open editor
+      if hCodeEditor != nil .and. hCodeEditor != 0
+         W32_EditorApplySettings( hCodeEditor, cFontName, nFontSize, ;
+            nBgColor, nTextColor, nKeywordClr, nCommandClr, ;
+            nCommentClr, nStringClr, nPreProcClr, nNumberClr, nSelBgClr )
+      endif
+   endif
+
+return nil
+
+// Apply the persisted editor settings to the active code editor (used at startup)
+static function ApplyEditorSettings()
+
+   if hCodeEditor != nil .and. hCodeEditor != 0
+      W32_EditorApplySettings( hCodeEditor, ;
+         IniRead( "Editor", "FontName", "Consolas" ), ;
+         Val( IniRead( "Editor", "FontSize", "15" ) ), ;
+         Val( IniRead( "Editor", "BgColor", "1973790" ) ), ;
+         Val( IniRead( "Editor", "TextColor", "13948116" ) ), ;
+         Val( IniRead( "Editor", "KeywordColor", "5668054" ) ), ;
+         Val( IniRead( "Editor", "CommandColor", "5098318" ) ), ;
+         Val( IniRead( "Editor", "CommentColor", "10658485" ) ), ;
+         Val( IniRead( "Editor", "StringColor", "13538510" ) ), ;
+         Val( IniRead( "Editor", "PreProcColor", "14530758" ) ), ;
+         Val( IniRead( "Editor", "NumberColor", "15185578" ) ), ;
+         Val( IniRead( "Editor", "SelBgColor", "4536632" ) ) )
+   endif
 
 return nil
 
@@ -9613,6 +9685,100 @@ static HWND ES_AddColorRow( HWND hDlg, const char * label, COLORREF clr, int y, 
    return hBtn;
 }
 
+/* ---- Editor Settings dialog state (modal, one instance at a time) ---- */
+static HWND s_hESFontCtl  = NULL;   /* font combo */
+static HWND s_hESSizeCtl  = NULL;   /* size edit */
+static HWND s_aESClrCtl[9] = {0};   /* color buttons 600..608 */
+static BOOL s_bESResult   = FALSE;  /* OK pressed? */
+static char s_cESFont[128] = "Consolas";
+static int  s_nESSize     = 15;
+static COLORREF s_aESClr[9] = { 1973790, 13948116, 5668054, 5098318,
+                                10658485, 13538510, 14530758, 15185578, 4536632 };
+
+/* Enumerate TrueType fonts of the system into a combo box (unique names) */
+static int CALLBACK ES_FontEnumProc( const LOGFONTA * lplf, const TEXTMETRICA * lptm,
+                                     DWORD dwType, LPARAM lParam )
+{
+   HWND hCb = (HWND) lParam;
+   if( dwType == TRUETYPE_FONTTYPE && lplf->lfFaceName[0] ) {
+      if( SendMessageA( hCb, CB_FINDSTRINGEXACT, (WPARAM)-1,
+                        (LPARAM) lplf->lfFaceName ) == CB_ERR )
+         SendMessageA( hCb, CB_ADDSTRING, 0, (LPARAM) lplf->lfFaceName );
+   }
+   return 1;
+}
+
+/* Live preview: apply the selected font/size to the preview control */
+static HWND  s_hESPreview     = NULL;
+static HFONT s_hESPreviewFont = NULL;
+static void  ES_UpdatePreview( void );
+static void  ES_ApplyPreset( int nPreset );
+
+static void ES_UpdatePreview( void )
+{
+   char szFont[128] = "Consolas";
+   char szSize[16] = "15";
+   int pts;
+   HFONT hF;
+   HDC hdc;
+
+   if( !s_hESPreview ) return;
+
+   if( s_hESFontCtl ) GetWindowTextA( s_hESFontCtl, szFont, sizeof(szFont) );
+   if( !szFont[0] ) lstrcpyA( szFont, "Consolas" );
+   if( s_hESSizeCtl ) GetWindowTextA( s_hESSizeCtl, szSize, sizeof(szSize) );
+   pts = atoi(szSize);
+   if( pts < 6 ) pts = 6;
+   if( pts > 48 ) pts = 48;
+
+   hdc = GetDC( s_hESPreview );
+   hF = CreateFontA( -MulDiv( pts, GetDeviceCaps(hdc, LOGPIXELSY), 72 ),
+      0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+      OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+      FIXED_PITCH | FF_MODERN, szFont );
+   ReleaseDC( s_hESPreview, hdc );
+
+   if( s_hESPreviewFont ) DeleteObject( s_hESPreviewFont );
+   s_hESPreviewFont = hF;
+   SendMessage( s_hESPreview, WM_SETFONT, (WPARAM) hF, TRUE );
+   InvalidateRect( s_hESPreview, NULL, TRUE );
+}
+
+/* Theme presets: Dark, Light, Monokai, Solarized.
+ * Order per row: Bg, Text, Keyword, Command, Comment, String, PreProc, Number, Selection. */
+static void ES_ApplyPreset( int nPreset )
+{
+   static const COLORREF aPresets[4][9] = {
+      /* Dark (VS Code Dark+) */
+      { RGB(30,30,30),    RGB(212,212,212), RGB(86,156,214),  RGB(78,201,176),
+        RGB(106,153,85),  RGB(206,145,120), RGB(197,134,192), RGB(181,206,168), RGB(38,79,120) },
+      /* Light (VS Code Light+) */
+      { RGB(255,255,255), RGB(30,30,30),    RGB(0,0,255),     RGB(0,128,128),
+        RGB(0,128,0),     RGB(163,21,21),   RGB(175,0,219),   RGB(9,134,88),    RGB(173,214,255) },
+      /* Monokai */
+      { RGB(39,40,34),    RGB(248,248,242), RGB(249,38,114),  RGB(166,226,46),
+        RGB(117,113,94),  RGB(230,219,116), RGB(102,217,239), RGB(174,129,255), RGB(73,72,62) },
+      /* Solarized Dark */
+      { RGB(0,43,54),     RGB(147,161,161), RGB(38,139,210),  RGB(133,153,0),
+        RGB(88,110,117),  RGB(42,161,152),  RGB(211,54,130),  RGB(131,148,150), RGB(7,54,66) }
+   };
+   int ci;
+   char buf[32];
+
+   if( nPreset < 0 || nPreset > 3 ) return;
+
+   for( ci = 0; ci < 9; ci++ ) {
+      s_aESClr[ci] = aPresets[nPreset][ci];
+      if( s_aESClrCtl[ci] ) {
+         sprintf( buf, "#%02X%02X%02X",
+            GetRValue(s_aESClr[ci]), GetGValue(s_aESClr[ci]), GetBValue(s_aESClr[ci]) );
+         SetWindowTextA( s_aESClrCtl[ci], buf );
+         InvalidateRect( s_aESClrCtl[ci], NULL, TRUE );
+      }
+   }
+   if( s_hESPreview ) InvalidateRect( s_hESPreview, NULL, TRUE );
+}
+
 static HBRUSH s_hESDlgBrush = NULL;
 static HBRUSH s_hESEditBrush = NULL;
 
@@ -9637,6 +9803,15 @@ static LRESULT CALLBACK EditorSettingsProc( HWND hWnd, UINT msg, WPARAM wParam, 
          }
          break;
       case WM_CTLCOLOREDIT:
+         /* Preview: show the current background/text colors of the preset */
+         if( s_hESPreview && (HWND) lParam == s_hESPreview ) {
+            HDC hdc = (HDC) wParam;
+            SetTextColor( hdc, s_aESClr[1] );
+            SetBkColor( hdc, s_aESClr[0] );
+            if( s_hESEditBrush ) DeleteObject( s_hESEditBrush );
+            s_hESEditBrush = CreateSolidBrush( s_aESClr[0] );
+            return (LRESULT) s_hESEditBrush;
+         }
          if( g_bDarkIDE ) {
             HDC hdc = (HDC)wParam;
             SetTextColor(hdc, RGB(212,212,212));
@@ -9646,28 +9821,108 @@ static LRESULT CALLBACK EditorSettingsProc( HWND hWnd, UINT msg, WPARAM wParam, 
             return (LRESULT)s_hESEditBrush;
          }
          break;
+      case WM_DRAWITEM:
+      {
+         DRAWITEMSTRUCT * dis = (DRAWITEMSTRUCT *) lParam;
+         int ci;
+         for( ci = 0; ci < 9; ci++ ) {
+            if( s_aESClrCtl[ci] && dis->hwndItem == s_aESClrCtl[ci] ) {
+               COLORREF cr = s_aESClr[ci];
+               HBRUSH hbr = CreateSolidBrush( cr );
+               FillRect( dis->hDC, &dis->rcItem, hbr );
+               DeleteObject( hbr );
+               /* thin border so the swatch stands out on dark dialogs */
+               { RECT rcF = dis->rcItem;
+                 InflateRect( &rcF, -1, -1 );
+                 FrameRect( dis->hDC, &rcF, (HBRUSH) GetStockObject( BLACK_BRUSH ) );
+               }
+               SetBkMode( dis->hDC, TRANSPARENT );
+               if( 299 * GetRValue(cr) + 587 * GetGValue(cr) + 114 * GetBValue(cr) < 128000 )
+                  SetTextColor( dis->hDC, RGB(255,255,255) );
+               else
+                  SetTextColor( dis->hDC, RGB(0,0,0) );
+               { char buf[32];
+                 sprintf( buf, "#%02X%02X%02X",
+                    GetRValue(cr), GetGValue(cr), GetBValue(cr) );
+                 DrawTextA( dis->hDC, buf, -1, &dis->rcItem,
+                    DT_CENTER | DT_VCENTER | DT_SINGLELINE );
+               }
+               return TRUE;
+            }
+         }
+      }
+      break;
       case WM_COMMAND:
       {
          WORD wId = LOWORD(wParam);
-         if(wId==IDOK || wId==IDCANCEL) {
+         /* Live preview on font/size change */
+         if( lParam && (HWND) lParam == s_hESFontCtl &&
+             ( HIWORD(wParam) == CBN_SELCHANGE || HIWORD(wParam) == CBN_EDITCHANGE ) ) {
+            ES_UpdatePreview();
+            return 0;
+         }
+         if( lParam && (HWND) lParam == s_hESSizeCtl && HIWORD(wParam) == EN_CHANGE ) {
+            ES_UpdatePreview();
+            return 0;
+         }
+         if( wId == IDCANCEL ) {
+            s_bESResult = FALSE;
             EnableWindow(GetParent(hWnd)?GetParent(hWnd):GetDesktopWindow(),TRUE);
             DestroyWindow(hWnd); return 0;
          }
+         if( wId == IDOK ) {
+            char sz[16];
+            int ci;
+            unsigned r=0, g=0, b=0;
+            s_bESResult = TRUE;
+            if( s_hESFontCtl ) {
+               GetWindowTextA( s_hESFontCtl, s_cESFont, sizeof(s_cESFont) );
+               if( !s_cESFont[0] ) lstrcpyA( s_cESFont, "Consolas" );
+            }
+            if( s_hESSizeCtl ) {
+               GetWindowTextA( s_hESSizeCtl, sz, sizeof(sz) );
+               s_nESSize = atoi(sz);
+            }
+            if( s_nESSize < 6 ) s_nESSize = 6;
+            if( s_nESSize > 48 ) s_nESSize = 48;
+            for( ci = 0; ci < 9; ci++ ) {
+               if( s_aESClrCtl[ci] &&
+                   GetWindowTextA( s_aESClrCtl[ci], sz, sizeof(sz) ) > 0 &&
+                   sz[0] == '#' &&
+                   sscanf( sz+1, "%02X%02X%02X", &r, &g, &b ) == 3 )
+                  s_aESClr[ci] = RGB(r,g,b);
+            }
+            EnableWindow(GetParent(hWnd)?GetParent(hWnd):GetDesktopWindow(),TRUE);
+            DestroyWindow(hWnd); return 0;
+         }
+         /* Theme presets: IDs 500-503 (Dark/Light/Monokai/Solarized) */
+         if(wId >= 500 && wId <= 503) {
+            ES_ApplyPreset( wId - 500 );
+            return 0;
+         }
          /* Color buttons: IDs 600-608 */
          if(wId >= 600 && wId <= 608) {
-            COLORREF crInit = RGB(128,128,128);
+            COLORREF crInit = s_aESClr[wId-600];
             COLORREF crNew = PickColor(hWnd, crInit);
             /* Update button text with color name */
             { char buf[32]; sprintf(buf, "#%02X%02X%02X",
                 GetRValue(crNew), GetGValue(crNew), GetBValue(crNew));
-              SetWindowTextA((HWND)lParam, buf); }
+              SetWindowTextA( s_aESClrCtl[wId-600], buf ); }
+            s_aESClr[wId-600] = crNew;
+            InvalidateRect( s_aESClrCtl[wId-600], NULL, TRUE );
+            if( s_hESPreview ) InvalidateRect( s_hESPreview, NULL, TRUE );
             return 0;
          }
          break;
       }
       case WM_CLOSE:
+         s_bESResult = FALSE;
          EnableWindow(GetParent(hWnd)?GetParent(hWnd):GetDesktopWindow(),TRUE);
          DestroyWindow(hWnd); return 0;
+      case WM_DESTROY:
+         if( s_hESPreviewFont ) { DeleteObject( s_hESPreviewFont ); s_hESPreviewFont = NULL; }
+         s_hESPreview = NULL;
+         break;
    }
    return DefWindowProc(hWnd,msg,wParam,lParam);
 }
@@ -9693,6 +9948,13 @@ HB_FUNC( W32_EDITORSETTINGSDIALOG )
       wc.lpszClassName="HbEditorSettings"; RegisterClassA(&wc); bReg=TRUE;
    }
 
+   /* Seed dialog state from Harbour params (defaults kept if not numeric) */
+   { int ci;
+     s_bESResult = FALSE;
+     for( ci = 0; ci < 9; ci++ )
+        if( HB_ISNUM( 3 + ci ) ) s_aESClr[ci] = (COLORREF) hb_parni( 3 + ci );
+   }
+
    hOwner = GetActiveWindow();
    x = ( GetSystemMetrics(SM_CXSCREEN) - ES_DLG_W ) / 2;
    y = ( GetSystemMetrics(SM_CYSCREEN) - ES_DLG_H ) / 2;
@@ -9708,27 +9970,36 @@ HB_FUNC( W32_EDITORSETTINGSDIALOG )
 
    hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
 
-   /* Font section */
+   /* Font section: combo box with system TrueType fonts */
    { HWND h;
      h = CreateWindowExA(0,"STATIC","Font:",WS_CHILD|WS_VISIBLE,16,16,50,20,
         hDlg,NULL,GetModuleHandle(NULL),NULL);
      SendMessage(h,WM_SETFONT,(WPARAM)hFont,TRUE);
 
-     hFontName = CreateWindowExA(WS_EX_CLIENTEDGE,"EDIT",
-        HB_ISCHAR(1)?hb_parc(1):"Consolas",
-        WS_CHILD|WS_VISIBLE|ES_AUTOHSCROLL,
-        70,14,200,22,hDlg,NULL,GetModuleHandle(NULL),NULL);
+     hFontName = CreateWindowExA(WS_EX_CLIENTEDGE,"COMBOBOX",NULL,
+        WS_CHILD|WS_VISIBLE|CBS_DROPDOWN|CBS_SORT|WS_VSCROLL,
+        70,14,205,320,hDlg,NULL,GetModuleHandle(NULL),NULL);
      SendMessage(hFontName,WM_SETFONT,(WPARAM)hFont,TRUE);
+     { HDC hdc = GetDC(hDlg);
+       LOGFONTA lf; memset(&lf,0,sizeof(lf));
+       lf.lfCharSet = DEFAULT_CHARSET;
+       EnumFontFamiliesExA(hdc,&lf,ES_FontEnumProc,(LPARAM)hFontName,0);
+       ReleaseDC(hDlg,hdc);
+       SendMessageA(hFontName, CB_SELECTSTRING, (WPARAM)-1,
+          (LPARAM)(HB_ISCHAR(1) && hb_parc(1)[0] ? hb_parc(1) : "Consolas"));
+     }
+     s_hESFontCtl = hFontName;
 
-     h = CreateWindowExA(0,"STATIC","Size:",WS_CHILD|WS_VISIBLE,290,16,40,20,
+     h = CreateWindowExA(0,"STATIC","Size:",WS_CHILD|WS_VISIBLE,295,16,40,20,
         hDlg,NULL,GetModuleHandle(NULL),NULL);
      SendMessage(h,WM_SETFONT,(WPARAM)hFont,TRUE);
 
      { char sz[8]; sprintf(sz,"%d",HB_ISNUM(2)?hb_parni(2):15);
        hFontSize = CreateWindowExA(WS_EX_CLIENTEDGE,"EDIT",sz,
           WS_CHILD|WS_VISIBLE|ES_AUTOHSCROLL|ES_NUMBER,
-          335,14,50,22,hDlg,NULL,GetModuleHandle(NULL),NULL);
+          340,14,50,22,hDlg,NULL,GetModuleHandle(NULL),NULL);
        SendMessage(hFontSize,WM_SETFONT,(WPARAM)hFont,TRUE);
+       s_hESSizeCtl = hFontSize;
      }
    }
 
@@ -9761,7 +10032,11 @@ HB_FUNC( W32_EDITORSETTINGSDIALOG )
 
    row = 106;
    for(x=0; labels[x]; x++) {
-      ES_AddColorRow(hDlg, labels[x], 0, row, 600+x);
+      s_aESClrCtl[x] = ES_AddColorRow(hDlg, labels[x], s_aESClr[x], row, 600+x);
+      { char buf[32];
+        sprintf(buf, "#%02X%02X%02X",
+           GetRValue(s_aESClr[x]), GetGValue(s_aESClr[x]), GetBValue(s_aESClr[x]));
+        SetWindowTextA( s_aESClrCtl[x], buf ); }
       row += 28;
    }
 
@@ -9770,11 +10045,12 @@ HB_FUNC( W32_EDITORSETTINGSDIALOG )
      h = CreateWindowExA(0,"STATIC","Preview:",WS_CHILD|WS_VISIBLE,
         270,96,80,18,hDlg,NULL,GetModuleHandle(NULL),NULL);
      SendMessage(h,WM_SETFONT,(WPARAM)hFont,TRUE);
-     h = CreateWindowExA(WS_EX_CLIENTEDGE,"EDIT",
+     s_hESPreview = CreateWindowExA(WS_EX_CLIENTEDGE,"EDIT",
         "// Preview\r\nfunction Main()\r\n   local x := 42\r\n   MsgInfo( \"Hello\" )\r\nreturn nil",
         WS_CHILD|WS_VISIBLE|ES_MULTILINE|ES_READONLY,
         270,118,ES_DLG_W-290,200,hDlg,NULL,GetModuleHandle(NULL),NULL);
-     SendMessage(h,WM_SETFONT,(WPARAM)hFont,TRUE);
+     SendMessage(s_hESPreview,WM_SETFONT,(WPARAM)hFont,TRUE);
+     ES_UpdatePreview();   /* apply current font/size to the preview */
    }
 
    /* OK / Cancel — positioned from actual client rect */
@@ -9797,6 +10073,19 @@ HB_FUNC( W32_EDITORSETTINGSDIALOG )
          SendMessage(hDlg,WM_CLOSE,0,0); break; }
       TranslateMessage(&msg); DispatchMessage(&msg);
    }
+
+   /* Return { font, size, 9 colors } on OK, NIL on cancel */
+   if( s_bESResult ) {
+      PHB_ITEM aRet = hb_itemArrayNew( 11 );
+      int ci;
+      hb_arraySetC ( aRet, 1, s_cESFont );
+      hb_arraySetNI( aRet, 2, s_nESSize );
+      for( ci = 0; ci < 9; ci++ )
+         hb_arraySetNI( aRet, 3 + ci, (int) s_aESClr[ci] );
+      hb_itemReturnRelease( aRet );
+      s_bESResult = FALSE;
+   } else
+      hb_ret();
 }
 
 /* ======================================================================
@@ -11029,6 +11318,74 @@ static void ConfigureScintilla( HWND hSci )
    { FILE * fLog = fopen( "scintilla_trace.log", "a" );
      if( fLog ) { fprintf( fLog, "ConfigureScintilla done for hwnd=%p\n", hSci ); fclose( fLog ); }
    }
+}
+
+/* W32_EditorApplySettings( hEditor, cFont, nSize, nBg,nText,nKw,nCmd,nCom,nStr,nPP,nNum,nSel )
+ * Applies the chosen font/colors live to the active Scintilla editor. */
+HB_FUNC( W32_EDITORAPPLYSETTINGS )
+{
+   CODEEDITOR * ed = (CODEEDITOR *) (HB_PTRUINT) hb_parnint(1);
+   HWND hSci;
+   const char * cFont;
+   int nSize, aClr[9], ci;
+
+   if( !ed || !ed->hEdit ) return;
+   hSci = ed->hEdit;
+
+   cFont = ( HB_ISCHAR(2) && hb_parc(2)[0] ) ? hb_parc(2) : "Consolas";
+   nSize = hb_parni(3);
+   if( nSize < 6 ) nSize = 6;
+   if( nSize > 48 ) nSize = 48;
+   for( ci = 0; ci < 9; ci++ )
+      aClr[ci] = HB_ISNUM(4+ci) ? hb_parni(4+ci) : (int) s_aESClr[ci];
+
+   /* Default style (font, size, colors) */
+   SciMsg( hSci, SCI_STYLESETFONT, STYLE_DEFAULT, (LPARAM) cFont );
+   SciMsg( hSci, SCI_STYLESETSIZE, STYLE_DEFAULT, nSize );
+   SciMsg( hSci, SCI_STYLESETFORE, STYLE_DEFAULT, aClr[1] );
+   SciMsg( hSci, SCI_STYLESETBACK, STYLE_DEFAULT, aClr[0] );
+   SciMsg( hSci, SCI_STYLECLEARALL, 0, 0 );
+
+   /* Line-number margin: STYLECLEARALL resets it to the default style (and a
+    * blank style renders with a white background), so re-apply it explicitly. */
+   SciMsg( hSci, SCI_STYLESETFORE, STYLE_LINENUMBER, RGB(133,133,133) );
+   SciMsg( hSci, SCI_STYLESETBACK, STYLE_LINENUMBER,
+      g_bDarkIDE ? RGB(37,37,38) : RGB(240,240,240) );
+
+   /* Keywords: bold */
+   SciMsg( hSci, SCI_STYLESETFORE, SCE_C_WORD, aClr[2] );
+   SciMsg( hSci, SCI_STYLESETBOLD, SCE_C_WORD, 1 );
+
+   /* Commands (WORD2) */
+   SciMsg( hSci, SCI_STYLESETFORE, SCE_C_WORD2, aClr[3] );
+
+   /* Comments */
+   SciMsg( hSci, SCI_STYLESETFORE, SCE_C_COMMENT,     aClr[4] );
+   SciMsg( hSci, SCI_STYLESETFORE, SCE_C_COMMENTLINE, aClr[4] );
+   SciMsg( hSci, SCI_STYLESETFORE, SCE_C_COMMENTDOC,  aClr[4] );
+   SciMsg( hSci, SCI_STYLESETITALIC, SCE_C_COMMENT, 1 );
+   SciMsg( hSci, SCI_STYLESETITALIC, SCE_C_COMMENTLINE, 1 );
+
+   /* Strings */
+   SciMsg( hSci, SCI_STYLESETFORE, SCE_C_STRING,    aClr[5] );
+   SciMsg( hSci, SCI_STYLESETFORE, SCE_C_CHARACTER, aClr[5] );
+
+   /* Numbers */
+   SciMsg( hSci, SCI_STYLESETFORE, SCE_C_NUMBER, aClr[7] );
+
+   /* Preprocessor */
+   SciMsg( hSci, SCI_STYLESETFORE, SCE_C_PREPROCESSOR, aClr[6] );
+
+   /* Operators + identifiers follow the text color */
+   SciMsg( hSci, SCI_STYLESETFORE, SCE_C_OPERATOR,   aClr[1] );
+   SciMsg( hSci, SCI_STYLESETFORE, SCE_C_IDENTIFIER, aClr[1] );
+   SciMsg( hSci, SCI_STYLESETFORE, SCE_C_GLOBALCLASS, aClr[3] );
+
+   /* Selection background */
+   SciMsg( hSci, SCI_SETSELBACK, 1, aClr[8] );
+
+   /* Force repaint */
+   InvalidateRect( hSci, NULL, TRUE );
 }
 
 /* ======================================================================
