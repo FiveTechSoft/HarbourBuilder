@@ -26,7 +26,7 @@ byte-for-byte what it is today; `hdbc` simply isn't a selectable driver.
 backend exclusively through standard RDD verbs — `dbUseArea`, `dbGoTop`,
 `dbSkip`, `FieldGet`, `dbAppend`, `RLock`, `FieldPut`, `dbDelete`,
 `dbCommit`, `dbCreate` — never hand-built SQL. RDDHDBC operates at exactly
-that level (`USE <table> VIA "HDBC"`), so adding it is additive: no other
+that level (`USE <table> VIA "RDDHDBC"`), so adding it is additive: no other
 file changes, and `ErpDbReadRows`/`ErpDbApply`/`erp_http.prg`'s dispatch
 (`if ErpDbDriver() != "json" ...`) work unmodified.
 
@@ -51,9 +51,16 @@ file changes, and `ErpDbReadRows`/`ErpDbApply`/`erp_http.prg`'s dispatch
    Point `build_win64.bat` at it via `HDBC_CONNECT_PRG=C:\path\to\your_file.prg`.
 
 With both present, `build_win64.bat` adds `-dHB_WITH_HDBC` to the `erp_db.prg`
-compile, compiles+links your connector, and links `hdbctools.lib` (plus
-anything you list in `HDBC_EXTRA_LIBS`). Missing either one → the script
-prints an `HDBC: not configured` note and builds exactly as before.
+compile, compiles+links your connector, and links `hdbctools.lib`. Missing
+either one → the script prints an `HDBC: not configured` note and builds
+exactly as before.
+
+In practice `hdbctools.lib` alone is not enough to link a working exe — the
+underlying package also ships driver-specific pieces (e.g. a MariaDB
+Connector/C wrapper lib) and needs the actual MariaDB Connector/C runtime
+DLL reachable at run time. List whatever `.lib` names and `/LIBPATH`s your
+own package needs via `HDBC_EXTRA_LIBS`; this was confirmed end-to-end
+against a real local MariaDB, see the "Verified" note below.
 
 Then set `meta/app.json -> "database"` either directly, or from
 `http://<host>:2222/db-config.html` (any admin session) — a small page that
@@ -102,3 +109,24 @@ reflects whether the running exe was actually built with `HB_WITH_HDBC`.
   data volumes.
 - Update this file (not `erp_db.prg`'s comments) if any of the above
   changes after you test against your own RDDHDBC version.
+
+## Verified end-to-end (own local build, own local database)
+
+This driver was built and exercised against a real MariaDB instance (own
+licensed RDDHDBC package, not part of this repo) before opening this PR:
+`GET /api/db/status` reporting `hdbcAvailable:true`; `GET /api/dataset`
+returning real rows (UTF-8, accents intact) sourced from MariaDB, not the
+JSON files; `POST /api/dataset` add/update/delete all round-tripped
+correctly (verified independently with direct SQL). Two real bugs were
+found and fixed in that process, both already reflected above:
+
+1. The RDD's actual registered name is `"RDDHDBC"`, not `"HDBC"` — used in
+   the `dbUseArea()` call. There is also no standalone `REQUEST` target for
+   it: your `ErpDbHdbcUserConnect()` calling any of the RDD's own public
+   functions (as the contract requires) already force-links its
+   registration code, since both live in the same compiled module.
+2. `ErpDbApply()`'s "delete not persisted" re-check (`Deleted()` right after
+   `dbDelete()`) is an OpenADS-specific workaround that produced false
+   negatives on hdbc — deletes were persisting correctly (`deleted_at` set)
+   even though `Deleted()` on the just-modified record read back `.F.`
+   before the next fetch. Now scoped to `driver == "openads"` only.

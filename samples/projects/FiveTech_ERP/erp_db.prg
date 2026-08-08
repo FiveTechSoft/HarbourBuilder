@@ -8,14 +8,13 @@
 REQUEST DBFCDX
 REQUEST ADS, ADSCDX
 
-// HDBC (RDDHDBC, a third-party RDD) is opt-in at COMPILE time: it is only
-// requested when the build defines HB_WITH_HDBC (see build_win64.bat and
-// docs/hdbc-driver.md). Without that define this REQUEST — and every branch
-// below guarded by #ifdef HB_WITH_HDBC — compiles out entirely, so a normal
-// build has no dependency on, and links nothing from, that RDD.
-#ifdef HB_WITH_HDBC
-REQUEST HDBC
-#endif
+// RDDHDBC (a third-party RDD) needs no REQUEST here: its own registration
+// module only gets linked in when your ErpDbHdbcUserConnect() (compiled in
+// only under HB_WITH_HDBC — see build_win64.bat and docs/hdbc-driver.md)
+// calls one of the RDD's own public functions, which pulls in the same
+// translation unit as its "register me" init code. A normal build defines
+// neither ErpDbHdbcUserConnect() nor HB_WITH_HDBC, so it links nothing from
+// that RDD at all.
 
 // ads.ch constants (avoid the extra include path — same values as
 // C:\harbour\contrib\rddads\ads.ch and the OpenADS smoke tests)
@@ -140,7 +139,7 @@ return .T.
 //     dataPath, dataPath holding the DB name for this driver).
 //   - build a connection with your licensed package and register it with
 //     the RDD via ITS OWN public entry point (documented by RDDHDBC, not
-//     reproduced here) so a later "dbUseArea(...,"HDBC",...)" can use it.
+//     reproduced here) so a later "dbUseArea(...,"RDDHDBC",...)" can use it.
 //   - return .T. once ready; .F. to fail the open cleanly.
 // A build that defines HB_WITH_HDBC without also linking a .prg that
 // implements ErpDbHdbcUserConnect() fails at LINK time (unresolved
@@ -179,7 +178,7 @@ static function ErpDbOpen( cName )
       if ! ErpDbHdbcConnect()
          return ""
       endif
-      cRDD  := "HDBC"
+      cRDD  := "RDDHDBC"          // the RDD's own registered name (rddRegister("RDDHDBC",...))
       cFile := cName              // table name (or the driver's own query syntax)
    else
       cRDD  := "DBFCDX"
@@ -763,6 +762,7 @@ return aRows
 function ErpDbApply( cDataKey, cAction, cBody )
 
    local cName := ErpDbDataName( cDataKey ), aMap, cAlias := ""
+   local cDriver := ErpDbDriver()
    local nF, hMap, nKey := 0, lOk := .F.
    local bOld, oErr, cCp
    local hReq := { => }, hRow, cKeyField, cKeyValue
@@ -830,10 +830,17 @@ function ErpDbApply( cDataKey, cAction, cBody )
                            ( cAlias )->( dbDelete() )
                         endif
                         ( cAlias )->( dbUnlock() )
-                        // remote OpenADS: dbDelete() can be a silent no-op
-                        // (Deleted() stays .F.) and FieldPut on rows that were
-                        // not written by this connection throws "write failed"
-                        if cAction == "delete" .and. ! ( cAlias )->( Deleted() )
+                        // remote OpenADS specifically: dbDelete() can be a
+                        // silent no-op (Deleted() stays .F.) and FieldPut on
+                        // rows not written by this connection throws "write
+                        // failed". This Deleted() re-check is an OpenADS
+                        // quirk workaround, not a general one — verified
+                        // against a real MariaDB that hdbc's dbDelete()
+                        // persists correctly (deleted_at set) even though
+                        // Deleted() on the just-modified record buffer can
+                        // read back .F. before the next fetch.
+                        if cAction == "delete" .and. cDriver == "openads" .and. ;
+                              ! ( cAlias )->( Deleted() )
                            s_cDbErr := "delete not persisted by the OpenADS server"
                            lOk := .F.
                         else
@@ -863,7 +870,7 @@ function ErpDbApply( cDataKey, cAction, cBody )
       lOk := .F.
       s_cDbErr := cAction + " " + cName + ": " + oErr:Description + ;
          iif( Empty( oErr:Operation ), "", " (" + oErr:Operation + ")" )
-      if ErpDbDriver() == "openads"
+      if cDriver == "openads"
          s_cDbErr += " — remote update/delete of pre-existing rows is not supported by this OpenADS server"
       endif
    end sequence
