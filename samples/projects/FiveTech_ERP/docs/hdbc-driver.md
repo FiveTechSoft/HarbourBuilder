@@ -73,15 +73,18 @@ exe was actually built with `HB_WITH_HDBC`.
 
 ## Known limits (verify before relying on this in production)
 
-- **Tables are not auto-created.** Unlike `dbfcdx`/`openads`,
-  `ErpDbEnsureTables()` treats `hdbc` like a SQL backend and does nothing —
-  provision your MariaDB schema yourself (RDDHDBC tables need its own
-  bookkeeping columns/metadata table; consult its docs). This is a solved
-  problem in practice, not a blocker: DBF/JSON-to-MariaDB schema migration
-  is a well-trodden path (infer columns from `meta/data/*.json` the same
-  way `ErpDbInferSchema()` already does for `dbfcdx`, then `CREATE TABLE`
-  once per dataset) — just not something this sample auto-runs against a
-  live database on your behalf.
+- **Tables are not auto-created against a live connection** — by design;
+  `ErpDbEnsureTables()` treats `hdbc` like a SQL backend and does nothing
+  automatically. What this repo *does* provide is `GET /api/db/schema-sql`
+  (any authenticated session), which returns `CREATE TABLE IF NOT EXISTS`
+  DDL for every `data.*` dataset — inferred from `meta/data/*.json` with the
+  same logic `ErpDbInferSchema()` already uses for `dbfcdx`, plus the
+  `_h_rowid_`/`deleted_at` bookkeeping columns RDDHDBC tables need. It only
+  ever generates text (`ErpDbHdbcSchemaSql()` in `erp_db.prg`, no HDBC
+  dependency at all) — review it, then run it yourself, e.g.
+  `curl -b cookies.txt http://127.0.0.1:2222/api/db/schema-sql > schema.sql && mysql -u ... < schema.sql`.
+  RDDHDBC's own index-metadata table is **not** included — provision it per
+  RDDHDBC's docs.
 - **Record locking (`RLock`) is process-local**, not database-wide — it
   correctly serializes the concurrent threads of a *single*
   `FiveTech_ERP.exe`, the model this sample already uses, but does not
