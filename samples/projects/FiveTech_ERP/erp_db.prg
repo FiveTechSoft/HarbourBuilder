@@ -634,14 +634,17 @@ return "TEXT"
 // cBase: bare dataset name (e.g. "products", matching data/products.json).
 static function ErpDbHdbcTableSql( cBase, aMap )
 
-   local cSql := "CREATE TABLE IF NOT EXISTS " + Lower( cBase ) + " (" + Chr( 10 )
+   local cSql := "CREATE TABLE IF NOT EXISTS `" + Lower( cBase ) + "` (" + Chr( 10 )
    local h
 
-   cSql += "  _h_rowid_ BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY," + Chr( 10 )
+   // Backtick every identifier: several field/dataset names in the demo
+   // meta (user, key, when, ...) are MariaDB reserved words and break the
+   // DDL without this (found by actually running it against a real server).
+   cSql += "  `_h_rowid_` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY," + Chr( 10 )
    for each h in aMap
-      cSql += "  " + Lower( h[ "dbf" ] ) + " " + ErpDbHdbcSqlType( h ) + "," + Chr( 10 )
+      cSql += "  `" + Lower( h[ "dbf" ] ) + "` " + ErpDbHdbcSqlType( h ) + "," + Chr( 10 )
    next
-   cSql += "  deleted_at DATETIME NULL DEFAULT NULL" + Chr( 10 )
+   cSql += "  `deleted_at` DATETIME NULL DEFAULT NULL" + Chr( 10 )
    cSql += ");" + Chr( 10 )
 return cSql
 
