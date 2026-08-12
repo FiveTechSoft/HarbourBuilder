@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FiveTech ERP — Rama Web (Vainilla)</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="view-login" class="login-wrap hidden">
+  <button type="button" class="theme-fab" id="btn-theme" title="Cambiar tema">Dark</button>
+  <div class="login-card">
+    <div class="login-brand">FiveTech ERP</div>
+    <div class="login-sub">Rama 100% web · frontend vainilla (sin framework)</div>
+    <form id="login-form">
+      <label>Usuario</label>
+      <input id="login-user" autocomplete="username" value="admin">
+      <label>Clave</label>
+      <input id="login-pass" type="password" autocomplete="current-password" value="1234">
+      <label>Fecha de trabajo</label>
+      <input id="login-date" type="date">
+      <button type="submit" id="login-btn">Entrar</button>
+      <div id="login-error" class="login-error"></div>
+    </form>
+    <button type="button" id="btn-tool" class="tool-toggle">Opciones de vista (ayuda)</button>
+    <div id="tool-panel" class="tool-panel hidden">
+      <div class="tool-row"><span>Ahora está en:</span> <b id="tool-rama">—</b></div>
+      <div class="tool-row">
+        <span><b>1 · Login directo — versión PC</b></span>
+        <div class="tool-note">Aplicación de este equipo. Login clásico: <a href="/login">/login</a></div>
+      </div>
+      <div class="tool-row">
+        <span><b>2 · WebView + HTTP</b></span>
+        <div class="tool-note">App de escritorio + navegador a la vez (como Edge con localhost:2222/portal).</div>
+        <div class="tool-links">
+          <a id="tool-open-local" href="/portal/">Abrir portal en el navegador</a>
+        </div>
+      </div>
+      <div class="tool-row">
+        <span><b>3 · Web 100%</b> — elija la vista (mismos datos)</span>
+        <nav class="tool-links">
+          <a href="/web-vainilla/index.html">Vainilla</a>
+          <a href="/web-angular/index.html">Angular</a>
+          <a href="/web-react/index.html">React</a>
+          <a href="/web-vue/index.html">Vue</a>
+          <a href="/portal/">Menú…</a>
+        </nav>
+      </div>
+      <div class="tool-row">
+        <span><b>Acceso por la red</b></span>
+        <div class="tool-note"><b>Intranet:</b> en otro PC/celular de la oficina use la dirección de abajo.</div>
+        <div class="tool-links">
+          <input id="tool-ip" class="tool-ip" placeholder="ej. 192.168.1.20" title="IP de este equipo">
+          <button type="button" class="btn" id="tool-open-remote">Probar</button>
+          <button type="button" class="btn" id="tool-copy-remote">Copiar enlace</button>
+        </div>
+        <div class="tool-note" id="tool-url-preview"></div>
+        <div class="tool-note"><b>Remoto (internet):</b> solo si sistemas habilitó acceso seguro (VPN o túnel). Sin eso, solo red de la empresa.</div>
+      </div>
+      <code id="tool-cmd-pc" class="hidden"></code>
+      <button type="button" class="btn hidden" id="tool-copy-pc">Copiar</button>
+    </div>
+  </div>
+</div>
+
+<div id="view-app" class="app hidden">
+  <header class="topbar">
+    <div class="topbar-left">
+      <button type="button" id="btn-sidebar" class="btn-icon-bar" title="Mostrar/ocultar menú" aria-label="Menú">☰</button>
+      <span class="brand">FiveTech ERP</span>
+      <span class="branch-tag" id="rama-tag">rama web</span>
+      <button type="button" id="btn-dashboard" class="btn-ghost btn-dash" title="Ir al dashboard FWH (shell HTTP)">Dashboard</button>
+    </div>
+    <div class="topbar-right">
+      <select id="sel-company" title="Empresa"></select>
+      <select id="sel-app" title="App / vertical"></select>
+      <input id="workdate" type="date" title="Fecha de trabajo">
+      <span id="user-chip" class="user-chip"></span>
+      <button id="btn-theme-top" class="btn-ghost" title="Cambiar tema">Dark</button>
+      <button id="btn-logout" class="btn-ghost">Salir</button>
+    </div>
+  </header>
+  <div class="body" id="app-body">
+    <nav id="sidebar" class="sidebar" aria-label="Módulos"></nav>
+    <main id="main" class="main"></main>
+  </div>
+</div>
+
+<script src="container.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

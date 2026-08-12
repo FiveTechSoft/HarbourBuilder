@@ -55,6 +55,7 @@ return nil
 METHOD StartServer() CLASS TForm1
 
    local cMsg := ""
+   local cArg
 
    if ! ErpHttpStart( ::nPort, @cMsg )
       ::SetWinTitle( "HTTP failed: " + cMsg )
@@ -64,6 +65,13 @@ METHOD StartServer() CLASS TForm1
    endif
 
    ::cUrl := "http://127.0.0.1:" + hb_ntos( ::nPort ) + "/"
+   // Rama PC parametrizable: ZWEB_FRONT=<montura> FiveTech_ERP_local.exe
+   // carga ese bundle dentro del WebView2 (mismo contrato que el navegador).
+   // Ej.: set ZWEB_FRONT=web-vainilla
+   cArg := AllTrim( hb_GetEnv( "ZWEB_FRONT" ) )
+   if ! Empty( cArg )
+      ::cUrl += cArg + "/index.html"
+   endif
    ::SetWinTitle( ::cUrl + "   ·   meta: " + ErpMetaRoot() )
    if ::oWeb != nil
       ::oWeb:Navigate( ::cUrl )
@@ -87,5 +95,43 @@ function Form1()
    oForm := TForm1():New()
    oApp:CreateForm( oForm )
    oApp:Run()
+
+return nil
+
+//--------------------------------------------------------------------
+// WebView2 → host: mensajes de JS (window.chrome.webview.postMessage / external.invoke).
+// Convención del prototipo web-branch:
+//   "open:http://..."  o  JSON {"cmd":"open","url":"http://..."}
+// Abre el navegador nativo del SO; NO navega el WebView embebido.
+// (Por defecto NewWindowRequested en fwh_webview2.cpp hace Navigate in-place.)
+function WEBVIEW2_ONBIND( cMsg, hWeb )
+
+   local cUrl, h, cCmd
+
+   HB_SYMBOL_UNUSED( hWeb )
+   cMsg := AllTrim( cMsg )
+   if Empty( cMsg )
+      return nil
+   endif
+
+   cUrl := ""
+   if Left( Lower( cMsg ), 5 ) == "open:"
+      cUrl := AllTrim( SubStr( cMsg, 6 ) )
+   elseif Left( cMsg, 1 ) == "{"
+      h := hb_jsonDecode( cMsg )
+      if ValType( h ) == "H"
+         cCmd := Lower( AllTrim( ErpToStr( hb_HGetDef( h, "cmd", "" ) ) ) )
+         if Empty( cCmd )
+            cCmd := Lower( AllTrim( ErpToStr( hb_HGetDef( h, "action", "" ) ) ) )
+         endif
+         if cCmd == "open" .or. cCmd == "openurl" .or. cCmd == "open-browser"
+            cUrl := AllTrim( ErpToStr( hb_HGetDef( h, "url", "" ) ) )
+         endif
+      endif
+   endif
+
+   if ! Empty( cUrl )
+      ErpShellOpenUrl( cUrl )
+   endif
 
 return nil

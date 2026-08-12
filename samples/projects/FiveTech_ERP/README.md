@@ -85,3 +85,48 @@ sync_meta.bat
 > Looking different in the window is usually the **HTML shell** (`www\index.html` is a slim client). FWH serves the full dashboard HTML from `login.prg`. Meta JSON can be identical while the UI chrome still differs.
 
 > **Warning — generated files:** `sync_meta.bat` (run by every build) mirrors `./meta` from the FWH tree and **regenerates `www\login.html` / `www\dashboard.html`** from the TEXT blocks in `C:\fwteam\samples\DesktopWeb\login.prg` (`_extract_fwh_html.py`). Never edit `www\*.html` or `./meta` locally as the only copy — apply durable changes in the FWH source and re-sync, or they are lost on the next build.
+
+## One design, three branches (PC / hybrid / 100% web)
+
+`erp_http.prg` already answers on `0.0.0.0`, serves the JSON API **and**
+static files from `www/`, and the desktop WebView is just one more client of
+that HTTP contract. This sample now makes that explicit as three interchangeable
+branches of the **same build** — nothing above changes for the default
+(no‑argument) run:
+
+| Branch | Container | How it loads |
+|---|---|---|
+| **PC** (native) | WebView2 inside the exe | `ZWEB_FRONT=<bundle>` makes `Form1.prg` navigate its embedded WebView2 to that bundle instead of the FWH shell. Unset → identical to today. |
+| **Hybrid** (native) | WebView2 per module, alongside native screens | Same URLs (`/web-*/`), module by module, from any native shell (pattern used in production by Zerus's `FW_DASHBOARD`). |
+| **Web** (ours) | Any real browser | `http://<host>:2222/web-vainilla/`, `/web-angular/`, `/web-react/`, `/web-vue/`, or `/portal/` to pick one. Same origin, same `DWSESS` cookie, no CORS. |
+
+```
+frontends/     source of the 4 bundles (vainilla / Angular 21+PrimeNG / React / Vue)
+www/web-*      built static output served by erp_http.prg (same as any other www/ asset)
+www/portal/    branch picker (login → choose frontend)
+scripts/       api-check.mjs · concurrency*.py · evidence.cjs (reproducible checks)
+docs/web-branch/  proposal, evidence and the concurrency fix write-up
+```
+
+Runtime container detection (`container.js` / `detectRama()` in each
+frontend): `window.chrome.webview` → pc, `+SendToFWH` → hybrid, else → web.
+Exposes `window.__RAMA__` / `data-rama` for capability flags and CSS — the
+SPA code itself calls no container API directly, only an optional bridge with
+an HTTP fallback.
+
+Two small, opt-in patches ship with this: `ZWEB_FRONT` in `Form1.prg` (off by
+default) and an `ErpMutexGuard` fix for a read‑modify‑write race in
+`POST /api/dataset` under concurrent writers (see
+`docs/web-branch/HALLAZGO_CONCURRENCIA_DATASETS.md`). Full rationale,
+per-branch trade-offs and reproducible evidence:
+`docs/web-branch/PROPUESTA_FIVETECH_RAMA_WEB.md` and
+`docs/web-branch/SUSTENTO_RAMA_100_WEB.md`.
+
+Rebuilding a frontend after editing its source:
+
+```bat
+cd frontends\react  && npm install && npm run build
+cd frontends\vue    && npm install && npm run build
+cd frontends\web-angular && npm install && npx ng build --configuration=production
+:: copy each dist/ output into www\web-<name>\ (vainilla needs no build step)
+```

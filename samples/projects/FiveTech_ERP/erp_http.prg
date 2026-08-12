@@ -1,6 +1,7 @@
 // erp_http.prg — portable multi-thread HTTP for FiveTech_ERP
 //--------------------------------------------------------------------
 #include "hbsocket.ch"
+#include "hbclass.ch"
 
 static s_lRun := .F.
 static s_hListen := NIL
@@ -500,7 +501,7 @@ static function ErpApiDatasetPost( cBody, hSess )
 
    local hReq := { => }, cKey, cAction, cKeyField, cKeyValue, hRow, cOut
    local cRaw, hDoc := { => }, aRows, n, lFound := .F.
-   local cFull, cJson, lOk
+   local cFull, cJson, lOk, oGuard
 
    if Empty( hSess )
       return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Not authenticated" } ), ;
@@ -554,6 +555,13 @@ static function ErpApiDatasetPost( cBody, hSess )
       return ErpHttpOk( hb_jsonEncode( { "ok" => .T., "key" => cKey, ;
          "action" => cAction } ), "application/json; charset=utf-8" )
    endif
+
+   // FIX race (hallazgo prototipo web-branch): la lectura vivía fuera del
+   // mutex → dos escrituras concurrentes perdían un add (last-writer-wins
+   // sobre el doc completo). El guard toma el mutex hasta salir de la
+   // función y hace atómico el read-modify-write.
+   oGuard := ErpMutexGuard():New( s_mtx )
+   HB_SYMBOL_UNUSED( oGuard )
 
    // Fresh copy from disk — never mutate the ErpMetaGet() cached hash
    cRaw := ErpMetaGetRaw( cKey )
@@ -639,13 +647,7 @@ static function ErpApiDatasetPost( cBody, hSess )
          "application/json; charset=utf-8" )
    endif
    cJson := hb_jsonEncode( hDoc ) + Chr( 10 )
-   if s_mtx != NIL
-      hb_mutexLock( s_mtx )
-   endif
    lOk := ErpWriteFileAtomic( cFull, cJson )
-   if s_mtx != NIL
-      hb_mutexUnlock( s_mtx )
-   endif
    if ! lOk
       return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Write failed" } ), ;
          "application/json; charset=utf-8" )
@@ -1764,6 +1766,73 @@ static function ErpHttpOk( cBody, cType )
 return cHdr + cBody
 
 //--------------------------------------------------------------------
+// Abre URL en el NAVEGADOR POR DEFECTO del SO (asociación nativa).
+// NO toca la rama embebida (WebView2 sigue en su ventana con ZWEB_FRONT).
+// Solo http(s); sin comillas/CR/LF.
+// Usado por POST /api/open-browser, cmd openurl y WEBVIEW2_ONBIND.
+function ErpShellOpenUrl( cUrl )
+
+   local cLow, nRet
+
+   cUrl := AllTrim( cUrl )
+   if Empty( cUrl )
+      return .F.
+   endif
+   cLow := Lower( cUrl )
+   if !( Left( cLow, 7 ) == "http://" .or. Left( cLow, 8 ) == "https://" )
+      return .F.
+   endif
+   if '"' $ cUrl .or. "'" $ cUrl .or. Chr( 10 ) $ cUrl .or. Chr( 13 ) $ cUrl .or. ;
+         Chr( 0 ) $ cUrl
+      return .F.
+   endif
+
+   // Windows: ShellExecuteA "open" → navegador por defecto del usuario.
+   // No es Navigate del WebView ni un navegador embebido.
+   nRet := ErpShellExecuteOpen( cUrl )
+   if nRet > 32
+      return .T.
+   endif
+
+   // Fallback multiplataforma si ShellExecute no aplica / falla
+#ifdef __PLATFORM__WINDOWS
+   hb_run( 'cmd /c start "" "' + cUrl + '"' )
+#else
+   #ifdef __PLATFORM__DARWIN
+      hb_run( 'open "' + cUrl + '"' )
+   #else
+      hb_run( 'xdg-open "' + cUrl + '"' )
+   #endif
+#endif
+
+return .T.
+
+//--------------------------------------------------------------------
+// C helper: ShellExecuteA(NULL,"open",url,...) — asociación del SO
+#pragma BEGINDUMP
+#include "hbapi.h"
+#if defined( HB_OS_WIN )
+   #include <windows.h>
+   #include <shellapi.h>
+#endif
+
+HB_FUNC( ERPSHELLEXECUTEOPEN )
+{
+#if defined( HB_OS_WIN )
+   const char * szUrl = hb_parc( 1 );
+   if( szUrl && *szUrl )
+      /* ShellExecute > 32 = éxito; usa asociación del SO (navegador por defecto) */
+      hb_retnl( ( long )( size_t ) ShellExecuteA( NULL, "open", szUrl, NULL, NULL, SW_SHOWNORMAL ) );
+   else
+      hb_retnl( 0 );
+#else
+   HB_SYMBOL_UNUSED( /* url */ 0 );
+   hb_retnl( 0 );
+#endif
+}
+#pragma ENDDUMP
+
+//--------------------------------------------------------------------
 static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
 
    local cOut, hDoc, aItems, cKey, hQ, cUser, cPass, cTok, hSess
@@ -1787,6 +1856,24 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
       ErpMetaSetRequestVertical( ErpSessVertical( hSess ) )
    else
       ErpMetaSetRequestVertical( "" )
+   endif
+
+   // Abrir URL en navegador nativo del SO (rama PC: no embebido).
+   // Público a propósito: el panel "Cargue y ramas" vive en el login sin cookie.
+   if cMethod == "POST" .and. cPath == "/api/open-browser"
+      hQ := ErpQuery( cBody )
+      cArg := AllTrim( hb_HGetDef( hQ, "url", hb_HGetDef( hQ, "a1", "" ) ) )
+      if Empty( cArg )
+         return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "url required" } ), ;
+            "application/json; charset=utf-8" )
+      endif
+      if ErpShellOpenUrl( cArg )
+         return ErpHttpOk( hb_jsonEncode( { "ok" => .T., "url" => cArg } ), ;
+            "application/json; charset=utf-8" )
+      endif
+      return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
+         "msg" => "Only http(s) URLs allowed" } ), ;
+         "application/json; charset=utf-8" )
    endif
 
    // --- pages (same routes as FWH DesktopWeb login.prg) ---
@@ -2038,6 +2125,19 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
          ErpSessPut( cTok, hSess )
          return ErpHttpOk( hb_jsonEncode( { "ok" => .T., "workDate" => cArg } ), ;
             "application/json; charset=utf-8" )
+      elseif cAction == "openurl" .or. cAction == "open-browser" .or. cAction == "openbrowser"
+         // a1 = URL http(s) → navegador nativo del SO (no WebView embebido)
+         if Empty( cArg )
+            return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "url required" } ), ;
+               "application/json; charset=utf-8" )
+         endif
+         if ErpShellOpenUrl( cArg )
+            return ErpHttpOk( hb_jsonEncode( { "ok" => .T., "url" => cArg } ), ;
+               "application/json; charset=utf-8" )
+         endif
+         return ErpHttpOk( hb_jsonEncode( { "ok" => .F., ;
+            "msg" => "Only http(s) URLs allowed" } ), ;
+            "application/json; charset=utf-8" )
       elseif cAction == "company" .or. cAction == "setcompany" .or. cAction == "set_company"
          // a1 = company code; optional a2 = app id within that company
          if Empty( cArg )
@@ -2235,18 +2335,34 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
    endif
 
    // static www assets (path traversal guard: URL-decode first, reject "..")
+   // /portal/ y /portal → www/portal/index.html (como un servidor web normal)
    if Left( cPath, 1 ) == "/"
       cRel := ErpUrlDecode( cPath )
       if ".." $ cRel
          return ErpHttpForbidden( cPath )
       endif
       cFile := hb_DirBase() + "www" + StrTran( cRel, "/", hb_ps() )
+      // Quitar separador final: /portal/ → carpeta portal
+      do while Len( cFile ) > 0 .and. Right( cFile, 1 ) $ "/\"
+         cFile := Left( cFile, Len( cFile ) - 1 )
+      enddo
+      if ! File( cFile )
+         // Carpeta o ruta sin archivo: servir index.html del directorio
+         if File( cFile + hb_ps() + "index.html" )
+            cFile := cFile + hb_ps() + "index.html"
+         elseif File( cFile + hb_ps() + "Index.html" )
+            cFile := cFile + hb_ps() + "Index.html"
+         endif
+      endif
       if File( cFile )
          cMime := "text/plain"
          if Right( Lower( cFile ), 5 ) == ".html" ; cMime := "text/html; charset=utf-8" ; endif
          if Right( Lower( cFile ), 3 ) == ".js"   ; cMime := "application/javascript" ; endif
          if Right( Lower( cFile ), 4 ) == ".css"  ; cMime := "text/css" ; endif
          if Right( Lower( cFile ), 5 ) == ".json" ; cMime := "application/json" ; endif
+         if Right( Lower( cFile ), 4 ) == ".svg"  ; cMime := "image/svg+xml" ; endif
+         if Right( Lower( cFile ), 4 ) == ".png"  ; cMime := "image/png" ; endif
+         if Right( Lower( cFile ), 4 ) == ".ico"  ; cMime := "image/x-icon" ; endif
          return ErpHttpOk( MemoRead( cFile ), cMime )
       endif
    endif
@@ -2705,3 +2821,31 @@ function ErpUrlDecode( c )
       endif
    enddo
 return cOut
+
+//--------------------------------------------------------------------
+// FIX race (prototipo web-branch, para PR a FiveTech):
+// Guard de mutex con destructor — Harbour invoca Destroy() al liberarse
+// el LOCAL (cualquier RETURN de la función que lo declara). Hace atómico
+// el read-modify-write de ErpApiDatasetPost sin tocar cada return.
+CLASS ErpMutexGuard
+
+   DATA mtx
+
+   METHOD New( m )
+   METHOD Destroy()
+
+ENDCLASS
+
+METHOD New( m ) CLASS ErpMutexGuard
+   ::mtx := m
+   if ::mtx != NIL
+      hb_mutexLock( ::mtx )
+   endif
+return Self
+
+METHOD Destroy() CLASS ErpMutexGuard
+   if ::mtx != NIL
+      hb_mutexUnlock( ::mtx )
+      ::mtx := NIL
+   endif
+return NIL
