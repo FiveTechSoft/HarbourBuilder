@@ -1929,6 +1929,26 @@ static function ErpDispatch( cMethod, cPath, cQuery, cBody, hHdr )
       return ErpHttpOk( cOut, "application/json; charset=utf-8" )
    endif
 
+   // DDL for the hdbc driver's target tables, generated (never executed
+   // against any connection) from the same meta/data/*.json schema
+   // inference dbfcdx already uses. Review-and-run-by-hand, see
+   // docs/hdbc-driver.md.
+   if cMethod == "GET" .and. cPath == "/api/db/schema-sql"
+      if Empty( hSess )
+         return ErpHttpOk( hb_jsonEncode( { "ok" => .F., "msg" => "Not authenticated" } ), ;
+            "application/json; charset=utf-8" )
+      endif
+      cOut := ""
+      bOld := ErrorBlock( {| e | Break( e ) } )
+      begin sequence
+         cOut := ErpDbHdbcSchemaSql()
+      recover
+         cOut := ""
+      end sequence
+      ErrorBlock( bOld )
+      return ErpHttpOk( cOut, "text/plain; charset=utf-8" )
+   endif
+
    if cMethod == "POST" .and. cPath == "/api/login"
       cUser := ""
       cPass := ""

@@ -42,6 +42,24 @@ if not exist "%HBLIB%\hbvmmt.lib" (
 echo Harbour: %HBDIR%
 echo Libs:    %HBLIB%
 
+REM --- Optional: HDBC (RDDHDBC over MariaDB) — third-party, licensed, opt-in.
+REM Nothing here is provided by this repo. To enable, you supply BOTH:
+REM   1. your own licensed hdbctools.lib in %HBLIB%
+REM   2. HDBC_CONNECT_PRG = path to your own .prg implementing
+REM      ErpDbHdbcUserConnect() (contract documented in erp_db.prg /
+REM      docs/hdbc-driver.md) using your licensed HDBC package.
+REM Missing either -> build is byte-identical to today (hdbc driver simply
+REM unavailable; see ErpDbHdbcAvailable() / GET /api/db/status).
+set "HDBC_DFLAG="
+set "HDBC_OBJ="
+set "HDBC_LIBS="
+if exist "%HBLIB%\hdbctools.lib" if not "%HDBC_CONNECT_PRG%"=="" if exist "%HDBC_CONNECT_PRG%" (
+  set "HDBC_DFLAG=-dHB_WITH_HDBC"
+  echo HDBC:    hdbctools.lib + %HDBC_CONNECT_PRG% found - hdbc driver will link
+) else (
+  echo HDBC:    not configured - hdbc driver will not link ^(see docs/hdbc-driver.md^)
+)
+
 REM --- VS x64 ---
 set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
 if not exist "%VSWHERE%" set "VSWHERE=%ProgramFiles%\Microsoft Visual Studio\Installer\vswhere.exe"
@@ -94,10 +112,18 @@ if errorlevel 1 (
   exit /b 1
 )
 copy /y "%PROJDIR%\erp_db.prg" "%BUILDDIR%\erp_db.prg" >nul
-"%HBBIN%\harbour.exe" erp_db.prg -n -w -q -i"%HBINC%" -i"%BUILDDIR%" -i"%HBROOT%\include" -oerp_db.c
+"%HBBIN%\harbour.exe" erp_db.prg -n -w -q %HDBC_DFLAG% -i"%HBINC%" -i"%BUILDDIR%" -i"%HBROOT%\include" -oerp_db.c
 if errorlevel 1 (
   echo HARBOUR FAILED on erp_db.prg
   exit /b 1
+)
+if not "%HDBC_DFLAG%"=="" (
+  copy /y "%HDBC_CONNECT_PRG%" "%BUILDDIR%\erp_db_hdbc_connect.prg" >nul
+  "%HBBIN%\harbour.exe" erp_db_hdbc_connect.prg -n -w -q %HDBC_DFLAG% -i"%HBINC%" -i"%BUILDDIR%" -i"%HBROOT%\include" -oerp_db_hdbc_connect.c
+  if errorlevel 1 (
+    echo HARBOUR FAILED on HDBC_CONNECT_PRG
+    exit /b 1
+  )
 )
 copy /y "%PROJDIR%\erp_proc.prg" "%BUILDDIR%\erp_proc.prg" >nul
 "%HBBIN%\harbour.exe" erp_proc.prg -n -w -q -i"%HBINC%" -i"%BUILDDIR%" -i"%HBROOT%\include" -oerp_proc.c
@@ -121,6 +147,12 @@ cl.exe %CL_BASE% erp_http.c /Foerp_http.obj
 if errorlevel 1 exit /b 1
 cl.exe %CL_BASE% erp_db.c /Foerp_db.obj
 if errorlevel 1 exit /b 1
+if not "%HDBC_DFLAG%"=="" (
+  cl.exe %CL_BASE% erp_db_hdbc_connect.c /Foerp_db_hdbc_connect.obj
+  if errorlevel 1 exit /b 1
+  set "HDBC_OBJ=erp_db_hdbc_connect.obj"
+  set "HDBC_LIBS=hdbctools.lib %HDBC_EXTRA_LIBS%"
+)
 cl.exe %CL_BASE% erp_proc.c /Foerp_proc.obj
 if errorlevel 1 exit /b 1
 cl.exe %CL_BASE% classes.c /Foclasses.obj
@@ -159,6 +191,7 @@ if errorlevel 1 (
 echo [4] Link FiveTech_ERP.exe  (hbvmmt)
 set "OBJS=main.obj erp_meta.obj erp_http.obj erp_db.obj erp_proc.obj classes.obj tcontrol.obj tform.obj tcontrols.obj hbbridge.obj hb_db_real.obj fwh_webview2.obj fte_errdlg.obj"
 if exist stddlgs.obj set "OBJS=%OBJS% stddlgs.obj"
+if not "%HDBC_OBJ%"=="" set "OBJS=%OBJS% %HDBC_OBJ%"
 
 set "HBLIBS=hbvmmt.lib hbrtl.lib hbcommon.lib hblang.lib hbrdd.lib hbmacro.lib hbpp.lib hbcplr.lib hbct.lib hbhsx.lib hbsix.lib hbusrrdd.lib rddntx.lib rddnsx.lib rddcdx.lib rddfpt.lib hbcpage.lib hbpcre.lib hbzlib.lib hbdebug.lib hbsqlit3.lib sqlite3.lib gtgui.lib gtwin.lib gtwvt.lib hbmainwin.lib"
 REM hbmainwin may be named differently
@@ -177,7 +210,7 @@ if exist "%HBLIB%\rddads.lib" (
 
 set "SYSLIBS=user32.lib kernel32.lib gdi32.lib comctl32.lib comdlg32.lib shell32.lib ole32.lib oleaut32.lib advapi32.lib uuid.lib ws2_32.lib winmm.lib msimg32.lib gdiplus.lib winspool.lib dwmapi.lib iphlpapi.lib shlwapi.lib"
 
-link.exe /NOLOGO /OUT:"%OUT%" /SUBSYSTEM:WINDOWS /NODEFAULTLIB:LIBCMT %ADSLINK% /LIBPATH:"%HBLIB%" %OBJS% %HBLIBS% %ADSLIBS% %SYSLIBS%
+link.exe /NOLOGO /OUT:"%OUT%" /SUBSYSTEM:WINDOWS /NODEFAULTLIB:LIBCMT %ADSLINK% /LIBPATH:"%HBLIB%" %OBJS% %HBLIBS% %ADSLIBS% %HDBC_LIBS% %SYSLIBS%
 if errorlevel 1 (
   echo LINK FAILED
   exit /b 1

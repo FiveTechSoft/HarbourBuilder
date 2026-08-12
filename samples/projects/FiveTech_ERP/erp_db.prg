@@ -1,11 +1,20 @@
 // erp_db.prg — selectable data layer for FiveTech_ERP
 // driver: json (default, meta/data/*.json) | dbfcdx (local <exedir>/data) |
-//         openads (remote OpenADS server via rddads tcp://host:port/dataPath)
+//         openads (remote OpenADS server via rddads tcp://host:port/dataPath) |
+//         hdbc (RDDHDBC over MariaDB — opt-in, see docs/hdbc-driver.md)
 // Config lives in meta/app.json -> "database" (saved by the UI via POST /api/meta).
 //--------------------------------------------------------------------
 
 REQUEST DBFCDX
 REQUEST ADS, ADSCDX
+
+// RDDHDBC (a third-party RDD) needs no REQUEST here: its own registration
+// module only gets linked in when your ErpDbHdbcUserConnect() (compiled in
+// only under HB_WITH_HDBC — see build_win64.bat and docs/hdbc-driver.md)
+// calls one of the RDD's own public functions, which pulls in the same
+// translation unit as its "register me" init code. A normal build defines
+// neither ErpDbHdbcUserConnect() nor HB_WITH_HDBC, so it links nothing from
+// that RDD at all.
 
 // ads.ch constants (avoid the extra include path — same values as
 // C:\harbour\contrib\rddads\ads.ch and the OpenADS smoke tests)
@@ -14,6 +23,7 @@ REQUEST ADS, ADSCDX
 
 static s_mtxDb := hb_MutexCreate()
 static s_hAdsConn := 0
+static s_lHdbcConn := .F.
 static s_cDbErr := ""        // last data-layer error (diagnostics via /api/db/status)
 
 //--------------------------------------------------------------------
@@ -75,6 +85,17 @@ function ErpDbAdsAvailable()
 return File( hb_DirBase() + "ace64.dll" )
 
 //--------------------------------------------------------------------
+// .T. only when this exe was compiled with HB_WITH_HDBC (i.e. the builder
+// had their own licensed RDDHDBC/hdbctools.lib — see docs/hdbc-driver.md).
+// A build without it simply cannot select the hdbc driver.
+function ErpDbHdbcAvailable()
+#ifdef HB_WITH_HDBC
+   return .T.
+#else
+   return .F.
+#endif
+
+//--------------------------------------------------------------------
 // Lazy one-time remote connection; the handle stays in s_hAdsConn and is
 // reused by every open. Call with s_mtxDb held.
 static function ErpDbAdsConnect()
@@ -107,6 +128,38 @@ static function ErpDbAdsConnect()
 return .T.
 
 //--------------------------------------------------------------------
+// Lazy one-time HDBC (RDDHDBC) connection — opt-in, third-party.
+//
+// This file NEVER calls into, links, or ships any RDDHDBC/HDBC code: it
+// only exists when the build defines HB_WITH_HDBC (docs/hdbc-driver.md),
+// and even then all it does is call ErpDbHdbcUserConnect( hCfg ), a
+// function YOU supply in your own extra .prg (added to your own build,
+// never part of this repo) using your own licensed HDBC package. Contract:
+//   - hCfg is the "database" hash from app.json (host/port/user/password/
+//     dataPath, dataPath holding the DB name for this driver).
+//   - build a connection with your licensed package and register it with
+//     the RDD via ITS OWN public entry point (documented by RDDHDBC, not
+//     reproduced here) so a later "dbUseArea(...,"RDDHDBC",...)" can use it.
+//   - return .T. once ready; .F. to fail the open cleanly.
+// A build that defines HB_WITH_HDBC without also linking a .prg that
+// implements ErpDbHdbcUserConnect() fails at LINK time (unresolved
+// reference) — intentional: half-configured HDBC support should not
+// silently degrade the way a missing OpenADS DLL does.
+static function ErpDbHdbcConnect()
+#ifdef HB_WITH_HDBC
+   if s_lHdbcConn
+      return .T.
+   endif
+   if ErpDbHdbcUserConnect( ErpDbConfig() )
+      s_lHdbcConn := .T.
+      return .T.
+   endif
+   return .F.
+#else
+   return .F.
+#endif
+
+//--------------------------------------------------------------------
 // Open <cName> (dataset base name) in a NEW workarea with the RDD that
 // matches the active driver. Returns the alias or "" on failure.
 // Call with s_mtxDb held and a trapping ErrorBlock installed.
@@ -121,6 +174,12 @@ static function ErpDbOpen( cName )
       endif
       cRDD  := "ADSCDX"
       cFile := cName              // relative to the server dataPath
+   elseif cDriver == "hdbc"
+      if ! ErpDbHdbcConnect()
+         return ""
+      endif
+      cRDD  := "RDDHDBC"          // the RDD's own registered name (rddRegister("RDDHDBC",...))
+      cFile := cName              // table name (or the driver's own query syntax)
    else
       cRDD  := "DBFCDX"
       cFile := ErpDbDataDir() + cName + ".dbf"
@@ -548,6 +607,90 @@ static function ErpDbCreateTable( cBase, aMap, aRows )
 return lOk
 
 //--------------------------------------------------------------------
+// hdbc schema provisioning: THIS FILE never talks to a live MariaDB
+// connection to create tables (see docs/hdbc-driver.md — provisioning is
+// deliberately a manual, reviewable step, not something the server does
+// silently against a real database). What it CAN do without any HDBC
+// dependency at all is generate the DDL text from the same JSON schema
+// inference already used for dbfcdx (ErpDbInferSchema): one CREATE TABLE
+// per data.* dataset, plus the "_h_rowid_"/"deleted_at" bookkeeping columns
+// RDDHDBC tables need (see its own docs for exact requirements/versions —
+// column names here are the ones documented publicly, not guessed).
+// Field-name map -> MariaDB column type. Same width/precision reasoning as
+// ErpDbInferSchema; VARCHAR is capped like the DBF C-type is.
+static function ErpDbHdbcSqlType( hMap )
+
+   do case
+   case hMap[ "type" ] == "C" ; return "VARCHAR(" + hb_ntos( Max( 1, hMap[ "len" ] ) ) + ")"
+   case hMap[ "type" ] == "N" ; return "DECIMAL(18," + hb_ntos( hMap[ "dec" ] ) + ")"
+   case hMap[ "type" ] == "L" ; return "TINYINT(1)"
+   otherwise                  ; return "TEXT"            // "M" — JSON-encoded, as ErpDbToDbf writes it
+   endcase
+return "TEXT"
+
+//--------------------------------------------------------------------
+// One "CREATE TABLE IF NOT EXISTS <cBase> (...)" for a single dataset.
+// cBase: bare dataset name (e.g. "products", matching data/products.json).
+static function ErpDbHdbcTableSql( cBase, aMap )
+
+   local cSql := "CREATE TABLE IF NOT EXISTS `" + Lower( cBase ) + "` (" + Chr( 10 )
+   local h
+
+   // Backtick every identifier: several field/dataset names in the demo
+   // meta (user, key, when, ...) are MariaDB reserved words and break the
+   // DDL without this (found by actually running it against a real server).
+   cSql += "  `_h_rowid_` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY," + Chr( 10 )
+   for each h in aMap
+      cSql += "  `" + Lower( h[ "dbf" ] ) + "` " + ErpDbHdbcSqlType( h ) + "," + Chr( 10 )
+   next
+   cSql += "  `deleted_at` DATETIME NULL DEFAULT NULL" + Chr( 10 )
+   cSql += ");" + Chr( 10 )
+return cSql
+
+//--------------------------------------------------------------------
+// Full DDL text for every data.* dataset under meta/data/*.json — infers
+// (or reuses a saved) field map exactly like ErpDbEnsureTables() does for
+// dbfcdx, but only ever returns SQL text; nothing here opens a database
+// connection. Meant to be reviewed and run by hand (e.g. "mysql -u ... <
+// schema.sql") before switching database.driver to "hdbc". See
+// GET /api/db/schema-sql (erp_http.prg) for the HTTP-facing wrapper.
+function ErpDbHdbcSchemaSql()
+
+   local cOut := "-- Generated by ErpDbHdbcSchemaSql() from meta/data/*.json" + Chr( 10 ) + ;
+      "-- Review before running. RDDHDBC's own bookkeeping table" + Chr( 10 ) + ;
+      "-- (index metadata) is NOT included here — provision it per RDDHDBC's docs." + Chr( 10 ) + Chr( 10 )
+   local aDir, aItem, cName, nDot, cBase, aRows, aMap
+
+   aDir := Directory( ErpMetaRoot() + "data" + hb_ps() + "*.json" )
+   for each aItem in aDir
+      cName := AllTrim( ErpToStr( aItem[ 1 ] ) )
+      if Empty( cName ) .or. "D" $ Upper( ErpToStr( aItem[ 5 ] ) )
+         loop
+      endif
+      nDot := RAt( ".", cName )
+      cBase := iif( nDot > 1, Left( cName, nDot - 1 ), cName )
+      aRows := ErpDbJsonRows( cBase )
+      if Empty( aRows )
+         loop
+      endif
+      aMap := ErpDbLoadMap( cBase )
+      if Empty( aMap )
+         aMap := ErpDbInferSchema( aRows )
+         if ! Empty( aMap )
+            // Persist it now — ErpDbReadRows()/ErpDbApply() need this same
+            // <name>.map.json (column<->field mapping) once "hdbc" is
+            // selected as the driver, same file dbfcdx already relies on.
+            ErpDbSaveMap( cBase, aMap )
+         endif
+      endif
+      if Empty( aMap )
+         loop
+      endif
+      cOut += ErpDbHdbcTableSql( cBase, aMap )
+   next
+return cOut
+
+//--------------------------------------------------------------------
 // Read all rows of a dataset through the active driver.
 // Returns an array of hashes with the JSON field names from the map.
 function ErpDbReadRows( cDataKey )
@@ -619,6 +762,7 @@ return aRows
 function ErpDbApply( cDataKey, cAction, cBody )
 
    local cName := ErpDbDataName( cDataKey ), aMap, cAlias := ""
+   local cDriver := ErpDbDriver()
    local nF, hMap, nKey := 0, lOk := .F.
    local bOld, oErr, cCp
    local hReq := { => }, hRow, cKeyField, cKeyValue
@@ -686,10 +830,17 @@ function ErpDbApply( cDataKey, cAction, cBody )
                            ( cAlias )->( dbDelete() )
                         endif
                         ( cAlias )->( dbUnlock() )
-                        // remote OpenADS: dbDelete() can be a silent no-op
-                        // (Deleted() stays .F.) and FieldPut on rows that were
-                        // not written by this connection throws "write failed"
-                        if cAction == "delete" .and. ! ( cAlias )->( Deleted() )
+                        // remote OpenADS specifically: dbDelete() can be a
+                        // silent no-op (Deleted() stays .F.) and FieldPut on
+                        // rows not written by this connection throws "write
+                        // failed". This Deleted() re-check is an OpenADS
+                        // quirk workaround, not a general one — verified
+                        // against a real MariaDB that hdbc's dbDelete()
+                        // persists correctly (deleted_at set) even though
+                        // Deleted() on the just-modified record buffer can
+                        // read back .F. before the next fetch.
+                        if cAction == "delete" .and. cDriver == "openads" .and. ;
+                              ! ( cAlias )->( Deleted() )
                            s_cDbErr := "delete not persisted by the OpenADS server"
                            lOk := .F.
                         else
@@ -719,7 +870,7 @@ function ErpDbApply( cDataKey, cAction, cBody )
       lOk := .F.
       s_cDbErr := cAction + " " + cName + ": " + oErr:Description + ;
          iif( Empty( oErr:Operation ), "", " (" + oErr:Operation + ")" )
-      if ErpDbDriver() == "openads"
+      if cDriver == "openads"
          s_cDbErr += " — remote update/delete of pre-existing rows is not supported by this OpenADS server"
       endif
    end sequence
@@ -763,6 +914,7 @@ function ErpDbStatus()
       "dbfDir"   => cDir, ;
       "tables"   => aTables, ;
       "openadsAvailable" => ErpDbAdsAvailable(), ;
+      "hdbcAvailable" => ErpDbHdbcAvailable(), ;
       "lastError" => s_cDbErr }
 
    if hCfg[ "driver" ] == "openads"
@@ -770,5 +922,9 @@ function ErpDbStatus()
       // accepted but only live in the server session cache (not durable);
       // update/delete of on-disk rows are rejected server-side
       hOut[ "remoteNote" ] := "OpenADS server: read ok; add is session-cached (not durable); update/delete of existing rows not supported"
+   elseif hCfg[ "driver" ] == "hdbc"
+      hOut[ "remoteNote" ] := iif( ErpDbHdbcAvailable(), ;
+         "RDDHDBC over MariaDB: third-party, licensed driver — see docs/hdbc-driver.md. Tables are NOT auto-created; provision the schema yourself.", ;
+         "hdbc driver selected but this exe was not built with HB_WITH_HDBC — see docs/hdbc-driver.md" )
    endif
 return hOut

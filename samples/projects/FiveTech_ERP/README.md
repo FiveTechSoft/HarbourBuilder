@@ -85,3 +85,12 @@ sync_meta.bat
 > Looking different in the window is usually the **HTML shell** (`www\index.html` is a slim client). FWH serves the full dashboard HTML from `login.prg`. Meta JSON can be identical while the UI chrome still differs.
 
 > **Warning — generated files:** `sync_meta.bat` (run by every build) mirrors `./meta` from the FWH tree and **regenerates `www\login.html` / `www\dashboard.html`** from the TEXT blocks in `C:\fwteam\samples\DesktopWeb\login.prg` (`_extract_fwh_html.py`). Never edit `www\*.html` or `./meta` locally as the only copy — apply durable changes in the FWH source and re-sync, or they are lost on the next build.
+
+## Data layer (`erp_db.prg`)
+
+`meta/app.json -> "database" -> "driver"` selects where `data.*` datasets
+actually live: `json` (default, `meta/data/*.json`), `dbfcdx` (local DBF/CDX
+in `./data`), `openads` (remote OpenADS server), or `hdbc` (RDDHDBC over
+MariaDB — opt-in, third-party, licensed separately; see
+`docs/hdbc-driver.md`). `GET /api/db/status` reports the active driver and
+its availability.
