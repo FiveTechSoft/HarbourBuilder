@@ -31,7 +31,11 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/harbour/core /tmp/harbour-src
           cd /tmp/harbour-src
-          HB_INSTALL_PREFIX="$HOME/harbour" make -j$(nproc) install
+          # Sequential: -j$(nproc) was failing here with
+          # "undefined reference to hb_compExpr*" linking libhbmacro,
+          # consistent with a parallel-build ordering race in harbour/core's
+          # Makefile. Plain `make install` is slower but reliable.
+          HB_INSTALL_PREFIX="$HOME/harbour" make install
 
       - name: Run tests
         run: |
@@ -58,8 +62,18 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/harbour/core C:\harbour-src
           cd C:\harbour-src
+          rem harbour/core dropped the old win\msvc64\makefile.vc (nmake) path;
+          rem it now builds with its own bundled GNU Make (win-make.exe) and
+          rem HB_PLATFORM/HB_COMPILER, per doc/gmake.txt. VsDevCmd puts
+          rem cl.exe/link.exe/ml64.exe on PATH for that build.
           set HB_INSTALL_PREFIX=C:\harbour
-          nmake /f "C:\harbour-src\win\msvc64\makefile.vc" install
+          set HB_PLATFORM=win
+          set HB_COMPILER=msvc64
+          for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath 2^>nul`) do set VSDIR=%%i
+          if not defined VSDIR for /f "usebackq tokens=*" %%i in (`"%ProgramFiles%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath 2^>nul`) do set VSDIR=%%i
+          if not defined VSDIR ( echo ERROR: Visual Studio not found via vswhere & exit /b 1 )
+          call "%VSDIR%\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64
+          C:\harbour-src\win-make.exe install
 
       - name: Run tests
         shell: cmd
