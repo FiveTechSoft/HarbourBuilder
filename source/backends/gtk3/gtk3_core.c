@@ -3466,6 +3466,20 @@ HB_FUNC( UI_SETPROP )
       if( p->FControlType == CT_COMBOBOX && p->FWidget &&
           GTK_IS_COMBO_BOX_TEXT(p->FWidget) )
          gtk_combo_box_set_active( GTK_COMBO_BOX(p->FWidget), cb->FItemIndex - 1 );
+      else if( p->FControlType == CT_LISTBOX && p->FWidget &&
+               GTK_IS_SCROLLED_WINDOW(p->FWidget) && cb->FItemIndex > 0 )
+      {
+         GtkWidget * tv = gtk_bin_get_child( GTK_BIN(p->FWidget) );
+         if( tv && GTK_IS_TREE_VIEW(tv) )
+         {
+            int row = cb->FItemIndex - 1;
+            if( row >= cb->FItemCount ) row = 0;
+            GtkTreeSelection * sel = gtk_tree_view_get_selection( GTK_TREE_VIEW(tv) );
+            GtkTreePath * path = gtk_tree_path_new_from_indices( row, -1 );
+            gtk_tree_selection_select_path( sel, path );
+            gtk_tree_path_free( path );
+         }
+      }
    }
    else if( strcasecmp(szProp,"cName")==0 && HB_ISCHAR(3) )
       strncpy( p->FName, hb_parc(3), sizeof(p->FName)-1 );

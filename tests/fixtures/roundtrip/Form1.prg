@@ -62,10 +62,10 @@ static function FixtureHelper( x )
    return Upper( hb_ValToStr( x ) )
 
 function FixtureCaption( oCtrl )
-   return "items:" + hb_ValToStr( Len( oCtrl:aItems ) )
+   return iif( oCtrl:ClassName() == "TCOMBOBOX", "caption-ok", "caption-bad" )
 
 function FixtureTrace( cTag, oCtrl )
-   HB_MemoWrit( "/tmp/fixture_trace.log", cTag + ":" + oCtrl:cName + Chr(10) )
+   MemoWrit( "/tmp/fixture_trace.log", cTag + ":" + oCtrl:cText + Chr(10) )
 return nil
 
 function FixtureClick( oForm )
