@@ -37,7 +37,7 @@ METHOD CreateForm() CLASS TForm1
    @ 60, 20 GET ::oEdit1 VAR "texto inicial" OF Self SIZE 220, 26
    FixtureTrace( "after-edit1", ::oEdit1 )
    @ 100, 20 CHECKBOX ::oChk1 PROMPT "Marcado" OF Self SIZE 140 CHECKED
-   @ 140, 20 COMBOBOX ::oCombo1 OF Self SIZE 180, 26 ITEMS "Uno", "Dos", "Tres"
+   @ 140, 20 COMBOBOX ::oCombo1 OF Self SIZE 180, 26 ITEMS "Uno", "Di " + Chr( 34 ) + "si" + Chr( 34 ), "Tre, s"
    ::oLabel1:cText := FixtureCaption( ::oCombo1 )
    @ 190, 20 GROUPBOX ::oGroup1 PROMPT "Grupo" OF Self SIZE 260, 90
    @ 210, 40 RADIOBUTTON ::oRadio1 PROMPT "Opcion A" OF Self SIZE 120 CHECKED
