@@ -2951,41 +2951,64 @@ static function TBRun()
       endif
       cCmd := "gcc -c -O2 -Wno-unused-value -I" + cHbInc + ;
               " " + cBuildDir + "/classes.c -o " + cBuildDir + "/classes.o 2>&1"
-      GTK_ShellExec( cCmd )
-      if File( cBuildDir + "/hix_runtime.c" )
+      cOutput := GTK_ShellExec( cCmd )
+      if ! File( cBuildDir + "/classes.o" )
+         cLog += "    FAILED (classes.c):" + Chr(10) + cOutput + Chr(10)
+         lError := .T.
+      endif
+      if ! lError .and. File( cBuildDir + "/hix_runtime.c" )
          cCmd := "gcc -c -O2 -Wno-unused-value -I" + cHbInc + ;
                  " " + cBuildDir + "/hix_runtime.c -o " + cBuildDir + "/hix_runtime.o 2>&1"
-         GTK_ShellExec( cCmd )
+         cOutput := GTK_ShellExec( cCmd )
+         if ! File( cBuildDir + "/hix_runtime.o" )
+            cLog += "    FAILED (hix_runtime.c):" + Chr(10) + cOutput + Chr(10)
+            lError := .T.
+         endif
       endif
-      if File( cBuildDir + "/hix_template.c" )
+      if ! lError .and. File( cBuildDir + "/hix_template.c" )
          cCmd := "gcc -c -O2 -Wno-unused-value -I" + cHbInc + ;
                  " " + cBuildDir + "/hix_template.c -o " + cBuildDir + "/hix_template.o 2>&1"
-         GTK_ShellExec( cCmd )
+         cOutput := GTK_ShellExec( cCmd )
+         if ! File( cBuildDir + "/hix_template.o" )
+            cLog += "    FAILED (hix_template.c):" + Chr(10) + cOutput + Chr(10)
+            lError := .T.
+         endif
       endif
-      cLog += "    OK" + Chr(10)
+      if ! lError; cLog += "    OK" + Chr(10); endif
    endif
 
    // Step 6: Compile GTK3 backend + DB bindings
    if ! lError
       GTK_ProgressStep( "Compiling GTK3 backend..." )
       cLog += "[6] Compiling GTK3 backend..." + Chr(10)
-      cCmd := "gcc -c -O2 -I" + cHbInc + ;
+      cCmd := "gcc -c -O2 -DHIX_PRGRUNTIME -I" + cHbInc + ;
+              " -I" + cProjDir + "/include" + ;
               " $(pkg-config --cflags gtk+-3.0)" + ;
               " $(pkg-config --exists webkit2gtk-4.1 2>/dev/null && echo '-DHAVE_WEBKIT2GTK '$(pkg-config --cflags webkit2gtk-4.1) || " + ;
               "  (pkg-config --exists webkit2gtk-4.0 2>/dev/null && echo '-DHAVE_WEBKIT2GTK '$(pkg-config --cflags webkit2gtk-4.0) || echo ''))" + ;
               " " + cProjDir + "/source/backends/gtk3/gtk3_core.c" + ;
               " -o " + cBuildDir + "/gtk3_core.o 2>&1"
-      GTK_ShellExec( cCmd )
+      cOutput := GTK_ShellExec( cCmd )
+      if ! File( cBuildDir + "/gtk3_core.o" )
+         cLog += "    FAILED (gtk3_core.c):" + Chr(10) + cOutput + Chr(10)
+         lError := .T.
+      endif
       // DB bindings via runtime dlopen — libmysqlclient.so / libpq.so
       // resolved at launch. classes.prg EXTERNAL HBMYSQL_*/HBPGSQL_* link
       // to safe-default impls when libs are missing on the user box.
       GTK_ShellExec( "rm -f " + cBuildDir + "/hbmysql.o " + ;
                      cBuildDir + "/hbpgsql.o " + cBuildDir + "/hbdb_stub.o" )
-      cCmd := "gcc -c -O2 -I" + cHbInc + ;
-              " " + cProjDir + "/source/backends/gtk3/gtk3_db_real.c" + ;
-              " -o " + cBuildDir + "/hbdb_real.o 2>&1"
-      GTK_ShellExec( cCmd )
-      cLog += "    OK" + Chr(10)
+      if ! lError
+         cCmd := "gcc -c -O2 -I" + cHbInc + ;
+                 " " + cProjDir + "/source/backends/gtk3/gtk3_db_real.c" + ;
+                 " -o " + cBuildDir + "/hbdb_real.o 2>&1"
+         cOutput := GTK_ShellExec( cCmd )
+         if ! File( cBuildDir + "/hbdb_real.o" )
+            cLog += "    FAILED (gtk3_db_real.c):" + Chr(10) + cOutput + Chr(10)
+            lError := .T.
+         endif
+      endif
+      if ! lError; cLog += "    OK" + Chr(10); endif
    endif
 
    // Step 7: Link
@@ -3012,7 +3035,7 @@ static function TBRun()
               " $(pkg-config --libs gtk+-3.0)" + ;
               " $(pkg-config --exists webkit2gtk-4.1 2>/dev/null && pkg-config --libs webkit2gtk-4.1 || " + ;
               "  (pkg-config --exists webkit2gtk-4.0 2>/dev/null && pkg-config --libs webkit2gtk-4.0 || echo ''))" + ;
-              " -lm -lpthread -ldl -lrt -lsqlite3 -lncurses 2>&1"
+              " -lm -lpthread -ldl -lrt -lsqlite3 -l:libncurses.so.6 2>&1"
       cOutput := GTK_ShellExec( cCmd )
       if "error" $ Lower( cOutput )
          cLog += "    FAILED:" + Chr(10) + cOutput + Chr(10)
@@ -3227,7 +3250,7 @@ static function TBDebugRun( lRunToBreak )
               " -Wl,--end-group" + ;
               " $(pkg-config --libs gtk+-3.0)" + ;
               " " + cWebKitLibs + ;
-              " -lm -lpthread -ldl -lrt -lsqlite3 -lncurses 2>&1"
+              " -lm -lpthread -ldl -lrt -lsqlite3 -l:libncurses.so.6 2>&1"
       cOutput := GTK_ShellExec( cCmd )
       if "error" $ Lower( cOutput )
          cLog += cOutput + Chr(10)

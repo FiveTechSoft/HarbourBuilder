@@ -5,6 +5,10 @@
  * Provides the same HB_FUNC bridge interface so Harbour code (classes.prg) works unchanged.
  */
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE 1   /* strcasestr, strnlen */
+#endif
+
 #include <gtk/gtk.h>
 
 #ifdef HAVE_WEBKIT2GTK
@@ -31,6 +35,7 @@
 #include <ctype.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <unistd.h>
 #include <sys/select.h>
 #include <signal.h>
@@ -13523,12 +13528,12 @@ HB_FUNC( RPT_EXPORTPDF )
 
 /* ======================================================================
  * HTTP Web Server — lightweight socket-based server
- * Runs in a background thread, dispatches requests to Harbour callbacks.
+ * The listening socket is watched from the GLib main loop; each request
+ * is dispatched to TWebServer:Dispatch on the Harbour VM thread.
  * ====================================================================== */
 
 static int  s_httpServerFd = -1;
 static int  s_httpRunning  = 0;
-static pthread_t s_httpThread;
 
 /* Current request context (per-request, single-threaded dispatch) */
 static int    s_httpClientFd   = -1;
@@ -13536,6 +13541,17 @@ static int    s_httpStatusCode = 200;
 static char   s_httpContentType[128] = "text/html; charset=utf-8";
 static char * s_httpResponseBody = NULL;
 static int    s_httpResponseLen  = 0;
+
+/* Current request context: filled by http_on_listen before Dispatch,
+   read by the UI_HIX_* accessors (same contract as cocoa_webserver.m). */
+static char   s_reqMethod[16]   = "";
+static char   s_reqPath[512]    = "";
+static char   s_reqQuery[2048]  = "";
+static char * s_reqBody         = NULL;
+static int    s_reqBodyLen      = 0;
+static char   s_reqIP[64]       = "";
+static PHB_ITEM s_pHttpServerObj = NULL;   /* TWebServer instance (Dispatch target) */
+static guint  s_httpWatchId     = 0;
 
 static void http_append_body( const char * data, int len )
 {
@@ -13546,18 +13562,182 @@ static void http_append_body( const char * data, int len )
    s_httpResponseBody[s_httpResponseLen] = 0;
 }
 
+static const char * http_reason_phrase( int code )
+{
+   switch( code )
+   {
+      case 200: return "OK";
+      case 201: return "Created";
+      case 204: return "No Content";
+      case 301: return "Moved Permanently";
+      case 302: return "Found";
+      case 304: return "Not Modified";
+      case 400: return "Bad Request";
+      case 401: return "Unauthorized";
+      case 403: return "Forbidden";
+      case 404: return "Not Found";
+      case 405: return "Method Not Allowed";
+      case 500: return "Internal Server Error";
+      case 503: return "Service Unavailable";
+      default:  return "OK";
+   }
+}
+
 static void http_send_response( int fd )
 {
    char header[512];
    snprintf( header, sizeof(header),
-      "HTTP/1.1 %d OK\r\n"
+      "HTTP/1.1 %d %s\r\n"
       "Content-Type: %s\r\n"
       "Content-Length: %d\r\n"
       "Connection: close\r\n\r\n",
-      s_httpStatusCode, s_httpContentType, s_httpResponseLen );
+      s_httpStatusCode, http_reason_phrase( s_httpStatusCode ),
+      s_httpContentType, s_httpResponseLen );
    send( fd, header, strlen(header), 0 );
    if( s_httpResponseBody && s_httpResponseLen > 0 )
       send( fd, s_httpResponseBody, s_httpResponseLen, 0 );
+}
+
+/* Copy a NUL-terminated, length-limited string into a fixed buffer. */
+static void http_copy_field( char * dst, int dstSize, const char * src, int len )
+{
+   if( len >= dstSize ) len = dstSize - 1;
+   memcpy( dst, src, len );
+   dst[len] = 0;
+}
+
+/* GLib watch on the listening socket: accept one request, fill the
+   request context, call oServer:Dispatch( cMethod, cPath, cQuery, cBody, cIP ),
+   then send whatever the UI_HIX_* accessors produced. */
+static gboolean http_on_listen( GIOChannel * channel, GIOCondition cond, gpointer data )
+{
+   (void) channel; (void) data;
+   if( ( cond & ( G_IO_HUP | G_IO_ERR ) ) || ! s_httpRunning )
+      return G_SOURCE_REMOVE;
+
+   struct sockaddr_in caddr;
+   socklen_t clen = sizeof( caddr );
+   int fd = accept( s_httpServerFd, (struct sockaddr *)&caddr, &clen );
+   if( fd < 0 )
+      return G_SOURCE_CONTINUE;
+
+   /* Do not stall the UI on a slow client */
+   {
+      struct timeval tv;
+      tv.tv_sec = 2; tv.tv_usec = 0;
+      setsockopt( fd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *)&tv, sizeof( tv ) );
+   }
+
+   /* Read the request: headers first, then Content-Length body (cap 1 MB) */
+   {
+      int cap = 1048576, total = 0, headerEnd = -1, contentLen = 0;
+      char * req = (char *) malloc( cap );
+      if( ! req ) { close( fd ); return G_SOURCE_CONTINUE; }
+      while( total < cap )
+      {
+         int n = (int) recv( fd, req + total, cap - total, 0 );
+         if( n <= 0 ) break;
+         total += n;
+         if( headerEnd < 0 )
+         {
+            req[total] = 0;
+            {
+               char * p = strstr( req, "\r\n\r\n" );
+               if( p )
+               {
+                  char * cl;
+                  headerEnd = (int)( p - req ) + 4;
+                  cl = strcasestr( req, "Content-Length:" );
+                  if( cl && ( cl - req ) < headerEnd )
+                     contentLen = atoi( cl + 15 );
+                  if( contentLen < 0 ) contentLen = 0;
+                  if( headerEnd + contentLen > cap ) contentLen = cap - headerEnd;
+               }
+            }
+         }
+         if( headerEnd >= 0 && total >= headerEnd + contentLen )
+            break;
+      }
+      if( total <= 0 || headerEnd < 0 )
+      {
+         free( req );
+         close( fd );
+         return G_SOURCE_CONTINUE;
+      }
+
+      /* Parse request line: METHOD SP URI SP HTTP/x */
+      {
+         char * sp1 = strchr( req, ' ' );
+         char * sp2 = sp1 ? strchr( sp1 + 1, ' ' ) : NULL;
+         if( sp1 && sp2 && sp2 - req < headerEnd )
+         {
+            char * uri  = sp1 + 1;
+            int uriLen  = (int)( sp2 - uri );
+            char * qm   = memchr( uri, '?', uriLen );
+            http_copy_field( s_reqMethod, sizeof( s_reqMethod ), req, (int)( sp1 - req ) );
+            if( qm )
+            {
+               http_copy_field( s_reqPath, sizeof( s_reqPath ), uri, (int)( qm - uri ) );
+               http_copy_field( s_reqQuery, sizeof( s_reqQuery ), qm + 1, uriLen - (int)( qm - uri ) - 1 );
+            }
+            else
+            {
+               http_copy_field( s_reqPath, sizeof( s_reqPath ), uri, uriLen );
+               s_reqQuery[0] = 0;
+            }
+         }
+         else
+         {
+            free( req );
+            close( fd );
+            return G_SOURCE_CONTINUE;
+         }
+      }
+
+      /* Body and client IP */
+      if( s_reqBody ) { free( s_reqBody ); s_reqBody = NULL; }
+      s_reqBodyLen = total - headerEnd;
+      if( s_reqBodyLen > 0 )
+      {
+         s_reqBody = (char *) malloc( s_reqBodyLen + 1 );
+         if( s_reqBody )
+         {
+            memcpy( s_reqBody, req + headerEnd, s_reqBodyLen );
+            s_reqBody[s_reqBodyLen] = 0;
+         }
+         else
+            s_reqBodyLen = 0;
+      }
+      http_copy_field( s_reqIP, sizeof( s_reqIP ), inet_ntoa( caddr.sin_addr ), 63 );
+      free( req );
+   }
+
+   /* Reset response state */
+   if( s_httpResponseBody ) { free( s_httpResponseBody ); s_httpResponseBody = NULL; }
+   s_httpResponseLen = 0;
+   s_httpStatusCode  = 200;
+   strncpy( s_httpContentType, "text/html; charset=utf-8", sizeof( s_httpContentType ) - 1 );
+
+   /* Dispatch to the Harbour TWebServer instance */
+   if( s_pHttpServerObj )
+   {
+      PHB_DYNS pDyn = hb_dynsymFindName( "DISPATCH" );
+      if( pDyn )
+      {
+         hb_vmPushDynSym( pDyn );
+         hb_vmPush( s_pHttpServerObj );
+         hb_vmPushString( s_reqMethod, strlen( s_reqMethod ) );
+         hb_vmPushString( s_reqPath, strlen( s_reqPath ) );
+         hb_vmPushString( s_reqQuery, strlen( s_reqQuery ) );
+         hb_vmPushString( s_reqBody ? s_reqBody : "", s_reqBodyLen );
+         hb_vmPushString( s_reqIP, strlen( s_reqIP ) );
+         hb_vmSend( 5 );
+      }
+   }
+
+   http_send_response( fd );
+   close( fd );
+   return G_SOURCE_CONTINUE;
 }
 
 /* UI_WebServerStart( nPort [, nPortSSL, cRoot, lTrace, oServer] ) --> lSuccess */
@@ -13596,6 +13776,17 @@ HB_FUNC( UI_WEBSERVERSTART )
       return;
    }
 
+   /* Keep the TWebServer object and watch the socket from the main loop */
+   if( s_pHttpServerObj ) { hb_itemRelease( s_pHttpServerObj ); s_pHttpServerObj = NULL; }
+   if( HB_ISOBJECT( 5 ) )
+      s_pHttpServerObj = hb_itemNew( hb_param( 5, HB_IT_OBJECT ) );
+
+   {
+      GIOChannel * ch = g_io_channel_unix_new( s_httpServerFd );
+      s_httpWatchId = g_io_add_watch( ch, G_IO_IN | G_IO_HUP | G_IO_ERR, http_on_listen, NULL );
+      g_io_channel_unref( ch );
+   }
+
    s_httpRunning = 1;
    hb_retl( 1 );
 }
@@ -13604,6 +13795,8 @@ HB_FUNC( UI_WEBSERVERSTART )
 HB_FUNC( UI_WEBSERVERSTOP )
 {
    s_httpRunning = 0;
+   if( s_httpWatchId ) { g_source_remove( s_httpWatchId ); s_httpWatchId = 0; }
+   if( s_pHttpServerObj ) { hb_itemRelease( s_pHttpServerObj ); s_pHttpServerObj = NULL; }
    if( s_httpServerFd >= 0 )
    {
       close( s_httpServerFd );
@@ -13625,11 +13818,41 @@ HB_FUNC( UI_HIX_SETSTATUS )
    s_httpStatusCode = HB_ISNUM(1) ? hb_parni(1) : 200;
 }
 
+/* UI_HIX_Query() --> cQueryString — current request query string */
+HB_FUNC( UI_HIX_QUERY )  { hb_retc( s_reqQuery ); }
+
+/* UI_HIX_Body() --> cBody — current request body */
+HB_FUNC( UI_HIX_BODY )   { hb_retclen( s_reqBody ? s_reqBody : "", s_reqBodyLen ); }
+
+/* UI_HIX_Method() --> cMethod — current request HTTP method */
+HB_FUNC( UI_HIX_METHOD ) { hb_retc( s_reqMethod ); }
+
+/* UI_HIX_Path() --> cPath — current request path */
+HB_FUNC( UI_HIX_PATH )   { hb_retc( s_reqPath ); }
+
+/* UI_HIX_Ip() --> cIP — current client IP */
+HB_FUNC( UI_HIX_IP )     { hb_retc( s_reqIP ); }
+
+/* UI_HIX_SetContentType( cMime ) — set HTTP response content type */
+HB_FUNC( UI_HIX_SETCONTENTTYPE )
+{
+   const char * ct = hb_parc(1);
+   if( ct && ct[0] )
+   {
+      strncpy( s_httpContentType, ct, sizeof( s_httpContentType ) - 1 );
+      s_httpContentType[ sizeof( s_httpContentType ) - 1 ] = 0;
+   }
+   hb_retl( 1 );
+}
+
 /* ======================================================================
  * HIX Runtime — Harbour-compatible template engine functions
  * These are normally defined in hix_runtime.prg but need C linkage
- * when that file is not compiled into the project.
+ * when that file is not compiled into the project (e.g. the IDE itself).
+ * User apps compile hix_runtime.prg, so the IDE build pipeline defines
+ * HIX_PRGRUNTIME to keep the PRG versions and avoid duplicate symbols.
  * ====================================================================== */
+#ifndef HIX_PRGRUNTIME
 
 static char s_hixRoot[512] = ".";
 
@@ -13756,6 +13979,8 @@ HB_FUNC( HIX_SERVESTATIC )
    }
    fclose( f );
 }
+
+#endif /* HIX_PRGRUNTIME */
 
 /* ======================================================================
  * AI-driven palette additions: TStaticText, TScrollBox, TLabeledEdit,

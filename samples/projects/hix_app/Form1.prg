@@ -80,7 +80,14 @@ METHOD OnStopClick() CLASS TForm1
 return nil
 
 METHOD OnBrowserClick() CLASS TForm1
-   MAC_ShellExec( "open http://localhost:" + hb_ntos( ::oWebServer1:nPort ) + "/" )
+   local cUrl := "http://localhost:" + hb_ntos( ::oWebServer1:nPort ) + "/"
+   #ifdef __PLATFORM__DARWIN
+      Mac_ShellExec( "open " + cUrl )
+   #else
+      #ifdef __PLATFORM__UNIX
+         GTK_ShellExec( "xdg-open " + cUrl )
+      #endif
+   #endif
 return nil
 
 METHOD RouteHome() CLASS TForm1
