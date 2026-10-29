@@ -793,7 +793,7 @@ static function HB_IsReturnStmt( cKeyU )
           ( Len( cKeyU ) == 6 .or. ! ( IsAlpha( SubStr( cKeyU, 7, 1 ) ) .or. ;
             IsDigit( SubStr( cKeyU, 7, 1 ) ) .or. SubStr( cKeyU, 7, 1 ) == "_" ) )
 
-static function RegenerateFormCode( cName, hForm, lConsume )
+static function RegenerateFormCode( cName, hForm )
 
    local cCode := "", e := Chr(13) + Chr(10)
    local cSep := "//" + Replicate( "-", 68 ) + e
@@ -816,17 +816,22 @@ static function RegenerateFormCode( cName, hForm, lConsume )
 
    s_aUnserializable := {}
 
-   if lConsume == nil; lConsume := .F.; endif
-
    // Controls deleted in the designer this session (Delete/BackSpace key):
    // the backend recorded their names; the merge below must DROP their
    // '@' lines instead of preserving them verbatim like hand-written
-   // controls (R1). The drain consumes the record, so only a regeneration
-   // whose result will be applied (lConsume) may do it; the serializability
-   // check path peeks nothing and leaves the record intact.
+   // controls (R1). This PEEKS the record (lClear=.F.); the record is only
+   // consumed at the point the regenerated code is actually applied, so an
+   // aborted sync/save never loses it.
    cDeleted := "|"
-   if lConsume .and. hForm != 0
-      cDeleted += Upper( UI_PopDeletedCtrls( hForm ) )
+   if hForm != 0
+      cDeleted += Upper( UI_PopDeletedCtrls( hForm, .F. ) )
+   endif
+   if Chr(1) + "OVF" $ cDeleted
+      // the per-form deletion record overflowed: refusing the save is safe,
+      // dropping or partially applying it would resurrect deleted controls
+      AAdd( s_aUnserializable, ;
+         "designer delete record overflowed (too many deletions this session)" )
+      cDeleted := "|"
    endif
 
    // Read existing code to find declared event handlers
@@ -952,7 +957,7 @@ static function RegenerateFormCode( cName, hForm, lConsume )
                   cCreate += ' ITEMS '
                   for kk := 1 to Len( hb_ATokens( cVal, "|" ) )
                      if kk > 1; cCreate += ', '; endif
-                     cCreate += '"' + hb_ATokens( cVal, "|" )[ kk ] + '"'
+                     cCreate += HB_QHarbourStr( hb_ATokens( cVal, "|" )[ kk ] )
                   next
                endif
                cCreate += e
@@ -979,7 +984,7 @@ static function RegenerateFormCode( cName, hForm, lConsume )
                   cCreate += ' ITEMS '
                   for kk := 1 to Len( aHdrs )
                      if kk > 1; cCreate += ', '; endif
-                     cCreate += '"' + aHdrs[kk] + '"'
+                     cCreate += HB_QHarbourStr( aHdrs[ kk ] )
                   next
                endif
                cCreate += e
@@ -992,7 +997,7 @@ static function RegenerateFormCode( cName, hForm, lConsume )
                   cCreate += ' ITEMS '
                   for kk := 1 to Len( hb_ATokens( cVal, "|" ) )
                      if kk > 1; cCreate += ', '; endif
-                     cCreate += '"' + hb_ATokens( cVal, "|" )[ kk ] + '"'
+                     cCreate += HB_QHarbourStr( hb_ATokens( cVal, "|" )[ kk ] )
                   next
                endif
                cCreate += e
@@ -1913,7 +1918,7 @@ static function SyncDesignerToCode( lFromSave )
    endif
 
    // Regenerate CLASS + CreateForm
-   cNewCode := RegenerateFormCode( aForms[ nActiveForm ][ 1 ], oDesignForm:hCpp, .T. )
+   cNewCode := RegenerateFormCode( aForms[ nActiveForm ][ 1 ], oDesignForm:hCpp )
 
    // Never report success while losing controls: abort the destructive save
    if ! Empty( s_aUnserializable )
@@ -1939,6 +1944,10 @@ static function SyncDesignerToCode( lFromSave )
    if ! Empty( cMethods )
       cNewCode += Chr(13) + Chr(10) + cMethods
    endif
+
+   // the regenerated code is being applied: now it is safe to consume the
+   // designer-deletion record this merge used to drop deleted controls
+   UI_PopDeletedCtrls( oDesignForm:hCpp )
 
    aForms[ nActiveForm ][ 3 ] := cNewCode
    CodeEditorSetTabText( hCodeEditor, nActiveForm + 1, cNewCode )
@@ -2389,7 +2398,7 @@ static function RestoreFormFromCode( hForm, cCode )
    local nCC, jjC, hC
    local nAtX, nAtY, nAtW, nAtH, cAtCmd, cAtName, cAtText, cRest, cAtSize
    local cRestU, nClPos, nClEnd, cClVal, cIt2
-   local cStrip, nK, nn, cC, cExpr, nQ, nEnd
+   local cStrip, nK, nn, cC, cExpr, nQ, nEnd, nOff
    local cItemExpr, k, aTmp
 
    if Empty( cCode ) .or. hForm == 0
@@ -2510,23 +2519,33 @@ static function RestoreFormFromCode( hForm, cCode )
                      cAtName := Left( cAtName, nClEnd )
                   endif
                   cAtText := ""
-                  nPos := At( '"', cRest )
+                  // the text comes only from an explicit PROMPT or VAR clause;
+                  // quotes in other clauses (ITEMS, PICTURE) are NOT the
+                  // control's text (a prompt-less COMBOBOX line would
+                  // otherwise mis-parse its ITEMS as text and R3-block)
+                  cStrip := HB_StripStrings( cRest )
+                  nPos := At( " PROMPT ", Upper( cStrip ) )
+                  nOff := 8
+                  if nPos == 0
+                     nPos := At( " VAR ", Upper( cStrip ) )
+                     nOff := 5
+                  endif
                   if nPos > 0
+                     nPos += nOff
                      // the value is a "..." [+ Chr(N)]... expression; it ends
                      // at the first clause keyword outside any string
-                     cStrip := HB_StripStrings( cRest )
                      nEnd := 0
                      for each cC in { " OF ", " SIZE ", " CHECKED", " ITEMS ", ;
                            " PICTURE ", " URL ", " COLUMNS ", " HEADERS ", ;
                            " COLSIZES ", " FOOTERS ", " PROMPTS ", " VAR ", ;
                            " PROMPT ", " ACCEL " }
-                        nK := At( cC, Upper( SubStr( cStrip, nPos + 1 ) ) )
+                        nK := At( cC, Upper( SubStr( cStrip, nPos ) ) )
                         if nK > 0 .and. ( nEnd == 0 .or. nK < nEnd )
                            nEnd := nK
                         endif
                      next
-                     if nEnd == 0; nEnd := Len( cRest ) - nPos + 1; endif
-                     cExpr := HB_HarbourStrEval( SubStr( cRest, nPos, nEnd ) )
+                     if nEnd == 0; nEnd := Len( cRest ) - nPos + 2; endif
+                     cExpr := HB_HarbourStrEval( SubStr( cRest, nPos, nEnd - 1 ) )
                      if cExpr != nil
                         cAtText := cExpr
                      else

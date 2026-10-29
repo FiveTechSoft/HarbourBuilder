@@ -147,6 +147,7 @@ struct _HBForm
       designer-deleted control is NOT preserved verbatim like a hand-written
       one. Per-form, session-scoped. */
    char         FDeletedNames[512];
+   int          FDeletedOverflow;  /* 1 = a deletion record did not fit; save must refuse, not resurrect */
    int          FDragging, FResizing;
    int          FResizeHandle;
    int          FDragStartX, FDragStartY;
@@ -2226,6 +2227,9 @@ static gboolean on_overlay_key_press( GtkWidget * widget, GdkEventKey * event, g
                form->FDeletedNames[dl + nl] = '|';
                form->FDeletedNames[dl + nl + 1] = '\0';
             }
+            else
+               form->FDeletedOverflow = 1;  /* refuse the save later; never drop the record silently */
+
          }
          /* unlink from the parent's children list so the code generator
             stops re-emitting it and no NULL-widget zombie stays reachable */
@@ -4245,10 +4249,17 @@ HB_FUNC( UI_GETCHILD )
       hb_retnint( 0 );
 }
 
+/* UI_PopDeletedCtrls( hForm [, lClear ] ) -> "Name1|Name2|" or "OVF" on
+   overflow. lClear defaults to .T.; pass .F. to peek without consuming, so a
+   sync that later aborts does not lose the deletion record (R1). */
 HB_FUNC( UI_POPDELETEDCTRLS )
 {
    HBForm * form = GetForm(1);
-   if( form ) { hb_retc( form->FDeletedNames ); form->FDeletedNames[0] = '\0'; }
+   if( form )
+   {
+      hb_retc( form->FDeletedOverflow ? "OVF" : form->FDeletedNames );
+      if( ! HB_ISLOG(2) || hb_parl(2 ) ) { form->FDeletedNames[0] = '\0'; form->FDeletedOverflow = 0; }
+   }
    else hb_retc( "" );
 }
 
