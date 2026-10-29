@@ -778,9 +778,9 @@ static void HBComboBox_CreateWidget( HBComboBox * p, GtkWidget * container )
    GtkWidget * combo = gtk_combo_box_text_new();
    for( int i = 0; i < p->FItemCount; i++ )
       gtk_combo_box_text_append_text( GTK_COMBO_BOX_TEXT(combo), p->FItems[i] );
-   if( p->FItemCount > 0 )
+   if( p->FItemCount > 0 && p->FItemIndex > 0 )
    {
-      int selRow = p->FItemIndex > 0 ? p->FItemIndex - 1 : 0;
+      int selRow = p->FItemIndex - 1;
       if( selRow >= p->FItemCount ) selRow = 0;
       gtk_combo_box_set_active( GTK_COMBO_BOX(combo), selRow );
       p->FItemIndex = selRow + 1;
@@ -1169,9 +1169,9 @@ static void HBListBox_CreateWidget( HBControl * p, GtkWidget * container )
       gtk_list_store_append( store, &iter );
       gtk_list_store_set( store, &iter, 0, cb->FItems[i], -1 );
    }
-   if( cb->FItemCount > 0 )
+   if( cb->FItemCount > 0 && cb->FItemIndex > 0 )
    {
-      int selRow = (cb->FItemIndex > 0) ? cb->FItemIndex - 1 : 0;
+      int selRow = cb->FItemIndex - 1;
       if( selRow >= cb->FItemCount ) selRow = 0;
       GtkTreeSelection * sel = gtk_tree_view_get_selection( GTK_TREE_VIEW(tv) );
       GtkTreePath * path = gtk_tree_path_new_from_indices( selRow, -1 );
@@ -3458,6 +3458,15 @@ HB_FUNC( UI_SETPROP )
       if( cb->base.FWidget )
          gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(cb->base.FWidget), cb->FChecked );
    }
+   else if( strcasecmp(szProp,"nItemIndex")==0 && HB_ISNUM(3) &&
+            (p->FControlType==CT_COMBOBOX || p->FControlType==CT_LISTBOX) )
+   {
+      HBComboBox * cb = (HBComboBox *)p;
+      cb->FItemIndex = hb_parni(3);
+      if( p->FControlType == CT_COMBOBOX && p->FWidget &&
+          GTK_IS_COMBO_BOX_TEXT(p->FWidget) )
+         gtk_combo_box_set_active( GTK_COMBO_BOX(p->FWidget), cb->FItemIndex - 1 );
+   }
    else if( strcasecmp(szProp,"cName")==0 && HB_ISCHAR(3) )
       strncpy( p->FName, hb_parc(3), sizeof(p->FName)-1 );
    else if( strcasecmp(szProp,"lSizable")==0 && p->FControlType == CT_FORM )
@@ -3599,6 +3608,8 @@ HB_FUNC( UI_SETPROP )
       strncpy( ((HBRadioButton*)p)->FGroupName, hb_parc(3), 31 );
    /* BitBtn */
    else if( strcasecmp( szProp, "cGlyph" ) == 0 && HB_ISCHAR(3) && p->FControlType == CT_BITBTN )
+      strncpy( ((HBBitBtn*)p)->FGlyph, hb_parc(3), 255 );
+   else if( strcasecmp( szProp, "cPicture" ) == 0 && HB_ISCHAR(3) && p->FControlType == CT_BITBTN )
       strncpy( ((HBBitBtn*)p)->FGlyph, hb_parc(3), 255 );
    else if( strcasecmp( szProp, "nLayout" ) == 0 && HB_ISNUM(3) && p->FControlType == CT_BITBTN )
       ((HBBitBtn*)p)->FLayout = hb_parni(3);
@@ -3961,6 +3972,8 @@ HB_FUNC( UI_GETPROP )
       hb_retl( ((HBCheckBox *)p)->FChecked );
    else if( strcasecmp(szProp,"cPicture")==0 && p->FControlType==CT_IMAGE )
       hb_retc( ((HBImage *)p)->FPicture );
+   else if( strcasecmp(szProp,"cPicture")==0 && p->FControlType==CT_BITBTN )
+      hb_retc( ((HBBitBtn *)p)->FGlyph );
    else if( strcasecmp(szProp,"cName")==0 )      hb_retc( p->FName );
    else if( strcasecmp(szProp,"cClassName")==0 ) hb_retc( p->FClassName );
    else if( strcasecmp(szProp,"lSizable")==0 && p->FControlType==CT_FORM )

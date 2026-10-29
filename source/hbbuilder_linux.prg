@@ -771,6 +771,8 @@ static function RegenerateFormCode( cName, hForm )
    local aCtrlMap := {}, cOf, hOwner, nPg, kk2, nLen0, cSlice
    local aExLines, lInClass, cExLine
    local aExL2, cTL, cTU, lInCF, aPreserved := {}, aWiringOld := {}, cKey
+   local aChunks := {}, cBody, cHdrChunk, lHdrOut, lWireOut, lSkipMenu, cMenuEnd
+   local cName2, nP1, nP2, lFound, nCk, lBodyStarted
    local aMenuNodes, nMI, cMNode, aMFields, nLv, cCap, cScut, cHndl
    local nPendingLevels, nPL, cInd, bIsPopup, aNextF
    local aMenuHandlers := {}, lHasHandlers
@@ -1240,6 +1242,8 @@ static function RegenerateFormCode( cName, hForm )
                endif
             endif
          next
+         // Chunk emitted for this control: used by the order-preserving merge
+         AAdd( aChunks, { cCtrlName, SubStr( cCreate, nLen0 + 1 ), .F. } )
       next
    endif
 
@@ -1262,12 +1266,37 @@ static function RegenerateFormCode( cName, hForm )
    endif
 
    // ------------------------------------------------------------------
-   // Fidelity pass: preserve lines from the existing CreateForm() that the
-   // generator does not emit itself (custom property assignments,
-   // hand-written event wiring, user comments). Nothing the user wrote
-   // inside CreateForm may vanish on save.
-   if ! Empty( cExistingCode )
-      lInCF := .F.
+   // Order-preserving merge: walk the existing CreateForm() top to bottom.
+   // Lines the generator owns (@/COMPONENT/menu/header/wiring it emits) are
+   // replaced by their freshly generated chunk AT THE SAME POSITION; every
+   // other line (custom code, comments, hand-written wiring) is kept verbatim
+   // where it was. Custom lines therefore never change their relative order
+   // and never execute twice. Controls absent from the old code (added in the
+   // designer) are flushed before the wiring section.
+   cHdrChunk := '   ::cTitle  := "' + cTitle + '"' + e
+   cHdrChunk += "   ::nLeft   := " + LTrim(Str(nFL)) + e
+   cHdrChunk += "   ::nTop    := " + LTrim(Str(nFT)) + e
+   cHdrChunk += "   ::nWidth  := " + LTrim(Str(nW)) + e
+   cHdrChunk += "   ::nHeight := " + LTrim(Str(nH)) + e
+   if nClr != 15790320
+      cHdrChunk += "   ::nClrPane := " + LTrim(Str(nClr)) + e
+   endif
+   if ! Empty( cAppTitle )
+      cHdrChunk += '   ::cAppTitle := "' + cAppTitle + '"' + e
+   endif
+
+   if Empty( cExistingCode )
+      cBody := cHdrChunk
+      if ! Empty( cCreate )
+         cBody += e + cCreate
+      endif
+      if ! Empty( cEvents )
+         cBody += e + "   // Event wiring" + e + cEvents
+      endif
+   else
+      cBody := ""
+      lHdrOut := .F.; lWireOut := .F.; lSkipMenu := .F.; cMenuEnd := ""
+      lInCF := .F.; lBodyStarted := .F.
       aExL2 := HB_ATokens( cExistingCode, Chr(10) )
       for j := 1 to Len( aExL2 )
          cTL := StrTran( aExL2[j], Chr(13), "" )
@@ -1278,29 +1307,100 @@ static function RegenerateFormCode( cName, hForm )
             endif
             loop
          endif
+         if lSkipMenu
+            if cTU == cMenuEnd; lSkipMenu := .F.; endif
+            loop
+         endif
          if cTU == "RETURN NIL" .or. cTU == "RETURN"; exit; endif
-         if Empty( cTU ); loop; endif
-         // lines the generator always emits itself
-         if Left( cTU, 1 ) == "@" ; loop; endif
-         if Left( cTU, 10 ) == "COMPONENT " .or. Left( cTU, 7 ) == "DEFINE " .or. ;
-            Left( cTU, 4 ) == "END " .or. Left( cTU, 8 ) == "MENUITEM" .or. ;
-            Left( cTU, 11 ) == "MENUSEPARAT" .or. cTU == "// EVENT WIRING" .or. ;
-            cTU == "// PRESERVED CUSTOM LINES" ; loop; endif
+         if Empty( cTU )
+            if lBodyStarted; cBody += e; endif
+            loop
+         endif
+         // menu blocks the COMPONENT chunk already re-emits wholesale
+         if Left( cTU, 14 ) == "DEFINE MENUBAR"
+            lSkipMenu := .T.; cMenuEnd := "END MENUBAR"; loop
+         endif
+         if Left( cTU, 15 ) == "DEFINE POPUPMENU"
+            lSkipMenu := .T.; cMenuEnd := "END POPUPMENU"; loop
+         endif
+         // generated section markers
+         if cTU == "// EVENT WIRING"
+            for nCk := 1 to Len( aChunks )
+               if ! aChunks[nCk][3]
+                  cBody += aChunks[nCk][2]
+                  aChunks[nCk][3] := .T.
+                  lBodyStarted := .T.
+               endif
+            next
+            if ! Empty( cEvents )
+               cBody += "   // Event wiring" + e + cEvents
+               lBodyStarted := .T.
+            endif
+            lWireOut := .T.
+            loop
+         endif
+         if cTU == "// PRESERVED CUSTOM LINES"; loop; endif
+         // form header property assignments: regenerated as one block
          if ":=" $ cTU .and. ( Left( cTU, 8 ) == "::CTITLE" .or. ;
               Left( cTU, 7 ) == "::NLEFT" .or. Left( cTU, 6 ) == "::NTOP" .or. ;
               Left( cTU, 8 ) == "::NWIDTH" .or. Left( cTU, 9 ) == "::NHEIGHT" .or. ;
-              Left( cTU, 10 ) == "::NCLRPANE" .or. Left( cTU, 11 ) == "::CAPPTITLE" ) ; loop; endif
-         // event wiring line (::oX:OnY := {...} or ::OnY := {...})
-         if Left( cTU, 2 ) == "::" .and. ":ON" $ cTU .and. ":=" $ cTU
-            cKey := Upper( AllTrim( Left( cTL, At( ":=", cTL ) - 1 ) ) )
-            if cKey $ Upper( cEvents ) .or. cKey $ Upper( cCreate ) ; loop; endif
-            AAdd( aWiringOld, cTL )
+              Left( cTU, 10 ) == "::NCLRPANE" .or. Left( cTU, 11 ) == "::CAPPTITLE" )
+            if ! lHdrOut
+               cBody += cHdrChunk
+               lHdrOut := .T.
+               lBodyStarted := .T.
+            endif
             loop
          endif
-         // anything else: preserve verbatim unless already generated
+         // control creation lines: replace with the generated chunk, same spot
+         cName2 := ""
+         if Left( cTU, 1 ) == "@" .or. Left( cTU, 10 ) == "COMPONENT "
+            nP1 := At( "::o", cTL )
+            if nP1 > 0
+               cName2 := SubStr( cTL, nP1 + 3 )
+               nP2 := At( " ", cName2 + " " )
+               cName2 := Left( cName2, nP2 - 1 )
+            endif
+         endif
+         if ! Empty( cName2 )
+            for nCk := 1 to Len( aChunks )
+               if Upper( aChunks[nCk][1] ) == Upper( cName2 )
+                  if ! aChunks[nCk][3]
+                     cBody += aChunks[nCk][2]
+                     aChunks[nCk][3] := .T.
+                     lBodyStarted := .T.
+                  endif
+                  exit
+               endif
+            next
+            // controls deleted in the designer simply drop out here
+            loop
+         endif
+         // hand-written event wiring: keep in place unless already generated
+         if Left( cTU, 2 ) == "::" .and. ":ON" $ cTU .and. ":=" $ cTU
+            cKey := Upper( AllTrim( Left( cTL, At( ":=", cTL ) - 1 ) ) )
+            if cKey $ Upper( cEvents ); loop; endif
+            cBody += cTL + e
+            lBodyStarted := .T.
+            loop
+         endif
+         // any other line: keep verbatim unless the generator already emits it
          if AllTrim( cTL ) $ cCreate .or. AllTrim( cTL ) $ cEvents ; loop; endif
-         AAdd( aPreserved, cTL )
+         cBody += cTL + e
+         lBodyStarted := .T.
       next
+      // flush whatever the old code never mentioned
+      if ! lHdrOut
+         cBody := cHdrChunk + iif( Empty( cBody ), "", e + cBody )
+      endif
+      for nCk := 1 to Len( aChunks )
+         if ! aChunks[nCk][3]
+            cBody += e + aChunks[nCk][2]
+         endif
+      next
+      if ! lWireOut .and. ! Empty( cEvents )
+         cBody += e + "   // Event wiring" + e + cEvents
+      endif
    endif
 
    cCode += "// " + cName + ".prg" + e
@@ -1342,36 +1442,12 @@ static function RegenerateFormCode( cName, hForm )
    cCode += cSep
    cCode += e
    cCode += "METHOD CreateForm() CLASS " + cClass + e
+   // blank lines at the end of CreateForm must not accumulate cycle over cycle
+   do while Len( cBody ) >= 4 .and. Right( cBody, 4 ) == e + e
+      cBody := Left( cBody, Len( cBody ) - 2 )
+   enddo
    cCode += e
-   cCode += '   ::cTitle  := "' + cTitle + '"' + e
-   cCode += "   ::nLeft   := " + LTrim(Str(nFL)) + e
-   cCode += "   ::nTop    := " + LTrim(Str(nFT)) + e
-   cCode += "   ::nWidth  := " + LTrim(Str(nW)) + e
-   cCode += "   ::nHeight := " + LTrim(Str(nH)) + e
-   if nClr != 15790320
-      cCode += "   ::nClrPane := " + LTrim(Str(nClr)) + e
-   endif
-   if ! Empty( cAppTitle )
-      cCode += '   ::cAppTitle := "' + cAppTitle + '"' + e
-   endif
-   if ! Empty( cCreate )
-      cCode += e + cCreate
-   endif
-   if ! Empty( aPreserved )
-      cCode += e
-      cCode += "   // Preserved custom lines" + e
-      for j := 1 to Len( aPreserved )
-         cCode += aPreserved[j] + e
-      next
-   endif
-   if ! Empty( cEvents ) .or. ! Empty( aWiringOld )
-      cCode += e
-      cCode += "   // Event wiring" + e
-      cCode += cEvents
-      for j := 1 to Len( aWiringOld )
-         cCode += aWiringOld[j] + e
-      next
-   endif
+   cCode += cBody
    cCode += e
    cCode += "return nil" + e
    cCode += cSep
@@ -2321,6 +2397,9 @@ static function RestoreFormFromCode( hForm, cCode )
                         enddo
                         if ! Empty( cIt2 )
                            UI_SetProp( hCtrl, "aItems", cIt2 )
+                           // the backend selects item 1 as an interactive
+                           // default; a loaded form keeps its saved state
+                           UI_SetProp( hCtrl, "nItemIndex", 0 )
                         endif
                      endif
                   endif

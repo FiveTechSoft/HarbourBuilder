@@ -1,4 +1,4 @@
-// Form1.prg - FIXTURE roundtrip v2: all @-parser types + non-default values + user code
+// Form1.prg - FIXTURE roundtrip v3: order preservation + side-effect calls
 //--------------------------------------------------------------------
 
 CLASS TForm1 FROM TForm
@@ -35,14 +35,17 @@ METHOD CreateForm() CLASS TForm1
    ::oButton1:oFont := "Sans,10"
    @ 20, 160 SAY ::oLabel1 PROMPT "Etiqueta fija" OF Self SIZE 200
    @ 60, 20 GET ::oEdit1 VAR "texto inicial" OF Self SIZE 220, 26
+   FixtureTrace( "after-edit1", ::oEdit1 )
    @ 100, 20 CHECKBOX ::oChk1 PROMPT "Marcado" OF Self SIZE 140 CHECKED
    @ 140, 20 COMBOBOX ::oCombo1 OF Self SIZE 180, 26 ITEMS "Uno", "Dos", "Tres"
+   ::oLabel1:cText := FixtureCaption( ::oCombo1 )
    @ 190, 20 GROUPBOX ::oGroup1 PROMPT "Grupo" OF Self SIZE 260, 90
    @ 210, 40 RADIOBUTTON ::oRadio1 PROMPT "Opcion A" OF Self SIZE 120 CHECKED
-   @ 300, 20 BITBTN ::oBitBtn1 PROMPT "ConIcono" OF Self SIZE 110, 32
+   @ 300, 20 BITBTN ::oBitBtn1 PROMPT "ConIcono" OF Self SIZE 110, 32 PICTURE "icon.png"
    @ 350, 20 IMAGE ::oImage1 OF Self SIZE 64, 64 PICTURE "test.png"
    @ 430, 20 MEMO ::oMemo1 VAR "linea1" OF Self SIZE 240, 80
    @ 430, 300 LISTBOX ::oList1 OF Self SIZE 160, 90 ITEMS "Alfa", "Beta"
+   ::oList1:Value := 2
 
    // comentario manual del usuario
    ::oEdit1:cText := "modificado"
@@ -57,6 +60,13 @@ return nil
 //--------------------------------------------------------------------
 static function FixtureHelper( x )
    return Upper( hb_ValToStr( x ) )
+
+function FixtureCaption( oCtrl )
+   return "items:" + hb_ValToStr( Len( oCtrl:aItems ) )
+
+function FixtureTrace( cTag, oCtrl )
+   HB_MemoWrit( "/tmp/fixture_trace.log", cTag + ":" + oCtrl:cName + Chr(10) )
+return nil
 
 function FixtureClick( oForm )
    oForm:oLabel1:cText := "fixture-ok"

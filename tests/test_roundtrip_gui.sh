@@ -11,6 +11,7 @@ RUN=/tmp/rt_run
 CYC="$RUN/cycles"
 GTKROOT=/tmp/gtk-root
 export DISPLAY=:99
+pgrep -x Xvfb >/dev/null || { Xvfb :99 -screen 0 1600x1000x24 & sleep 2; }
 
 fail() { echo "FAIL: $1"; exit 1; }
 
@@ -147,7 +148,25 @@ chk '// comentario manual del usuario'
 chk '::oButton1:OnClick := \{ \|\| FixtureClick\( Self \) \}'
 chk 'static function FixtureHelper'
 chk 'function FixtureClick'
+chk 'BITBTN ::oBitBtn1 PROMPT "ConIcono".* PICTURE "icon.png"'
+chk '::oList1:Value := 2'
+chk 'FixtureTrace\( "after-edit1", ::oEdit1 \)'
+chk '::oLabel1:cText := FixtureCaption\( ::oCombo1 \)'
+chk 'function FixtureTrace'
+chk 'function FixtureCaption'
 rej '// ::o(Radio1|BitBtn1|Image1|Memo1)'
+rej 'Value := 1'
+
+# no duplicated side-effect lines
+N=$(grep -c 'FixtureTrace( "after-edit1"' "$CYC/cycle2.prg")
+[ "$N" = 1 ] || { echo "  DUPLICATED/LOST side-effect line (count=$N)"; FAILN=$((FAILN+1)); }
+
+# order preservation: custom lines stay between their original neighbours
+ord() { grep -n "$1" "$CYC/cycle2.prg" | head -1 | cut -d: -f1; }
+L_GET=$(ord 'GET ::oEdit1');  L_TR=$(ord 'FixtureTrace( "after'); L_CHK=$(ord 'CHECKBOX ::oChk1')
+L_CB=$(ord 'COMBOBOX ::oCombo1'); L_CAP=$(ord 'FixtureCaption'); L_GB=$(ord 'GROUPBOX ::oGroup1')
+[ "$L_GET" -lt "$L_TR" ] && [ "$L_TR" -lt "$L_CHK" ] || { echo "  ORDER BROKEN around FixtureTrace ($L_GET/$L_TR/$L_CHK)"; FAILN=$((FAILN+1)); }
+[ "$L_CB" -lt "$L_CAP" ] && [ "$L_CAP" -lt "$L_GB" ] || { echo "  ORDER BROKEN around FixtureCaption ($L_CB/$L_CAP/$L_GB)"; FAILN=$((FAILN+1)); }
 
 if ! diff -q "$CYC/cycle1.prg" "$CYC/cycle2.prg" >/dev/null; then
   echo "  NOT A FIXPOINT: cycle1 != cycle2"; FAILN=$((FAILN+1))
