@@ -2023,6 +2023,7 @@ static function RestoreFormFromCode( hForm, cCode )
    local cML, cMLU, cPopCap, nQ1, nQ2, nPar, nPar2, nPar3
    local nQ3, nQ4, nQ5, cItCap, cItHndl, cItAccl, nAct, nSpc, nAccl
    local nCC, jjC, hC
+   local nAtX, nAtY, nAtW, nAtH, cAtCmd, cAtName, cAtText, cRest, cAtSize
 
    if Empty( cCode ) .or. hForm == 0
       return nil
@@ -2092,6 +2093,93 @@ static function RestoreFormFromCode( hForm, cCode )
                endif
                if nType >= 38
                   hCtrl := UI_DropNonVisual( hForm, nType, cName )
+               endif
+            endif
+         endif
+         loop
+      endif
+
+      // Parse visual controls: @ nL, nT <CMD> ::oName [PROMPT "c"] OF Self [SIZE nW[, nH]]
+      // (samples and hand-written forms use the @ command syntax; without this
+      //  branch the designer dropped every visual control on open and a later
+      //  save stripped them from the file)
+      if Left( cTrim, 1 ) == "@"
+         nAtX := 0; nAtY := 0; nAtW := 0; nAtH := 0
+         cAtCmd := ""; cAtName := ""; cAtText := ""
+         cRest := AllTrim( SubStr( cTrim, 2 ) )
+         nPos := At( ",", cRest )
+         if nPos > 0
+            nAtX := Val( Left( cRest, nPos - 1 ) )
+            cRest := AllTrim( SubStr( cRest, nPos + 1 ) )
+            nPos := At( " ", cRest )
+            if nPos > 0
+               nAtY := Val( Left( cRest, nPos - 1 ) )
+               cRest := AllTrim( SubStr( cRest, nPos + 1 ) )
+               nPos := At( " ", cRest )
+               if nPos > 0
+                  cAtCmd := Upper( Left( cRest, nPos - 1 ) )
+                  cRest := AllTrim( SubStr( cRest, nPos + 1 ) )
+                  nPos := At( "::o", cRest )
+                  if nPos > 0
+                     cAtName := SubStr( cRest, nPos + 3 )
+                     nPos2 := At( " ", cAtName + " " )
+                     cAtName := Left( cAtName, nPos2 - 1 )
+                  endif
+                  nPos := At( '"', cRest )
+                  if nPos > 0
+                     nPos2 := At( '"', SubStr( cRest, nPos + 1 ) )
+                     if nPos2 > 0; cAtText := SubStr( cRest, nPos + 1, nPos2 - 1 ); endif
+                  endif
+                  nPos := At( "SIZE ", Upper( cRest ) )
+                  if nPos > 0
+                     cAtSize := AllTrim( SubStr( cRest, nPos + 5 ) )
+                     nPos2 := At( ",", cAtSize )
+                     if nPos2 > 0
+                        nAtW := Val( Left( cAtSize, nPos2 - 1 ) )
+                        nAtH := Val( SubStr( cAtSize, nPos2 + 1 ) )
+                     else
+                        nAtW := Val( cAtSize )
+                     endif
+                  endif
+                  hCtrl := 0
+                  do case
+                     case cAtCmd == "BUTTON"
+                        hCtrl := UI_ButtonNew( hForm, cAtText, nAtX, nAtY, ;
+                           iif( nAtW > 0, nAtW, 88 ), iif( nAtH > 0, nAtH, 26 ) )
+                     case cAtCmd == "SAY"
+                        hCtrl := UI_LabelNew( hForm, cAtText, nAtX, nAtY, ;
+                           iif( nAtW > 0, nAtW, 80 ), iif( nAtH > 0, nAtH, 15 ) )
+                     case cAtCmd == "GET" .or. cAtCmd == "EDIT"
+                        hCtrl := UI_EditNew( hForm, cAtText, nAtX, nAtY, ;
+                           iif( nAtW > 0, nAtW, 200 ), iif( nAtH > 0, nAtH, 24 ) )
+                     case cAtCmd == "CHECKBOX"
+                        hCtrl := UI_CheckBoxNew( hForm, cAtText, nAtX, nAtY, ;
+                           iif( nAtW > 0, nAtW, 100 ), iif( nAtH > 0, nAtH, 20 ) )
+                     case cAtCmd == "COMBOBOX"
+                        hCtrl := UI_ComboBoxNew( hForm, nAtX, nAtY, ;
+                           iif( nAtW > 0, nAtW, 120 ), iif( nAtH > 0, nAtH, 24 ) )
+                     case cAtCmd == "GROUPBOX"
+                        hCtrl := UI_GroupBoxNew( hForm, cAtText, nAtX, nAtY, ;
+                           iif( nAtW > 0, nAtW, 150 ), iif( nAtH > 0, nAtH, 80 ) )
+                     case cAtCmd == "RADIOBUTTON" .or. cAtCmd == "RADIO"
+                        hCtrl := UI_RadioButtonNew( hForm, cAtText, nAtX, nAtY, ;
+                           iif( nAtW > 0, nAtW, 120 ), iif( nAtH > 0, nAtH, 20 ) )
+                     case cAtCmd == "BITBTN"
+                        hCtrl := UI_BitBtnNew( hForm, cAtText, nAtX, nAtY, ;
+                           iif( nAtW > 0, nAtW, 88 ), iif( nAtH > 0, nAtH, 26 ) )
+                     case cAtCmd == "IMAGE"
+                        hCtrl := UI_ImageNew( hForm, nAtX, nAtY, ;
+                           iif( nAtW > 0, nAtW, 100 ), iif( nAtH > 0, nAtH, 100 ) )
+                     case cAtCmd == "MEMO"
+                        hCtrl := UI_MemoNew( hForm, cAtText, nAtX, nAtY, ;
+                           iif( nAtW > 0, nAtW, 180 ), iif( nAtH > 0, nAtH, 80 ) )
+                     case cAtCmd == "LISTBOX"
+                        hCtrl := UI_ListBoxNew( hForm, nAtX, nAtY, ;
+                           iif( nAtW > 0, nAtW, 120 ) )
+                  endcase
+                  if hCtrl != 0 .and. ! Empty( cAtName )
+                     UI_SetProp( hCtrl, "cName", cAtName )
+                  endif
                endif
             endif
          endif
@@ -2949,6 +3037,7 @@ static function TBRun()
          cLog += "    FAILED:" + Chr(10) + cOutput + Chr(10)
          lError := .T.
       endif
+      GTK_ShellExec( "rm -f " + cBuildDir + "/classes.o" )
       cCmd := "gcc -c -O2 -Wno-unused-value -I" + cHbInc + ;
               " " + cBuildDir + "/classes.c -o " + cBuildDir + "/classes.o 2>&1"
       cOutput := GTK_ShellExec( cCmd )
@@ -2957,6 +3046,7 @@ static function TBRun()
          lError := .T.
       endif
       if ! lError .and. File( cBuildDir + "/hix_runtime.c" )
+         GTK_ShellExec( "rm -f " + cBuildDir + "/hix_runtime.o" )
          cCmd := "gcc -c -O2 -Wno-unused-value -I" + cHbInc + ;
                  " " + cBuildDir + "/hix_runtime.c -o " + cBuildDir + "/hix_runtime.o 2>&1"
          cOutput := GTK_ShellExec( cCmd )
@@ -2966,6 +3056,7 @@ static function TBRun()
          endif
       endif
       if ! lError .and. File( cBuildDir + "/hix_template.c" )
+         GTK_ShellExec( "rm -f " + cBuildDir + "/hix_template.o" )
          cCmd := "gcc -c -O2 -Wno-unused-value -I" + cHbInc + ;
                  " " + cBuildDir + "/hix_template.c -o " + cBuildDir + "/hix_template.o 2>&1"
          cOutput := GTK_ShellExec( cCmd )
@@ -2981,6 +3072,7 @@ static function TBRun()
    if ! lError
       GTK_ProgressStep( "Compiling GTK3 backend..." )
       cLog += "[6] Compiling GTK3 backend..." + Chr(10)
+      GTK_ShellExec( "rm -f " + cBuildDir + "/gtk3_core.o" )
       cCmd := "gcc -c -O2 -DHIX_PRGRUNTIME -I" + cHbInc + ;
               " -I" + cProjDir + "/include" + ;
               " $(pkg-config --cflags gtk+-3.0)" + ;
@@ -2999,6 +3091,7 @@ static function TBRun()
       GTK_ShellExec( "rm -f " + cBuildDir + "/hbmysql.o " + ;
                      cBuildDir + "/hbpgsql.o " + cBuildDir + "/hbdb_stub.o" )
       if ! lError
+         GTK_ShellExec( "rm -f " + cBuildDir + "/hbdb_real.o" )
          cCmd := "gcc -c -O2 -I" + cHbInc + ;
                  " " + cProjDir + "/source/backends/gtk3/gtk3_db_real.c" + ;
                  " -o " + cBuildDir + "/hbdb_real.o 2>&1"
