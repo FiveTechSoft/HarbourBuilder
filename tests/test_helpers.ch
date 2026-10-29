@@ -9,7 +9,7 @@
    IF !(cond); TestFail( __FILE__, __LINE__, (msg) ); ENDIF
 
 #define TEST_ASSERT_EQ( got, exp, msg ) ;
-   IF (got) != (exp); ;
+   IF !( (got) == (exp) ); ;
       TestFail( __FILE__, __LINE__, (msg) + " (got=" + hb_ValToStr(got) + " exp=" + hb_ValToStr(exp) + ")" ); ;
    ENDIF
 

@@ -1,85 +1,55 @@
 #!/usr/bin/env bash
-# Run HarbourBuilder headless unit tests (Linux / macOS)
+# Run HarbourBuilder headless unit tests (Linux / macOS).
 set -euo pipefail
-
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 HBDIR="${HBDIR:-$HOME/harbour}"
-COMMON="$ROOT/source/hbbuilder_common.prg"
-RUNNER="$ROOT/tests/test_runner.prg"
-INCDIR="$ROOT/include"
-TESTDIR="$ROOT/tests"
-BINDIR="$ROOT/tests/bin"
-
-if [ ! -x "$HBDIR/bin/harbour" ] && [ ! -x "$HBDIR/bin/linux/gcc/harbour" ]; then
-   echo "ERROR: harbour not found in HBDIR=$HBDIR"
+HB_BIN=""
+for dir in "$HBDIR/bin" "$HBDIR/bin/linux/gcc" "$HBDIR/bin/darwin/clang"; do
+   if [ -x "$dir/harbour" ] && [ -x "$dir/hbmk2" ]; then
+      HB_BIN="$dir"
+      break
+   fi
+done
+if [ -z "$HB_BIN" ]; then
+   echo "ERROR: harbour and hbmk2 not found in HBDIR=$HBDIR"
    exit 1
 fi
-
-HB_BIN="$HBDIR/bin/harbour"
-[ -x "$HB_BIN" ] || HB_BIN="$HBDIR/bin/linux/gcc/harbour"
-
-HB_INC="$HBDIR/include"
-HB_LIB="$HBDIR/lib"
-[ -d "$HB_LIB" ] || HB_LIB="$HBDIR/lib/linux/gcc"
-
+export PATH="$HB_BIN:$PATH"
+BINDIR="$ROOT/tests/bin"
 mkdir -p "$BINDIR"
-cd "$TESTDIR"
-
-echo "=== messages_stubs ==="
-rm -f messages_stubs.c messages_stubs.o
-"$HB_BIN" messages_stubs.prg -n -w -es2 -q -I"$HB_INC" -omessages_stubs
-gcc -c -o messages_stubs.o messages_stubs.c -I"$HB_INC" -Wno-unused-variable
-
-TESTS=(
-   test_codegen
-   test_hbp_index
-   test_hbp_parse
-   test_messages
-   test_project_tab
-   test_hix_path
-   test_component_types
-   test_ct_constants
-)
-
-HBLINK="-lhbvm -lhbrtl -lhbcommon -lhblang -lhbrdd -lhbmacro -lhbpp -lhbct -lhbsix -lrddntx -lrddfpt -lgttrm -lm -ldl"
+TESTS=(test_codegen test_hbp_index test_hbp_parse test_messages test_project_tab
+       test_hix_path test_component_types test_ct_constants test_project_roundtrip)
 FAIL=0
 PASS=0
-
-for name in "${TESTS[@]}"; do
-   echo "=== $name ==="
-   rm -f "${name}.c" "${name}.o"
-   "$HB_BIN" "${name}.prg" "$RUNNER" "$COMMON" \
-      -n -w -es2 -q -I"$HB_INC" -I"$INCDIR" -o"${name}"
-   if [ ! -f "${name}.c" ]; then
-      echo "NO C OUTPUT: $name"
-      FAIL=$((FAIL + 1))
-      continue
-   fi
-   gcc -o "$BINDIR/${name}" "${name}.c" messages_stubs.o \
-      -I"$HB_INC" -L"$HB_LIB" $HBLINK -Wno-unused-variable
-   if "$BINDIR/${name}"; then
-      PASS=$((PASS + 1))
-   else
-      echo "FAILED: $name (exit $?)"
-      FAIL=$((FAIL + 1))
-   fi
-done
-
-echo ""
-echo "=== compile-only: IDE sources ==="
-cd "$ROOT/source"
-for ide in hbbuilder_linux hbbuilder_macos; do
-   "$HB_BIN" hbbuilder_common.prg "${ide}.prg" \
-      -n -w -es2 -q -I"$HB_INC" -I"$INCDIR" -I"$ROOT/source" -o"${ide}_syntax"
-   rm -f "${ide}_syntax.c" hbbuilder_common.c
-   echo "OK: ${ide}.prg syntax"
-done
-
-echo ""
-if [ "$FAIL" -eq 0 ]; then
-   echo "ALL TESTS PASSED ($PASS tests)"
-   exit 0
-else
-   echo "TESTS FAILED ($FAIL failed, $PASS passed)"
+# Verify that an assertion failure actually reaches the caller as a nonzero exit.
+echo "=== test harness self-check ==="
+"$HB_BIN/hbmk2" "$ROOT/tests/harness_failure.prg" "$ROOT/tests/test_runner.prg" \
+   -I"$ROOT/tests" -q -quiet -w -es2 -gtstd -o"$BINDIR/harness_failure"
+if "$BINDIR/harness_failure"; then
+   echo "ERROR: test harness accepted an intentional assertion failure"
    exit 1
 fi
+for name in "${TESTS[@]}"; do
+   echo "=== $name ==="
+   if "$HB_BIN/hbmk2" "$ROOT/tests/$name.prg" "$ROOT/tests/test_runner.prg" \
+      "$ROOT/source/hbbuilder_common.prg" "$ROOT/tests/messages_stubs.prg" \
+      -I"$ROOT/include" -I"$ROOT/tests" -q -quiet -w -es2 -gtstd -o"$BINDIR/$name"; then
+      if "$BINDIR/$name"; then PASS=$((PASS + 1)); else FAIL=$((FAIL + 1)); fi
+   else
+      echo "BUILD FAILED: $name"
+      FAIL=$((FAIL + 1))
+   fi
+done
+# Compilation to C checks Harbour syntax only, not native GUI/runtime support.
+echo "=== compile-only: IDE sources ==="
+for ide in hbbuilder_linux hbbuilder_macos; do
+   if "$HB_BIN/harbour" "$ROOT/source/$ide.prg" -n -w -es2 -q \
+      -I"$HBDIR/include" -I"$ROOT/include" -I"$ROOT/source" -o"$BINDIR/${ide}_syntax.c"; then
+      echo "OK: $ide.prg syntax"
+   else
+      echo "SYNTAX FAILED: $ide.prg"
+      FAIL=$((FAIL + 1))
+   fi
+done
+echo "TEST SUMMARY: $PASS suites passed, $FAIL failures"
+[ "$FAIL" -eq 0 ]

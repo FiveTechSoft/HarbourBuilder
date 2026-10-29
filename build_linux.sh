@@ -46,22 +46,7 @@ echo "Using Harbour: $HBDIR"
 echo "Building: $PROG"
 echo ""
 
-# Helper: rebuild if any source content changed (sha1-based, mtime-proof).
-# Survives git pulls preserving mtime, manual .o copies, clock skew.
-# Usage: needs_rebuild <obj> <src1> [<src2> ...]
-# Sidecar <obj>.sha stores combined hash of all sources used to build <obj>.
-needs_rebuild() {
-   local obj="$1"; shift
-   local stamp="${obj}.sha"
-   [ ! -f "$obj" ] && { sha1sum "$@" | sha1sum | awk '{print $1}' > "$stamp"; return 0; }
-   local cur
-   cur="$(sha1sum "$@" | sha1sum | awk '{print $1}')"
-   if [ ! -f "$stamp" ] || [ "$cur" != "$(cat "$stamp")" ]; then
-      echo "$cur" > "$stamp"
-      return 0
-   fi
-   return 1
-}
+source "$PROJDIR/scripts/build_cache.sh"
 
 NEED_LINK=0
 
@@ -78,7 +63,7 @@ if [ ! -f "$RESDIR/libscintilla.so" ] || [ ! -f "$RESDIR/liblexilla.so" ]; then
 fi
 
 # [1/6] Harbour -> C (only if .prg changed)
-if needs_rebuild "${PROG}.c" \
+if needs_rebuild "${PROG}.c" "$HBBIN/harbour $HBINC" \
       "${PROG}.prg" \
       "$PROJDIR/source/core/classes.prg" \
       "$PROJDIR/source/inspector/inspector_gtk.prg" \
@@ -91,18 +76,26 @@ if needs_rebuild "${PROG}.c" \
       -I"$PROJDIR/include" \
       -I"$PROJDIR/source" \
       -o${PROG}.c
+   record_build_signature "${PROG}.c" "$HBBIN/harbour $HBINC" \
+      "${PROG}.prg" \
+      "$PROJDIR/source/core/classes.prg" \
+      "$PROJDIR/source/inspector/inspector_gtk.prg" \
+      "$PROJDIR/source/hbbuilder_common.prg" \
+      "$PROJDIR/include/hbbuilder.ch" \
+      "$PROJDIR/include/hbide.ch"
    NEED_LINK=1
 else
    echo "[1/6] ${PROG}.prg — up to date"
 fi
 
 # [2/6] C -> Object (only if .c changed)
-if needs_rebuild "${PROG}.o" "${PROG}.c"; then
+if needs_rebuild "${PROG}.o" "$HBINC $(pkg-config --cflags gtk+-3.0)" "${PROG}.c"; then
    echo "[2/6] Compiling ${PROG}.c..."
    gcc -c -g -Wno-unused-value \
       -I"$HBINC" \
       $(pkg-config --cflags gtk+-3.0) \
       ${PROG}.c -o ${PROG}.o
+   record_build_signature "${PROG}.o" "$HBINC $(pkg-config --cflags gtk+-3.0)" "${PROG}.c"
    NEED_LINK=1
 else
    echo "[2/6] ${PROG}.o — up to date"
@@ -128,7 +121,7 @@ else
 fi
 
 # [3/6] GTK3 core (only if .c changed)
-if needs_rebuild gtk3_core.o "$PROJDIR/source/backends/gtk3/gtk3_core.c"; then
+if needs_rebuild gtk3_core.o "$HBINC $WEBKIT_DEFINE $WEBKIT_CFLAGS $WEBKIT_LIBS $(pkg-config --cflags gtk+-3.0)" "$PROJDIR/source/backends/gtk3/gtk3_core.c"; then
    echo "[3/6] Compiling GTK3 core..."
    gcc -c -g \
       -I"$HBINC" \
@@ -136,18 +129,20 @@ if needs_rebuild gtk3_core.o "$PROJDIR/source/backends/gtk3/gtk3_core.c"; then
       $(pkg-config --cflags gtk+-3.0) \
       $WEBKIT_CFLAGS $WEBKIT_DEFINE \
       "$PROJDIR/source/backends/gtk3/gtk3_core.c" -o gtk3_core.o
+   record_build_signature gtk3_core.o "$HBINC $WEBKIT_DEFINE $WEBKIT_CFLAGS $WEBKIT_LIBS $(pkg-config --cflags gtk+-3.0)" "$PROJDIR/source/backends/gtk3/gtk3_core.c"
    NEED_LINK=1
 else
    echo "[3/6] gtk3_core.o — up to date"
 fi
 
 # [4/6] GTK3 inspector (only if .c changed)
-if needs_rebuild gtk3_inspector.o "$PROJDIR/source/backends/gtk3/gtk3_inspector.c"; then
+if needs_rebuild gtk3_inspector.o "$HBINC $(pkg-config --cflags gtk+-3.0)" "$PROJDIR/source/backends/gtk3/gtk3_inspector.c"; then
    echo "[4/6] Compiling GTK3 inspector..."
    gcc -c -g \
       -I"$HBINC" \
       $(pkg-config --cflags gtk+-3.0) \
       "$PROJDIR/source/backends/gtk3/gtk3_inspector.c" -o gtk3_inspector.o
+   record_build_signature gtk3_inspector.o "$HBINC $(pkg-config --cflags gtk+-3.0)" "$PROJDIR/source/backends/gtk3/gtk3_inspector.c"
    NEED_LINK=1
 else
    echo "[4/6] gtk3_inspector.o — up to date"
@@ -157,10 +152,11 @@ fi
 # time. Mirrors Win hb_db_real.cpp pattern. libmysqlclient.so / libpq.so
 # resolved at launch; missing libs return safe defaults.
 rm -f hbmysql.o hbpgsql.o hbdb_stub.o
-if needs_rebuild hbdb_real.o "$PROJDIR/source/backends/gtk3/gtk3_db_real.c"; then
+if needs_rebuild hbdb_real.o "$HBINC" "$PROJDIR/source/backends/gtk3/gtk3_db_real.c"; then
    echo "[4b] Compiling DB bindings (dlopen-based)..."
    gcc -c -O2 -I"$HBINC" \
       "$PROJDIR/source/backends/gtk3/gtk3_db_real.c" -o hbdb_real.o
+   record_build_signature hbdb_real.o "$HBINC" "$PROJDIR/source/backends/gtk3/gtk3_db_real.c"
    NEED_LINK=1
 fi
 

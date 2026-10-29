@@ -4526,7 +4526,7 @@ HB_FUNC( UI_HTTPGET )
    const char * url = hb_parc(1);
    char buf[256];
    if( url )
-      sprintf( buf, "HTTP GET %s -> 200 OK (placeholder)", url );
+      snprintf( buf, sizeof(buf), "HTTP GET %s -> 200 OK (placeholder)", url );
    else
       strcpy( buf, "" );
    hb_retc( buf );
@@ -4539,7 +4539,7 @@ HB_FUNC( UI_HTTPPOST )
    const char * body = hb_parc(2);
    char buf[256];
    if( url )
-      sprintf( buf, "HTTP POST %s [%d bytes] -> 200 OK (placeholder)",
+      snprintf( buf, sizeof(buf), "HTTP POST %s [%d bytes] -> 200 OK (placeholder)",
                url, body ? (int)strlen(body) : 0 );
    else
       strcpy( buf, "" );

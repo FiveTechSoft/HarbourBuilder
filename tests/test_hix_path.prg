@@ -22,12 +22,12 @@ FUNCTION Main()
    cPath := HIX_ResolvePath( cRoot, "/pages/index.html" )
    TEST_ASSERT_EQ( cPath, "/var/www/app/pages/index.html", "leading slash relative to root" )
 
-   TEST_ASSERT_EQ( HIX_ResolvePath( cRoot, "/outside/file.txt" ), "", "absolute outside root blocked" )
+   TEST_ASSERT_EQ( HIX_ResolvePath( cRoot, "/outside/file.txt" ), "/var/www/app/outside/file.txt", "leading slash stays relative to application root" )
 
    cPath := HIX_ResolvePath( "C:/projects/demo", "views/home.html" )
    TEST_ASSERT( Lower( cPath ) == "c:/projects/demo/views/home.html", "windows-style root" )
 
    cPath := HIX_ResolvePath( cRoot, "C:/windows/system.ini" )
-   TEST_ASSERT( ! Empty( cPath ), "drive-absolute path accepted as literal" )
+   TEST_ASSERT_EQ( cPath, "", "drive-absolute path outside root blocked" )
 
 RETURN TestPass( "hix path security" )

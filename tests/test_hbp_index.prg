@@ -13,7 +13,7 @@ FUNCTION Main()
    cHbp := HB_BuildHbpIndex( { "Form1", "Form2" }, { "utils", "helpers" } )
    aLines := hb_ATokens( cHbp, Chr(10) )
 
-   TEST_ASSERT_EQ( Len( aLines ), 6, "header + 2 forms + [modules] + 2 modules" )
+   TEST_ASSERT_EQ( Len( aLines ), 7, "header + 2 forms + [modules] + 2 modules + final empty token" )
    TEST_ASSERT_EQ( aLines[1], "Project1", "project header" )
    TEST_ASSERT_EQ( aLines[2], "Form1", "first form" )
    TEST_ASSERT_EQ( aLines[3], "Form2", "second form" )
@@ -23,7 +23,7 @@ FUNCTION Main()
 
    cHbp := HB_BuildHbpIndex( { "Main" }, {} )
    aLines := hb_ATokens( cHbp, Chr(10) )
-   TEST_ASSERT_EQ( Len( aLines ), 2, "no modules section when empty" )
+   TEST_ASSERT_EQ( Len( aLines ), 3, "header + form + final empty token" )
    TEST_ASSERT( ! ( "[modules]" $ cHbp ), "no [modules] tag without modules" )
 
 RETURN TestPass( "hbp index" )

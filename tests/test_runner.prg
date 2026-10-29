@@ -14,7 +14,9 @@ RETURN
 FUNCTION TestPass( cName )
    IF s_nFailures > 0
       ? "FAILED: " + cName + " (" + LTrim( Str( s_nFailures ) ) + " assertion failures)"
+      ErrorLevel( 1 )
       RETURN 1
    ENDIF
    ? "OK: " + cName
+   ErrorLevel( 0 )
 RETURN 0
