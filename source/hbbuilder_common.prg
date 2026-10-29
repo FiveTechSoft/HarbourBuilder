@@ -22,8 +22,74 @@ FUNCTION HB_EscapeHarbourStr( cText )
    c := StrTran( c, Chr(9), '\t' )
 RETURN c
 
+/* Harbour literals do NOT process backslash escapes: "a\"b" is a syntax
+   error. Build a compile-safe expression instead: plain chunks between
+   double quotes (they can never contain a quote, those are split out),
+   quotes/control chars as Chr() terms, joined with " + ". */
 FUNCTION HB_QHarbourStr( cText )
-RETURN '"' + HB_EscapeHarbourStr( cText ) + '"'
+   LOCAL aTok := {}, cCur := "", i, c, cOut
+   IF cText == nil; cText := ""; ENDIF
+   FOR i := 1 TO Len( cText )
+      c := SubStr( cText, i, 1 )
+      IF c == '"' .or. c == "'" .or. c == Chr(13) .or. c == Chr(10) .or. c == Chr(9)
+         IF ! Empty( cCur ); AAdd( aTok, '"' + cCur + '"' ); cCur := ""; ENDIF
+         AAdd( aTok, "Chr(" + LTrim( Str( Asc( c ) ) ) + ")" )
+      ELSE
+         cCur += c
+      ENDIF
+   NEXT
+   IF ! Empty( cCur ); AAdd( aTok, '"' + cCur + '"' ); ENDIF
+   IF Len( aTok ) == 0; RETURN '""'; ENDIF
+   cOut := aTok[ 1 ]
+   FOR i := 2 TO Len( aTok )
+      cOut += " + " + aTok[ i ]
+   NEXT
+RETURN cOut
+
+/* Inverse of HB_QHarbourStr: evaluate a "literal" + Chr(N) expression back
+   to its text. Returns nil when the expression is not in that shape. */
+FUNCTION HB_HarbourStrEval( cExpr )
+   LOCAL cOut := "", n := 1, nL := Len( cExpr ), c, nEnd
+   DO WHILE n <= nL
+      c := SubStr( cExpr, n, 1 )
+      IF c == " " .or. c == Chr(9) .or. c == "+"
+         n++
+         LOOP
+      ENDIF
+      IF c == '"'
+         nEnd := At( '"', SubStr( cExpr, n + 1 ) )
+         IF nEnd == 0; RETURN nil; ENDIF
+         cOut += SubStr( cExpr, n + 1, nEnd - 1 )
+         n += nEnd + 1
+         LOOP
+      ENDIF
+      IF Upper( SubStr( cExpr, n, 4 ) ) == "CHR("
+         nEnd := At( ")", SubStr( cExpr, n ) )
+         IF nEnd == 0; RETURN nil; ENDIF
+         cOut += Chr( Val( SubStr( cExpr, n + 4, nEnd - 5 ) ) )
+         n += nEnd
+         LOOP
+      ENDIF
+      RETURN nil
+   ENDDO
+RETURN cOut
+
+/* Same length as cLine, with the inside of double-quoted strings blanked:
+   clause detection on the result cannot match text inside prompts/items. */
+FUNCTION HB_StripStrings( cLine )
+   LOCAL cOut := "", lIn := .F., i, c
+   FOR i := 1 TO Len( cLine )
+      c := SubStr( cLine, i, 1 )
+      IF c == '"'
+         lIn := ! lIn
+         cOut += " "
+      ELSEIF lIn
+         cOut += " "
+      ELSE
+         cOut += c
+      ENDIF
+   NEXT
+RETURN cOut
 
 FUNCTION HB_NormalizeCtrlType( nType )
    DO CASE

@@ -107,3 +107,7 @@ bp_trace.log
 # IDE runtime dirs
 hbbuilder_build/
 hbbuilder_debug/
+
+# Local build seals and the sandbox-built IDE binary (machine-specific)
+source/*.sha
+source/hbbuilder_linux

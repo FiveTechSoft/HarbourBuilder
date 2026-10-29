@@ -37,6 +37,7 @@ static oTB2          // Debug toolbar (for highlighting Debug button)
 static aDbgOffsets   // line offset tracking for debug_main.prg sections
 static lSyncingFromCode := .f.  // Guard: prevents re-entrant loop when syncing code→form
 static s_aUnserializable := {}  // Visual controls the generator cannot serialize; non-empty aborts a destructive save
+static s_cLastRefusal := ""  // rate-limit: do not re-show the same refusal on every auto-sync
 
 function Main()
 
@@ -757,6 +758,20 @@ return cCode
 static function GenerateFormCode( cName )
 return RegenerateFormCode( cName, 0 )
 
+// A function/method start line (used to bound CreateForm without relying on
+// indentation, which is user-controlled)
+static function HB_IsFuncStartLine( cKeyU )
+   return Left( cKeyU, 16 ) == "STATIC FUNCTION " .or. ;
+          Left( cKeyU, 9 ) == "FUNCTION " .or. ;
+          Left( cKeyU, 7 ) == "METHOD " .or. ;
+          Left( cKeyU, 10 ) == "PROCEDURE "
+
+// A RETURN statement (whole trimmed-upper line)
+static function HB_IsReturnStmt( cKeyU )
+   return Left( cKeyU, 6 ) == "RETURN" .and. ;
+          ( Len( cKeyU ) == 6 .or. ! ( IsAlpha( SubStr( cKeyU, 7, 1 ) ) .or. ;
+            IsDigit( SubStr( cKeyU, 7, 1 ) ) .or. SubStr( cKeyU, 7, 1 ) == "_" ) )
+
 static function RegenerateFormCode( cName, hForm )
 
    local cCode := "", e := Chr(13) + Chr(10)
@@ -771,6 +786,7 @@ static function RegenerateFormCode( cName, hForm )
    local aCtrlMap := {}, cOf, hOwner, nPg, kk2, nLen0, cSlice
    local aExLines, lInClass, cExLine
    local aExL2, cTL, cTU, lInCF, aPreserved := {}, aWiringOld := {}, cKey
+   local cCh, cLhs, aEmittedLines := {}, nE
    local aChunks := {}, cBody, cHdrChunk, lHdrOut, lWireOut, lSkipMenu, cMenuEnd
    local cName2, nP1, nP2, lFound, nCk, lBodyStarted
    local aMenuNodes, nMI, cMNode, aMFields, nLv, cCap, cScut, cHndl
@@ -781,7 +797,9 @@ static function RegenerateFormCode( cName, hForm )
 
    // Read existing code to find declared event handlers
    cExistingCode := ""
-   if nActiveForm > 0 .and. nActiveForm <= Len( aForms )
+   // hForm == 0 means a NEW form: never inherit the active tab's code,
+   // or custom lines from another form would contaminate the fresh one
+   if hForm != 0 .and. nActiveForm > 0 .and. nActiveForm <= Len( aForms )
       cExistingCode := CodeEditorGetTabText( hCodeEditor, nActiveForm + 1 )
    endif
 
@@ -872,11 +890,11 @@ static function RegenerateFormCode( cName, hForm )
                   // TMemo shares CT_EDIT in the gtk3 backend (UI_MemoNew);
                   // serialize by CLASS so a memo survives save/reopen as a memo
                   cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
-                     ' MEMO ::o' + cCtrlName + ' VAR "' + cText + '" OF Self SIZE ' + ;
+                     ' MEMO ::o' + cCtrlName + ' VAR ' + HB_QHarbourStr( cText ) + ' OF Self SIZE ' + ;
                      LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
                else
                   cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
-                     ' GET ::o' + cCtrlName + ' VAR "' + cText + '" OF Self SIZE ' + ;
+                     ' GET ::o' + cCtrlName + ' VAR ' + HB_QHarbourStr( cText ) + ' OF Self SIZE ' + ;
                      LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
                endif
             case nType == 3
@@ -1308,10 +1326,27 @@ static function RegenerateFormCode( cName, hForm )
             loop
          endif
          if lSkipMenu
-            if cTU == cMenuEnd; lSkipMenu := .F.; endif
+            if Left( cTU, Len( cMenuEnd ) ) == cMenuEnd; lSkipMenu := .F.; endif
             loop
          endif
-         if cTU == "RETURN NIL" .or. cTU == "RETURN"; exit; endif
+         // end of CreateForm, independent of the user's indentation style:
+         // the next function always ends the walk (a CreateForm without
+         // RETURN never absorbs later methods); a RETURN ends the method
+         // only when nothing but blanks/comments/separator follow before the
+         // next function or EOF - a RETURN with code after it is nested in
+         // an IF/block and the walk keeps going, preserving it verbatim
+         if HB_IsFuncStartLine( cTU ); exit; endif
+         if HB_IsReturnStmt( cTU )
+            lFound := .T.
+            for nE := j + 1 to Len( aExL2 )
+               cKey := Upper( AllTrim( StrTran( aExL2[ nE ], Chr(13), "" ) ) )
+               if Empty( cKey ) .or. Left( cKey, 2 ) == "//"; loop; endif
+               if HB_IsFuncStartLine( cKey ); exit; endif
+               lFound := .F.
+               exit
+            next
+            if lFound; exit; endif
+         endif
          if Empty( cTU )
             if lBodyStarted; cBody += e; endif
             loop
@@ -1341,10 +1376,16 @@ static function RegenerateFormCode( cName, hForm )
          endif
          if cTU == "// PRESERVED CUSTOM LINES"; loop; endif
          // form header property assignments: regenerated as one block
-         if ":=" $ cTU .and. ( Left( cTU, 8 ) == "::CTITLE" .or. ;
-              Left( cTU, 7 ) == "::NLEFT" .or. Left( cTU, 6 ) == "::NTOP" .or. ;
-              Left( cTU, 8 ) == "::NWIDTH" .or. Left( cTU, 9 ) == "::NHEIGHT" .or. ;
-              Left( cTU, 10 ) == "::NCLRPANE" .or. Left( cTU, 11 ) == "::CAPPTITLE" )
+         // (match the whole LHS identifier: ::cTitleExtra and ::nClrPanel
+         //  are custom user props and must survive verbatim)
+         if ":=" $ cTL
+            cLhs := Upper( AllTrim( Left( cTL, At( ":=", cTL ) - 1 ) ) )
+         else
+            cLhs := ""
+         endif
+         if cLhs == "::CTITLE" .or. cLhs == "::NLEFT" .or. cLhs == "::NTOP" .or. ;
+            cLhs == "::NWIDTH" .or. cLhs == "::NHEIGHT" .or. ;
+            cLhs == "::NCLRPANE" .or. cLhs == "::CAPPTITLE"
             if ! lHdrOut
                cBody += cHdrChunk
                lHdrOut := .T.
@@ -1355,14 +1396,20 @@ static function RegenerateFormCode( cName, hForm )
          // control creation lines: replace with the generated chunk, same spot
          cName2 := ""
          if Left( cTU, 1 ) == "@" .or. Left( cTU, 10 ) == "COMPONENT "
-            nP1 := At( "::o", cTL )
+            nP1 := At( "::O", cTU )
             if nP1 > 0
-               cName2 := SubStr( cTL, nP1 + 3 )
-               nP2 := At( " ", cName2 + " " )
+               cName2 := SubStr( cTU, nP1 + 3 )
+               for nP2 := 1 to Len( cName2 )
+                  cCh := SubStr( cName2, nP2, 1 )
+                  if ! ( IsAlpha( cCh ) .or. IsDigit( cCh ) .or. cCh == "_" )
+                     exit
+                  endif
+               next
                cName2 := Left( cName2, nP2 - 1 )
             endif
          endif
          if ! Empty( cName2 )
+            lFound := .F.
             for nCk := 1 to Len( aChunks )
                if Upper( aChunks[nCk][1] ) == Upper( cName2 )
                   if ! aChunks[nCk][3]
@@ -1370,10 +1417,17 @@ static function RegenerateFormCode( cName, hForm )
                      aChunks[nCk][3] := .T.
                      lBodyStarted := .T.
                   endif
+                  lFound := .T.
                   exit
                endif
             next
-            // controls deleted in the designer simply drop out here
+            // an @ / COMPONENT line naming a control the designer does not
+            // have was written by hand: keep it verbatim instead of
+            // silently deleting it
+            if ! lFound
+               cBody += cTL + e
+               lBodyStarted := .T.
+            endif
             loop
          endif
          // hand-written event wiring: keep in place unless already generated
@@ -1384,8 +1438,15 @@ static function RegenerateFormCode( cName, hForm )
             lBodyStarted := .T.
             loop
          endif
-         // any other line: keep verbatim unless the generator already emits it
-         if AllTrim( cTL ) $ cCreate .or. AllTrim( cTL ) $ cEvents ; loop; endif
+         // any other line: keep verbatim unless the generator already emits
+         // that exact line (substring matching deleted short custom lines)
+         if Len( aEmittedLines ) == 0
+            for nE := 1 to Len( HB_ATokens( cCreate + cEvents, Chr(10) ) )
+               AAdd( aEmittedLines, Upper( AllTrim( StrTran( ;
+                  HB_ATokens( cCreate + cEvents, Chr(10) )[ nE ], Chr(13), "" ) ) ) )
+            next
+         endif
+         if AScan( aEmittedLines, {|x| x == cTU } ) > 0 ; loop; endif
          cBody += cTL + e
          lBodyStarted := .T.
       next
@@ -1700,10 +1761,13 @@ static function WireDesignForm()
 
 return nil
 
-static function SyncDesignerToCode()
+static function SyncDesignerToCode( lFromSave )
 
    local cNewCode, cOldCode, cMethods, nPos, nPos2
+   local cVal, cKey, cCh, aExLines, nE, nP1, kk, lFound, lRetB := .F.
    local cSep := "//" + Replicate( "-", 68 )
+
+   if lFromSave == nil; lFromSave := .F.; endif
 
    if nActiveForm < 1 .or. nActiveForm > Len( aForms ); return nil; endif
 
@@ -1719,24 +1783,72 @@ static function SyncDesignerToCode()
    // Look for "METHOD CreateForm()", then find "return nil" after it,
    // then the separator after that = end of generated code
    cMethods := ""
-   nPos := At( "METHOD CreateForm()", cOldCode )
+   // case-insensitive: a hand-written "RETURN .T." or "Method Createform()"
+   // must not silently drop everything the user wrote after CreateForm
+   // the implementation, never the in-CLASS declaration
+   nPos := At( "METHOD CREATEFORM() CLASS", Upper( cOldCode ) )
    if nPos > 0
-      // Find "return nil" after CreateForm
-      nPos2 := At( "return nil", SubStr( cOldCode, nPos ) )
-      if nPos2 > 0
-         nPos := nPos + nPos2 - 1 + Len( "return nil" )
-         // Find separator after return nil
-         nPos2 := At( cSep, SubStr( cOldCode, nPos ) )
-         if nPos2 > 0
-            nPos := nPos + nPos2 - 1 + Len( cSep )
-            // Everything after = user METHOD implementations
-            if nPos <= Len( cOldCode )
-               cMethods := SubStr( cOldCode, nPos )
-               do while Left( cMethods, 1 ) == Chr(10) .or. Left( cMethods, 1 ) == Chr(13)
-                  cMethods := SubStr( cMethods, 2 )
-               enddo
+      // find the first line that is a RETURN statement after CreateForm
+      cVal := SubStr( cOldCode, nPos )
+      aExLines := HB_ATokens( cVal, Chr(10) )
+      // The RETURN that ends CreateForm: the next significant line after it
+      // (skipping blanks/comments) must be a function start or EOF - the
+      // same indentation-independent rule as the merge walk. A RETURN with
+      // code after it is nested in an IF/block and cannot end the method.
+      nPos2 := 0
+      lRetB := .F.
+      for nE := 2 to Len( aExLines )
+         cKey := Upper( AllTrim( StrTran( aExLines[ nE ], Chr(13), "" ) ) )
+         if HB_IsReturnStmt( cKey )
+            lFound := .T.
+            for kk := nE + 1 to Len( aExLines )
+               cCh := Upper( AllTrim( StrTran( aExLines[ kk ], Chr(13), "" ) ) )
+               if Empty( cCh ) .or. Left( cCh, 2 ) == "//"; loop; endif
+               if HB_IsFuncStartLine( cCh ); exit; endif
+               lFound := .F.
+               exit
+            next
+            if lFound
+               nPos2 := nE + 1   // user section starts after the RETURN
+               lRetB := .T.
+               exit
             endif
          endif
+      next
+      if ! lRetB
+         // CreateForm has no RETURN: user code starts at the next function
+         for nE := 2 to Len( aExLines )
+            cKey := Upper( AllTrim( StrTran( aExLines[ nE ], Chr(13), "" ) ) )
+            if HB_IsFuncStartLine( cKey )
+               nPos2 := nE
+               exit
+            endif
+         next
+      endif
+      if nPos2 > 0
+         // byte offset of the boundary line (1-based lines)
+         nP1 := 0
+         for nE := 1 to nPos2 - 1
+            nP1 += Len( aExLines[ nE ] ) + 1
+         next
+         if lRetB
+            // after the RETURN, skip blanks and pure-dash separator lines
+            // only: user comments before their first function survive
+            do while nPos2 <= Len( aExLines )
+               cCh := AllTrim( StrTran( aExLines[ nPos2 ], Chr(13), "" ) )
+               if Empty( cCh ) .or. ( Left( cCh, 2 ) == "//" .and. ;
+                     Empty( StrTran( SubStr( cCh, 3 ), "-", "" ) ) )
+                  nP1 += Len( aExLines[ nPos2 ] ) + 1
+                  nPos2 += 1
+                  loop
+               endif
+               exit
+            enddo
+         endif
+         cMethods := SubStr( cVal, nP1 + 1 )
+         do while Left( cMethods, 1 ) == Chr(10) .or. Left( cMethods, 1 ) == Chr(13)
+            cMethods := SubStr( cMethods, 2 )
+         enddo
       endif
    endif
 
@@ -1749,13 +1861,19 @@ static function SyncDesignerToCode()
       for nPos := 1 to Len( s_aUnserializable )
          cNewCode += "  - " + s_aUnserializable[ nPos ] + Chr(10)
       next
-      MsgInfo( "Save aborted: these controls cannot be saved faithfully and" + ;
-         Chr(10) + "would be lost on reopen:" + Chr(10) + Chr(10) + cNewCode + ;
-         Chr(10) + "Keep them in code, or use a supported control type.", ;
-         "HbBuilder" )
+      // auto-syncs (resize, inspector) warn only when the refusal set changes;
+      // an explicit save always warns
+      if lFromSave .or. cNewCode != s_cLastRefusal
+         MsgInfo( "Save aborted: these controls cannot be saved faithfully and" + ;
+            Chr(10) + "would be lost on reopen:" + Chr(10) + Chr(10) + cNewCode + ;
+            Chr(10) + "Keep them in code, or use a supported control type.", ;
+            "HbBuilder" )
+      endif
+      s_cLastRefusal := cNewCode
       lSyncingFromCode := .f.
       return nil
    endif
+   s_cLastRefusal := ""
 
    // Append preserved METHOD implementations
    if ! Empty( cMethods )
@@ -2211,6 +2329,7 @@ static function RestoreFormFromCode( hForm, cCode )
    local nCC, jjC, hC
    local nAtX, nAtY, nAtW, nAtH, cAtCmd, cAtName, cAtText, cRest, cAtSize
    local cRestU, nClPos, nClEnd, cClVal, cIt2
+   local cStrip, nK, nn, cC, cExpr, nQ, nEnd
 
    if Empty( cCode ) .or. hForm == 0
       return nil
@@ -2307,16 +2426,38 @@ static function RestoreFormFromCode( hForm, cCode )
                if nPos > 0
                   cAtCmd := Upper( Left( cRest, nPos - 1 ) )
                   cRest := AllTrim( SubStr( cRest, nPos + 1 ) )
-                  nPos := At( "::o", cRest )
+                  nPos := At( "::O", Upper( cRest ) )
                   if nPos > 0
                      cAtName := SubStr( cRest, nPos + 3 )
-                     nPos2 := At( " ", cAtName + " " )
-                     cAtName := Left( cAtName, nPos2 - 1 )
+                     nClEnd := 0
+                     for nn := 1 to Len( cAtName )
+                        cC := SubStr( cAtName, nn, 1 )
+                        if ! ( IsAlpha( cC ) .or. IsDigit( cC ) .or. cC == "_" )
+                           exit
+                        endif
+                        nClEnd := nn
+                     next
+                     cAtName := Left( cAtName, nClEnd )
                   endif
+                  cAtText := ""
                   nPos := At( '"', cRest )
                   if nPos > 0
-                     nPos2 := At( '"', SubStr( cRest, nPos + 1 ) )
-                     if nPos2 > 0; cAtText := SubStr( cRest, nPos + 1, nPos2 - 1 ); endif
+                     // the value is a "..." [+ Chr(N)]... expression; it ends
+                     // at the first clause keyword outside any string
+                     cStrip := HB_StripStrings( cRest )
+                     nEnd := 0
+                     for each cC in { " OF ", " SIZE ", " CHECKED", " ITEMS ", ;
+                           " PICTURE ", " URL ", " COLUMNS ", " HEADERS ", ;
+                           " COLSIZES ", " FOOTERS ", " PROMPTS ", " VAR ", ;
+                           " PROMPT ", " ACCEL " }
+                        nK := At( cC, Upper( SubStr( cStrip, nPos + 1 ) ) )
+                        if nK > 0 .and. ( nEnd == 0 .or. nK < nEnd )
+                           nEnd := nK
+                        endif
+                     next
+                     if nEnd == 0; nEnd := Len( cRest ) - nPos + 1; endif
+                     cExpr := HB_HarbourStrEval( SubStr( cRest, nPos, nEnd ) )
+                     if cExpr != nil; cAtText := cExpr; endif
                   endif
                   nPos := At( "SIZE ", Upper( cRest ) )
                   if nPos > 0
@@ -2371,16 +2512,19 @@ static function RestoreFormFromCode( hForm, cCode )
                   if hCtrl != 0
                      // apply optional clauses the generator may emit, so a
                      // load->save cycle does not drop them
-                     cRestU := Upper( cRest )
+                     cRestU := Upper( HB_StripStrings( cRest ) )
                      if " CHECKED" $ cRestU
                         UI_SetProp( hCtrl, "lChecked", .T. )
                      endif
-                     nClPos := At( 'PICTURE "', cRestU )
+                     nClPos := At( "PICTURE ", cRestU )
                      if nClPos > 0
-                        nClPos += 9
-                        nClEnd := At( '"', SubStr( cRest, nClPos ) )
-                        if nClEnd > 0
-                           UI_SetProp( hCtrl, "cPicture", SubStr( cRest, nClPos, nClEnd - 1 ) )
+                        nQ := At( '"', SubStr( cRest, nClPos + 8 ) )
+                        if nQ > 0
+                           nQ += nClPos + 7
+                           cExpr := HB_HarbourStrEval( SubStr( cRest, nQ ) )
+                           if cExpr != nil .and. ! Empty( cExpr )
+                              UI_SetProp( hCtrl, "cPicture", cExpr )
+                           endif
                         endif
                      endif
                      nClPos := At( "ITEMS ", cRestU )
@@ -2987,9 +3131,43 @@ static function TBSaveAs()
    TBSave()
 return nil
 
+// true when every live form can be serialized faithfully; shows the
+// refusal notice and returns .F. otherwise. Used by Save, Run and Debug so
+// none of them writes or executes stale code after a refused sync.
+static function HB_CheckFormsSerializable()
+
+   local i
+
+   if nActiveForm >= 1 .and. nActiveForm <= Len( aForms )
+      SyncDesignerToCode( .T. )
+      if ! Empty( s_aUnserializable )
+         return .F.
+      endif
+   endif
+   // non-active forms keep live designer objects: check them too before
+   // their stored code is written to disk or compiled
+   for i := 1 to Len( aForms )
+      if i != nActiveForm .and. ValType( aForms[ i ][ 2 ] ) == "O" .and. ;
+         ValType( aForms[ i ][ 2 ]:hCpp ) == "N" .and. aForms[ i ][ 2 ]:hCpp != 0
+         RegenerateFormCode( aForms[ i ][ 1 ], aForms[ i ][ 2 ]:hCpp )
+         if ! Empty( s_aUnserializable )
+            MsgInfo( "Operation aborted: form " + aForms[ i ][ 1 ] + ;
+               " holds controls that cannot be saved faithfully." + Chr(10) + ;
+               "Open it and remove or replace them first.", "HbBuilder" )
+            return .F.
+         endif
+      endif
+   next
+
+return .T.
+
 static function TBSave()
 
    local cDir, cFile, cHbp, i
+
+   if ! HB_CheckFormsSerializable()
+      return nil
+   endif
 
    SaveActiveFormCode()
 
@@ -3109,6 +3287,11 @@ static function TBRun()
    local cHbDir, cHbBin, cHbInc, cHbLib, cProjDir
    local cAllPrg, cCmd, cAllCode, nHash, cDestDir, cAppExe, cAppTitle
    static nLastHash := 0
+
+   // refuse to compile/run stale code after a refused sync
+   if ! HB_CheckFormsSerializable()
+      return nil
+   endif
 
    SaveActiveFormCode()
 
@@ -3401,6 +3584,11 @@ static function TBDebugRun( lRunToBreak )
    local cHbDir, cHbBin, cHbInc, cHbLib, cProjDir
    local cAllPrg, cCmd, cMainPrg, cSection
    local nCurLine, cWebKitLibs
+
+   // refuse to debug stale code after a refused sync
+   if ! HB_CheckFormsSerializable()
+      return nil
+   endif
 
    if lRunToBreak == nil; lRunToBreak := .F.; endif
 

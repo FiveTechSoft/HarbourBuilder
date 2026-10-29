@@ -1,0 +1,114 @@
+# Common harness for the GUI regression scripts (Linux sandbox, Xvfb).
+# Isolation rules: never kills IDE instances it did not start, saves and
+# restores bin/hbbuilder.ini, prints provenance (commit + binary hash).
+GTKROOT=${GTKROOT:-/tmp/gtk-root}
+RT_DISPLAY=${RT_DISPLAY:-:99}
+export DISPLAY=$RT_DISPLAY
+
+rt_provenance() {
+  echo "== provenance =="
+  echo "commit: $(git -C "$REPO" rev-parse HEAD)"
+  echo "binary: $(sha256sum "$REPO/bin/hbbuilder_linux" | cut -d' ' -f1)  bin/hbbuilder_linux"
+  echo "date:   $(date -Is)"
+}
+
+rt_setup() {  # $1 = project dir to point the IDE at
+  REPO=$(cd "$(dirname "${BASH_SOURCE[1]}")/.." && pwd)
+  RT_PROJDIR=$1
+  pgrep -x Xvfb >/dev/null || { Xvfb $RT_DISPLAY -screen 0 1600x1000x24 & sleep 2; }
+  [ -f "$REPO/bin/hbbuilder.ini" ] && cp "$REPO/bin/hbbuilder.ini" /tmp/rt_ini_backup
+  printf 'File1=%s\nFile2=\nFile3=\nFile4=\nFile5=\nFile6=\nFile7=\nFile8=\n' \
+    "$RT_PROJDIR/Project1.hbp" > "$REPO/bin/hbbuilder.ini"
+  RT_IDEPID=""
+}
+
+rt_launch_ide() {
+  local before after p
+  before=$(pgrep -f '\./hbbuilder_linux' | tr '\n' ' ')
+  cd "$REPO/bin"
+  nohup setsid env DISPLAY=$RT_DISPLAY \
+    LD_LIBRARY_PATH=.:$GTKROOT/usr/lib/x86_64-linux-gnu \
+    PKG_CONFIG_PATH=$GTKROOT/usr/lib/x86_64-linux-gnu/pkgconfig:$GTKROOT/usr/share/pkgconfig \
+    PKG_CONFIG_SYSROOT_DIR=$GTKROOT LIBRARY_PATH=$GTKROOT/usr/lib/x86_64-linux-gnu \
+    GDK_BACKEND=x11 LIBGL_ALWAYS_SOFTWARE=1 WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1 \
+    ./hbbuilder_linux >/tmp/rt_ide.log 2>&1 </dev/null &
+  disown
+  for i in $(seq 1 15); do
+    sleep 1
+    after=$(pgrep -f '\./hbbuilder_linux' | tr '\n' ' ')
+    for p in $after; do
+      case " $before " in *" $p "*) ;; *) RT_IDEPID=$p;; esac
+    done
+    [ -n "$RT_IDEPID" ] && break
+  done
+  [ -n "$RT_IDEPID" ] || { echo "HARNESS FAIL: IDE did not start (/tmp/rt_ide.log)"; exit 1; }
+  echo "IDE pid: $RT_IDEPID (started by this script)"
+}
+
+rt_cleanup() {  # kill only the IDE this script started; restore the INI
+  [ -n "${RT_IDEPID:-}" ] && kill "$RT_IDEPID" 2>/dev/null
+  [ -f /tmp/rt_ini_backup ] && cp /tmp/rt_ini_backup "$REPO/bin/hbbuilder.ini"
+}
+
+rt_ide_windows() { xdotool search --pid "$RT_IDEPID" 2>/dev/null; }
+
+rt_find_designer() {
+  local w t
+  for w in $(rt_ide_windows); do
+    t=$(xdotool getwindowname "$w" 2>/dev/null)
+    case "$t" in Form1*|*"Fixture Roundtrip"*) echo "$w"; return 0;; esac
+  done
+  return 1
+}
+
+rt_find_bar() {
+  local w t geo h wd
+  for w in $(rt_ide_windows); do
+    t=$(xdotool getwindowname "$w" 2>/dev/null)
+    case "$t" in HbBuilder*)
+      geo=$(xdotool getwindowgeometry --shell "$w" 2>/dev/null) || continue
+      h=$(echo "$geo" | sed -n 's/^HEIGHT=//p'); wd=$(echo "$geo" | sed -n 's/^WIDTH=//p')
+      [ -n "$h" ] && [ "$h" -le 130 ] && [ "$wd" -ge 800 ] && { echo "$w"; return 0; }
+      ;;
+    esac
+  done
+  return 1
+}
+
+rt_unmap_all_but() {
+  local keep=$1 w
+  for w in $(rt_ide_windows); do
+    [ "$w" = "$keep" ] || xdotool windowunmap "$w" 2>/dev/null
+  done
+}
+
+rt_park_all_but() {  # move every IDE window except the listed ids off-screen
+  local w keep=" $* "
+  for w in $(rt_ide_windows); do
+    case "$keep" in *" $w "*) ;; *) xdotool windowmove "$w" 3000 3000 2>/dev/null;; esac
+  done
+}
+
+rt_map_all() { local w; for w in $(rt_ide_windows); do xdotool windowmap "$w" 2>/dev/null; done; }
+
+rt_reopen_project() {  # File -> Reopen Last Project, then wait for the designer
+  local bar i
+  bar=$(rt_find_bar) || { echo "HARNESS FAIL: IDE bar not found"; exit 1; }
+  rt_unmap_all_but "$bar"; sleep 0.4
+  xdotool mousemove 20 12 click 1;  sleep 0.8
+  xdotool mousemove 100 134 click 1; sleep 5
+  rt_map_all; sleep 1
+  for i in $(seq 1 12); do
+    RT_DESIGNER=$(rt_find_designer) && break
+    sleep 1
+  done
+  [ -n "${RT_DESIGNER:-}" ] || { echo "HARNESS FAIL: designer window not found"; exit 1; }
+}
+
+rt_ocr_bar_token() {  # $1 = regex of the token; prints "x y" centre on stdout
+  local png=/tmp/rt_bar_$$.png
+  import -window root -crop "1600x118+0+0" "$png" 2>/dev/null
+  tesseract "$png" - tsv 2>/dev/null | \
+    awk -F'\t' -v re="$1" '$12 ~ re && $9+0 > 5 && $10+0 > 5 && $11+0 > 40 {printf "%d %d\n", $7+$9/2, $8+$10/2; exit}'
+  rm -f "$png"
+}

@@ -769,7 +769,8 @@ static void HBCheckBox_CreateWidget( HBCheckBox * p, GtkWidget * container )
 static void on_combo_changed( GtkWidget * widget, gpointer data )
 {
    HBComboBox * p = (HBComboBox *)data;
-   p->FItemIndex = gtk_combo_box_get_active( GTK_COMBO_BOX(widget) );
+   int active = gtk_combo_box_get_active( GTK_COMBO_BOX(widget) );
+   p->FItemIndex = active < 0 ? 0 : active + 1;  /* FItemIndex is 1-based, 0 = none */
    HBControl_FireEvent( &p->base, p->base.FOnChange );
 }
 
@@ -3463,21 +3464,27 @@ HB_FUNC( UI_SETPROP )
    {
       HBComboBox * cb = (HBComboBox *)p;
       cb->FItemIndex = hb_parni(3);
+      if( cb->FItemIndex < 0 ) cb->FItemIndex = 0;
+      if( cb->FItemIndex > cb->FItemCount ) cb->FItemIndex = cb->FItemCount;
       if( p->FControlType == CT_COMBOBOX && p->FWidget &&
           GTK_IS_COMBO_BOX_TEXT(p->FWidget) )
          gtk_combo_box_set_active( GTK_COMBO_BOX(p->FWidget), cb->FItemIndex - 1 );
       else if( p->FControlType == CT_LISTBOX && p->FWidget &&
-               GTK_IS_SCROLLED_WINDOW(p->FWidget) && cb->FItemIndex > 0 )
+               GTK_IS_SCROLLED_WINDOW(p->FWidget) )
       {
          GtkWidget * tv = gtk_bin_get_child( GTK_BIN(p->FWidget) );
          if( tv && GTK_IS_TREE_VIEW(tv) )
          {
-            int row = cb->FItemIndex - 1;
-            if( row >= cb->FItemCount ) row = 0;
             GtkTreeSelection * sel = gtk_tree_view_get_selection( GTK_TREE_VIEW(tv) );
-            GtkTreePath * path = gtk_tree_path_new_from_indices( row, -1 );
-            gtk_tree_selection_select_path( sel, path );
-            gtk_tree_path_free( path );
+            if( cb->FItemIndex > 0 )
+            {
+               int row = cb->FItemIndex - 1;
+               GtkTreePath * path = gtk_tree_path_new_from_indices( row, -1 );
+               gtk_tree_selection_select_path( sel, path );
+               gtk_tree_path_free( path );
+            }
+            else
+               gtk_tree_selection_unselect_all( sel );
          }
       }
    }
@@ -3807,9 +3814,7 @@ HB_FUNC( UI_SETPROP )
          if( !pipe ) break;
          raw = pipe + 1;
       }
-      /* Default selection to first item when items are set */
-      if( cb->FItemCount > 0 && cb->FItemIndex == 0 )
-         cb->FItemIndex = 1;
+      /* keep FItemIndex as the model says: 0 means no selection */
       /* Rebuild live widget */
       if( p->FControlType == CT_COMBOBOX && p->FWidget &&
           GTK_IS_COMBO_BOX_TEXT(p->FWidget) )
@@ -3835,15 +3840,16 @@ HB_FUNC( UI_SETPROP )
                   gtk_list_store_append( store, &iter );
                   gtk_list_store_set( store, &iter, 0, cb->FItems[i], -1 );
                }
-               /* Update selection to reflect FItemIndex */
+               /* Update selection to reflect FItemIndex (0 = unselect all) */
                GtkTreeSelection * sel = gtk_tree_view_get_selection( GTK_TREE_VIEW(tv) );
-               int selRow = cb->FItemIndex > 0 ? cb->FItemIndex - 1 : 0;
-               if( selRow < cb->FItemCount )
+               if( cb->FItemIndex > 0 && cb->FItemIndex <= cb->FItemCount )
                {
-                  GtkTreePath * path = gtk_tree_path_new_from_indices( selRow, -1 );
+                  GtkTreePath * path = gtk_tree_path_new_from_indices( cb->FItemIndex - 1, -1 );
                   gtk_tree_selection_select_path( sel, path );
                   gtk_tree_path_free( path );
                }
+               else
+                  gtk_tree_selection_unselect_all( sel );
             }
          }
       }

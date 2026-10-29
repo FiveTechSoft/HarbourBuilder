@@ -9,78 +9,21 @@ REPO=$(cd "$(dirname "$0")/.." && pwd)
 FIX="$REPO/tests/fixtures/roundtrip"
 RUN=/tmp/rt_run
 CYC="$RUN/cycles"
-GTKROOT=/tmp/gtk-root
-export DISPLAY=:99
-pgrep -x Xvfb >/dev/null || { Xvfb :99 -screen 0 1600x1000x24 & sleep 2; }
+source "$REPO/tests/harness_lib.sh"
+fail() { echo "FAIL: $1"; rt_cleanup; exit 1; }
 
-fail() { echo "FAIL: $1"; exit 1; }
-
-# 0. fresh working copy of the fixture
+rt_provenance
 rm -rf "$RUN"; mkdir -p "$CYC"
 cp "$FIX"/Project1.hbp "$FIX"/Project1.prg "$FIX"/Form1.prg "$RUN"/
 cp "$FIX/Form1.prg" "$CYC/original.prg"
+rt_setup "$RUN"
+rt_launch_ide
 
-# 1. INI points at the working copy (Reopen Last Project source)
-printf 'File1=%s\nFile2=\nFile3=\nFile4=\nFile5=\nFile6=\nFile7=\nFile8=\n' \
-  "$RUN/Project1.hbp" > "$REPO/bin/hbbuilder.ini"
-
-# 2. relaunch the IDE with the current binary
-pkill -f 'hbbuilder_linux' 2>/dev/null; sleep 1
-cd "$REPO/bin"
-nohup setsid env DISPLAY=:99 \
-  LD_LIBRARY_PATH=.:$GTKROOT/usr/lib/x86_64-linux-gnu \
-  PKG_CONFIG_PATH=$GTKROOT/usr/lib/x86_64-linux-gnu/pkgconfig:$GTKROOT/usr/share/pkgconfig \
-  PKG_CONFIG_SYSROOT_DIR=$GTKROOT \
-  LIBRARY_PATH=$GTKROOT/usr/lib/x86_64-linux-gnu \
-  GDK_BACKEND=x11 LIBGL_ALWAYS_SOFTWARE=1 \
-  WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1 \
-  ./hbbuilder_linux >/tmp/ide-rt.log 2>&1 </dev/null &
-disown
-sleep 7
-IDEPID=$(pgrep -f '\./hbbuilder_linux' | head -1)
-[ -n "$IDEPID" ] || fail "IDE did not start (see /tmp/ide-rt.log)"
-echo "IDE pid: $IDEPID"
-
-# helpers ----------------------------------------------------------------
-ide_windows() { xdotool search --pid "$IDEPID" 2>/dev/null; }
-
-unmap_all_but() {  # $1 = window id to keep mapped
-  local keep=$1 w
-  for w in $(ide_windows); do
-    [ "$w" = "$keep" ] && continue
-    xdotool windowunmap "$w" 2>/dev/null
-  done
-}
-
-find_designer() {  # the design surface window is titled with the form name
-  local w t
-  for w in $(ide_windows); do
-    t=$(xdotool getwindowname "$w" 2>/dev/null)
-    case "$t" in Form1*|*"Fixture Roundtrip"*) echo "$w"; return 0;; esac
-  done
-  return 1
-}
-
-find_bar() {  # IDE bar: full-width, short window titled HbBuilder
-  local w t geo h wd
-  for w in $(ide_windows); do
-    t=$(xdotool getwindowname "$w" 2>/dev/null)
-    case "$t" in
-      HbBuilder*)
-        geo=$(xdotool getwindowgeometry --shell "$w" 2>/dev/null) || continue
-        h=$(echo "$geo" | sed -n 's/^HEIGHT=//p')
-        wd=$(echo "$geo" | sed -n 's/^WIDTH=//p')
-        [ -n "$h" ] && [ "$h" -le 130 ] && [ "$wd" -ge 800 ] && { echo "$w"; return 0; }
-        ;;
-    esac
-  done
-  return 1
-}
-
-map_all() {
-  local w
-  for w in $(ide_windows); do xdotool windowmap "$w" 2>/dev/null; done
-}
+ide_windows() { rt_ide_windows; }
+unmap_all_but() { rt_unmap_all_but "$@"; }
+find_designer() { rt_find_designer; }
+find_bar() { rt_find_bar; }
+map_all() { rt_map_all; }
 
 # cycles -------------------------------------------------------------------
 for C in 1 2; do
@@ -106,14 +49,17 @@ for C in 1 2; do
   # save: focus the bar and hit the Save accelerator
   BAR=$(find_bar); unmap_all_but "$BAR"; sleep 0.3
   xdotool mousemove 700 12 click 1; sleep 0.4
-  M0=$(stat -c %Y "$RUN/Form1.prg")
+  touch -d '2000-01-01 00:00:00' "$RUN/Form1.prg"
   xdotool key ctrl+s; sleep 2
   M1=$(stat -c %Y "$RUN/Form1.prg")
-  if [ "$M1" = "$M0" ] && [ "$C" = 1 ]; then
+  if [ "$M1" -lt 1000000000 ]; then
     # accelerator did not fire: fall back to File -> Save menu item
     xdotool mousemove 20 12 click 1; sleep 0.8
     xdotool mousemove 100 200 click 1; sleep 2
+    M1=$(stat -c %Y "$RUN/Form1.prg")
   fi
+  [ "$M1" -ge 1000000000 ] || fail "cycle $C: no real save (Form1.prg mtime unchanged)"
+  echo "cycle $C: Form1.prg written (mtime $(date -d @$M1 -Is))"
   cp "$RUN/Form1.prg" "$CYC/cycle$C.prg"
 done
 
@@ -172,11 +118,28 @@ if ! diff -q "$CYC/cycle1.prg" "$CYC/cycle2.prg" >/dev/null; then
   echo "  NOT A FIXPOINT: cycle1 != cycle2"; FAILN=$((FAILN+1))
 fi
 
+# T2: original -> cycle2 may only differ in the form geometry lines
+GEOM_BAD=$(diff <(tr -d '\r' < "$CYC/original.prg") <(tr -d '\r' < "$CYC/cycle2.prg") | grep -E '^[<>]' | \
+  grep -vE '^[<>] +::nHeight := (480|530)$' | \
+  grep -vE '^[<>] +@ 430, 300 LISTBOX ::oList1 OF Self SIZE 160, (90|100) ITEMS "Alfa", "Beta"$' | \
+  grep -vE '^[<>] +DATA o(Label1|Edit1|Chk1|Combo1|Group1|Radio1|Image1|Memo1|List1) +// [A-Za-z0-9_]+$' | \
+  grep -vE '^[<>] // Form1\.prg$' | \
+  grep -vE '^[<>] // Form1\.prg - FIXTURE roundtrip v3: order preservation \+ side-effect calls$' | \
+  grep -vE '^[<>] +// Event wiring$' | \
+  grep -v $'\x1A' || true)
+if [ -n "$GEOM_BAD" ]; then
+  echo "  UNEXPECTED DRIFT original -> cycle2:"
+  echo "$GEOM_BAD" | head -20
+  FAILN=$((FAILN+1))
+fi
+
 if [ "$FAILN" -gt 0 ]; then
   echo "ROUNDTRIP FAIL ($FAILN problems). Evidence in $CYC"
+  rt_cleanup
   exit 1
 fi
-echo "ROUNDTRIP PASS: 2 cycles, no content lost, fixpoint reached."
-echo "diff original -> cycle2 (allowed geometry drift only):"
-diff "$CYC/original.prg" "$CYC/cycle2.prg" | head -60
+echo "ROUNDTRIP PASS: 2 cycles, real save verified in both, no content lost, fixpoint reached."
+echo "diff original -> cycle2, CRLF-normalized (known drift only; M6/M7/T6 tracked):"
+diff <(tr -d '\r' < "$CYC/original.prg") <(tr -d '\r' < "$CYC/cycle2.prg") | head -60
+rt_cleanup
 exit 0

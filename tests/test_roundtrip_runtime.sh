@@ -10,29 +10,16 @@ set -u
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 FIX="$REPO/tests/fixtures/roundtrip"
 RUN=/tmp/rt_run
-GTKROOT=/tmp/gtk-root
-export DISPLAY=:99
-fail() { echo "RUNTIME FAIL: $1"; exit 1; }
+source "$REPO/tests/harness_lib.sh"
+fail() { echo "RUNTIME FAIL: $1"; rt_cleanup; exit 1; }
 
-pgrep -x Xvfb >/dev/null || { Xvfb :99 -screen 0 1600x1000x24 & sleep 2; }
+rt_provenance
 rm -f /tmp/fixture_trace.log /tmp/rt_runtime.png
 rm -rf "$RUN"; mkdir -p "$RUN"
 cp "$FIX"/Project1.hbp "$FIX"/Project1.prg "$FIX"/Form1.prg "$RUN"/
-printf 'File1=%s\nFile2=\nFile3=\nFile4=\nFile5=\nFile6=\nFile7=\nFile8=\n' \
-  "$RUN/Project1.hbp" > "$REPO/bin/hbbuilder.ini"
-
-pkill -f 'hbbuilder_linux' 2>/dev/null; sleep 1
-cd "$REPO/bin"
-nohup setsid env DISPLAY=:99 \
-  LD_LIBRARY_PATH=.:$GTKROOT/usr/lib/x86_64-linux-gnu \
-  PKG_CONFIG_PATH=$GTKROOT/usr/lib/x86_64-linux-gnu/pkgconfig:$GTKROOT/usr/share/pkgconfig \
-  PKG_CONFIG_SYSROOT_DIR=$GTKROOT LIBRARY_PATH=$GTKROOT/usr/lib/x86_64-linux-gnu \
-  GDK_BACKEND=x11 LIBGL_ALWAYS_SOFTWARE=1 WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1 \
-  ./hbbuilder_linux >/tmp/ide-runtime.log 2>&1 </dev/null &
-disown
-sleep 7
-IDEPID=$(pgrep -f '\./hbbuilder_linux' | head -1)
-[ -n "$IDEPID" ] || fail "IDE did not start"
+rt_setup "$RUN"
+rt_launch_ide
+IDEPID=$RT_IDEPID
 
 find_bar() {
   local w t geo h wd
@@ -97,3 +84,4 @@ echo "$OCR" | grep -q 'modificado' || { echo "  edit effect missing"; FAILN=$((F
 kill "$APPPID" 2>/dev/null
 [ "$FAILN" -gt 0 ] && fail "$FAILN runtime effect(s) missing (screenshot /tmp/rt_runtime.png)"
 echo "RUNTIME PASS: side-effect call, dependent caption and custom edit all executed."
+rt_cleanup
