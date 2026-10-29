@@ -51,7 +51,7 @@ eval "$(xdotool getwindowgeometry --shell "$DLG")"
 import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/refusal-dialog.png
 TXT=$(tesseract /tmp/refusal-dialog.png - 2>/dev/null)
 echo "$TXT" | grep -qi 'Save aborted' || fail "dialog is not the save-abort notice"
-echo "$TXT" | grep -qi 'type 22' || fail "dialog does not name the control"
+echo "$TXT" | grep -qi 'type 32' || fail "dialog does not name the control"
 MD1=$(md5sum "$RUN/Form1.prg" | cut -d' ' -f1)
 [ "$MD0" = "$MD1" ] || fail "Form1.prg changed on disk"
 xdotool key Return; sleep 0.5
