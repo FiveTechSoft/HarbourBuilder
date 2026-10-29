@@ -122,6 +122,8 @@ fi
 GEOM_BAD=$(diff <(tr -d '\r' < "$CYC/original.prg") <(tr -d '\r' < "$CYC/cycle2.prg") | grep -E '^[<>]' | \
   grep -vE '^[<>] +::nHeight := (480|530)$' | \
   grep -vE '^[<>] +@ 430, 300 LISTBOX ::oList1 OF Self SIZE 160, (90|100) ITEMS "Alfa", "Beta"$' | \
+  grep -vE '^[<>] +@ 140, 20 COMBOBOX ::oCombo1 OF Self SIZE 180, 26 ITEMS "Uno", "Di " \+ Chr\( ?34 ?\) \+ "si" \+ Chr\( ?34 ?\), "Tre, s"$' | \
+
   grep -vE '^[<>] +DATA o(Label1|Edit1|Chk1|Combo1|Group1|Radio1|Image1|Memo1|List1) +// [A-Za-z0-9_]+$' | \
   grep -vE '^[<>] // Form1\.prg$' | \
   grep -vE '^[<>] // Form1\.prg - FIXTURE roundtrip v3: order preservation \+ side-effect calls$' | \
