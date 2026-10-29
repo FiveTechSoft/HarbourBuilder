@@ -105,8 +105,13 @@ grep -q 'KEEP-ME: do not delete' "$RUN/Form1.prg" || fail "hand-written marker l
 grep -q 'DATA oSay1' "$RUN/Form1.prg" || fail "unrelated SAY DATA lost"
 echo "--- resulting Form1.prg ---"; cat "$RUN/Form1.prg"
 
-# Compileability of regenerated code from this fixture family is covered by
-# tests/test_roundtrip_runtime.sh (IDE build & run via Ctrl+R) - not duplicated here.
+# Post-delete syntax check of THE SAVED FILE itself (harbour compiler
+# with the hbbuilder.ch command definitions pre-included).
+HARBOUR=${HARBOUR:-/tmp/harbour-review/bin/linux/gcc/harbour}
+HB_INC=${HB_INC:-/tmp/harbour-review/include}
+"$HARBOUR" -n2 -q -w -es2 -i"$REPO/include" -i"$HB_INC" \
+  -u+"$REPO/include/hbbuilder.ch" "$RUN/Form1.prg" -o/tmp/rt_simpledel_syntax.hrb \
+  && echo "post-delete syntax check: OK" || fail "post-delete Form1.prg has syntax errors"
 
 rt_cleanup
 echo "SIMPLE_DELETE PASS: designer delete saved without resurrection; unrelated and hand-written lines intact."
