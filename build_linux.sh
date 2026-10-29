@@ -62,44 +62,46 @@ if [ ! -f "$RESDIR/libscintilla.so" ] || [ ! -f "$RESDIR/liblexilla.so" ]; then
    fi
 fi
 
-# [1/6] Harbour -> C (only if .prg changed)
-if needs_rebuild "${PROG}.c" "$HBBIN/harbour $HBINC" \
-      "${PROG}.prg" \
-      "$PROJDIR/source/core/classes.prg" \
-      "$PROJDIR/source/inspector/inspector_gtk.prg" \
-      "$PROJDIR/source/hbbuilder_common.prg" \
-      "$PROJDIR/include/hbbuilder.ch" \
-      "$PROJDIR/include/hbide.ch"; then
-   echo "[1/6] Compiling ${PROG}.prg..."
-   "$HBBIN/harbour" hbbuilder_common.prg ${PROG}.prg -n -w -q \
-      -I"$HBINC" \
-      -I"$PROJDIR/include" \
-      -I"$PROJDIR/source" \
-      -o${PROG}.c
-   record_build_signature "${PROG}.c" "$HBBIN/harbour $HBINC" \
-      "${PROG}.prg" \
-      "$PROJDIR/source/core/classes.prg" \
-      "$PROJDIR/source/inspector/inspector_gtk.prg" \
-      "$PROJDIR/source/hbbuilder_common.prg" \
-      "$PROJDIR/include/hbbuilder.ch" \
-      "$PROJDIR/include/hbide.ch"
-   NEED_LINK=1
-else
-   echo "[1/6] ${PROG}.prg — up to date"
-fi
+# [1/6] Harbour -> C (per module; one -o output keeps only one module,
+# so each .prg must be compiled separately and linked as its own object)
+HB_MODULES="hbbuilder_common ${PROG}"
+HB_MODULE_DEPS="$PROJDIR/source/core/classes.prg
+$PROJDIR/source/inspector/inspector_gtk.prg
+$PROJDIR/source/hbbuilder_common.prg
+$PROJDIR/source/hix_runtime.prg
+$PROJDIR/include/hbbuilder.ch
+$PROJDIR/include/hbide.ch"
+for mod in $HB_MODULES; do
+   if needs_rebuild "${mod}.c" "$HBBIN/harbour $HBINC" "${mod}.prg" $HB_MODULE_DEPS; then
+      echo "[1/6] Compiling ${mod}.prg..."
+      "$HBBIN/harbour" "${mod}.prg" -n -w -q \
+         -I"$HBINC" \
+         -I"$PROJDIR/include" \
+         -I"$PROJDIR/source" \
+         -o"${mod}.c"
+      record_build_signature "${mod}.c" "$HBBIN/harbour $HBINC" "${mod}.prg" $HB_MODULE_DEPS
+      NEED_LINK=1
+   else
+      echo "[1/6] ${mod}.prg — up to date"
+   fi
+done
 
-# [2/6] C -> Object (only if .c changed)
-if needs_rebuild "${PROG}.o" "$HBINC $(pkg-config --cflags gtk+-3.0)" "${PROG}.c"; then
-   echo "[2/6] Compiling ${PROG}.c..."
-   gcc -c -g -Wno-unused-value \
-      -I"$HBINC" \
-      $(pkg-config --cflags gtk+-3.0) \
-      ${PROG}.c -o ${PROG}.o
-   record_build_signature "${PROG}.o" "$HBINC $(pkg-config --cflags gtk+-3.0)" "${PROG}.c"
-   NEED_LINK=1
-else
-   echo "[2/6] ${PROG}.o — up to date"
-fi
+# [2/6] C -> Object (per module, only if .c changed)
+HB_OBJS=""
+for mod in $HB_MODULES; do
+   if needs_rebuild "${mod}.o" "$HBINC $(pkg-config --cflags gtk+-3.0)" "${mod}.c"; then
+      echo "[2/6] Compiling ${mod}.c..."
+      gcc -c -g -Wno-unused-value \
+         -I"$HBINC" \
+         $(pkg-config --cflags gtk+-3.0) \
+         "${mod}.c" -o "${mod}.o"
+      record_build_signature "${mod}.o" "$HBINC $(pkg-config --cflags gtk+-3.0)" "${mod}.c"
+      NEED_LINK=1
+   else
+      echo "[2/6] ${mod}.o — up to date"
+   fi
+   HB_OBJS="$HB_OBJS ${mod}.o"
+done
 
 # Detect WebKit2GTK (try 4.1 first, then 4.0)
 WEBKIT_CFLAGS=""
@@ -174,7 +176,7 @@ echo "[5/6] Linking ${PROG}..."
 EXTRA_OBJS=""
 [ -f hbdb_real.o ] && EXTRA_OBJS="$EXTRA_OBJS hbdb_real.o"
 
-gcc ${PROG}.o gtk3_core.o gtk3_inspector.o $EXTRA_OBJS -g -o ${PROG} \
+gcc $HB_OBJS gtk3_core.o gtk3_inspector.o $EXTRA_OBJS -g -o ${PROG} \
    -L"$HBLIB" \
    -Wl,--start-group \
    -lhbcommon -lhbvm -lhbrtl -lhbrdd -lhbmacro -lhblang -lhbcpage -lhbpp \
