@@ -13631,9 +13631,10 @@ static gboolean http_on_listen( GIOChannel * channel, GIOCondition cond, gpointe
    /* Read the request: headers first, then Content-Length body (cap 1 MB) */
    {
       int cap = 1048576, total = 0, headerEnd = -1, contentLen = 0;
-      char * req = (char *) malloc( cap );
+      char * req = (char *) malloc( cap + 1 ); /* +1: req[total]=0 when total==cap */
+      time_t deadline = time( NULL ) + 5; /* hard wall: a slow-drip client must not stall the UI main loop */
       if( ! req ) { close( fd ); return G_SOURCE_CONTINUE; }
-      while( total < cap )
+      while( total < cap && time( NULL ) < deadline )
       {
          int n = (int) recv( fd, req + total, cap - total, 0 );
          if( n <= 0 ) break;
@@ -13658,7 +13659,9 @@ static gboolean http_on_listen( GIOChannel * channel, GIOCondition cond, gpointe
          if( headerEnd >= 0 && total >= headerEnd + contentLen )
             break;
       }
-      if( total <= 0 || headerEnd < 0 )
+      /* Reject incomplete requests (timeout, truncation, slow drip):
+         never dispatch a partial body as if it were complete. */
+      if( total <= 0 || headerEnd < 0 || total < headerEnd + contentLen )
       {
          free( req );
          close( fd );
@@ -13757,7 +13760,9 @@ HB_FUNC( UI_WEBSERVERSTART )
    struct sockaddr_in addr;
    memset( &addr, 0, sizeof(addr) );
    addr.sin_family = AF_INET;
-   addr.sin_addr.s_addr = htonl( INADDR_ANY );
+   /* Dev/test server: bind loopback only so user apps are never exposed
+      on external interfaces (matches the debugger server above). */
+   addr.sin_addr.s_addr = htonl( INADDR_LOOPBACK );
    addr.sin_port = htons( nPort );
 
    if( bind( s_httpServerFd, (struct sockaddr *)&addr, sizeof(addr) ) < 0 )
