@@ -3450,7 +3450,8 @@ HB_FUNC( UI_SETPROP )
       ((HBButton *)p)->FDefault = hb_parl(3);
    else if( strcasecmp(szProp,"lCancel")==0 && p->FControlType == CT_BUTTON )
       ((HBButton *)p)->FCancel = hb_parl(3);
-   else if( strcasecmp(szProp,"lChecked")==0 && p->FControlType == CT_CHECKBOX )
+   else if( strcasecmp(szProp,"lChecked")==0 &&
+            ( p->FControlType == CT_CHECKBOX || p->FControlType == CT_RADIO ) )
    {
       HBCheckBox * cb = (HBCheckBox *)p;
       cb->FChecked = hb_parl(3);
@@ -3955,8 +3956,11 @@ HB_FUNC( UI_GETPROP )
       hb_retl( ((HBButton *)p)->FDefault );
    else if( strcasecmp(szProp,"lCancel")==0 && p->FControlType==CT_BUTTON )
       hb_retl( ((HBButton *)p)->FCancel );
-   else if( strcasecmp(szProp,"lChecked")==0 && p->FControlType==CT_CHECKBOX )
+   else if( strcasecmp(szProp,"lChecked")==0 &&
+            ( p->FControlType==CT_CHECKBOX || p->FControlType==CT_RADIO ) )
       hb_retl( ((HBCheckBox *)p)->FChecked );
+   else if( strcasecmp(szProp,"cPicture")==0 && p->FControlType==CT_IMAGE )
+      hb_retc( ((HBImage *)p)->FPicture );
    else if( strcasecmp(szProp,"cName")==0 )      hb_retc( p->FName );
    else if( strcasecmp(szProp,"cClassName")==0 ) hb_retc( p->FClassName );
    else if( strcasecmp(szProp,"lSizable")==0 && p->FControlType==CT_FORM )

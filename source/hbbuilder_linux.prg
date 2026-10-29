@@ -36,6 +36,7 @@ static aOpenFiles    // Array of open files (not in project): { { cName, cCode, 
 static oTB2          // Debug toolbar (for highlighting Debug button)
 static aDbgOffsets   // line offset tracking for debug_main.prg sections
 static lSyncingFromCode := .f.  // Guard: prevents re-entrant loop when syncing code→form
+static s_aUnserializable := {}  // Visual controls the generator cannot serialize; non-empty aborts a destructive save
 
 function Main()
 
@@ -769,9 +770,12 @@ static function RegenerateFormCode( cName, hForm )
    local cVal, aHdrs, kk, nColCount, aColProps, nColW, nCtrlClr, nInterval, nVal
    local aCtrlMap := {}, cOf, hOwner, nPg, kk2, nLen0, cSlice
    local aExLines, lInClass, cExLine
+   local aExL2, cTL, cTU, lInCF, aPreserved := {}, aWiringOld := {}, cKey
    local aMenuNodes, nMI, cMNode, aMFields, nLv, cCap, cScut, cHndl
    local nPendingLevels, nPL, cInd, bIsPopup, aNextF
    local aMenuHandlers := {}, lHasHandlers
+
+   s_aUnserializable := {}
 
    // Read existing code to find declared event handlers
    cExistingCode := ""
@@ -862,9 +866,17 @@ static function RegenerateFormCode( cName, hForm )
                   ' SAY ::o' + cCtrlName + ' PROMPT ' + HB_QHarbourStr( cText ) + ' OF Self SIZE ' + ;
                   LTrim(Str(nCW)) + e
             case nType == 2
-               cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
-                  ' GET ::o' + cCtrlName + ' VAR "' + cText + '" OF Self SIZE ' + ;
-                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
+               if cCtrlClass == "TMemo"
+                  // TMemo shares CT_EDIT in the gtk3 backend (UI_MemoNew);
+                  // serialize by CLASS so a memo survives save/reopen as a memo
+                  cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
+                     ' MEMO ::o' + cCtrlName + ' VAR "' + cText + '" OF Self SIZE ' + ;
+                     LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
+               else
+                  cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
+                     ' GET ::o' + cCtrlName + ' VAR "' + cText + '" OF Self SIZE ' + ;
+                     LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
+               endif
             case nType == 3
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' BUTTON ::o' + cCtrlName + ' PROMPT ' + HB_QHarbourStr( cText ) + ' OF Self SIZE ' + ;
@@ -872,7 +884,11 @@ static function RegenerateFormCode( cName, hForm )
             case nType == 4
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' CHECKBOX ::o' + cCtrlName + ' PROMPT ' + HB_QHarbourStr( cText ) + ' OF Self SIZE ' + ;
-                  LTrim(Str(nCW)) + e
+                  LTrim(Str(nCW))
+               if UI_GetProp( hCtrl, "lChecked" ) == .T.
+                  cCreate += ' CHECKED'
+               endif
+               cCreate += e
             case nType == 5  // ComboBox
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' COMBOBOX ::o' + cCtrlName + ' OF Self SIZE ' + ;
@@ -934,6 +950,32 @@ static function RegenerateFormCode( cName, hForm )
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' GROUPBOX ::o' + cCtrlName + ' PROMPT ' + HB_QHarbourStr( cText ) + ' OF Self SIZE ' + ;
                   LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
+            case nType == 8  // RadioButton
+               cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
+                  ' RADIOBUTTON ::o' + cCtrlName + ' PROMPT ' + HB_QHarbourStr( cText ) + ' OF Self SIZE ' + ;
+                  LTrim(Str(nCW))
+               if UI_GetProp( hCtrl, "lChecked" ) == .T.
+                  cCreate += ' CHECKED'
+               endif
+               cCreate += e
+            case nType == 12  // BitBtn
+               cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
+                  ' BITBTN ::o' + cCtrlName + ' PROMPT ' + HB_QHarbourStr( cText ) + ' OF Self SIZE ' + ;
+                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH))
+               cVal := UI_GetProp( hCtrl, "cPicture" )
+               if ValType( cVal ) == "C" .and. ! Empty( cVal )
+                  cCreate += ' PICTURE ' + HB_QHarbourStr( cVal )
+               endif
+               cCreate += e
+            case nType == 14  // Image
+               cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
+                  ' IMAGE ::o' + cCtrlName + ' OF Self SIZE ' + ;
+                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH))
+               cVal := UI_GetProp( hCtrl, "cPicture" )
+               if ValType( cVal ) == "C" .and. ! Empty( cVal )
+                  cCreate += ' PICTURE ' + HB_QHarbourStr( cVal )
+               endif
+               cCreate += e
             case nType == 79  // Browse
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' BROWSE ::o' + cCtrlName + ' OF Self SIZE ' + ;
@@ -1129,9 +1171,11 @@ static function RegenerateFormCode( cName, hForm )
                      endif
                   endif
                else
-                  cCreate += '   // ::o' + cCtrlName + ' (' + cCtrlClass + ') at ' + ;
-                     LTrim(Str(nL)) + ',' + LTrim(Str(nT)) + ' SIZE ' + ;
-                     LTrim(Str(nCW)) + ',' + LTrim(Str(nCH)) + e
+                  /* Visual control type with no faithful serialization:
+                     refuse the destructive save instead of silently degrading
+                     the control to a comment (which reopen would lose). */
+                  AAdd( s_aUnserializable, cCtrlClass + " '" + cCtrlName + ;
+                     "' (type " + LTrim( Str( nType ) ) + ")" )
                endif
          endcase
 
@@ -1217,6 +1261,48 @@ static function RegenerateFormCode( cName, hForm )
       next
    endif
 
+   // ------------------------------------------------------------------
+   // Fidelity pass: preserve lines from the existing CreateForm() that the
+   // generator does not emit itself (custom property assignments,
+   // hand-written event wiring, user comments). Nothing the user wrote
+   // inside CreateForm may vanish on save.
+   if ! Empty( cExistingCode )
+      lInCF := .F.
+      aExL2 := HB_ATokens( cExistingCode, Chr(10) )
+      for j := 1 to Len( aExL2 )
+         cTL := StrTran( aExL2[j], Chr(13), "" )
+         cTU := Upper( AllTrim( cTL ) )
+         if ! lInCF
+            if Left( cTU, 19 ) == "METHOD CREATEFORM()" .and. "CLASS" $ cTU
+               lInCF := .T.
+            endif
+            loop
+         endif
+         if cTU == "RETURN NIL" .or. cTU == "RETURN"; exit; endif
+         if Empty( cTU ); loop; endif
+         // lines the generator always emits itself
+         if Left( cTU, 1 ) == "@" ; loop; endif
+         if Left( cTU, 10 ) == "COMPONENT " .or. Left( cTU, 7 ) == "DEFINE " .or. ;
+            Left( cTU, 4 ) == "END " .or. Left( cTU, 8 ) == "MENUITEM" .or. ;
+            Left( cTU, 11 ) == "MENUSEPARAT" .or. cTU == "// EVENT WIRING" .or. ;
+            cTU == "// PRESERVED CUSTOM LINES" ; loop; endif
+         if ":=" $ cTU .and. ( Left( cTU, 8 ) == "::CTITLE" .or. ;
+              Left( cTU, 7 ) == "::NLEFT" .or. Left( cTU, 6 ) == "::NTOP" .or. ;
+              Left( cTU, 8 ) == "::NWIDTH" .or. Left( cTU, 9 ) == "::NHEIGHT" .or. ;
+              Left( cTU, 10 ) == "::NCLRPANE" .or. Left( cTU, 11 ) == "::CAPPTITLE" ) ; loop; endif
+         // event wiring line (::oX:OnY := {...} or ::OnY := {...})
+         if Left( cTU, 2 ) == "::" .and. ":ON" $ cTU .and. ":=" $ cTU
+            cKey := Upper( AllTrim( Left( cTL, At( ":=", cTL ) - 1 ) ) )
+            if cKey $ Upper( cEvents ) .or. cKey $ Upper( cCreate ) ; loop; endif
+            AAdd( aWiringOld, cTL )
+            loop
+         endif
+         // anything else: preserve verbatim unless already generated
+         if AllTrim( cTL ) $ cCreate .or. AllTrim( cTL ) $ cEvents ; loop; endif
+         AAdd( aPreserved, cTL )
+      next
+   endif
+
    cCode += "// " + cName + ".prg" + e
    cCode += cSep
    cCode += e
@@ -1271,10 +1357,20 @@ static function RegenerateFormCode( cName, hForm )
    if ! Empty( cCreate )
       cCode += e + cCreate
    endif
-   if ! Empty( cEvents )
+   if ! Empty( aPreserved )
+      cCode += e
+      cCode += "   // Preserved custom lines" + e
+      for j := 1 to Len( aPreserved )
+         cCode += aPreserved[j] + e
+      next
+   endif
+   if ! Empty( cEvents ) .or. ! Empty( aWiringOld )
       cCode += e
       cCode += "   // Event wiring" + e
       cCode += cEvents
+      for j := 1 to Len( aWiringOld )
+         cCode += aWiringOld[j] + e
+      next
    endif
    cCode += e
    cCode += "return nil" + e
@@ -1570,6 +1666,20 @@ static function SyncDesignerToCode()
 
    // Regenerate CLASS + CreateForm
    cNewCode := RegenerateFormCode( aForms[ nActiveForm ][ 1 ], oDesignForm:hCpp )
+
+   // Never report success while losing controls: abort the destructive save
+   if ! Empty( s_aUnserializable )
+      cNewCode := ""
+      for nPos := 1 to Len( s_aUnserializable )
+         cNewCode += "  - " + s_aUnserializable[ nPos ] + Chr(10)
+      next
+      MsgInfo( "Save aborted: these controls cannot be saved faithfully and" + ;
+         Chr(10) + "would be lost on reopen:" + Chr(10) + Chr(10) + cNewCode + ;
+         Chr(10) + "Keep them in code, or use a supported control type.", ;
+         "HbBuilder" )
+      lSyncingFromCode := .f.
+      return nil
+   endif
 
    // Append preserved METHOD implementations
    if ! Empty( cMethods )
@@ -2024,6 +2134,7 @@ static function RestoreFormFromCode( hForm, cCode )
    local nQ3, nQ4, nQ5, cItCap, cItHndl, cItAccl, nAct, nSpc, nAccl
    local nCC, jjC, hC
    local nAtX, nAtY, nAtW, nAtH, cAtCmd, cAtName, cAtText, cRest, cAtSize
+   local cRestU, nClPos, nClEnd, cClVal, cIt2
 
    if Empty( cCode ) .or. hForm == 0
       return nil
@@ -2109,11 +2220,12 @@ static function RestoreFormFromCode( hForm, cCode )
          cRest := AllTrim( SubStr( cTrim, 2 ) )
          nPos := At( ",", cRest )
          if nPos > 0
-            nAtX := Val( Left( cRest, nPos - 1 ) )
+            // @ syntax is "@ nTop, nLeft"; UI_*New() takes (nLeft, nTop)
+            nAtY := Val( Left( cRest, nPos - 1 ) )
             cRest := AllTrim( SubStr( cRest, nPos + 1 ) )
             nPos := At( " ", cRest )
             if nPos > 0
-               nAtY := Val( Left( cRest, nPos - 1 ) )
+               nAtX := Val( Left( cRest, nPos - 1 ) )
                cRest := AllTrim( SubStr( cRest, nPos + 1 ) )
                nPos := At( " ", cRest )
                if nPos > 0
@@ -2179,6 +2291,38 @@ static function RestoreFormFromCode( hForm, cCode )
                   endcase
                   if hCtrl != 0 .and. ! Empty( cAtName )
                      UI_SetProp( hCtrl, "cName", cAtName )
+                  endif
+                  if hCtrl != 0
+                     // apply optional clauses the generator may emit, so a
+                     // load->save cycle does not drop them
+                     cRestU := Upper( cRest )
+                     if " CHECKED" $ cRestU
+                        UI_SetProp( hCtrl, "lChecked", .T. )
+                     endif
+                     nClPos := At( 'PICTURE "', cRestU )
+                     if nClPos > 0
+                        nClPos += 9
+                        nClEnd := At( '"', SubStr( cRest, nClPos ) )
+                        if nClEnd > 0
+                           UI_SetProp( hCtrl, "cPicture", SubStr( cRest, nClPos, nClEnd - 1 ) )
+                        endif
+                     endif
+                     nClPos := At( "ITEMS ", cRestU )
+                     if nClPos > 0
+                        cClVal := SubStr( cRest, nClPos + 6 )
+                        cIt2 := ""
+                        do while ( nClEnd := At( '"', cClVal ) ) > 0
+                           cClVal := SubStr( cClVal, nClEnd + 1 )
+                           nClEnd := At( '"', cClVal )
+                           if nClEnd == 0; exit; endif
+                           if ! Empty( cIt2 ); cIt2 += "|"; endif
+                           cIt2 += Left( cClVal, nClEnd - 1 )
+                           cClVal := SubStr( cClVal, nClEnd + 1 )
+                        enddo
+                        if ! Empty( cIt2 )
+                           UI_SetProp( hCtrl, "aItems", cIt2 )
+                        endif
+                     endif
                   endif
                endif
             endif
