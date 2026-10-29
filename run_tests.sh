@@ -17,7 +17,7 @@ fi
 export PATH="$HB_BIN:$PATH"
 BINDIR="$ROOT/tests/bin"
 mkdir -p "$BINDIR"
-TESTS=(test_codegen test_hbp_index test_hbp_parse test_messages test_project_tab
+TESTS=(test_codegen test_items_parse test_hbp_index test_hbp_parse test_messages test_project_tab
        test_hix_path test_component_types test_ct_constants test_project_roundtrip)
 FAIL=0
 PASS=0

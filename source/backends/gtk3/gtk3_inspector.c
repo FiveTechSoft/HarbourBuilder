@@ -1062,6 +1062,26 @@ static void on_row_activated( GtkTreeView * treeView, GtkTreePath * path,
          gtk_text_buffer_get_bounds( tbuf, &start, &end );
          gchar * text = gtk_text_buffer_get_text( tbuf, &start, &end, FALSE );
 
+         /* Refuse items containing '|': it is the item separator both in
+            the backend storage and in the generated ITEMS clause, so
+            applying it would silently split one item into two (R2). */
+         {
+            int lBad = 0;
+            for( const char * p = text ? text : ""; *p; p++ )
+               if( *p == '|' ) { lBad = 1; break; }
+            if( lBad )
+            {
+               GtkWidget * err = gtk_message_dialog_new( GTK_WINDOW(dialog),
+                  GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING, GTK_BUTTONS_OK,
+                  "An item cannot contain the '|' character (it is the item separator). The change was NOT applied." );
+               gtk_dialog_run( GTK_DIALOG( err ) );
+               gtk_widget_destroy( err );
+               g_free( text );
+               gtk_widget_destroy( dialog );
+               return;
+            }
+         }
+
          /* Convert newlines back to pipes */
          char result[256] = {0};
          int o = 0;

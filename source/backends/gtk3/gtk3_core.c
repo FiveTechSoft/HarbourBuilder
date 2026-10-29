@@ -142,6 +142,11 @@ struct _HBForm
    int          FDesignMode;
    HBControl *  FSelected[MAX_CHILDREN];
    int          FSelCount;
+   /* Designer-deleted control names ("Name1|Name2|"), recorded by the
+      Delete/BackSpace handler and drained by the Harbour-side merge so a
+      designer-deleted control is NOT preserved verbatim like a hand-written
+      one. Per-form, session-scoped. */
+   char         FDeletedNames[512];
    int          FDragging, FResizing;
    int          FResizeHandle;
    int          FDragStartX, FDragStartY;
@@ -2207,11 +2212,41 @@ static gboolean on_overlay_key_press( GtkWidget * widget, GdkEventKey * event, g
    if( (event->keyval == GDK_KEY_Delete || event->keyval == GDK_KEY_BackSpace) && form->FSelCount > 0 )
    {
       for( int i = 0; i < form->FSelCount; i++ )
-         if( form->FSelected[i]->FWidget )
+      {
+         HBControl * p = form->FSelected[i];
+         if( !p ) continue;
+         /* record the name so the Harbour-side merge drops this control's
+            '@' line instead of preserving it verbatim (H4/R1) */
+         if( p->FName[0] )
          {
-            gtk_widget_destroy( form->FSelected[i]->FWidget );
-            form->FSelected[i]->FWidget = NULL;
+            size_t dl = strlen( form->FDeletedNames ), nl = strlen( p->FName );
+            if( dl + nl + 2 <= sizeof( form->FDeletedNames ) )
+            {
+               memcpy( form->FDeletedNames + dl, p->FName, nl );
+               form->FDeletedNames[dl + nl] = '|';
+               form->FDeletedNames[dl + nl + 1] = '\0';
+            }
          }
+         /* unlink from the parent's children list so the code generator
+            stops re-emitting it and no NULL-widget zombie stays reachable */
+         if( p->FCtrlParent )
+         {
+            HBControl * par = p->FCtrlParent;
+            for( int j = 0; j < par->FChildCount; j++ )
+               if( par->FChildren[j] == p )
+               {
+                  memmove( &par->FChildren[j], &par->FChildren[j+1],
+                           ( par->FChildCount - j - 1 ) * sizeof( HBControl * ) );
+                  par->FChildCount--;
+                  break;
+               }
+            p->FCtrlParent = NULL;
+         }
+         if( p->FWidget ) { gtk_widget_destroy( p->FWidget ); p->FWidget = NULL; }
+         /* The HBControl struct is intentionally not freed: other tables
+            (toolbars, page owners) may still reference it; it is small and
+            reclaimed when the form closes. */
+      }
       HBForm_ClearSelection( form );
       return TRUE;
    }
@@ -4208,6 +4243,13 @@ HB_FUNC( UI_GETCHILD )
       hb_retnint( (HB_PTRUINT) p->FChildren[n] );
    else
       hb_retnint( 0 );
+}
+
+HB_FUNC( UI_POPDELETEDCTRLS )
+{
+   HBForm * form = GetForm(1);
+   if( form ) { hb_retc( form->FDeletedNames ); form->FDeletedNames[0] = '\0'; }
+   else hb_retc( "" );
 }
 
 HB_FUNC( UI_GETTYPE ) { HBControl * p = GetCtrl(1); hb_retni( p ? p->FControlType : -1 ); }

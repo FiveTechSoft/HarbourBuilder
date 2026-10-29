@@ -74,6 +74,23 @@ FUNCTION HB_HarbourStrEval( cExpr )
    ENDDO
 RETURN cOut
 
+/* Split a comma-separated expression list at TOP-LEVEL commas only:
+   commas inside double-quoted strings do not split. Used for ITEMS parsing
+   so item text may contain commas and Chr() expressions (R2). */
+FUNCTION HB_SplitTopLevelCommas( s )
+   LOCAL aOut := {}, i, c, lIn := .F., nStart := 1
+   FOR i := 1 TO Len( s )
+      c := SubStr( s, i, 1 )
+      IF c == '"'
+         lIn := ! lIn
+      ELSEIF c == "," .and. ! lIn
+         AAdd( aOut, SubStr( s, nStart, i - nStart ) )
+         nStart := i + 1
+      ENDIF
+   NEXT
+   AAdd( aOut, SubStr( s, nStart ) )
+RETURN aOut
+
 /* Same length as cLine, with the inside of double-quoted strings blanked:
    clause detection on the result cannot match text inside prompts/items. */
 FUNCTION HB_StripStrings( cLine )

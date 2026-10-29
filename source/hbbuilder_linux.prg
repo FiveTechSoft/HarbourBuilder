@@ -38,6 +38,27 @@ static aDbgOffsets   // line offset tracking for debug_main.prg sections
 static lSyncingFromCode := .f.  // Guard: prevents re-entrant loop when syncing code→form
 static s_aUnserializable := {}  // Visual controls the generator cannot serialize; non-empty aborts a destructive save
 static s_cLastRefusal := ""  // rate-limit: do not re-show the same refusal on every auto-sync
+static s_aParseBlocked := {}   // R3: { { hForm, cReason }, ... } - forms whose code could not be fully understood on load
+
+static function HB_SetParseBlock( hForm, cReason )
+   local k
+   for k := 1 to Len( s_aParseBlocked )
+      if s_aParseBlocked[ k ][ 1 ] == hForm
+         s_aParseBlocked[ k ][ 2 ] := cReason
+         return nil
+      endif
+   next
+   AAdd( s_aParseBlocked, { hForm, cReason } )
+return nil
+
+static function HB_ParseBlockFor( hForm )
+   local k
+   for k := 1 to Len( s_aParseBlocked )
+      if s_aParseBlocked[ k ][ 1 ] == hForm
+         return s_aParseBlocked[ k ][ 2 ]
+      endif
+   next
+return ""
 
 function Main()
 
@@ -772,7 +793,7 @@ static function HB_IsReturnStmt( cKeyU )
           ( Len( cKeyU ) == 6 .or. ! ( IsAlpha( SubStr( cKeyU, 7, 1 ) ) .or. ;
             IsDigit( SubStr( cKeyU, 7, 1 ) ) .or. SubStr( cKeyU, 7, 1 ) == "_" ) )
 
-static function RegenerateFormCode( cName, hForm )
+static function RegenerateFormCode( cName, hForm, lConsume )
 
    local cCode := "", e := Chr(13) + Chr(10)
    local cSep := "//" + Replicate( "-", 68 ) + e
@@ -786,7 +807,7 @@ static function RegenerateFormCode( cName, hForm )
    local aCtrlMap := {}, cOf, hOwner, nPg, kk2, nLen0, cSlice
    local aExLines, lInClass, cExLine
    local aExL2, cTL, cTU, lInCF, aPreserved := {}, aWiringOld := {}, cKey
-   local cCh, cLhs, aEmittedLines := {}, nE
+   local cCh, cLhs, aEmittedLines := {}, nE, cDeleted
    local aChunks := {}, cBody, cHdrChunk, lHdrOut, lWireOut, lSkipMenu, cMenuEnd
    local cName2, nP1, nP2, lFound, nCk, lBodyStarted
    local aMenuNodes, nMI, cMNode, aMFields, nLv, cCap, cScut, cHndl
@@ -794,6 +815,19 @@ static function RegenerateFormCode( cName, hForm )
    local aMenuHandlers := {}, lHasHandlers
 
    s_aUnserializable := {}
+
+   if lConsume == nil; lConsume := .F.; endif
+
+   // Controls deleted in the designer this session (Delete/BackSpace key):
+   // the backend recorded their names; the merge below must DROP their
+   // '@' lines instead of preserving them verbatim like hand-written
+   // controls (R1). The drain consumes the record, so only a regeneration
+   // whose result will be applied (lConsume) may do it; the serializability
+   // check path peeks nothing and leaves the record intact.
+   cDeleted := "|"
+   if lConsume .and. hForm != 0
+      cDeleted += Upper( UI_PopDeletedCtrls( hForm ) )
+   endif
 
    // Read existing code to find declared event handlers
    cExistingCode := ""
@@ -1423,10 +1457,15 @@ static function RegenerateFormCode( cName, hForm )
             next
             // an @ / COMPONENT line naming a control the designer does not
             // have was written by hand: keep it verbatim instead of
-            // silently deleting it
+            // silently deleting it - unless the control was deleted in the
+            // designer this session, in which case the line must go (R1)
             if ! lFound
-               cBody += cTL + e
-               lBodyStarted := .T.
+               if ! Empty( cName2 ) .and. "|" + Upper( cName2 ) + "|" $ cDeleted
+                  // deleted in the designer: drop the line
+               else
+                  cBody += cTL + e
+                  lBodyStarted := .T.
+               endif
             endif
             loop
          endif
@@ -1765,6 +1804,7 @@ static function SyncDesignerToCode( lFromSave )
 
    local cNewCode, cOldCode, cMethods, nPos, nPos2
    local cVal, cKey, cCh, aExLines, nE, nP1, kk, lFound, lRetB := .F.
+   local cParseBlock := ""
    local cSep := "//" + Replicate( "-", 68 )
 
    if lFromSave == nil; lFromSave := .F.; endif
@@ -1775,6 +1815,26 @@ static function SyncDesignerToCode( lFromSave )
    if lSyncingFromCode; return nil; endif
 
    lSyncingFromCode := .t.
+
+   // R3: the code->form parse could not understand an expression on this
+   // form. Regenerating now would rewrite the affected PROMPT/PICTURE/ITEMS
+   // as empty and a save would lose the original text, so refuse the
+   // sync/save until the line is fixed or simplified.
+   cParseBlock := ""
+   if ValType( aForms[ nActiveForm ][ 2 ] ) == "O"
+      cParseBlock := HB_ParseBlockFor( aForms[ nActiveForm ][ 2 ]:hCpp )
+   endif
+   if ! Empty( cParseBlock )
+      if lFromSave .or. cParseBlock != s_cLastRefusal
+         s_cLastRefusal := cParseBlock
+         MsgInfo( "Save/sync aborted: this form has an expression that could not be" + ;
+            Chr(10) + "understood when the code was loaded:" + Chr(10) + Chr(10) + ;
+            cParseBlock + Chr(10) + Chr(10) + ;
+            "Fix or simplify that line in the code editor, then try again.", "HbBuilder" )
+      endif
+      lSyncingFromCode := .f.
+      return nil
+   endif
 
    // Get existing code to preserve METHOD implementations
    cOldCode := CodeEditorGetTabText( hCodeEditor, nActiveForm + 1 )
@@ -1853,7 +1913,7 @@ static function SyncDesignerToCode( lFromSave )
    endif
 
    // Regenerate CLASS + CreateForm
-   cNewCode := RegenerateFormCode( aForms[ nActiveForm ][ 1 ], oDesignForm:hCpp )
+   cNewCode := RegenerateFormCode( aForms[ nActiveForm ][ 1 ], oDesignForm:hCpp, .T. )
 
    // Never report success while losing controls: abort the destructive save
    if ! Empty( s_aUnserializable )
@@ -2330,10 +2390,20 @@ static function RestoreFormFromCode( hForm, cCode )
    local nAtX, nAtY, nAtW, nAtH, cAtCmd, cAtName, cAtText, cRest, cAtSize
    local cRestU, nClPos, nClEnd, cClVal, cIt2
    local cStrip, nK, nn, cC, cExpr, nQ, nEnd
+   local cItemExpr, k, aTmp
 
    if Empty( cCode ) .or. hForm == 0
       return nil
    endif
+
+   // this form parses cleanly unless a failure below re-blocks it (R3)
+   aTmp := {}
+   for k := 1 to Len( s_aParseBlocked )
+      if s_aParseBlocked[ k ][ 1 ] != hForm
+         AAdd( aTmp, s_aParseBlocked[ k ] )
+      endif
+   next
+   s_aParseBlocked := aTmp
 
    aLines := HB_ATokens( StrTran( cCode, Chr(13), "" ), Chr(10) )
 
@@ -2457,7 +2527,13 @@ static function RestoreFormFromCode( hForm, cCode )
                      next
                      if nEnd == 0; nEnd := Len( cRest ) - nPos + 1; endif
                      cExpr := HB_HarbourStrEval( SubStr( cRest, nPos, nEnd ) )
-                     if cExpr != nil; cAtText := cExpr; endif
+                     if cExpr != nil
+                        cAtText := cExpr
+                     else
+                        HB_SetParseBlock( hForm, "Line " + LTrim( Str( i ) ) + ;
+                           ", control '" + cAtName + ;
+                           "': text expression not understood" )
+                     endif
                   endif
                   nPos := At( "SIZE ", Upper( cRest ) )
                   if nPos > 0
@@ -2524,21 +2600,37 @@ static function RestoreFormFromCode( hForm, cCode )
                            cExpr := HB_HarbourStrEval( SubStr( cRest, nQ ) )
                            if cExpr != nil .and. ! Empty( cExpr )
                               UI_SetProp( hCtrl, "cPicture", cExpr )
+                           elseif cExpr == nil
+                              HB_SetParseBlock( hForm, "Line " + LTrim( Str( i ) ) + ;
+                                 ", control '" + cAtName + ;
+                                 "': PICTURE expression not understood" )
                            endif
                         endif
                      endif
                      nClPos := At( "ITEMS ", cRestU )
                      if nClPos > 0
-                        cClVal := SubStr( cRest, nClPos + 6 )
+                        // items are top-level comma-separated expressions;
+                        // quotes are written as Chr( 34 ) terms. Evaluate
+                        // each item exactly; an unparseable item or one
+                        // containing '|' blocks sync/save instead of
+                        // silently splitting or emptying items (R2/R3)
                         cIt2 := ""
-                        do while ( nClEnd := At( '"', cClVal ) ) > 0
-                           cClVal := SubStr( cClVal, nClEnd + 1 )
-                           nClEnd := At( '"', cClVal )
-                           if nClEnd == 0; exit; endif
+                        for each cItemExpr in HB_SplitTopLevelCommas( SubStr( cRest, nClPos + 6 ) )
+                           cExpr := HB_HarbourStrEval( AllTrim( cItemExpr ) )
+                           if cExpr == nil
+                              HB_SetParseBlock( hForm, "Line " + LTrim( Str( i ) ) + ;
+                                 ", control '" + cAtName + ;
+                                 "': ITEMS expression not understood" )
+                              cExpr := ""
+                           endif
+                           if "|" $ cExpr
+                              HB_SetParseBlock( hForm, "Line " + LTrim( Str( i ) ) + ;
+                                 ", control '" + cAtName + ;
+                                 "': an ITEMS item contains '|' (the item separator)" )
+                           endif
                            if ! Empty( cIt2 ); cIt2 += "|"; endif
-                           cIt2 += Left( cClVal, nClEnd - 1 )
-                           cClVal := SubStr( cClVal, nClEnd + 1 )
-                        enddo
+                           cIt2 += cExpr
+                        next
                         if ! Empty( cIt2 )
                            UI_SetProp( hCtrl, "aItems", cIt2 )
                            // the backend selects item 1 as an interactive
@@ -3143,12 +3235,24 @@ static function HB_CheckFormsSerializable()
       if ! Empty( s_aUnserializable )
          return .F.
       endif
+      if ValType( aForms[ nActiveForm ][ 2 ] ) == "O" .and. ;
+         ! Empty( HB_ParseBlockFor( aForms[ nActiveForm ][ 2 ]:hCpp ) )
+         return .F.   // refusal dialog already shown by SyncDesignerToCode
+      endif
    endif
    // non-active forms keep live designer objects: check them too before
    // their stored code is written to disk or compiled
    for i := 1 to Len( aForms )
       if i != nActiveForm .and. ValType( aForms[ i ][ 2 ] ) == "O" .and. ;
          ValType( aForms[ i ][ 2 ]:hCpp ) == "N" .and. aForms[ i ][ 2 ]:hCpp != 0
+         if ! Empty( HB_ParseBlockFor( aForms[ i ][ 2 ]:hCpp ) )
+            MsgInfo( "Operation aborted: form " + aForms[ i ][ 1 ] + ;
+               " has an expression that could not be understood on load:" + ;
+               Chr(10) + Chr(10) + HB_ParseBlockFor( aForms[ i ][ 2 ]:hCpp ) + ;
+               Chr(10) + Chr(10) + "Open it and fix or simplify that line first.", ;
+               "HbBuilder" )
+            return .F.
+         endif
          RegenerateFormCode( aForms[ i ][ 1 ], aForms[ i ][ 2 ]:hCpp )
          if ! Empty( s_aUnserializable )
             MsgInfo( "Operation aborted: form " + aForms[ i ][ 1 ] + ;
