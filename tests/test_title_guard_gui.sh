@@ -45,6 +45,7 @@ for mode in ${CLASS_MODES:-save saveas run debug sync};do
  fi
  sleep 2
  for w in $(rt_ide_windows);do
+  echo "window $w $(xdotool getwindowname "$w")"
   [ "$(xdotool getwindowname "$w")" = HbBuilder ] && { xdotool windowmap "$w";xdotool windowraise "$w"; }
  done
  import -window root /tmp/class-$mode-refusal.png
