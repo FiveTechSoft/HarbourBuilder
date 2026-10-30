@@ -27,7 +27,11 @@ for w in $(rt_ide_windows);do
  fi
 done
 import -window root /tmp/gapped-load-save.png
-tesseract /tmp/gapped-load-dialog.png - --psm 6 2>/dev/null | tee "$RUN/ocr"
+if [ "${EXPECT:-red}" = red ];then
+ tesseract /tmp/gapped-load-dialog.png - --psm 6 2>/dev/null | tee "$RUN/ocr"
+else
+ tesseract /tmp/gapped-load-save.png - --psm 11 2>/dev/null | tee "$RUN/ocr"
+fi
 python3 - "$RUN" "${EXPECT:-red}" <<'CHECK'
 from pathlib import Path
 import sys
