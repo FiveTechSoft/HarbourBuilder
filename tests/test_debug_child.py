@@ -20,7 +20,7 @@ static void gtk_main_iteration_do(int b){(void)b;}
 '''+s[s.index('static int DbgServerStart( int port )'):s.index('static void DbgServerSend( const char * cmd )')]+''' 
 int main(){
  int status, i; GPid owned; struct sigaction act; sigaction(SIGCHLD,NULL,&act);
- printf("SIGCHLD default=%d ignored=%d no_cldwait=%d\n",act.sa_handler==SIG_DFL,act.sa_handler==SIG_IGN,!!(act.sa_flags&SA_NOCLDWAIT)); GError *error=NULL;
+ printf("SIGCHLD default=%d ignored=%d no_cldwait=%d\\n",act.sa_handler==SIG_DFL,act.sa_handler==SIG_IGN,!!(act.sa_flags&SA_NOCLDWAIT)); GError *error=NULL;
  pid_t other=fork(); if(other==0){sleep(30);_exit(0);}
  if(!DbgChildStart("/tmp/debug-child-test/child",&error))return 1;
  owned=s_dbgChildPID; g_usleep(50000);
@@ -33,7 +33,7 @@ int main(){
  g_usleep(50000);DbgChildStop();DbgChildStop();if(s_dbgChildPID)return 5;
  unsetenv("FAST");
  if(DbgChildStart("/tmp/debug-child-test/missing",&error))return 6;
- if(error)g_error_free(error);
+ if(error){g_error_free(error);error=NULL;}
  if(DbgServerStart(0)!=0)return 7;
  setenv("FAST","1",1);if(!DbgChildStart("/tmp/debug-child-test/child",&error))return 8;
  if(DbgServerAccept(1.0)==0)return 9;DbgChildStop();
