@@ -96,5 +96,7 @@ run refuse page_junk 's/::oFld1:aPages\[2\]/::oFld1:aPages[2x]/' 'not resolved'
 run keep empty_prompt 's/PROMPTS "P1", "P2"/PROMPTS "", "P2"/' 'PROMPTS "", "P2"'
 run keep empty_header 's/HEADERS "Nombre", "Edad"/HEADERS "", "Edad"/' 'HEADERS "", "Edad"'
 run keep case_variant 's/OF ::oFld1:aPages\[2\]/OF ::oFLD1:aPages[2]/' 'OF ::oFld1:aPages[2]'
+run keep space_header 's/HEADERS "Nombre", "Edad"/HEADERS " ", "Edad"/' 'HEADERS " ", "Edad"'
+run keep tab_header 's/HEADERS "Nombre", "Edad"/HEADERS "Nom\tbre", "Edad"/' 'HEADERS "Nom" + Chr(9) + "bre", "Edad"'
 
 echo "T4EDGE PASS: 5 refusals byte-identical; empty first prompt/header and case-variant folder name survive the save"

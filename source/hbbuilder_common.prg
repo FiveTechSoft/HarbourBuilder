@@ -32,13 +32,15 @@ FUNCTION HB_QHarbourStr( cText )
    FOR i := 1 TO Len( cText )
       c := SubStr( cText, i, 1 )
       IF c == '"' .or. c == "'" .or. c == Chr(13) .or. c == Chr(10) .or. c == Chr(9)
-         IF ! Empty( cCur ); AAdd( aTok, '"' + cCur + '"' ); cCur := ""; ENDIF
+         // Len(), not Empty(): a whitespace-only segment is real content
+         // (e.g. a tab caption of spaces) and must not be dropped (T4 audit)
+         IF Len( cCur ) > 0; AAdd( aTok, '"' + cCur + '"' ); cCur := ""; ENDIF
          AAdd( aTok, "Chr(" + LTrim( Str( Asc( c ) ) ) + ")" )
       ELSE
          cCur += c
       ENDIF
    NEXT
-   IF ! Empty( cCur ); AAdd( aTok, '"' + cCur + '"' ); ENDIF
+   IF Len( cCur ) > 0; AAdd( aTok, '"' + cCur + '"' ); ENDIF
    IF Len( aTok ) == 0; RETURN '""'; ENDIF
    cOut := aTok[ 1 ]
    FOR i := 2 TO Len( aTok )
