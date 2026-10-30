@@ -24,7 +24,11 @@ for w in $(rt_ide_windows);do
 done
 import -window root /tmp/newform-name-gap.png
 BAR=$(rt_find_bar);rt_unmap_all_but "$BAR";xdotool mousemove 700 12 click 1;xdotool key ctrl+s;sleep 2
-rt_map_all;import -window root /tmp/newform-name-gap-after-save.png
+rt_map_all
+for w in $(rt_ide_windows);do
+ [ "$(xdotool getwindowname "$w")" = 'Code Editor' ] && { xdotool windowraise "$w";xdotool windowfocus "$w"; }
+done
+import -window root /tmp/newform-name-gap-after-save.png
 tesseract /tmp/newform-name-gap-after-save.png - --psm 11 2>/dev/null
 python3 - "$RUN" "${EXPECT:-red}" <<'CHECK'
 from pathlib import Path

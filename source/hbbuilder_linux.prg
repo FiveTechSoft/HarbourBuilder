@@ -2723,16 +2723,36 @@ static function ToggleFormCode()
 
 return nil
 
+// Forms and modules share the project source filename namespace.
+static function HB_NextFormName( aFormRows, aModuleRows )
+   local n := Len( aFormRows ) + 1, cName, row, lUsed
+   do while .T.
+      cName := "Form" + LTrim( Str( n ) )
+      lUsed := .F.
+      for each row in aFormRows
+         if Upper( row[ 1 ] ) == Upper( cName ); lUsed := .T.; exit; endif
+      next
+      if ! lUsed
+         for each row in aModuleRows
+            if Upper( row[ 1 ] ) == Upper( cName ); lUsed := .T.; exit; endif
+         next
+      endif
+      if ! lUsed; return cName; endif
+      n++
+   enddo
+return nil
+
 static function MenuNewForm()
 
    local nFormX, nFormY, nInsW, nEditorX, nEditorW, nEditorH
-   local nInsTop, nEditorTop, nTabPos
+   local nInsTop, nEditorTop, nTabPos, cName
 
    // Reserve the tab before changing the form model or hiding its window.
    // New forms precede every module and standalone file in the index map.
+   cName := HB_NextFormName( aForms, aModules )
    nTabPos := Len( aForms ) + 2
    if ! CodeEditorInsertTab( hCodeEditor, nTabPos, ;
-         "Form" + LTrim( Str( Len( aForms ) + 1 ) ) + ".prg" )
+         cName + ".prg" )
       MsgInfo( "Could not add form: the editor has no room for another tab.", "HbBuilder" )
       return nil
    endif
@@ -2758,7 +2778,7 @@ static function MenuNewForm()
    nFormX := nEditorX + Int( ( nEditorW - 400 ) / 2 ) + Len(aForms) * 20
    nFormY := nEditorTop + Int( ( nEditorH - 300 ) * 0.35 ) + Len(aForms) * 20
 
-   CreateDesignForm( nFormX, nFormY )
+   CreateDesignForm( nFormX, nFormY, cName )
    oDesignForm:SetDesign( .t. )
    UI_SetDesignForm( oDesignForm:hCpp )
    oDesignForm:Show()
