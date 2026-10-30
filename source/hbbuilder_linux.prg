@@ -2626,8 +2626,12 @@ static function RestoreFormFromCode( hForm, cCode )
                         hCtrl := UI_MemoNew( hForm, cAtText, nAtX, nAtY, ;
                            iif( nAtW > 0, nAtW, 180 ), iif( nAtH > 0, nAtH, 80 ) )
                      case cAtCmd == "LISTBOX"
+                        // height must round-trip: UI_ListBoxNew defaults to
+                        // 100 when the 5th arg is missing, and dropping the
+                        // parsed SIZE h rewrites the user's file on the next
+                        // save (M6 root cause of the 90->100 drift)
                         hCtrl := UI_ListBoxNew( hForm, nAtX, nAtY, ;
-                           iif( nAtW > 0, nAtW, 120 ) )
+                           iif( nAtW > 0, nAtW, 120 ), iif( nAtH > 0, nAtH, 100 ) )
                   endcase
                   if hCtrl != 0 .and. ! Empty( cAtName )
                      UI_SetProp( hCtrl, "cName", cAtName )

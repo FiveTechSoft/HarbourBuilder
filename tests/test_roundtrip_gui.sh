@@ -122,7 +122,9 @@ fi
 # T2: original -> cycle2 may only differ in the form geometry lines
 GEOM_BAD=$(diff <(tr -d '\r' < "$CYC/original.prg") <(tr -d '\r' < "$CYC/cycle2.prg") | grep -E '^[<>]' | \
   grep -vE '^[<>] +::nHeight := (480|530)$' | \
-  grep -vE '^[<>] +@ 430, 300 LISTBOX ::oList1 OF Self SIZE 160, (90|100) ITEMS "Alfa", "Beta"$' | \
+  # LISTBOX 90->100 drift FIXED (M6): RestoreFormFromCode dropped the SIZE
+  # height and UI_ListBoxNew defaulted to 100; the height now round-trips,
+  # so a '>' LISTBOX line here is a real regression and must fail.
   # SAY lines are regenerated with their explicit height (the width-only
   # emission that dropped a hand-written SAY height was fixed in this
   # batch). The fixture line is width-only; the parser defaults the height
@@ -151,7 +153,7 @@ if [ "$FAILN" -gt 0 ]; then
   exit 1
 fi
 echo "ROUNDTRIP PASS: 2 cycles, real save verified in both, no content lost, fixpoint reached."
-echo "diff original -> cycle2, CRLF-normalized (known drift only; M6/M7/T6 tracked):"
+echo "diff original -> cycle2, CRLF-normalized (known drift only; form nHeight M6-root-caused, M7/T6 tracked):"
 diff <(tr -d '\r' < "$CYC/original.prg") <(tr -d '\r' < "$CYC/cycle2.prg") | head -60
 rt_cleanup
 exit 0
