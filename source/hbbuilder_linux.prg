@@ -4933,7 +4933,7 @@ static function TBDebugRun( lRunToBreak )
    cCmd := cHbBin + "/harbour " + cBuildDir + "/debug_main.prg -b -n -w -q" + ;
            " -I" + cHbInc + " -I" + cBuildDir + ;
            " -o" + cBuildDir + "/debug_main.c 2>&1"
-   cOutput := GTK_ShellExec( cCmd )
+   if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
    if lError .or. "Error" $ cOutput
       cLog += cOutput + Chr(10)
       lError := .t.

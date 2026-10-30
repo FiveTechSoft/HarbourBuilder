@@ -43,6 +43,8 @@ int main(void){
  if(result!=0 || strcmp(output,"warning")){printf("FAIL warning status=%d\n",result);fail++;}
  result=999;cmd="kill -TERM $$"; GTK_SHELLEXEC();
  if(result!=143){printf("FAIL signal status=%d\n",result);fail++;}
+ result=999;s_progressCancelled=1;cmd="exit 0"; GTK_SHELLEXEC();
+ if(result!=130){printf("FAIL cancelled status=%d\n",result);fail++;}
  printf("SHELL EXIT actual C body failures=%d\n",fail);return fail;
 }
 '''
