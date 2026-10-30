@@ -128,7 +128,8 @@ for w in $(rt_ide_windows); do
  case "$t" in HbBuilder*|*Palette*|*Components*) [ "$w" = "$BAR" ] || { xdotool windowmove "$w" 320 25;xdotool windowraise "$w"; };; esac
 done
 sleep 1
-read PX PY <<< $(rt_ocr_bar_token '^Standard$')
+import -window root /tmp/class-palette-now.png
+read PX PY <<< $(ocr_root '^Standard$')
 [ -n "${PX:-}" ] || fail "Standard palette not visible"
 xdotool mousemove "$PX" "$PY" click 1
 sleep 1
