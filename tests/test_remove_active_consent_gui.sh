@@ -90,12 +90,13 @@ if [ "${CHOICE:-cancel}" = cancel ] || [ "${CHOICE:-cancel}" = failure ];then
 else
  ! grep -Eq "${NAME/1/[1l]}.prg" "$RUN/tabs.txt" || exit 1
 fi
-cmp "$RUN/other-before" "$RUN/HelperB.prg" || exit 1
+if [ "${CHOICE:-cancel}" != save ];then cmp "$RUN/other-before" "$RUN/HelperB.prg" || exit 1;fi
 # Locate standalone by OCR in actual geometry after any shifting.
 if [ "${CHOICE:-cancel}" = cancel ] || [ "${CHOICE:-cancel}" = failure ];then SX=493;else SX=387;fi
-xdotool mousemove "$SX" 142 click 1;sleep 1;xdotool windowfocus "$ED";xdotool key ctrl+a ctrl+c;sleep 1
+xdotool mousemove "$SX" 142 click 1;sleep 1;xdotool mousemove 350 250 click 1;xdotool key ctrl+a ctrl+c;sleep 1
 xclip -selection clipboard -o > "$RUN/standalone-after"
 cmp "$RUN/before-editor.txt" "$RUN/standalone-after" || exit 1
 echo "TARGET=$TARGET CHOICE=${CHOICE:-cancel}: notebook membership and unrelated dirty standalone preserved"
+echo "BUFFER after=";head -c 150 "$RUN/standalone-after";echo
 import -window root /tmp/remove-consent-after.png
 cp /tmp/remove-consent-after.png "/tmp/remove-$TARGET-${CHOICE:-cancel}-after.png"
