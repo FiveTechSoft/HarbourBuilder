@@ -1592,7 +1592,7 @@ static function RegenerateFormCode( cName, hForm )
       cHdrChunk += "   ::nClrPane := " + LTrim(Str(nClr)) + e
    endif
    if ! Empty( cAppTitle )
-      cHdrChunk += '   ::cAppTitle := "' + cAppTitle + '"' + e
+      cHdrChunk += '   ::cAppTitle := ' + HB_QHarbourStr( cAppTitle ) + e
    endif
 
    if Empty( cExistingCode )
@@ -3077,11 +3077,13 @@ static function RestoreFormFromCode( hForm, cCode )
          endif
          loop
       endif
-      if '::cAppTitle' $ cTrim .and. ':=' $ cTrim
-         nPos := At( '"', cTrim )
-         nPos2 := RAt( '"', cTrim )
-         if nPos > 0 .and. nPos2 > nPos
-            UI_SetProp( hForm, "cAppTitle", SubStr( cTrim, nPos + 1, nPos2 - nPos - 1 ) )
+      if nPos > 0 .and. Upper( AllTrim( Left( cTrim, nPos - 1 ) ) ) == "::CAPPTITLE"
+         cExpr := HB_FormTitleExprEval( AllTrim( SubStr( cTrim, nPos + 2 ) ) )
+         if ValType( cExpr ) == "C"
+            UI_SetProp( hForm, "cAppTitle", cExpr )
+         else
+            HB_SetParseBlock( hForm, "Line " + LTrim( Str( i ) ) + ;
+               ": application title expression is not a supported string: " + cTrim )
          endif
          loop
       endif
