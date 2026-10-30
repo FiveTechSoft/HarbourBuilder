@@ -34,7 +34,12 @@ for cycle in 1 2; do
  [ "$(stat -c %Y "$RUN/Form1.prg")" -gt 1000000000 ] || { echo "FAIL no actual save cycle$cycle";rt_cleanup;exit 1; }
  cp "$RUN/Form1.prg" "$RUN/cycle$cycle.prg"
  echo "Actual save cycle$cycle completed"
- [ "$cycle" = 2 ] || rt_reopen_project
+ if [ "$cycle" = 1 ]; then
+  rt_cleanup
+  rt_setup "$RUN";rt_launch_ide
+  for try in $(seq 1 12); do rt_find_bar >/dev/null && break; sleep 1; done
+  rt_reopen_project
+ fi
 done
 rt_cleanup
 python3 - "$RUN" <<'PY'
