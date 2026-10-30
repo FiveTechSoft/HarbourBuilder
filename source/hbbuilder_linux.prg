@@ -1535,6 +1535,17 @@ static function RegenerateFormCode( cName, hForm )
             cCreate += '   ::o' + cCtrlName + ':lEnabled := .F.' + e
          endif
 
+         // Emit lDefault / lCancel for buttons when set (.T. instead of default
+         // .F.); FDefault/FCancel drive modal results at runtime
+         if nType == CT_BUTTON
+            if UI_GetProp( hCtrl, "lDefault" ) == .T.
+               cCreate += '   ::o' + cCtrlName + ':lDefault := .T.' + e
+            endif
+            if UI_GetProp( hCtrl, "lCancel" ) == .T.
+               cCreate += '   ::o' + cCtrlName + ':lCancel := .T.' + e
+            endif
+         endif
+
          // Emit oFont if non-default (skip Linux/Windows defaults)
          cVal := UI_GetProp( hCtrl, "oFont" )
          if ! Empty( cVal ) .and. cVal != "System,12" .and. ;
@@ -4110,6 +4121,10 @@ static function RestoreFormFromCode( hForm, cCode )
          UI_SetProp( hCtrl, "lVisible", AllTrim( cText ) == ".T." )
       elseif cVal == "lEnabled"
          UI_SetProp( hCtrl, "lEnabled", AllTrim( cText ) == ".T." )
+      elseif cVal == "lDefault"
+         UI_SetProp( hCtrl, "lDefault", AllTrim( cText ) == ".T." )
+      elseif cVal == "lCancel"
+         UI_SetProp( hCtrl, "lCancel", AllTrim( cText ) == ".T." )
       elseif cVal == "nAlign"
          UI_SetProp( hCtrl, "nAlign", Val( cText ) )
       elseif cVal == "oFont"
