@@ -37,7 +37,8 @@ return nil
 '''
 for stage in ['run','debug']:
  (p/stage/'Project1.prg').mkdir(parents=True,exist_ok=True)
-(p/'probe.prg').write_text(main+''.join(parts))
+a=s.index('static function HB_BuildWrite(');b=s.index('static function TBRun()',a)
+(p/'probe.prg').write_text(main+''.join(parts)+s[a:b])
 print('commit:',subprocess.check_output(['git','rev-parse','HEAD'],cwd=r,text=True).strip(),flush=True)
 subprocess.run(['/tmp/harbour-review/bin/linux/gcc/hbmk2',str(p/'probe.prg'),'-gtstd','-q','-quiet','-o'+str(p/'probe')],check=True)
 raise SystemExit(subprocess.run([str(p/'probe')]).returncode)

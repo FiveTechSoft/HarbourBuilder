@@ -4365,6 +4365,15 @@ static function EnsureHarbour( cHbDir )
 
 return .F.
 
+// Staging is not a save: never compile a stale file after a failed write.
+static function HB_BuildWrite( cFile, cText )
+   if ! MemoWrit( cFile, cText )
+      MsgInfo( "Build aborted: could not write " + cFile + Chr(10) + ;
+         "No compiler or application was started from this staging step.", "HbBuilder" )
+      return .F.
+   endif
+return .T.
+
 static function TBRun()
 
    local cBuildDir, cOutput, cLog, i, lError
@@ -4456,14 +4465,23 @@ static function TBRun()
    // Step 1: Save files
    GTK_ProgressStep( "Saving project files..." )
    cLog += "[1] Saving project files..." + Chr(10)
-   MemoWrit( cBuildDir + "/Project1.prg", CodeEditorGetTabText( hCodeEditor, 1 ) )
+   if ! HB_BuildWrite( cBuildDir + "/Project1.prg", CodeEditorGetTabText( hCodeEditor, 1 ) )
+      GTK_ProgressClose()
+      return .F.
+   endif
    for i := 1 to Len( aForms )
-      MemoWrit( cBuildDir + "/" + aForms[i][1] + ".prg", aForms[i][3] )
+      if ! HB_BuildWrite( cBuildDir + "/" + aForms[i][1] + ".prg", aForms[i][3] )
+         GTK_ProgressClose()
+         return .F.
+      endif
       cLog += "    " + aForms[i][1] + ".prg" + Chr(10)
    next
    for i := 1 to Len( aModules )
       aModules[i][2] := CodeEditorGetTabText( hCodeEditor, 1 + Len(aForms) + i )
-      MemoWrit( cBuildDir + "/" + aModules[i][1] + ".prg", aModules[i][2] )
+      if ! HB_BuildWrite( cBuildDir + "/" + aModules[i][1] + ".prg", aModules[i][2] )
+         GTK_ProgressClose()
+         return .F.
+      endif
       cLog += "    " + aModules[i][1] + ".prg (module)" + Chr(10)
    next
    GTK_ShellExec( "cp " + cProjDir + "/source/core/classes.prg " + cBuildDir + "/" )
@@ -4486,7 +4504,10 @@ static function TBRun()
                           '#include "classes.prg"', "" ), ;
                           '#include "hbbuilder.ch"', "" ) + Chr(10)
    next
-   MemoWrit( cBuildDir + "/main.prg", cAllPrg )
+   if ! HB_BuildWrite( cBuildDir + "/main.prg", cAllPrg )
+      GTK_ProgressClose()
+      return .F.
+   endif
    MemoWrit( "/tmp/hbbuilder_debug_main.prg", cAllPrg )
 
    // Step 3: Compile Harbour code
@@ -4738,10 +4759,14 @@ static function TBDebugRun( lRunToBreak )
 
    // Step 1: Save user code + copy framework
    cLog += "[1] Saving files..." + Chr(10)
-   MemoWrit( cBuildDir + "/Project1.prg", CodeEditorGetTabText( hCodeEditor, 1 ) )
+   if ! HB_BuildWrite( cBuildDir + "/Project1.prg", CodeEditorGetTabText( hCodeEditor, 1 ) )
+      return .F.
+   endif
    for i := 1 to Len( aForms )
-      MemoWrit( cBuildDir + "/" + aForms[i][1] + ".prg", ;
+      if ! HB_BuildWrite( cBuildDir + "/" + aForms[i][1] + ".prg", ;
          CodeEditorGetTabText( hCodeEditor, i + 1 ) )
+         return .F.
+      endif
    next
    GTK_ShellExec( "cp " + cProjDir + "/source/core/classes.prg " + cBuildDir + "/" )
    GTK_ShellExec( "cp " + cProjDir + "/source/hix_runtime.prg " + cBuildDir + "/ 2>/dev/null" )
@@ -4806,7 +4831,9 @@ static function TBDebugRun( lRunToBreak )
       cAllPrg += MemoRead( cBuildDir + "/hix_template.prg" ) + Chr(10)
    endif
 
-   MemoWrit( cBuildDir + "/debug_main.prg", cAllPrg )
+   if ! HB_BuildWrite( cBuildDir + "/debug_main.prg", cAllPrg )
+      return .F.
+   endif
 
    // Step 3: Harbour compile → C
    cLog += "[3] Harbour compile..." + Chr(10)
