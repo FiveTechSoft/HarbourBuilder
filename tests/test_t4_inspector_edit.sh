@@ -73,31 +73,46 @@ edit_row() {  # $1 prop name, $2 new value
   [ -n "$rel" ] || { tesseract /tmp/t4insp_props.png - 2>/dev/null | head -25; fail "property row $PROP not found after scrolling"; }
   set -- $rel
   echo "  [$PROP] row at +$1,+$2; inspector $INS origin=$X,$Y size=${WIDTH}x${HEIGHT}"
-  # value column: right half of the inspector, same row
-  xdotool mousemove $((X+WIDTH-60)) $((Y+$2)) click --repeat 2 --delay 120 1; sleep 0.7
-  xdotool key ctrl+a; sleep 0.2
-  xdotool type --delay 20 "$NEWVAL"; sleep 0.3
-  xdotool key Return; sleep 1.5
-  # verify the cell commit independently of any save step: re-read the row
-  eval "$(xdotool getwindowgeometry --shell "$INS")"
-  import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/t4insp_after.png
-  local NOW
-  NOW=$(tesseract /tmp/t4insp_after.png - 2>/dev/null | grep -iE "atabs|acolumns" | head -2 | tr '\n' ' ')
-  echo "  [edit_row $PROP] inspector row after commit: $NOW"
-  echo "$NOW" | grep -qF "$NEWVAL" || fail "$PROP: cell edit did not commit (row shows: $NOW)"
+  # Array properties use the dedicated Array Editor, not inline editing.
+  # Activate the name cell to avoid the noneditable value renderer.
+  xdotool mousemove $((X+60)) $((Y+$2)) click 1
+  xdotool key Return; sleep 1
+  local ARR="" w
+  for w in $(rt_ide_windows); do
+    [ "$(xdotool getwindowname "$w" 2>/dev/null)" = "Array Editor" ] && { ARR=$w; break; }
+  done
+  [ -n "$ARR" ] || fail "$PROP: Array Editor did not open"
+  eval "$(xdotool getwindowgeometry --shell "$ARR")"
+  xdotool windowraise "$ARR"; xdotool windowfocus "$ARR"
+  xdotool mousemove $((X+100)) $((Y+80)) click 1
+  xdotool key ctrl+a
+  printf '%s' "$NEWVAL" | tr '|' '\n' > /tmp/t4insp_newvalue.txt
+  xdotool type --clearmodifiers --file /tmp/t4insp_newvalue.txt; sleep 0.5
+  import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/t4insp_array_${PROP}.png
+  echo "  [$PROP] Array Editor content: $(tesseract /tmp/t4insp_array_${PROP}.png - 2>/dev/null | tr '\n' ' ')"
+  local ok
+  ok=$(tesseract /tmp/t4insp_array_${PROP}.png - tsv 2>/dev/null | awk -F'\t' '$12 == "OK" {printf "%d %d", $7+$9/2, $8+$10/2; exit}')
+  [ -n "$ok" ] || fail "$PROP: OK button not located"
+  set -- $ok
+  xdotool mousemove $((X+$1)) $((Y+$2)) click 1; sleep 1.5
+  xwininfo -id "$ARR" 2>/dev/null | grep -q IsViewable && fail "$PROP: Array Editor did not close"
+  echo "  [$PROP] Array Editor OK applied; checking generated buffer next"
+
 }
 
 # OCR the code editor buffer for a regenerated line BEFORE any save: proves
 # the two-way sync updated the buffer (separates edit-commit from save driving)
 verify_buffer() {  # $1 = OCR regex expected in the Code Editor buffer
-  [ -n "${CED:-}" ] || { echo "  [buffer] Code Editor window unknown, skipped"; return 0; }
+  [ -n "${CED:-}" ] || fail "Code Editor missing"
+  xdotool windowmove "$CED" 310 200; xdotool windowraise "$CED"; xdotool windowfocus "$CED"
   eval "$(xdotool getwindowgeometry --shell "$CED")"
-  import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/t4insp_buf.png
-  if tesseract /tmp/t4insp_buf.png - 2>/dev/null | grep -qE "$1"; then
-    echo "  [buffer] regenerated line visible in code editor: $1"
-  else
-    echo "  [buffer] WARN: $1 not visible (tab not focused?); continuing to save check"
-  fi
+  xdotool mousemove $((X+400)) $((Y+150)) click 1
+  xdotool key ctrl+Home
+  xdotool key --repeat 54 --repeat-delay 5 Down; sleep 0.5
+  import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/t4insp_buffer_$1.png
+  tesseract /tmp/t4insp_buffer_$1.png - 2>/dev/null | grep -qF "$1" || fail "regenerated buffer missing $1 before Save"
+  echo "  [buffer] regenerated text verified BEFORE Save: $1"
+
 }
 
 save_and_check() {  # $1 label, rest: grep -F patterns that must be in the file
