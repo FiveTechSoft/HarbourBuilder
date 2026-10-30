@@ -5221,6 +5221,9 @@ static function TBDebugRun( lRunToBreak )
    endif
 
 
+   // Keep successful build diagnostics visible before entering the debugger.
+   IDE_SetMessages( cLog )
+
    // Step 7: Hide design form, highlight Debug button, switch inspector to debug, launch
    if oDesignForm != nil
       UI_FormHide( oDesignForm:hCpp )
