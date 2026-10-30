@@ -4917,11 +4917,11 @@ static function TBRun()
       cLog += "[6] Compiling GTK3 backend..." + Chr(10)
       GTK_ShellExec( "rm -f " + cBuildDir + "/gtk3_core.o" )
       cCmd := "gcc -c -O2 -DHIX_PRGRUNTIME -I" + HB_ShellArg( cHbInc ) + ;
-              " -I" + cProjDir + "/include" + ;
+              " -I" + HB_ShellArg( cProjDir + "/include" ) + ;
               " $(pkg-config --cflags gtk+-3.0)" + ;
               " $(pkg-config --exists webkit2gtk-4.1 2>/dev/null && echo '-DHAVE_WEBKIT2GTK '$(pkg-config --cflags webkit2gtk-4.1) || " + ;
               "  (pkg-config --exists webkit2gtk-4.0 2>/dev/null && echo '-DHAVE_WEBKIT2GTK '$(pkg-config --cflags webkit2gtk-4.0) || echo ''))" + ;
-              " " + cProjDir + "/source/backends/gtk3/gtk3_core.c" + ;
+              " " + HB_ShellArg( cProjDir + "/source/backends/gtk3/gtk3_core.c" ) + ;
               " -o " + cBuildDir + "/gtk3_core.o 2>&1"
       if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
       if lError .or. ! File( cBuildDir + "/gtk3_core.o" )
@@ -4936,7 +4936,7 @@ static function TBRun()
       if ! lError
          GTK_ShellExec( "rm -f " + cBuildDir + "/hbdb_real.o" )
          cCmd := "gcc -c -O2 -I" + HB_ShellArg( cHbInc ) + ;
-                 " " + cProjDir + "/source/backends/gtk3/gtk3_db_real.c" + ;
+                 " " + HB_ShellArg( cProjDir + "/source/backends/gtk3/gtk3_db_real.c" ) + ;
                  " -o " + cBuildDir + "/hbdb_real.o 2>&1"
          if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
          if lError .or. ! File( cBuildDir + "/hbdb_real.o" )
@@ -5169,18 +5169,18 @@ static function TBDebugRun( lRunToBreak )
       GTK_ShellExec( "rm -f " + cBuildDir + "/dbghook.o " + cBuildDir + ;
          "/gtk3_core.o " + cBuildDir + "/hbdb_real.o" )
       cCmd := "gcc -c -O2 -I" + HB_ShellArg( cHbInc ) + ;
-         " " + cProjDir + "/source/debugger/dbghook.c -o " + cBuildDir + "/dbghook.o 2>&1"
+         " " + HB_ShellArg( cProjDir + "/source/debugger/dbghook.c" ) + " -o " + cBuildDir + "/dbghook.o 2>&1"
       if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
       cLog += cOutput
       cCmd := "gcc -c -O2 -DHIX_PRGRUNTIME -I" + HB_ShellArg( cHbInc ) + ;
-         " -I" + cProjDir + "/include $(pkg-config --cflags gtk+-3.0)" + ;
+         " -I" + HB_ShellArg( cProjDir + "/include" ) + " $(pkg-config --cflags gtk+-3.0)" + ;
          " $(pkg-config --exists webkit2gtk-4.1 2>/dev/null && echo '-DHAVE_WEBKIT2GTK '$(pkg-config --cflags webkit2gtk-4.1) || " + ;
          " (pkg-config --exists webkit2gtk-4.0 2>/dev/null && echo '-DHAVE_WEBKIT2GTK '$(pkg-config --cflags webkit2gtk-4.0) || echo ''))" + ;
-         " " + cProjDir + "/source/backends/gtk3/gtk3_core.c -o " + cBuildDir + "/gtk3_core.o 2>&1"
+         " " + HB_ShellArg( cProjDir + "/source/backends/gtk3/gtk3_core.c" ) + " -o " + cBuildDir + "/gtk3_core.o 2>&1"
       if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
       cLog += cOutput
-      cCmd := "gcc -c -O2 -I" + HB_ShellArg( cHbInc ) + " " + cProjDir + ;
-         "/source/backends/gtk3/gtk3_db_real.c -o " + cBuildDir + "/hbdb_real.o 2>&1"
+      cCmd := "gcc -c -O2 -I" + HB_ShellArg( cHbInc ) + " " + HB_ShellArg( cProjDir + ;
+         "/source/backends/gtk3/gtk3_db_real.c" ) + " -o " + cBuildDir + "/hbdb_real.o 2>&1"
       if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
       cLog += cOutput
       if ! HB_BuildCopy( cProjDir + "/source/gtk3_inspector.o", cBuildDir + "/gtk3_inspector.o" )
