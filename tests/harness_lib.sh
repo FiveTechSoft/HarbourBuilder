@@ -90,10 +90,9 @@ rt_find_bar() {
 rt_expose_bar() {  # move non-bar HbBuilder windows off the menu bar area
   local w t bar
   bar=$(rt_find_bar) || return 1
-  # move EVERY non-bar window of this IDE off the bar area: the Code Editor
-  # and designer toplevels are not named "HbBuilder*" but can cover 0,0
   for w in $(rt_ide_windows); do
-    [ "$w" = "$bar" ] || xdotool windowmove "$w" 0 500 2>/dev/null
+    t=$(xdotool getwindowname "$w" 2>/dev/null)
+    case "$t" in HbBuilder*) [ "$w" = "$bar" ] || xdotool windowmove "$w" 0 500 2>/dev/null;; esac
   done
   sleep 0.5
   echo "$bar"

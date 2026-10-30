@@ -105,6 +105,9 @@ run_case() {  # $1 name, $2 sed expr, $3 reason regex expected in dialog OCR
   echo "  [$1] SEQ: editor after repair OCR tail: $(tesseract /tmp/t4neg_$1-repair.png - 2>/dev/null | grep -iE 'folder|browse|prompts|colsizes' | head -2 | tr '\n' ' ' | cut -c1-120)"
   # save via the real File -> Save menu: the Ctrl+S accel lives on the main
   # window's menu and is not delivered when the Code Editor toplevel has focus
+  xdotool windowmove "$CED" 0 500 2>/dev/null
+  [ -n "${RT_DESIGNER:-}" ] && xdotool windowmove "$RT_DESIGNER" 0 600 2>/dev/null
+  sleep 0.5
   menu_path_click '^Save' || fail "$1: File > Save menu path not clickable"
   sleep 2
   # any dialog here (third refusal, freshness guard) is product behavior: capture it
