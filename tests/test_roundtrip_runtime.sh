@@ -109,6 +109,23 @@ else
   [ "$MAG" -lt 50 ] || { echo "  CONTROL FAIL: magenta present without the image file (check cannot detect absence)"; FAILN=$((FAILN+1)); }
 fi
 
+# 5. T4 widget reality: browse headers/footer really rendered, and the
+# page-2 button is visible ONLY after switching the folder to page 2.
+HDR=$(tesseract /tmp/rt_runtime.png - 2>/dev/null)
+for w in Nombre Edad Total; do
+  echo "$HDR" | grep -q "$w" || { echo "  browse widget text '$w' not rendered"; FAILN=$((FAILN+1)); }
+done
+echo "$HDR" | grep -q 'Pag2' && { echo "  Pag2 visible on page 1: page membership broken"; FAILN=$((FAILN+1)); }
+APPX=$X; APPY=$Y
+xdotool mousemove $((APPX+510)) $((APPY+72)) click 1; sleep 1
+import -window root -crop "${WIDTH}x${HEIGHT}+${APPX}+${APPY}" /tmp/rt_runtime_p2.png
+P2=$(tesseract /tmp/rt_runtime_p2.png - 2>/dev/null)
+echo "$P2" | grep -q 'Pag2' || { echo "  Pag2 NOT visible after switching to page 2"; FAILN=$((FAILN+1)); }
+xdotool mousemove $((APPX+470)) $((APPY+72)) click 1; sleep 1
+import -window root -crop "${WIDTH}x${HEIGHT}+${APPX}+${APPY}" /tmp/rt_runtime_p1b.png
+P1B=$(tesseract /tmp/rt_runtime_p1b.png - 2>/dev/null)
+echo "$P1B" | grep -q 'Pag2' && { echo "  Pag2 still visible after switching back to page 1"; FAILN=$((FAILN+1)); }
+
 kill "$APPPID" 2>/dev/null
 rm -f "$REPO/bin/icon.png" "$REPO/bin/test.png"
 [ "$FAILN" -gt 0 ] && fail "$FAILN runtime effect(s) missing (screenshot /tmp/rt_runtime.png)"
