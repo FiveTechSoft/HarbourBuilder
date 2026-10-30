@@ -355,7 +355,7 @@ rt_cleanup
 click_menu_item() {  # $1 = OCR token; clicks that word in the open File menu
   import -window root -crop "240x340+0+0" /tmp/dl_menu.png 2>/dev/null
   local rel
-  rel=$(tesseract /tmp/dl_menu.png - tsv 2>/dev/null | awk -F'\t' -v w="$1" '$12 == w {print $7" "$8" "$9" "$10; exit}')
+  rel=$(tesseract /tmp/dl_menu.png - tsv 2>/dev/null | awk -F'\t' -v w="$1" '$12 ~ ("^" w) {print $7" "$8" "$9" "$10; exit}')
   [ -n "$rel" ] || { echo "  [diag] menu token $1 not found:"; tesseract /tmp/dl_menu.png - 2>/dev/null | head -5; return 1; }
   set -- $rel
   xdotool mousemove $(($1 + $3/2)) $(($2 + $4/2)) click 1; sleep 1
