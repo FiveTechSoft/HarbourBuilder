@@ -1271,6 +1271,7 @@ static void HBImage_CreateWidget( HBControl * p, GtkWidget * container )
       }
    }
    gtk_container_add( GTK_CONTAINER(ev), img );
+   gtk_widget_show( img ); /* HBGeneric shows the event box only; the image itself must be shown */
    HBGeneric_CreateWidget( p, container, ev );
 }
 
