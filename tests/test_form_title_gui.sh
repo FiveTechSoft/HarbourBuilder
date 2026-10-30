@@ -68,6 +68,7 @@ print(''.join(difflib.unified_diff(a.splitlines(True),b.splitlines(True),fromfil
 get=lambda s:re.search(r'^   ::cTitle  := (.*)$',s,re.M).group(1)
 print('TITLE before='+get(a));print('TITLE after='+get(b))
 n=0
+if (p/'cycle1.prg').read_bytes()!=(p/'cycle2.prg').read_bytes():print('FAIL no fixpoint');n+=1
 if get(a)!=get(b):print('TITLE CHANGED '+os.environ['TITLE_CASE']);n+=1
 if os.environ['TITLE_EXTRA']=='1' and '   ::cTitleExtra := "USER-EXTRA-KEEP"' not in b:print('EXTRA LOST');n+=1
 print('FORM TITLE GUI changed_count='+str(n))
