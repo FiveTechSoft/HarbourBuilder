@@ -47,13 +47,16 @@ pick_combo() {  # $1 = entry text regex
   [ -n "$rel" ] || fail "inspector combo not located"
   set -- $rel
   xdotool mousemove $((X+$1)) $((Y+$2)) click 1; sleep 1
-  import -window root -crop 1600x1000+0+0 +repage /tmp/t4insp_combo.png
-  local pick
-  pick=$(tesseract /tmp/t4insp_combo.png - tsv 2>/dev/null | \
-    awk -F'\t' -v w="$PICKRE" '$12 ~ w {printf "%d %d\n", $7+$9/2, $8+$10/2; exit}')
-  [ -n "$pick" ] || { tesseract /tmp/t4insp_combo.png - 2>/dev/null | head -12; fail "combo entry $PICKRE not found"; }
-  set -- $pick
-  xdotool mousemove "$1" "$2" click 1; sleep 1
+  # Fixture order is fixed: form=0, 12 controls, folder=13, its
+  # pages=14/15, page-2 button=16, browse=17. Keyboard avoids popup
+  # autoscroll while moving the pointer from an already selected row.
+  local idx
+  case "$PICKRE" in 'TFolder$') idx=13;; 'TBrowse$') idx=17;; *) fail "unsupported fixture selection";; esac
+  xdotool key Home
+  xdotool key --repeat "$idx" --repeat-delay 40 Down
+  xdotool key Return; sleep 1
+  echo "  [combo] selected index $idx: $(xdotool getwindowname "$INS")"
+
 }
 
 edit_row() {  # $1 prop name, $2 new value
