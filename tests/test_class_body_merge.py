@@ -5,7 +5,7 @@ import subprocess,tempfile
 r=Path(__file__).resolve().parents[1];s=(r/'source/hbbuilder_linux.prg').read_text();a=s.index('static function HB_DesignerDataName');b=s.index('static function RegenerateFormCode',a)
 main='''static s_aUnserializable:={}
 function Main()
- local e:=Chr(13)+Chr(10),cOld,cNew,cOut,nFail:=0,cLine
+ local e:=Chr(13)+Chr(10),cOld,cNew,cOut,nFail:=0,cLine,cEnd
  cOld:='CLASS TForm1 FROM TForm'+e+;
  ' // USER comment'+e+' DATA nCounter INIT 42 // USER-COUNTER'+e+;
  ' DATA cNote INIT "keep  spaces" // USER-NOTE'+e+;
@@ -28,6 +28,14 @@ function Main()
  if Len(HB_MergeClassBody('CLASS TForm1'+e+'DATA nUser INIT 3'+e,1,cNew,'|'))!=0.or.Empty(s_aUnserializable);nFail++;endif
  s_aUnserializable:={}
  if !HB_ClassDeclaresMember('DATA oOther, oAdded INIT nil','OADDED').or.Len(s_aUnserializable)!=1; nFail++; endif
+ for each cEnd in {'ENDCLASS //comment','ENDCLASS//comment','ENDCLASS  //comment','ENDCLASS'+Chr(9)+'//comment','ENDCLASS &&comment'}
+  s_aUnserializable:={}
+  HB_MergeClassBody('CLASS TForm1'+e+'DATA nUser INIT 3'+e+cEnd+e,1,'','|')
+  if !Empty(s_aUnserializable);nFail++;endif
+ next
+ s_aUnserializable:={}
+ HB_MergeClassBody('CLASS TForm1'+e+'ENDCLASSX'+e,1,'','|')
+ if Empty(s_aUnserializable);nFail++;endif
  QOut(cOut)
  QOut('CLASS BODY exact custom lines/add/delete/fixpoint failures='+hb_ntos(nFail))
  ErrorLevel(nFail)

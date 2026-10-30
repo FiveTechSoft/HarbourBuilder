@@ -940,13 +940,16 @@ return Upper( SubStr( cName, 2 ) )
 static function HB_MergeClassBody( cExisting, nClassLine, cDatas, cDeleted )
    local aLines := HB_ATokens( cExisting, Chr(10) ), aNew := HB_ATokens( cDatas, Chr(10) )
    local aSeen := {}, cBody := "", cLine, cName, j, k, e := Chr(13) + Chr(10)
-   local lCreate := .F., cTrim, nEndClass := 0
+   local lCreate := .F., cTrim, cTail, nEndClass := 0
    // Missing boundary must never copy later functions into the class.
    for j := nClassLine + 1 to Len( aLines )
       cTrim := Upper( AllTrim( StrTran( aLines[j], Chr(13), "" ) ) )
-      if cTrim == "ENDCLASS" .or. Left( cTrim, 10 ) == "ENDCLASS /"
-         nEndClass := j
-         exit
+      if Left( cTrim, 8 ) == "ENDCLASS"
+         cTail := AllTrim( SubStr( cTrim, 9 ) )
+         if Empty( cTail ) .or. Left( cTail, 2 ) == "//" .or. Left( cTail, 2 ) == "&&"
+            nEndClass := j
+            exit
+         endif
       endif
    next
    if nEndClass == 0
