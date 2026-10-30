@@ -133,16 +133,17 @@ run_case() {  # $1 name, $2 sed expr, $3 reason regex expected in dialog OCR
 }
 
 WANT="${1:-all}"
-[ "$WANT" = "all" ] || [ "$WANT" = "prompts" ] || exit 0
+if [ "$WANT" = "all" ] || [ "$WANT" = "prompts" ]; then
 run_case prompts 's/PROMPTS "P1", "P2"/PROMPTS "P1", "P2/' 'PROMPTS' 54 \
   '   @ 60, 460 FOLDER ::oFld1 OF Self SIZE 165, 160 PROMPTS "P1", "P2"' \
   'PROMPTS "P1", "P2"'
-[ "$WANT" = "all" ] || [ "$WANT" = "colsizes" ] || exit 0
+fi
+if [ "$WANT" = "all" ] || [ "$WANT" = "colsizes" ]; then
 run_case colsizes 's/COLSIZES 90, 60/COLSIZES 90x, 60/' 'COLSIZES' 56 \
   '   @ 240, 460 BROWSE ::oBrw1 OF Self SIZE 165, 150 HEADERS "Nombre", "Edad" COLSIZES 90, 60 FOOTERS "Total", ""' \
   'COLSIZES 90, 60'
-
-[ "$WANT" = "all" ] || [ "$WANT" = "items" ] || exit 0
+fi
+if [ "$WANT" = "all" ] || [ "$WANT" = "items" ]; then
 # Pre-existing block type at open: if an R2-era ITEMS block also dialogs at
 # open, the at-open notice is the old guard's behavior, not a T4 regression.
 RUN=/tmp/t4neg_items
@@ -171,5 +172,7 @@ fi
 [ "$(md5sum "$RUN/Form1.prg" | cut -d' ' -f1)" = "$MD0" ] || fail "items: disk changed on open"
 rt_cleanup
 sleep 1
+
+fi
 
 echo "T4BLOCK PASS: unparseable FOLDER PROMPTS and non-numeric COLSIZES both refused; disk byte-identical."
