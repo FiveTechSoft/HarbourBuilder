@@ -85,13 +85,16 @@ run_keep_case() {  # $1 name, $2 sed expr, $3 grep -F expected in saved file
   sleep 1
 }
 
-run_refuse_case surplus_sizes 's/COLSIZES 90, 60/COLSIZES 90, 60, 30/' 'COLSIZES'
-run_refuse_case surplus_footers 's/FOOTERS "Total", ""/FOOTERS "Total", "", "X"/' 'FOOTERS'
-run_refuse_case sizes_no_headers 's/ HEADERS "Nombre", "Edad"//' 'COLSIZES'
-run_refuse_case page_oob 's/::oFld1:aPages\[2\]/::oFld1:aPages[9]/' 'not resolved'
-run_refuse_case page_junk 's/::oFld1:aPages\[2\]/::oFld1:aPages[2x]/' 'not resolved'
-run_keep_case empty_prompt 's/PROMPTS "P1", "P2"/PROMPTS "", "P2"/' 'PROMPTS "", "P2"'
-run_keep_case empty_header 's/HEADERS "Nombre", "Edad"/HEADERS "", "Edad"/' 'HEADERS "", "Edad"'
-run_keep_case case_variant 's/OF ::oFld1:aPages\[2\]/OF ::oFLD1:aPages[2]/' 'OF ::oFld1:aPages[2]'
+WANT="${1:-all}"
+run() { local kind=$1 name=$2; shift 2; [ "$WANT" = "all" ] || [ "$WANT" = "$name" ] || return 0; "run_${kind}_case" "$name" "$@"; }
+
+run refuse surplus_sizes 's/COLSIZES 90, 60/COLSIZES 90, 60, 30/' 'COLSIZES'
+run refuse surplus_footers 's/FOOTERS "Total", ""/FOOTERS "Total", "", "X"/' 'FOOTERS'
+run refuse sizes_no_headers 's/ HEADERS "Nombre", "Edad"//' 'COLSIZES'
+run refuse page_oob 's/::oFld1:aPages\[2\]/::oFld1:aPages[9]/' 'not resolved'
+run refuse page_junk 's/::oFld1:aPages\[2\]/::oFld1:aPages[2x]/' 'not resolved'
+run keep empty_prompt 's/PROMPTS "P1", "P2"/PROMPTS "", "P2"/' 'PROMPTS "", "P2"'
+run keep empty_header 's/HEADERS "Nombre", "Edad"/HEADERS "", "Edad"/' 'HEADERS "", "Edad"'
+run keep case_variant 's/OF ::oFld1:aPages\[2\]/OF ::oFLD1:aPages[2]/' 'OF ::oFld1:aPages[2]'
 
 echo "T4EDGE PASS: 5 refusals byte-identical; empty first prompt/header and case-variant folder name survive the save"
