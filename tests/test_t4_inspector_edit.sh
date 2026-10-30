@@ -209,6 +209,14 @@ check_array() {
   xdotool key Escape; sleep 0.5
 }
 check_array aTabs P1 Pag2X 'TFolder$'
+# Use another fresh process for the second read-only Inspector check. This
+# avoids selection changes caused by the previous modal's focus restoration.
+rt_cleanup
+rt_launch_ide
+rt_reopen_project
+for w in $(rt_ide_windows); do
+  case "$(xdotool getwindowname "$w" 2>/dev/null)" in Inspector*) INS=$w; break;; esac
+done
 check_array aColumns Nombre Anos 'TBrowse$'
 rt_cleanup
 echo "T4INSP PASS: inspector edits, generated buffer, Save and fresh-process Inspector reopen verified"
