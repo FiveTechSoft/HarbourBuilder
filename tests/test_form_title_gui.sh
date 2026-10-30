@@ -14,6 +14,7 @@ rt_find_designer(){
 }
 TITLE_CASE=${TITLE_CASE:-quote}
 export TITLE_CASE
+export TITLE_EXTRA=${TITLE_EXTRA:-1}
 RUN=/tmp/form_title_gui_$TITLE_CASE
 rt_provenance
 mkdir -p "$RUN"
@@ -25,7 +26,7 @@ p=Path(sys.argv[1]);s=p.read_text()
 values={'literal':'"Fixture Roundtrip plain"','quote':'"Fixture Roundtrip " + Chr(34) + "Hola" + Chr(34)','dynamic':'"Fixture Roundtrip " + Upper("dynamic")'}
 value=values[os.environ['TITLE_CASE']]
 s=s.replace('"Fixture Roundtrip"',value,1)
-s=s.replace('   ::nWidth', '   ::cTitleExtra := "USER-EXTRA-KEEP"\n   ::nWidth',1)
+if os.environ['TITLE_EXTRA']=='1':s=s.replace('   ::nWidth', '   ::cTitleExtra := "USER-EXTRA-KEEP"\n   ::nWidth',1)
 p.write_text(s)
 PY2
 cp "$RUN/Form1.prg" "$RUN/before.prg"
@@ -68,7 +69,7 @@ get=lambda s:re.search(r'^   ::cTitle  := (.*)$',s,re.M).group(1)
 print('TITLE before='+get(a));print('TITLE after='+get(b))
 n=0
 if get(a)!=get(b):print('TITLE CHANGED '+os.environ['TITLE_CASE']);n+=1
-if '   ::cTitleExtra := "USER-EXTRA-KEEP"' not in b:print('EXTRA LOST');n+=1
+if os.environ['TITLE_EXTRA']=='1' and '   ::cTitleExtra := "USER-EXTRA-KEEP"' not in b:print('EXTRA LOST');n+=1
 print('FORM TITLE GUI changed_count='+str(n))
 sys.exit(n)
 PY
