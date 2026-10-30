@@ -79,20 +79,24 @@ else
   ! grep -q UNSAVED-MODULE-WORK "$RUN/$NAME.prg" || exit 1;echo 'DISCARD explicitly removed edit without disk write'
  fi
 fi
-# Model mutation is observable in generated main text even before saving HBP.
-xdotool mousemove 50 142 click 1;sleep 1;xdotool key ctrl+a ctrl+c;sleep 1
-xclip -selection clipboard -o > "$RUN/main-after"
+# Check the actual notebook header, not generated main (modules are not emitted there).
+xdotool windowmap "$ED";xdotool windowraise "$ED";xdotool windowfocus "$ED"
+xdotool windowmove "$ED" 0 125;xdotool windowsize "$ED" 1500 820;sleep 1
+import -window root -crop 1500x40+0+125 "$RUN/tabs.png"
+tesseract "$RUN/tabs.png" "$RUN/tabs" 2>/dev/null
+cat "$RUN/tabs.txt"
 if [ "${CHOICE:-cancel}" = cancel ] || [ "${CHOICE:-cancel}" = failure ];then
- grep -q "$NAME" "$RUN/main-after" || exit 1
+ grep -q "$NAME.prg" "$RUN/tabs.txt" || exit 1
 else
- ! grep -q "$NAME" "$RUN/main-after" || exit 1
+ ! grep -q "$NAME.prg" "$RUN/tabs.txt" || exit 1
 fi
 cmp "$RUN/other-before" "$RUN/HelperB.prg" || exit 1
-# The standalone remains present at a shifted x position after removal.
-if [ "${CHOICE:-cancel}" = cancel ] || [ "${CHOICE:-cancel}" = failure ];then SX=493;else SX=387;fi
-xdotool mousemove "$SX" 142 click 1;sleep 1;xdotool key ctrl+a ctrl+c;sleep 1
+# Locate standalone by OCR in actual geometry after any shifting.
+read SX SY < <(tesseract "$RUN/tabs.png" - tsv 2>/dev/null | awk -F'\t' '$12 ~ /Standalone/ {print $7+$9/2,125+$8+$10/2;exit}')
+[ -n "${SX:-}" ] || exit 1
+xdotool mousemove "$SX" "$SY" click 1;sleep 1;xdotool key ctrl+a ctrl+c;sleep 1
 xclip -selection clipboard -o > "$RUN/standalone-after"
 cmp "$RUN/before-editor.txt" "$RUN/standalone-after" || exit 1
-echo "TARGET=$TARGET CHOICE=${CHOICE:-cancel}: generated main membership and unrelated dirty standalone preserved"
+echo "TARGET=$TARGET CHOICE=${CHOICE:-cancel}: notebook membership and unrelated dirty standalone preserved"
 import -window root /tmp/remove-consent-after.png
 cp /tmp/remove-consent-after.png "/tmp/remove-$TARGET-${CHOICE:-cancel}-after.png"
