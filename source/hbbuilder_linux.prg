@@ -2139,8 +2139,10 @@ static function HB_ConfirmDiscardChanges( cAction )
    if n == 1
       // Save, then continue only if every write really succeeded:
       // baselines move only on real writes, so recompute is ground truth
-      TBSave()
-      HB_SaveOpenFiles()
+      // A refusal is authoritative even if project-save callbacks alter
+      // dirty bookkeeping. Preserve standalone buffers before that work.
+      if ! HB_SaveOpenFiles(); return .F.; endif
+      if ! TBSave(); return .F.; endif
       HB_RecomputeDirty()
       return ( ! lProjectDirty .and. ! lOpenFilesDirty )
    elseif n == 2
