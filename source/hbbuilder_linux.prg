@@ -2498,8 +2498,10 @@ static function SwitchToForm( nIdx )
 
    CodeEditorSelectTab( hCodeEditor, nIdx + 1 )
 
+   lSyncingFromCode := .t.
    InspectorRefresh( oDesignForm:hCpp )
    InspectorPopulateCombo( oDesignForm:hCpp )
+   lSyncingFromCode := .f.
 
 return nil
 
@@ -2759,8 +2761,10 @@ static function TBNew()
    lProjectDirty := .f.
    lOpenFilesDirty := .f.
 
+   lSyncingFromCode := .t.
    InspectorRefresh( oDesignForm:hCpp )
    InspectorPopulateCombo( oDesignForm:hCpp )
+   lSyncingFromCode := .f.
 
 return nil
 
@@ -3563,6 +3567,15 @@ static function HB_DiskBaseCheck()
    next
 return ""
 
+static function HB_DiskBaseHas( cPath )
+   local i
+   for i := 1 to Len( aDiskBase )
+      if aDiskBase[i][1] == cPath
+         return .T.
+      endif
+   next
+return .F.
+
 // .T. when cText matches the stored disk baseline of cPath
 static function HB_DiskBaseMatch( cPath, cText )
    local i
@@ -3679,8 +3692,12 @@ static function OpenProjectFile( cFile, cAction )
       oDesignForm := aForms[1][2]
       UI_SetDesignForm( oDesignForm:hCpp )
       CodeEditorSelectTab( hCodeEditor, 2 )
+      // programmatic inspector population fires prop-changed; syncing here
+      // would regenerate (and normalize) code the user never edited
+      lSyncingFromCode := .t.
       InspectorRefresh( oDesignForm:hCpp )
       InspectorPopulateCombo( oDesignForm:hCpp )
+      lSyncingFromCode := .f.
    endif
 
    cCurrentFile := cFile
@@ -3691,8 +3708,36 @@ static function OpenProjectFile( cFile, cAction )
 return nil
 
 static function TBSaveAs()
+
+   local cOldFile := cCurrentFile
+   local aOldBase := {}, i
+
+   // deep copy: baseline entries are mutated in place by HB_DiskBaseSet
+   for i := 1 to Len( aDiskBase )
+      AAdd( aOldBase, { aDiskBase[i][1], aDiskBase[i][2] } )
+   next
+
    cCurrentFile := ""
-   TBSave()
+   if TBSave() .and. ! Empty( cCurrentFile )
+      // identity transition is safe only now that every new write
+      // succeeded: drop the old project's baselines so its later deletion
+      // causes no false refusal, and rebase on what is really on disk
+      HB_DiskBaseReset()
+      HB_DiskBaseSet( cCurrentFile, MemoRead( cCurrentFile ) )
+      cOldFile := HB_ProjectDirFromFile( cCurrentFile )
+      HB_DiskBaseSet( cOldFile + "Project1.prg", MemoRead( cOldFile + "Project1.prg" ) )
+      for i := 1 to Len( aForms )
+         HB_DiskBaseSet( cOldFile + aForms[i][1] + ".prg", MemoRead( cOldFile + aForms[i][1] + ".prg" ) )
+      next
+      for i := 1 to Len( aModules )
+         HB_DiskBaseSet( cOldFile + aModules[i][1] + ".prg", MemoRead( cOldFile + aModules[i][1] + ".prg" ) )
+      next
+   else
+      // cancel or failed save: the old project keeps identity+protection
+      cCurrentFile := cOldFile
+      aDiskBase := aOldBase
+   endif
+
 return nil
 
 // true when every live form can be serialized faithfully; shows the
@@ -3750,7 +3795,7 @@ return .T.
 static function TBSave()
 
    local cDir, cFile, cHbp, i, cExtern
-   local lAllOk := .T.
+   local lAllOk := .T., cFailed := "", cConflicts := ""
 
    // freshness guard FIRST: saving over a file that changed on disk since
    // load/last save would silently overwrite external work. Refuse and
@@ -3771,7 +3816,32 @@ static function TBSave()
 
    if Empty( cCurrentFile )
       cFile := GTK_SaveFileDialog( "Save HbBuilder Project", "Project1.hbp", "hbp" )
-      if Empty( cFile ); return nil; endif
+      if Empty( cFile ); return .F.; endif
+      cDir := HB_ProjectDirFromFile( cFile )
+      // never overwrite foreign files implicitly: anything already on disk
+      // that is not part of this project's baselines needs an explicit yes
+      if File( cFile ) .and. ! HB_DiskBaseHas( cFile )
+         cConflicts += cFile + Chr(10)
+      endif
+      if File( cDir + "Project1.prg" ) .and. ! HB_DiskBaseHas( cDir + "Project1.prg" )
+         cConflicts += cDir + "Project1.prg" + Chr(10)
+      endif
+      for i := 1 to Len( aForms )
+         if File( cDir + aForms[i][1] + ".prg" ) .and. ! HB_DiskBaseHas( cDir + aForms[i][1] + ".prg" )
+            cConflicts += cDir + aForms[i][1] + ".prg" + Chr(10)
+         endif
+      next
+      for i := 1 to Len( aModules )
+         if File( cDir + aModules[i][1] + ".prg" ) .and. ! HB_DiskBaseHas( cDir + aModules[i][1] + ".prg" )
+            cConflicts += cDir + aModules[i][1] + ".prg" + Chr(10)
+         endif
+      next
+      if ! Empty( cConflicts )
+         if ! UI_MsgYesNo( "These files already exist and are not part of this project:" + ;
+               Chr(10) + Chr(10) + cConflicts + Chr(10) + "Overwrite them?", "HbBuilder" )
+            return .F.
+         endif
+      endif
       cCurrentFile := cFile
    endif
 
@@ -3784,6 +3854,7 @@ static function TBSave()
       HB_DiskBaseSet( cCurrentFile, cHbp )
    else
       lAllOk := .F.
+      cFailed += cCurrentFile + Chr(10)
    endif
 
    if MemoWrit( cDir + "Project1.prg", CodeEditorGetTabText( hCodeEditor, 1 ) )
@@ -3791,6 +3862,7 @@ static function TBSave()
       HB_TabMarkKnown( 1, CodeEditorGetTabText( hCodeEditor, 1 ) )
    else
       lAllOk := .F.
+      cFailed += cDir + "Project1.prg" + Chr(10)
    endif
 
    for i := 1 to Len( aForms )
@@ -3799,6 +3871,7 @@ static function TBSave()
          HB_TabMarkKnown( 1 + i, aForms[i][3] )
       else
          lAllOk := .F.
+         cFailed += cDir + aForms[i][1] + ".prg" + Chr(10)
       endif
    next
 
@@ -3810,8 +3883,15 @@ static function TBSave()
          HB_TabMarkKnown( 1 + Len( aForms ) + i, aModules[i][2] )
       else
          lAllOk := .F.
+         cFailed += cDir + aModules[i][1] + ".prg" + Chr(10)
       endif
    next
+
+   // a failed save must never be silent: name what did not get written
+   if ! lAllOk
+      MsgInfo( "Save FAILED - these files were NOT written:" + Chr(10) + Chr(10) + ;
+         cFailed + Chr(10) + "Your changes remain unsaved.", "HbBuilder" )
+   endif
 
    // the dirty flag clears only when every write really succeeded
    if lAllOk
@@ -3820,7 +3900,7 @@ static function TBSave()
 
    AddRecentProject( cCurrentFile )
 
-return nil
+return lAllOk
 
 // Check if Harbour compiler is installed, download and build if not
 // Returns .T. if Harbour is available, .F. if user cancelled or build failed
