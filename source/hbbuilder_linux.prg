@@ -2989,6 +2989,43 @@ static function RestoreSelectionAssignment( hForm, cLine )
    HB_SetParseBlock( hForm, "Value target is not a resolved ComboBox/ListBox (creation must precede assignment)" )
 return .T.
 
+static function HB_FormTitleExprEval( cExpr )
+   local n := 1, nLen := Len( cExpr ), nStart, nEnd, cDigits
+   local lNeedTerm := .T.
+   do while n <= nLen
+      if SubStr( cExpr, n, 1 ) $ ( " " + Chr(9) )
+         n++
+         loop
+      endif
+      if ! lNeedTerm
+         if !( SubStr( cExpr, n, 1 ) == "+" ); return nil; endif
+         lNeedTerm := .T.
+         n++
+         loop
+      endif
+      if SubStr( cExpr, n, 1 ) == '"'
+         nEnd := At( '"', SubStr( cExpr, n + 1 ) )
+         if nEnd == 0; return nil; endif
+         n += nEnd + 1
+      elseif Upper( SubStr( cExpr, n, 4 ) ) == "CHR("
+         n += 4
+         nStart := n
+         do while n <= nLen .and. IsDigit( SubStr( cExpr, n, 1 ) )
+            n++
+         enddo
+         cDigits := SubStr( cExpr, nStart, n - nStart )
+         if Len( cDigits ) == 0 .or. Val( cDigits ) > 255 .or. !( SubStr( cExpr, n, 1 ) == ")" )
+            return nil
+         endif
+         n++
+      else
+         return nil
+      endif
+      lNeedTerm := .F.
+   enddo
+   if lNeedTerm; return nil; endif
+return HB_HarbourStrEval( cExpr )
+
 static function RestoreFormFromCode( hForm, cCode )
 
    local aLines, cLine, cTrim, i, nType, lInCreateForm
@@ -3031,7 +3068,7 @@ static function RestoreFormFromCode( hForm, cCode )
       // Parse form properties: ::cTitle, ::nWidth, ::nHeight, ::nLeft, ::nTop, ::nClrPane
       nPos := At( ":=", cTrim )
       if nPos > 0 .and. Upper( AllTrim( Left( cTrim, nPos - 1 ) ) ) == "::CTITLE"
-         cExpr := HB_HarbourStrEval( AllTrim( SubStr( cTrim, nPos + 2 ) ) )
+         cExpr := HB_FormTitleExprEval( AllTrim( SubStr( cTrim, nPos + 2 ) ) )
          if ValType( cExpr ) == "C"
             UI_SetProp( hForm, "cText", cExpr )
          else
