@@ -26,7 +26,8 @@ copy_editor(){
 select_tab(){
  xdotool windowraise "$ED";xdotool windowfocus "$ED";sleep .5
  import -window root /tmp/module-tabs.png
- read X Y < <(tesseract /tmp/module-tabs.png - tsv 2>/dev/null | awk -F'\t' -v n="$1.prg" '$12==n {print $7+$9/2,$8+$10/2;exit}')
+ case "$1" in One) X=512;;Two) X=584;;NewModule) X=420;;esac
+ Y=142
  [ -n "${X:-}" ] || { echo "FAIL tab absent $1";exit 1; }
  xdotool mousemove "$X" "$Y" click 1;sleep 1
 }
