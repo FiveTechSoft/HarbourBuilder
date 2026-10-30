@@ -22,21 +22,31 @@ run_case() {  # $1 name, $2 sed expr, $3 reason regex expected in dialog OCR
   rt_reopen_project
   local MD0=$(md5sum "$RUN/Form1.prg" | cut -d' ' -f1)
   local W0=$(rt_ide_windows | tr '\n' ' ')
-  # the designer parsed the corrupted form at open (rt_reopen_project waits
-  # for it); a designer->code sync must hit the parse-block refusal
-  eval "$(xdotool getwindowgeometry --shell "$RT_DESIGNER")"
-  xdotool windowsize "$RT_DESIGNER" $((WIDTH+1)) "$HEIGHT"; sleep 1.5
-  xdotool windowsize "$RT_DESIGNER" "$WIDTH" "$HEIGHT"; sleep 1.5
+  # the refusal dialog may appear AT OPEN (the designer parses the corrupted
+  # form right away; s_cLastRefusal then dedups later syncs) or on the first
+  # designer->code sync; accept whichever comes first.
   local DLG=""
-  for i in 1 2 3 4 5; do
+  for i in 1 2 3; do
     for w in $(rt_ide_windows); do
-      case " $W0 " in *" $w "*) continue;; esac
-      [ "$(xdotool getwindowname "$w" 2>/dev/null)" = "HbBuilder" ] && { DLG=$w; break; }
+      [ "$(xdotool getwindowname "$w" 2>/dev/null)" = "HbBuilder" ] &&         xwininfo -id "$w" 2>/dev/null | grep -q IsViewable && { DLG=$w; break; }
     done
     [ -n "$DLG" ] && break
     sleep 1
   done
-  [ -n "$DLG" ] || fail "$1: Ctrl+S was not refused (no dialog)"
+  if [ -z "$DLG" ]; then
+    eval "$(xdotool getwindowgeometry --shell "$RT_DESIGNER")"
+    xdotool windowsize "$RT_DESIGNER" $((WIDTH+1)) "$HEIGHT"; sleep 1.5
+    xdotool windowsize "$RT_DESIGNER" "$WIDTH" "$HEIGHT"; sleep 1.5
+    for i in 1 2 3 4 5; do
+      for w in $(rt_ide_windows); do
+        case " $W0 " in *" $w "*) continue;; esac
+        [ "$(xdotool getwindowname "$w" 2>/dev/null)" = "HbBuilder" ] && { DLG=$w; break; }
+      done
+      [ -n "$DLG" ] && break
+      sleep 1
+    done
+  fi
+  [ -n "$DLG" ] || fail "$1: save/sync was not refused (no dialog at open nor on sync)"
   eval "$(xdotool getwindowgeometry --shell "$DLG")"
   import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/t4neg_$1.png
   local TXT=$(tesseract /tmp/t4neg_$1.png - 2>/dev/null)
