@@ -87,6 +87,36 @@ rt_find_bar() {
   return 1
 }
 
+rt_expose_bar() {  # move non-bar HbBuilder windows off the menu bar area
+  local w t bar
+  bar=$(rt_find_bar) || return 1
+  for w in $(rt_ide_windows); do
+    t=$(xdotool getwindowname "$w" 2>/dev/null)
+    case "$t" in HbBuilder*) [ "$w" = "$bar" ] || xdotool windowmove "$w" 0 500 2>/dev/null;; esac
+  done
+  sleep 0.5
+  echo "$bar"
+}
+
+# These menus are press-drag-release: the dropdown stays open only while
+# the button is held, and mouseup activates the item under the cursor.
+# $1 = OCR regex for the item; opens File at (30,12) and releases on the item.
+menu_path_click() {
+  local ITEMRE="$1" rel
+  rt_expose_bar >/dev/null
+  xdotool mousemove 30 12 mousedown 1; sleep 0.7
+  import -window root -crop "400x400+0+0" /tmp/rt_menu.png 2>/dev/null
+  rel=$(tesseract /tmp/rt_menu.png - tsv 2>/dev/null | awk -F'\t' -v w="$ITEMRE" '$8+0 > 20 && $12 ~ w {print $7" "$8" "$9" "$10; exit}')
+  if [ -z "$rel" ]; then
+    xdotool mouseup 1; sleep 0.3
+    echo "  [diag] menu item $ITEMRE not found:"; tesseract /tmp/rt_menu.png - 2>/dev/null | grep -v '^$' | head -8
+    return 1
+  fi
+  set -- $rel
+  xdotool mousemove $(($1 + $3/2)) $(($2 + $4/2)); sleep 0.4
+  xdotool mouseup 1; sleep 1
+}
+
 rt_unmap_all_but() {
   local keep=$1 w
   for w in $(rt_ide_windows); do
@@ -106,10 +136,8 @@ rt_map_all() { local w; for w in $(rt_ide_windows); do xdotool windowmap "$w" 2>
 rt_reopen_project() {  # File -> Reopen Last Project, then wait for the designer
   local bar i
   bar=$(rt_find_bar) || { echo "HARNESS FAIL: IDE bar not found"; exit 1; }
-  rt_unmap_all_but "$bar"; sleep 0.4
-  xdotool mousemove 20 12 click 1;  sleep 0.8
-  xdotool mousemove 100 134 click 1; sleep 5
-  rt_map_all; sleep 1
+  menu_path_click '^Reopen' || { echo "HARNESS FAIL: Reopen menu item not found"; exit 1; }
+  sleep 4
   for i in $(seq 1 12); do
     RT_DESIGNER=$(rt_find_designer) && break
     sleep 1

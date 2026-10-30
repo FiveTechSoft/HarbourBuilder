@@ -545,14 +545,11 @@ run_closefile() {
 launch_a
 echo 'line one' > /tmp/rt_openme.txt
 # File > Open File...
-BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"; sleep 0.3
-xdotool mousemove 20 12 mousedown 1; sleep 0.4; xdotool mouseup 1; sleep 0.8
-click_menu_item 'File'
+menu_path_click '^File\.\.\.$' || { FAILN=$((FAILN+1)); echo "  CLOSEFILE: Open File menu failed (harness)"; rt_cleanup; return; }
 sleep 1
 xdotool key ctrl+l; sleep 0.5
 xdotool type --delay 15 '/tmp/rt_openme.txt'; sleep 0.5
 xdotool key Return; sleep 2
-rt_map_all; sleep 0.5
 # edit the opened file tab
 CED=""
 for w in $(rt_ide_windows); do
@@ -566,11 +563,9 @@ xdotool key ctrl+End; sleep 0.3
 xdotool type --delay 15 '// edited'; sleep 1
 rt_map_all; sleep 0.3
 # File > Close File -> expect Save/Discard/Cancel
-BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"; sleep 0.3
 local BEFORE w i
 BEFORE=$(rt_ide_windows | sort -n | tr '\n' ' ')
-xdotool mousemove 20 12 mousedown 1; sleep 0.4; xdotool mouseup 1; sleep 0.8
-click_menu_item 'Close'
+menu_path_click '^Close$'
 DLG=""
 for i in $(seq 1 8); do
   for w in $(rt_ide_windows); do
@@ -587,10 +582,8 @@ else
   shot_dialog "$DLG" closefile
   cancel_dialog "$DLG"
   # Cancel must keep the file open: closing again prompts again
-  BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"; sleep 0.3
   BEFORE=$(rt_ide_windows | sort -n | tr '\n' ' ')
-  xdotool mousemove 20 12 mousedown 1; sleep 0.4; xdotool mouseup 1; sleep 0.8
-  click_menu_item 'Close'
+  menu_path_click '^Close$'
   DLG=""
   for i in $(seq 1 8); do
     for w in $(rt_ide_windows); do
@@ -693,12 +686,14 @@ launch_fresh
 # edit then exact revert (BackSpace) on the Project1.prg tab of a never-saved
 # project: back to the known text = clean. (Form-tab edits rebuild the form
 # from code; that interaction is exercised separately.)
-local CED w rel
+local CED w rel D DX DY
 CED=""
 for w in $(rt_ide_windows); do
   [ "$(xdotool getwindowname "$w" 2>/dev/null)" = "Code Editor" ] && { CED=$w; break; }
 done
 [ -n "$CED" ] || fail "Code Editor window not found"
+D=$(rt_find_designer) || fail "designer window not found"
+eval "$(xdotool getwindowgeometry --shell "$D")"; DX=$X; DY=$Y
 BAR=$(rt_find_bar); rt_park_all_but "$CED" "$BAR"; sleep 0.5
 eval "$(xdotool getwindowgeometry --shell "$CED")"
 import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/dl_tabs.png 2>/dev/null
@@ -712,6 +707,9 @@ xdotool type --delay 15 'x'; sleep 0.5
 xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT/2)) click 1; sleep 0.4
 xdotool key ctrl+End; sleep 0.3
 xdotool key BackSpace; sleep 0.8
+# the form position is a persisted property: restore the parked designer
+# window before judging dirtiness (parking itself is not a user change)
+xdotool windowmove "$D" "$DX" "$DY"; sleep 1.5
 rt_map_all; sleep 0.3
 DLG=$(trigger_and_expect_dialog "ctrl+q")
 if [ -n "$DLG" ]; then
