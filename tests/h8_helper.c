@@ -4,6 +4,7 @@
 #include <gtk/gtk.h>
 #include <hbapi.h>
 #include <hbapiitm.h>
+#include <hbvm.h>
 
 static GtkWidget * g_combo = NULL, * g_tree = NULL;
 
@@ -62,7 +63,7 @@ HB_FUNC( H8_LISTSELROW )       /* 0-based selected row, -1 = none */
 static gboolean fire_block( gpointer data )
 {
    PHB_ITEM b = (PHB_ITEM) data;
-   hb_itemEval( b, 0 );
+   hb_vmEvalBlock( b );
    hb_itemRelease( b );
    return G_SOURCE_REMOVE;
 }
