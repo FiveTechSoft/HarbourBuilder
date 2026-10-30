@@ -17,7 +17,7 @@ MD=$(sha256sum "$RUN/Form1.prg" | cut -d' ' -f1)
 rt_setup "$RUN";rt_launch_ide
 for try in $(seq 1 12);do rt_find_bar >/dev/null&&break;sleep 1;done
 rt_reopen_project
-for mode in sync save saveas run debug;do
+for mode in save saveas run debug sync;do
  W0=$(rt_ide_windows | tr '\n' ' ')
  BAR=$(rt_find_bar)
  if [ "$mode" = sync ];then
