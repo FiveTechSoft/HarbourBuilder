@@ -8,7 +8,7 @@ src='''static nCalls := 0
 static nEffects := 0
 function Main()
 ''';parts=[]
-for plat,guard in [('win','PictureParseAllowed'),('macos','SelectionParseAllowed')]:
+for plat,guard in [('win','PictureParseAllowed'),('macos','PictureParseAllowed')]:
  s=(r/f'source/hbbuilder_{plat}.prg').read_text()
  for fn in ['TBSave','TBSaveAs','TBRun','TBDebugRun']:
   a=s.index('static function '+fn+'(');b=s.index(f'if ! {guard}( nil ); return .F.; endif',a)+len(f'if ! {guard}( nil ); return .F.; endif')

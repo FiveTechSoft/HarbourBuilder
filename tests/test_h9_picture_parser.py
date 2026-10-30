@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-import pathlib,subprocess
-r=pathlib.Path(__file__).resolve().parents[1];s=(r/'source/hbbuilder_win.prg').read_text();a=s.index('static function PictureExprEval');b=s.index('static function RestoreFormFromCode',a)
+import pathlib,subprocess,sys
+r=pathlib.Path(__file__).resolve().parents[1];platform=sys.argv[1] if len(sys.argv)>1 else 'win';s=(r/f'source/hbbuilder_{platform}.prg').read_text();a=s.index('static function PictureExprEval');b=s.index('static function RestoreFormFromCode',a)
 p=pathlib.Path('/tmp/h9-picture');p.mkdir(exist_ok=True)
 main='''static aPictureParseBlocks := {}
 static aWrites := {}

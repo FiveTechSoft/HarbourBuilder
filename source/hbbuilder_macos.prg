@@ -67,6 +67,7 @@ static aDbgOffsets   // Debug line offsets: { {startLine, "tabName", nTabIndex, 
 static oTB2          // Debug toolbar (for highlighting Debug button)
 static lIgnoreSelChange := .f.  // Flag to prevent re-entrant selection change
 static aSelectionParseBlocks := {}
+static aPictureParseBlocks := {}
 static lUpdatingInspectorCombo := .F. // no callbacks during programmatic mirror rebuild
 static lSyncingFromCode := .f.  // Guard: true while syncing code -> designer
 
@@ -84,6 +85,7 @@ function Main()
    nScreenH := MAC_GetScreenHeight()
    cCurrentFile := ""
    aSelectionParseBlocks := {}
+   aPictureParseBlocks := {}
    aForms := {}
    nActiveForm := 0
    aModules := {}
@@ -1107,8 +1109,8 @@ static function RegenerateFormCode( cName, hForm )
                   ' IMAGE ::o' + cCtrlName + ' OF ' + cParent + ' SIZE ' + ;
                   LTrim(Str(nCW)) + ", " + LTrim(Str(nCH))
                cVal := UI_GetProp( hCtrl, "cPicture" )
-               if ! Empty( cVal )
-                  cCreate += ' PICTURE "' + cVal + '"'
+               if ValType( cVal ) == "C" .and. Len( cVal ) > 0
+                  cCreate += ' PICTURE ' + HB_QHarbourStr( cVal )
                endif
                cCreate += e
             case nType == 16  // Bevel
@@ -1154,8 +1156,8 @@ static function RegenerateFormCode( cName, hForm )
                   cCreate += ' KIND ' + LTrim( Str( cVal ) )
                endif
                cVal := UI_GetProp( hCtrl, "cPicture" )
-               if ! Empty( cVal )
-                  cCreate += ' PICTURE "' + cVal + '"'
+               if ValType( cVal ) == "C" .and. Len( cVal ) > 0
+                  cCreate += ' PICTURE ' + HB_QHarbourStr( cVal )
                endif
                cCreate += e
             case nType == 20  // TreeView
@@ -1840,6 +1842,69 @@ static function SelectionParseAllowed( hForm, lQuiet )
    next
 return .T.
 
+static function PictureExprEval( cExpr )
+   local n := 1, nLen := Len( cExpr ), nStart, nEnd, cDigits
+   local lNeedTerm := .T.
+   do while n <= nLen
+      if SubStr( cExpr, n, 1 ) $ ( " " + Chr(9) )
+         n++
+         loop
+      endif
+      if ! lNeedTerm
+         if !( SubStr( cExpr, n, 1 ) == "+" ); return nil; endif
+         lNeedTerm := .T.
+         n++
+         loop
+      endif
+      if SubStr( cExpr, n, 1 ) == '"'
+         nEnd := At( '"', SubStr( cExpr, n + 1 ) )
+         if nEnd == 0; return nil; endif
+         n += nEnd + 1
+      elseif Upper( SubStr( cExpr, n, 4 ) ) == "CHR("
+         n += 4
+         nStart := n
+         do while n <= nLen .and. IsDigit( SubStr( cExpr, n, 1 ) )
+            n++
+         enddo
+         cDigits := SubStr( cExpr, nStart, n - nStart )
+         if Len( cDigits ) == 0 .or. Val( cDigits ) > 255 .or. !( SubStr( cExpr, n, 1 ) == ")" )
+            return nil
+         endif
+         n++
+      else
+         return nil
+      endif
+      lNeedTerm := .F.
+   enddo
+   if lNeedTerm; return nil; endif
+return HB_HarbourStrEval( cExpr )
+
+static function RestorePictureClause( hForm, hCtrl, cLine )
+   local nPos := At( " PICTURE ", Upper( HB_StripStrings( cLine ) ) )
+   local cExpr, xValue
+   if nPos == 0; return .T.; endif
+   cExpr := AllTrim( SubStr( cLine, nPos + 9 ) )
+   xValue := PictureExprEval( cExpr )
+   if xValue == nil
+      AAdd( aPictureParseBlocks, { hForm, "PICTURE expression not understood" } )
+      return .F.
+   endif
+   UI_SetProp( hCtrl, "cPicture", xValue )
+return .T.
+
+static function PictureParseAllowed( hForm, lQuiet )
+   local row
+   if ! SelectionParseAllowed( hForm, lQuiet ); return .F.; endif
+   for each row in aPictureParseBlocks
+      if hForm == nil .or. row[1] == hForm
+         if !( lQuiet == .T. )
+         MsgInfo( "Save/sync refused: " + row[2] + ". Fix the PICTURE clause in the code editor.", "HbBuilder" )
+         endif
+         return .F.
+      endif
+   next
+return .T.
+
 static function RestoreFormFromCode( hForm, cCode )
 
    local aLines, cLine, cTrim, i, j, nType, nCount, lInCreateForm
@@ -1853,6 +1918,13 @@ static function RestoreFormFromCode( hForm, cCode )
    local cMenuSerial, nMenuLevel, aParentStack, nFirstNode, jj, cML, cMLU
    local nQ1, nQ2, nQ3, nQ4, nQ5, cPopCap, cItCap, cItHndl, cItAccl, nAct, nAccl
    local nPar, nPar2, nPar3, nCC, jjC, hC
+
+   for i := Len( aPictureParseBlocks ) to 1 step -1
+      if aPictureParseBlocks[i][1] == hForm
+         ADel( aPictureParseBlocks, i )
+         ASize( aPictureParseBlocks, Len( aPictureParseBlocks ) - 1 )
+      endif
+   next
 
    for i := Len( aSelectionParseBlocks ) to 1 step -1
       if aSelectionParseBlocks[i][1] == hForm
@@ -2668,14 +2740,7 @@ static function RestoreFormFromCode( hForm, cCode )
          case " IMAGE " $ Upper( cTrim )
             hCtrl := UI_ImageNew( hForm, nL, nT, nW, nH )
             if hCtrl != 0
-               nPos := At( 'PICTURE "', cTrim )
-               if nPos > 0
-                  cVal := SubStr( cTrim, nPos + 9 )
-                  nPos2 := At( '"', cVal )
-                  if nPos2 > 0
-                     UI_SetProp( hCtrl, "cPicture", Left( cVal, nPos2 - 1 ) )
-                  endif
-               endif
+               RestorePictureClause( hForm, hCtrl, cTrim )
             endif
          case " SHAPE " $ Upper( cTrim )
             hCtrl := UI_ShapeNew( hForm, nL, nT, nW, nH )
@@ -2715,14 +2780,7 @@ static function RestoreFormFromCode( hForm, cCode )
                   UI_SetProp( hCtrl, "nKind", ;
                      Val( AllTrim( SubStr( cTrim, nPos + 6 ) ) ) )
                endif
-               nPos := At( 'PICTURE "', cTrim )
-               if nPos > 0
-                  cVal := SubStr( cTrim, nPos + 9 )
-                  nPos2 := At( '"', cVal )
-                  if nPos2 > 0
-                     UI_SetProp( hCtrl, "cPicture", Left( cVal, nPos2 - 1 ) )
-                  endif
-               endif
+               RestorePictureClause( hForm, hCtrl, cTrim )
             endif
          case " COMBOBOX " $ Upper( cTrim )
             hCtrl := UI_ComboBoxNew( hForm, nL, nT, nW, nH )
@@ -3547,7 +3605,7 @@ static function SyncDesignerToCode()
       return nil
    endif
 
-   if ! SelectionParseAllowed( oDesignForm:hCpp, .T. ); return .F.; endif
+   if ! PictureParseAllowed( oDesignForm:hCpp, .T. ); return .F.; endif
 
    // Get existing code to preserve METHOD implementations
    cOldCode := CodeEditorGetTabText( hCodeEditor, nActiveForm + 1 )
@@ -3916,6 +3974,7 @@ static function TBNew()
       aForms[i][2]:Destroy()
    next
    aSelectionParseBlocks := {}
+   aPictureParseBlocks := {}
    aForms := {}
    nActiveForm := 0
    aModules := {}
@@ -3970,7 +4029,7 @@ static function TBSave()
 
    local cDir, cFile, cHbp, i
 
-   if ! SelectionParseAllowed( nil ); return .F.; endif
+   if ! PictureParseAllowed( nil ); return .F.; endif
 
    // Sync current form code
    SaveActiveFormCode()
@@ -4107,7 +4166,7 @@ static function TBRun()
    local hForm, nCount, hCtrl, oReport, oBand, cBandType, nBandH
    static nLastHash := 0
 
-   if ! SelectionParseAllowed( nil ); return .F.; endif
+   if ! PictureParseAllowed( nil ); return .F.; endif
 
    // If the active form is a report (has bands), preview instead of compile+run
    if nActiveForm > 0 .and. nActiveForm <= Len( aForms ) .and. ;
@@ -4576,7 +4635,7 @@ static function TBDebugRun( lRunToBreakpoint )
       lRunToBreakpoint := .T.
    endif
 
-   if ! SelectionParseAllowed( nil ); return .F.; endif
+   if ! PictureParseAllowed( nil ); return .F.; endif
 
    SaveActiveFormCode()
 
@@ -5441,7 +5500,7 @@ return nil
 
 static function TBSaveAs()
    local cFile
-   if ! SelectionParseAllowed( nil ); return .F.; endif
+   if ! PictureParseAllowed( nil ); return .F.; endif
    cFile := MAC_SaveFileDialog( "Save As", "Project1", "hbp" )
    if ! Empty( cFile )
       cCurrentFile := cFile
@@ -5532,6 +5591,12 @@ static function RemoveFromProject()
          return nil
       endif
       hRemoved := aForms[nSel][2]:hCpp
+      for j := Len( aPictureParseBlocks ) to 1 step -1
+         if aPictureParseBlocks[j][1] == hRemoved
+            ADel( aPictureParseBlocks, j )
+            ASize( aPictureParseBlocks, Len( aPictureParseBlocks ) - 1 )
+         endif
+      next
       for j := Len( aSelectionParseBlocks ) to 1 step -1
          if aSelectionParseBlocks[j][1] == hRemoved
             ADel( aSelectionParseBlocks, j )
@@ -5896,6 +5961,7 @@ static function OpenProjectFile( cFile )
       aForms[i][2]:Destroy()
    next
    aSelectionParseBlocks := {}
+   aPictureParseBlocks := {}
    aForms := {}
    nActiveForm := 0
    aModules := {}
