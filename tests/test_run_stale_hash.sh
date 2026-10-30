@@ -18,14 +18,17 @@ fail() { echo "RUNHASH FAIL: $1"; rt_cleanup; exit 1; }
 rt_provenance
 FAILN=0
 
-rm -rf "$RUNA" "$RUNB"; mkdir -p "$RUNA" "$RUNB"
-cp "$FIX"/Project1.hbp "$FIX"/Project1.prg "$FIX"/Form1.prg "$RUNA"/
-cp "$FIX"/Project1.hbp "$FIX"/Project1.prg "$FIX"/Form1.prg "$RUNB"/
-rm -f "$TRACE"
-rt_setup "$RUNA"
-rt_launch_ide
-IDEPID=$RT_IDEPID
-rt_reopen_project
+CASES="${@:-tail}"
+
+launch_a() {
+  rm -rf "$RUNA"; mkdir -p "$RUNA"
+  cp "$FIX"/Project1.hbp "$FIX"/Project1.prg "$FIX"/Form1.prg "$RUNA"/
+  rm -f "$TRACE"
+  rt_setup "$RUNA"
+  rt_launch_ide
+  IDEPID=$RT_IDEPID
+  rt_reopen_project
+}
 
 ctrl_r_and_trace() {  # $1=expected-version-or-empty; echoes app trace line
   local BAR w p APPW="" APPPID="" i
@@ -48,6 +51,8 @@ ctrl_r_and_trace() {  # $1=expected-version-or-empty; echoes app trace line
   [ -f "$TRACE" ] && cat "$TRACE"
 }
 
+run_tail() {
+launch_a
 # --- build 1: full build, effect VERSION-A
 T1=$(ctrl_r_and_trace)
 echo "trace after first Run: ${T1:-<missing>}"
@@ -73,8 +78,18 @@ echo "${T2:-}" | grep -q 'version:VERSION-B' \
 echo "${T2:-}" | grep -q 'version:VERSION-A' \
   && { echo "  TAIL-EDIT: stale binary executed"; }
 
+echo "tail case done (FAILN=$FAILN)"
+rt_cleanup
+}
+
+run_identity() {
+launch_a
+# first Run builds project A (fills the process-static cache)
+T1=$(ctrl_r_and_trace)
+echo "trace after project-A Run: ${T1:-<missing>}"
 # --- case identity: same process, point the INI at project B, reopen, Run
-sed -i 's/VERSION-B/VERSION-A/' /tmp/rt_runhash_v2.prg   # v2 var reused below
+rm -rf "$RUNB"; mkdir -p "$RUNB"
+cp "$FIX"/Project1.hbp "$FIX"/Project1.prg "$FIX"/Form1.prg "$RUNB"/
 rt_setup "$RUNB"    # rewrites bin/hbbuilder.ini File1 -> project B (same IDE!)
 BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"; sleep 0.3
 xdotool mousemove 20 12 click 1; sleep 0.8
@@ -90,6 +105,15 @@ else
   echo "  IDENTITY: project B got NO exe (quick-path reused project A's build)"
   FAILN=$((FAILN+1))
 fi
+
+echo "identity case done (FAILN=$FAILN)"
+rt_cleanup
+}
+
+for c in $CASES; do
+  echo "== case: $c =="
+  run_$c
+done
 
 if [ "$FAILN" -eq 0 ]; then
   echo "RUNHASH PASS: tail edits beyond char 5000 rebuild with the new app effect; a same-text project at a new path gets its own build and exe."
