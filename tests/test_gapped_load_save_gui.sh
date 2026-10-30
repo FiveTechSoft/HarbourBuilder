@@ -19,8 +19,15 @@ rt_reopen_project
 cp "$RUN/Form3.prg" "$RUN/before-form3.prg"
 touch -d '2000-01-01' "$RUN/Form3.prg"
 BAR=$(rt_find_bar);rt_unmap_all_but "$BAR";xdotool mousemove 700 12 click 1;xdotool key ctrl+s;sleep 2
-rt_map_all;import -window root /tmp/gapped-load-save.png
-tesseract /tmp/gapped-load-save.png - --psm 11 2>/dev/null | tee "$RUN/ocr"
+rt_map_all
+for w in $(rt_ide_windows);do
+ if [ "$(xdotool getwindowname "$w")" = HbBuilder ];then
+  xdotool windowraise "$w";eval "$(xdotool getwindowgeometry --shell "$w")"
+  import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/gapped-load-dialog.png
+ fi
+done
+import -window root /tmp/gapped-load-save.png
+tesseract /tmp/gapped-load-dialog.png - --psm 6 2>/dev/null | tee "$RUN/ocr"
 python3 - "$RUN" "${EXPECT:-red}" <<'CHECK'
 from pathlib import Path
 import sys
