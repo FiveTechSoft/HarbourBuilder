@@ -189,6 +189,8 @@ grep -q 'VERSION-Z' "$RUNA/Form1.prg" \
 # the refused Run must have preserved the pending buffer edit
 BAR=$(rt_find_bar); rt_park_all_but "$CED" "$BAR"; sleep 0.5
 eval "$(xdotool getwindowgeometry --shell "$CED")"
+xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT/2)) click 1; sleep 0.4
+xdotool key ctrl+End; sleep 0.5   # scroll the viewport back to the tail line
 import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/ee_conflict_buffer.png 2>/dev/null
 tesseract /tmp/ee_conflict_buffer.png - 2>/dev/null | grep -q 'VERSION-Y' \
   && echo "  conflict: buffer edit preserved after refusal (VERSION-Y)" \
