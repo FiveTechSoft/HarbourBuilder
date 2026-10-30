@@ -25,5 +25,18 @@ grep -q UNSAVED-STANDALONE-WORK "$RUN/before-editor.txt" || exit 1
 # Remove HelperA while standalone remains the active editor tab.
 BAR=$(rt_find_bar);rt_unmap_all_but "$BAR";xdotool mousemove 700 12 click 1
 xdotool mousemove 217 12 mousedown 1;sleep .5
-import -window root /tmp/remove-project-menu.png
-xdotool mouseup 1
+xdotool mousemove 300 62 mouseup 1;sleep 1
+for w in $(rt_ide_windows);do [ "$(xdotool getwindowname "$w")" = 'Remove from Project' ] && DLG=$w;done
+[ -n "${DLG:-}" ] || { echo 'FAIL remove dialog absent';exit 1; }
+xdotool windowmap "$DLG";xdotool windowraise "$DLG";xdotool windowfocus "$DLG"
+# Combo default Form1, next item HelperA.
+xdotool key Down Tab Return;sleep 2
+rt_map_all;xdotool windowraise "$ED";xdotool windowfocus "$ED";xdotool key ctrl+a ctrl+c;sleep 1
+xclip -selection clipboard -o > "$RUN/after-editor.txt"
+import -window root /tmp/remove-module-dirty-after.png
+python3 - "$RUN" <<'CHECK'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1]);a=(p/'before-editor.txt').read_text();b=(p/'after-editor.txt').read_text();print('BEFORE',repr(a));print('AFTER',repr(b));assert 'UNSAVED-STANDALONE-WORK' in a;assert a!=b
+print('RED removing another module discards active standalone unsaved editor text')
+CHECK
