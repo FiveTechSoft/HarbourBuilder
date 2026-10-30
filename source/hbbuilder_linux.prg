@@ -3048,7 +3048,10 @@ static function HB_FormNumberEval( cExpr, lColor )
          ch := SubStr( c, i, 1 )
          if IsDigit( ch )
             nDigits++
-            if lDot; nAfterDot++; endif
+            if lDot
+               nAfterDot++
+               if !( ch == "0" ); return nil; endif
+            endif
          elseif ch == "." .and. ! lDot
             lDot := .T.
          else
