@@ -3887,11 +3887,14 @@ static function TBSave()
       cFile := GTK_SaveFileDialog( "Save HbBuilder Project", "Project1.hbp", "hbp" )
       if Empty( cFile ); return .F.; endif
       // the GTK save chooser appends the filter extension unconditionally:
-      // a name typed with .hbp comes back as name.hbp.hbp. Exactly one.
-      do while Lower( Right( cFile, 4 ) ) == ".hbp"
+      // a name typed with .hbp comes back as name.hbp.hbp. Drop only the
+      // appended copy - the user's own suffix (any case) stays untouched.
+      if Lower( Right( cFile, 8 ) ) == ".hbp.hbp"
          cFile := Left( cFile, Len( cFile ) - 4 )
-      enddo
-      cFile += ".hbp"
+      endif
+      if Lower( Right( cFile, 4 ) ) != ".hbp"
+         cFile += ".hbp"
+      endif
       cDir := HB_ProjectDirFromFile( cFile )
       // never overwrite foreign files implicitly: anything already on disk
       // that is not part of this project's baselines needs an explicit yes
