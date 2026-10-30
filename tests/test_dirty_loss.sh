@@ -702,6 +702,10 @@ eval "$(xdotool getwindowgeometry --shell "$CED")"
 xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT/2)) click 1; sleep 0.4
 xdotool key ctrl+End; sleep 0.3
 xdotool type --delay 15 'x'; sleep 0.5
+# the code->form rebuild may steal focus; click back into the editor and
+# return to the buffer end before deleting the char (exact revert)
+xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT/2)) click 1; sleep 0.4
+xdotool key ctrl+End; sleep 0.3
 xdotool key BackSpace; sleep 0.8
 rt_map_all; sleep 0.3
 DLG=$(trigger_and_expect_dialog "ctrl+q")
