@@ -12,7 +12,7 @@ maccombo=branch('macos','            case nType == 5  // ComboBox','            
 maclist=branch('macos','            case nType == 7  // ListBox','            case nType == 8  // RadioButton')
 winpic=branch('win','            case nType == 12  // BitBtn','            case nType == 14  // Image')
 winimage=branch('win','            case nType == 14  // Image','            case nType == 15  // Shape')
-macradio=branch('macos','            case nType == 8  // RadioButton','            case nType == 12  // BitBtn')
+macradio=branch('macos','            case nType == 8  // RadioButton','            case nType == 24  // Memo')
 winradio=branch('win','            case nType == 8  // RadioButton','            case nType == 12  // BitBtn')
 pre='''#include "hbide.ch"
 static nFails := 0
