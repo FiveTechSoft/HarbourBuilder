@@ -55,10 +55,10 @@ METHOD CreateForm() CLASS TForm1
    @ 90, 475 BUTTON ::oBtnPg2 PROMPT "Pag2" OF ::oFld1:aPages[2] SIZE 90, 26
    @ 240, 460 BROWSE ::oBrw1 OF Self SIZE 165, 150 HEADERS "Nombre", "Edad" COLSIZES 90, 60 FOOTERS "Total", ""
    FixtureTraceRaw( "folder-tabs:" + UI_GetProp( ::oFld1:hCpp, "aTabs" ) )
-   FixtureTraceRaw( "browse-cols:" + hb_ValToStr( UI_BrowseColCount( ::oBrw1:hCpp ) ) )
+   FixtureTraceRaw( "browse-cols:" + LTrim( hb_ValToStr( UI_BrowseColCount( ::oBrw1:hCpp ) ) ) )
    FixtureTraceRaw( "page2-btn:" + UI_GetProp( ::oBtnPg2:hCpp, "cText" ) )
    FixtureTraceRaw( "page2-owner:" + iif( UI_GetCtrlOwner( ::oBtnPg2:hCpp ) == ::oFld1:hCpp, "folder", "other" ) )
-   FixtureTraceRaw( "page2-page:" + hb_ValToStr( UI_GetCtrlPage( ::oBtnPg2:hCpp ) ) )
+   FixtureTraceRaw( "page2-page:" + LTrim( hb_ValToStr( UI_GetCtrlPage( ::oBtnPg2:hCpp ) ) ) )
 
    // comentario manual del usuario
    ::oEdit1:cText := "modificado"
