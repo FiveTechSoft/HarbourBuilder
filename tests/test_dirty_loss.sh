@@ -414,6 +414,19 @@ xdotool key ctrl+s; sleep 2
 xdotool key ctrl+l; sleep 0.5
 xdotool type --delay 15 '/tmp/rt_occ/Project1'; sleep 0.5
 xdotool key Return; sleep 2
+# the GTK chooser asks its own Replace? when the .hbp exists: confirm it so
+# the product-level foreign-file check gets the path at all
+REP=""
+for w in $(rt_ide_windows); do
+  REP=$(tesseract /tmp/dl_repl.png - tsv 2>/dev/null | awk -F'\t' '$12 ~ /^Replace/ {print $7" "$8" "$9" "$10; exit}')
+done
+import -window root /tmp/dl_replroot.png 2>/dev/null
+REP=$(tesseract /tmp/dl_replroot.png - tsv 2>/dev/null | awk -F'\t' '$12 ~ /^Replace/ {print $7" "$8" "$9" "$10; exit}')
+if [ -n "$REP" ]; then
+  set -- $REP
+  echo "  occupied: confirming the GTK chooser's own Replace prompt"
+  xdotool mousemove $(($1 + $3/2)) $(($2 + $4/2)) click 1; sleep 2
+fi
 WARN=""
 for w in $(rt_ide_windows); do
   xdotool getwindowname "$w" 2>/dev/null | grep -q '^HbBuilder$' && WARN=$w
