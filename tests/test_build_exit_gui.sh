@@ -41,10 +41,9 @@ import -window root /tmp/build-exit-refused.png
 tesseract /tmp/build-exit-refused.png - --psm 6 2>/dev/null | tee "$RUN/ocr"
 grep -q 'exited 7' "$RUN/ocr" || { rt_cleanup; exit 1; }
 echo "BUILD EXIT GUI refusal PASS stale main.o=$OLD not executed"
-# Build failure displays a modal result dialog. Close only that dialog.
-for w in $(rt_ide_windows); do
- case "$(xdotool getwindowname "$w")" in *Build\ Failed*) xdotool windowfocus "$w"; xdotool key Escape;; esac
-done
+# Build failure uses MsgInfo. Its title varies with the GTK wrapper.
+xdotool key Return
+sleep 1
 rm "$RUN/fail"
 press_run
 for try in $(seq 1 50); do [ -f /tmp/debugmodules-result.txt ] && break; sleep 1; done

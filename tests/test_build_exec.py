@@ -17,7 +17,7 @@ main='''function Main()
 return nil
 function GTK_ShellExec(c,nExit)
  local out:='',err:=''
- nExit:=hb_processRun(c,,@out,@err)
+ nExit:=hb_processRun('/bin/sh -c '+Chr(34)+c+Chr(34),,@out,@err)
 return out+err
 '''
 # Every compile/link cCmd in Run and Debug must route through the checked helper.
