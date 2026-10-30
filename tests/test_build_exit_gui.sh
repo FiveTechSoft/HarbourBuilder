@@ -3,6 +3,7 @@ set -u
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 source "$REPO/tests/harness_lib.sh"
 MODE=${MODE:-run}
+export FAIL_STAGE=${FAIL_STAGE:-compile}
 RUN=/tmp/build_exit_gui
 rt_provenance
 mkdir -p "$RUN/tools"
@@ -10,7 +11,11 @@ cp "$REPO/tests/fixtures/debugmodules/"* "$RUN/"
 cat > "$RUN/tools/gcc" <<'EOF'
 #!/bin/bash
 if [ -f /tmp/build_exit_gui/fail ]; then
- case "$*" in *main.c*) echo "$*" >> /tmp/build_exit_gui/refusals; exit 7;; esac
+ if [ "$FAIL_STAGE" = link ]; then
+  case "$*" in *"/UserApp "*|*"/DebugApp "*) echo "$*" >> /tmp/build_exit_gui/refusals; exit 7;; esac
+ else
+  case "$*" in *main.c*) echo "$*" >> /tmp/build_exit_gui/refusals; exit 7;; esac
+ fi
 fi
 exec /usr/bin/gcc "$@"
 EOF
@@ -57,4 +62,4 @@ press_run
 for try in $(seq 1 50); do [ -f /tmp/debugmodules-result.txt ] && break; sleep 1; done
 grep -q MODULES-EXECUTED /tmp/debugmodules-result.txt || { rt_cleanup; exit 1; }
 rt_cleanup
-echo 'BUILD EXIT GUI mode=$MODE recovery PASS'
+echo "BUILD EXIT GUI mode=$MODE stage=$FAIL_STAGE recovery PASS"
