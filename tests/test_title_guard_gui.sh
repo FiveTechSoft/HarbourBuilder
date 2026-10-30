@@ -44,6 +44,9 @@ for mode in ${CLASS_MODES:-save saveas run debug sync};do
   case "$mode" in save)xdotool key ctrl+s;; saveas)xdotool mousemove 20 12 click 1;sleep 1;xdotool mousemove 100 237 click 1;;run)xdotool key ctrl+r;;debug)xdotool mousemove 15 62 click 1;;esac
  fi
  sleep 2
+ for w in $(rt_ide_windows);do
+  [ "$(xdotool getwindowname "$w")" = HbBuilder ] && { xdotool windowmap "$w";xdotool windowraise "$w"; }
+ done
  import -window root /tmp/class-$mode-refusal.png
  text=$(tesseract /tmp/class-$mode-refusal.png - --psm 6 2>/dev/null)
  echo "$mode: $text" | grep -E 'ambiguous|aborted|faithfully' || true
