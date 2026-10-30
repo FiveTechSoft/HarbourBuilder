@@ -16,9 +16,9 @@ CLASS TForm1 FROM TForm
    DATA oMemo1     // TMemo
    DATA oList1     // TListBox
    DATA oLedit1    // TLabeledEdit
-   DATA oFld1      // TFolder
-   DATA oBtnPg2    // TButton
-   DATA oBrw1      // TBrowse
+   DATA oFld1   // TFolder
+   DATA oBtnPg2   // TButton
+   DATA oBrw1   // TBrowse
 
    // Event handlers
 
