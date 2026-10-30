@@ -4283,7 +4283,7 @@ return nil
 // none of them writes or executes stale code after a refused sync.
 static function HB_CheckFormsSerializable()
 
-   local i, cCode, aPending := {}
+   local i, j, cCode, cRefusal, aPending := {}
    local nPrev := nActiveForm, oPrev := oDesignForm
 
    // Probe every form through the same preserving merge. Do not apply any
@@ -4312,9 +4312,14 @@ static function HB_CheckFormsSerializable()
             return .F.
          endif
          if ! Empty( s_aUnserializable )
-            MsgInfo( "Operation aborted: form " + aForms[ i ][ 1 ] + ;
-               " holds controls that cannot be saved faithfully." + Chr(10) + ;
-               "Open it and remove or replace them first.", "HbBuilder" )
+            cRefusal := ""
+            for j := 1 to Len( s_aUnserializable )
+               cRefusal += "  - " + s_aUnserializable[ j ] + Chr(10)
+            next
+            MsgInfo( "Save aborted: these controls cannot be saved faithfully and" + ;
+               Chr(10) + "would be lost on reopen (form " + aForms[ i ][ 1 ] + ;
+               "):" + Chr(10) + Chr(10) + cRefusal + Chr(10) + ;
+               "Keep them in code, or use a supported control type.", "HbBuilder" )
             return .F.
          endif
          if ValType( cCode ) != "C" .or. Empty( cCode )
