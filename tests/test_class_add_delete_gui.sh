@@ -125,7 +125,7 @@ BAR=$(rt_find_bar); rt_map_all
 for w in $(rt_ide_windows); do
  t=$(xdotool getwindowname "$w")
  echo "add setup window $w $t"
- case "$t" in *Palette*|*Components*) xdotool windowmove "$w" 320 25;xdotool windowraise "$w";; esac
+ case "$t" in HbBuilder*|*Palette*|*Components*) [ "$w" = "$BAR" ] || { xdotool windowmove "$w" 320 25;xdotool windowraise "$w"; };; esac
 done
 sleep 1
 read PX PY <<< $(rt_ocr_bar_token '^Standard$')
