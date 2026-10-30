@@ -2486,11 +2486,21 @@ static function RestoreFormFromCode( hForm, cCode )
 
       // Parse non-visual components: COMPONENT ::oName TYPE nType OF Self
       if Left( Upper( cTrim ), 10 ) == "COMPONENT "
-         nPos := At( "::o", cTrim )
+         // case-insensitive "::o" and identifier-boundary name cut: a
+         // hand-written "::OName" or a tab after the name used to drop or
+         // corrupt the component (H5 residual; same pattern as the '@' branch)
+         nPos := At( "::O", Upper( cTrim ) )
          if nPos > 0
             cName := SubStr( cTrim, nPos + 3 )
-            nPos2 := At( " ", cName )
-            if nPos2 > 0; cName := Left( cName, nPos2 - 1 ); endif
+            nClEnd := 0
+            for nn := 1 to Len( cName )
+               cC := SubStr( cName, nn, 1 )
+               if ! ( IsAlpha( cC ) .or. IsDigit( cC ) .or. cC == "_" )
+                  exit
+               endif
+               nClEnd := nn
+            next
+            cName := Left( cName, nClEnd )
             nPos := At( "TYPE ", Upper( cTrim ) )
             if nPos > 0
                cTypeStr := AllTrim( SubStr( cTrim, nPos + 5 ) )
@@ -2707,7 +2717,7 @@ static function RestoreFormFromCode( hForm, cCode )
          do while jj <= Len( aLines )
             cML  := AllTrim( aLines[jj] )
             cMLU := Upper( cML )
-            if cMLU == "END MENUBAR"
+            if HB_IsKeywordLine( cMLU, "END MENUBAR" )
                exit
             elseif Left( cMLU, 12 ) == "DEFINE POPUP"
                nQ1 := At( '"', cML )
@@ -2720,7 +2730,7 @@ static function RestoreFormFromCode( hForm, cCode )
                AAdd( aParentStack, Len( HB_ATokens( cMenuSerial, "|" ) ) - 1 )
                nMenuLevel++
                nFirstNode := .F.
-            elseif cMLU == "END POPUP"
+            elseif HB_IsKeywordLine( cMLU, "END POPUP" )
                nMenuLevel--
                if Len( aParentStack ) > 0
                   ASize( aParentStack, Len(aParentStack)-1 )
@@ -2789,7 +2799,7 @@ static function RestoreFormFromCode( hForm, cCode )
          do while jj <= Len( aLines )
             cML  := AllTrim( aLines[jj] )
             cMLU := Upper( cML )
-            if cMLU == "END POPUPMENU"
+            if HB_IsKeywordLine( cMLU, "END POPUPMENU" )
                exit
             elseif Left( cMLU, 12 ) == "DEFINE POPUP"
                nQ1 := At( '"', cML )
@@ -2802,7 +2812,7 @@ static function RestoreFormFromCode( hForm, cCode )
                AAdd( aParentStack, Len( HB_ATokens( cMenuSerial, "|" ) ) - 1 )
                nMenuLevel++
                nFirstNode := .F.
-            elseif cMLU == "END POPUP"
+            elseif HB_IsKeywordLine( cMLU, "END POPUP" )
                nMenuLevel--
                if Len( aParentStack ) > 0
                   ASize( aParentStack, Len(aParentStack)-1 )
@@ -2857,6 +2867,10 @@ static function RestoreFormFromCode( hForm, cCode )
          loop
       endif
 
+      // NOTE: UNREACHABLE dead code kept for reference - the live '@' branch
+      // above (Left(cTrim,1)=="@") ends with an unconditional loop, so no
+      // line can reach this second '@' parser. Do NOT reorder these branches;
+      // delete this block deliberately in a dedicated cleanup if wanted.
       // Parse control creation lines: @ nT, nL KEYWORD ::oName ...
       if ! ( Left( cTrim, 2 ) == "@ " )
          loop

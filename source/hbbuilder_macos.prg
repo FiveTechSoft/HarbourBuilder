@@ -1929,7 +1929,7 @@ static function RestoreFormFromCode( hForm, cCode )
          do while jj <= Len( aLines )
             cML  := AllTrim( aLines[jj] )
             cMLU := Upper( cML )
-            if cMLU == "END MENUBAR"
+            if HB_IsKeywordLine( cMLU, "END MENUBAR" )
                exit
             elseif Left( cMLU, 12 ) == "DEFINE POPUP"
                nQ1 := At( '"', cML )
@@ -1942,7 +1942,7 @@ static function RestoreFormFromCode( hForm, cCode )
                AAdd( aParentStack, Len( HB_ATokens( cMenuSerial, "|" ) ) - 1 )
                nMenuLevel++
                nFirstNode := .F.
-            elseif cMLU == "END POPUP"
+            elseif HB_IsKeywordLine( cMLU, "END POPUP" )
                nMenuLevel--
                if Len( aParentStack ) > 0
                   ASize( aParentStack, Len(aParentStack)-1 )
@@ -2010,7 +2010,7 @@ static function RestoreFormFromCode( hForm, cCode )
          do while jj <= Len( aLines )
             cML  := AllTrim( aLines[jj] )
             cMLU := Upper( cML )
-            if cMLU == "END POPUPMENU"
+            if HB_IsKeywordLine( cMLU, "END POPUPMENU" )
                exit
             elseif Left( cMLU, 12 ) == "DEFINE POPUP"
                nQ1 := At( '"', cML )
@@ -2023,7 +2023,7 @@ static function RestoreFormFromCode( hForm, cCode )
                AAdd( aParentStack, Len( HB_ATokens( cMenuSerial, "|" ) ) - 1 )
                nMenuLevel++
                nFirstNode := .F.
-            elseif cMLU == "END POPUP"
+            elseif HB_IsKeywordLine( cMLU, "END POPUP" )
                nMenuLevel--
                if Len( aParentStack ) > 0
                   ASize( aParentStack, Len(aParentStack)-1 )

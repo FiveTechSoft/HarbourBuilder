@@ -108,6 +108,22 @@ FUNCTION HB_StripStrings( cLine )
    NEXT
 RETURN cOut
 
+/* Menu-block line matcher: .T. when the (trimmed, uppercased) line starts
+   with cKeyword and the keyword ends there - the next char is not part of a
+   longer identifier. Tolerates trailing comments ("END MENUBAR // x"), which
+   an exact match rejects (M2: the menu parse loop then swallowed the rest of
+   CreateForm). */
+FUNCTION HB_IsKeywordLine( cLineU, cKeyword )
+   LOCAL nL := Len( cKeyword ), cNext
+   IF Left( cLineU, nL ) != cKeyword
+      RETURN .F.
+   ENDIF
+   IF Len( cLineU ) == nL
+      RETURN .T.
+   ENDIF
+   cNext := SubStr( cLineU, nL + 1, 1 )
+RETURN ! ( IsAlpha( cNext ) .or. IsDigit( cNext ) .or. cNext == "_" )
+
 FUNCTION HB_NormalizeCtrlType( nType )
    DO CASE
    CASE nType == CT_POPUPMENU_LEGACY
