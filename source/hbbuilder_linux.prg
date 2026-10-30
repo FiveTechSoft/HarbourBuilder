@@ -995,6 +995,12 @@ static function HB_ClassDeclaresMember( cLine, cMember )
    local cDecl
    if Len( aWords ) < 2 .or. !( aWords[1] == "DATA" ); return .F.; endif
    cDecl := aWords[2]
+   // A compound declaration may own this member, but splitting INIT
+   // expressions safely is outside this merge. Refuse rather than duplicate.
+   if "," $ cLine .and. cMember $ Upper( HB_StripStrings( cLine ) )
+      AAdd( s_aUnserializable, "ambiguous compound class DATA: " + cLine )
+      return .T.
+   endif
 return cDecl == cMember
 
 static function RegenerateFormCode( cName, hForm )

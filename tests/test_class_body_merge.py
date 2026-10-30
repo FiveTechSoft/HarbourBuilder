@@ -3,7 +3,8 @@
 from pathlib import Path
 import subprocess,tempfile
 r=Path(__file__).resolve().parents[1];s=(r/'source/hbbuilder_linux.prg').read_text();a=s.index('static function HB_DesignerDataName');b=s.index('static function RegenerateFormCode',a)
-main='''function Main()
+main='''static s_aUnserializable:={}
+function Main()
  local e:=Chr(13)+Chr(10),cOld,cNew,cOut,nFail:=0,cLine
  cOld:='CLASS TForm1 FROM TForm'+e+;
  ' // USER comment'+e+' DATA nCounter INIT 42 // USER-COUNTER'+e+;
@@ -22,6 +23,7 @@ main='''function Main()
  if !( 'DATA oAdded' $ cOut ); nFail++; endif
  if 'DATA oKeep   //' $ cOut; nFail++; endif
  if !(HB_MergeClassBody('CLASS TForm1'+e+cOut+'ENDCLASS'+e,1,cNew,'|')==cOut); nFail++; endif
+ if !HB_ClassDeclaresMember('DATA oOther, oAdded INIT nil','OADDED').or.Len(s_aUnserializable)!=1; nFail++; endif
  QOut(cOut)
  QOut('CLASS BODY exact custom lines/add/delete/fixpoint failures='+hb_ntos(nFail))
  ErrorLevel(nFail)
