@@ -916,7 +916,7 @@ return 0
 // Only exact designer-shaped DATA declarations are reconciled. All other
 // class lines, including custom DATA/INIT/comments/METHODs, stay verbatim.
 static function HB_DesignerDataName( cLine )
-   local cTrim := AllTrim( cLine ), nComment, cLeft, cRight, aWords, cName, i, c
+   local cTrim := AllTrim( StrTran( cLine, Chr(13), "" ) ), nComment, cLeft, cRight, aWords, cName, i, c
    nComment := At( "//", cTrim )
    if nComment == 0; return ""; endif
    cLeft := AllTrim( Left( cTrim, nComment - 1 ) )
