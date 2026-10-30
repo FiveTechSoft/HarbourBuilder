@@ -4466,6 +4466,16 @@ static function HB_PublishProjectApp( cBuildDir )
       endif
 return .T.
 
+// Build success depends on process status, not localized compiler text.
+static function HB_BuildExec( cCommand, cOutput )
+   local nExit := -1
+   cOutput := GTK_ShellExec( cCommand, @nExit )
+   if nExit != 0
+      cOutput += Chr(10) + "Error: build command exited " + LTrim( Str( nExit ) ) + Chr(10)
+      return .F.
+   endif
+return .T.
+
 static function TBRun()
 
    local cBuildDir, cOutput, cLog, i, lError
@@ -4611,8 +4621,8 @@ static function TBRun()
       cCmd := cHbBin + "/harbour " + cBuildDir + "/main.prg -n -w -q" + ;
               " -I" + cHbInc + " -I" + cBuildDir + ;
               " -o" + cBuildDir + "/main.c 2>&1"
-      cOutput := GTK_ShellExec( cCmd )
-      if "Error" $ cOutput
+      if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
+      if lError .or. "Error" $ cOutput
          cLog += "    FAILED:" + Chr(10) + cOutput + Chr(10)
          lError := .T.
       else
@@ -4627,8 +4637,8 @@ static function TBRun()
       cCmd := cHbBin + "/harbour " + cBuildDir + "/classes.prg -n -w -q" + ;
               " -I" + cHbInc + " -I" + cBuildDir + ;
               " -o" + cBuildDir + "/classes.c 2>&1"
-      cOutput := GTK_ShellExec( cCmd )
-      if "Error" $ cOutput
+      if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
+      if lError .or. "Error" $ cOutput
          cLog += "    classes FAILED:" + Chr(10) + cOutput + Chr(10)
          lError := .T.
       endif
@@ -4636,8 +4646,8 @@ static function TBRun()
          cCmd := cHbBin + "/harbour " + cBuildDir + "/hix_runtime.prg -n -w -q" + ;
                  " -I" + cHbInc + " -I" + cBuildDir + ;
                  " -o" + cBuildDir + "/hix_runtime.c 2>&1"
-         cOutput := GTK_ShellExec( cCmd )
-         if "Error" $ cOutput
+         if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
+         if lError .or. "Error" $ cOutput
             cLog += "    hix_runtime FAILED:" + Chr(10) + cOutput + Chr(10)
             lError := .T.
          endif
@@ -4646,8 +4656,8 @@ static function TBRun()
          cCmd := cHbBin + "/harbour " + cBuildDir + "/hix_template.prg -n -w -q" + ;
                  " -I" + cHbInc + " -I" + cBuildDir + ;
                  " -o" + cBuildDir + "/hix_template.c 2>&1"
-         cOutput := GTK_ShellExec( cCmd )
-         if "Error" $ cOutput
+         if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
+         if lError .or. "Error" $ cOutput
             cLog += "    hix_template FAILED:" + Chr(10) + cOutput + Chr(10)
             lError := .T.
          endif
@@ -4661,16 +4671,16 @@ static function TBRun()
       cLog += "[5] Compiling C sources..." + Chr(10)
       cCmd := "gcc -c -O2 -Wno-unused-value -I" + cHbInc + ;
               " " + cBuildDir + "/main.c -o " + cBuildDir + "/main.o 2>&1"
-      cOutput := GTK_ShellExec( cCmd )
-      if ! Empty( cOutput )
+      if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
+      if lError .or. ! Empty( cOutput )
          cLog += "    FAILED:" + Chr(10) + cOutput + Chr(10)
          lError := .T.
       endif
       GTK_ShellExec( "rm -f " + cBuildDir + "/classes.o" )
       cCmd := "gcc -c -O2 -Wno-unused-value -I" + cHbInc + ;
               " " + cBuildDir + "/classes.c -o " + cBuildDir + "/classes.o 2>&1"
-      cOutput := GTK_ShellExec( cCmd )
-      if ! File( cBuildDir + "/classes.o" )
+      if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
+      if lError .or. ! File( cBuildDir + "/classes.o" )
          cLog += "    FAILED (classes.c):" + Chr(10) + cOutput + Chr(10)
          lError := .T.
       endif
@@ -4678,8 +4688,8 @@ static function TBRun()
          GTK_ShellExec( "rm -f " + cBuildDir + "/hix_runtime.o" )
          cCmd := "gcc -c -O2 -Wno-unused-value -I" + cHbInc + ;
                  " " + cBuildDir + "/hix_runtime.c -o " + cBuildDir + "/hix_runtime.o 2>&1"
-         cOutput := GTK_ShellExec( cCmd )
-         if ! File( cBuildDir + "/hix_runtime.o" )
+         if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
+         if lError .or. ! File( cBuildDir + "/hix_runtime.o" )
             cLog += "    FAILED (hix_runtime.c):" + Chr(10) + cOutput + Chr(10)
             lError := .T.
          endif
@@ -4688,8 +4698,8 @@ static function TBRun()
          GTK_ShellExec( "rm -f " + cBuildDir + "/hix_template.o" )
          cCmd := "gcc -c -O2 -Wno-unused-value -I" + cHbInc + ;
                  " " + cBuildDir + "/hix_template.c -o " + cBuildDir + "/hix_template.o 2>&1"
-         cOutput := GTK_ShellExec( cCmd )
-         if ! File( cBuildDir + "/hix_template.o" )
+         if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
+         if lError .or. ! File( cBuildDir + "/hix_template.o" )
             cLog += "    FAILED (hix_template.c):" + Chr(10) + cOutput + Chr(10)
             lError := .T.
          endif
@@ -4709,8 +4719,8 @@ static function TBRun()
               "  (pkg-config --exists webkit2gtk-4.0 2>/dev/null && echo '-DHAVE_WEBKIT2GTK '$(pkg-config --cflags webkit2gtk-4.0) || echo ''))" + ;
               " " + cProjDir + "/source/backends/gtk3/gtk3_core.c" + ;
               " -o " + cBuildDir + "/gtk3_core.o 2>&1"
-      cOutput := GTK_ShellExec( cCmd )
-      if ! File( cBuildDir + "/gtk3_core.o" )
+      if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
+      if lError .or. ! File( cBuildDir + "/gtk3_core.o" )
          cLog += "    FAILED (gtk3_core.c):" + Chr(10) + cOutput + Chr(10)
          lError := .T.
       endif
@@ -4724,8 +4734,8 @@ static function TBRun()
          cCmd := "gcc -c -O2 -I" + cHbInc + ;
                  " " + cProjDir + "/source/backends/gtk3/gtk3_db_real.c" + ;
                  " -o " + cBuildDir + "/hbdb_real.o 2>&1"
-         cOutput := GTK_ShellExec( cCmd )
-         if ! File( cBuildDir + "/hbdb_real.o" )
+         if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
+         if lError .or. ! File( cBuildDir + "/hbdb_real.o" )
             cLog += "    FAILED (gtk3_db_real.c):" + Chr(10) + cOutput + Chr(10)
             lError := .T.
          endif
@@ -4758,8 +4768,8 @@ static function TBRun()
               " $(pkg-config --exists webkit2gtk-4.1 2>/dev/null && pkg-config --libs webkit2gtk-4.1 || " + ;
               "  (pkg-config --exists webkit2gtk-4.0 2>/dev/null && pkg-config --libs webkit2gtk-4.0 || echo ''))" + ;
               " -lm -lpthread -ldl -lrt -lsqlite3 -l:libncurses.so.6 2>&1"
-      cOutput := GTK_ShellExec( cCmd )
-      if "error" $ Lower( cOutput )
+      if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
+      if lError .or. "error" $ Lower( cOutput )
          cLog += "    FAILED:" + Chr(10) + cOutput + Chr(10)
          lError := .T.
       else
@@ -4924,7 +4934,7 @@ static function TBDebugRun( lRunToBreak )
            " -I" + cHbInc + " -I" + cBuildDir + ;
            " -o" + cBuildDir + "/debug_main.c 2>&1"
    cOutput := GTK_ShellExec( cCmd )
-   if "Error" $ cOutput
+   if lError .or. "Error" $ cOutput
       cLog += cOutput + Chr(10)
       lError := .t.
    else
@@ -4938,8 +4948,8 @@ static function TBDebugRun( lRunToBreak )
       cCmd := "gcc -c -O0 -g -Wno-unused-value -I" + cHbInc + ;
               " " + cBuildDir + "/debug_main.c" + ;
               " -o " + cBuildDir + "/debug_main.o 2>&1"
-      cOutput := GTK_ShellExec( cCmd )
-      if "error:" $ Lower( cOutput )
+      if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
+      if lError .or. "error:" $ Lower( cOutput )
          cLog += cOutput + Chr(10)
          lError := .t.
       else
@@ -4955,16 +4965,19 @@ static function TBDebugRun( lRunToBreak )
          "/gtk3_core.o " + cBuildDir + "/hbdb_real.o" )
       cCmd := "gcc -c -O2 -I" + cHbInc + ;
          " " + cProjDir + "/source/debugger/dbghook.c -o " + cBuildDir + "/dbghook.o 2>&1"
-      cLog += GTK_ShellExec( cCmd )
+      if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
+      cLog += cOutput
       cCmd := "gcc -c -O2 -DHIX_PRGRUNTIME -I" + cHbInc + ;
          " -I" + cProjDir + "/include $(pkg-config --cflags gtk+-3.0)" + ;
          " $(pkg-config --exists webkit2gtk-4.1 2>/dev/null && echo '-DHAVE_WEBKIT2GTK '$(pkg-config --cflags webkit2gtk-4.1) || " + ;
          " (pkg-config --exists webkit2gtk-4.0 2>/dev/null && echo '-DHAVE_WEBKIT2GTK '$(pkg-config --cflags webkit2gtk-4.0) || echo ''))" + ;
          " " + cProjDir + "/source/backends/gtk3/gtk3_core.c -o " + cBuildDir + "/gtk3_core.o 2>&1"
-      cLog += GTK_ShellExec( cCmd )
+      if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
+      cLog += cOutput
       cCmd := "gcc -c -O2 -I" + cHbInc + " " + cProjDir + ;
          "/source/backends/gtk3/gtk3_db_real.c -o " + cBuildDir + "/hbdb_real.o 2>&1"
-      cLog += GTK_ShellExec( cCmd )
+      if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
+      cLog += cOutput
       if ! HB_BuildCopy( cProjDir + "/source/gtk3_inspector.o", cBuildDir + "/gtk3_inspector.o" )
          return .F.
       endif
@@ -5006,8 +5019,8 @@ static function TBDebugRun( lRunToBreak )
               " $(pkg-config --libs gtk+-3.0)" + ;
               " " + cWebKitLibs + ;
               " -lm -lpthread -ldl -lrt -lsqlite3 -l:libncurses.so.6 2>&1"
-      cOutput := GTK_ShellExec( cCmd )
-      if "error" $ Lower( cOutput )
+      if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
+      if lError .or. "error" $ Lower( cOutput )
          cLog += cOutput + Chr(10)
          lError := .t.
       else

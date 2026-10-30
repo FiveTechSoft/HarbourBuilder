@@ -38,6 +38,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <sys/select.h>
+#include <sys/wait.h>
 #include <signal.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -8418,7 +8419,7 @@ HB_FUNC( CODEEDITORSHOWFINDBAR )
  * Platform dialogs & utilities (GTK3 equivalents of MAC_*)
  * ====================================================================== */
 
-/* GTK_ShellExec( cCommand ) --> cOutput */
+/* GTK_ShellExec( cCommand, @nExitStatus ) --> cOutput; optional status */
 /* GTK_ProcessEvents() — flush pending GTK events to keep UI responsive */
 HB_FUNC( GTK_PROCESSEVENTS )
 {
@@ -8443,10 +8444,12 @@ static void ProgressLogAppend( const char * text, int len )
 
 HB_FUNC( GTK_SHELLEXEC )
 {
+   hb_storni( -1, 2 );
    if( !HB_ISCHAR(1) ) { hb_retc(""); return; }
 
    FILE * fp = popen( hb_parc(1), "r" );
    if( !fp ) { hb_retc(""); return; }
+   int cancelled = 0;
 
    size_t bufSize = 65536, total = 0;
    char * buf = (char *) malloc( bufSize );
@@ -8462,6 +8465,7 @@ HB_FUNC( GTK_SHELLEXEC )
       /* Check for cancel */
       if( s_progressCancelled )
       {
+         cancelled = 1;
          const char * msg = "\n*** Cancelled by user ***\n";
          size_t msgLen = strlen( msg );
          if( total + msgLen + 1 >= bufSize ) {
@@ -8507,7 +8511,13 @@ HB_FUNC( GTK_SHELLEXEC )
          break;  /* read error */
    }
 
-   pclose( fp );
+   int status = pclose( fp );
+   int code = -1;
+   if( status != -1 ) {
+      if( WIFEXITED( status ) ) code = WEXITSTATUS( status );
+      else if( WIFSIGNALED( status ) ) code = 128 + WTERMSIG( status );
+   }
+   hb_storni( cancelled ? 130 : code, 2 );
    hb_retc( buf );
    free( buf );
 }
