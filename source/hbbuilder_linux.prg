@@ -829,7 +829,7 @@ static function RegenerateFormCode( cName, hForm )
    local aExL2, cTL, cTU, lInCF, aPreserved := {}, aWiringOld := {}, cKey
    local cCh, cLhs, aEmittedLines := {}, nE, cDeleted
    local aChunks := {}, cBody, cHdrChunk, lHdrOut, lWireOut, lSkipMenu, cMenuEnd
-   local cName2, nP1, nP2, lFound, nCk, lBodyStarted
+   local cName2, nP1, nP2, lFound, nCk, lBodyStarted, cPreClass
    local aMenuNodes, nMI, cMNode, aMFields, nLv, cCap, cScut, cHndl
    local nPendingLevels, nPL, cInd, bIsPopup, aNextF
    local aMenuHandlers := {}, lHasHandlers
@@ -1532,9 +1532,29 @@ static function RegenerateFormCode( cName, hForm )
       endif
    endif
 
-   cCode += "// " + cName + ".prg" + e
-   cCode += cSep
-   cCode += e
+   // Preserve the original pre-CLASS region (#include lines and header
+   // comments) verbatim and in order; only a form with no existing code
+   // gets the generated header. Previously this region was regenerated
+   // on every save and the include/comments were silently dropped, which
+   // breaks standalone compilation of the saved form (no CLASS syntax,
+   // no CT_* constants) and erases user notes.
+   cPreClass := ""
+   if ! Empty( cExistingCode )
+      aExLines := HB_ATokens( cExistingCode, Chr(10) )
+      for j := 1 to Len( aExLines )
+         if Upper( Left( AllTrim( StrTran( aExLines[j], Chr(13), "" ) ), 6 ) ) == "CLASS "
+            exit
+         endif
+         cPreClass += StrTran( aExLines[j], Chr(13), "" ) + e
+      next
+   endif
+   if ! Empty( cPreClass )
+      cCode += cPreClass
+   else
+      cCode += "// " + cName + ".prg" + e
+      cCode += cSep
+      cCode += e
+   endif
    cCode += "CLASS " + cClass + " FROM TForm" + e
    cCode += e
    cCode += "   // IDE-managed Components" + e
