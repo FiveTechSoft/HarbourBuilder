@@ -8,8 +8,12 @@
 #             for the edit OCR and moved back afterwards, because its live
 #             position is written back into the generated nLeft/nTop and
 #             would otherwise legitimately change the hash (drift).
-#   identity: project B with IDENTICAL text but different path must get a
-#             real build and its own exe copy, not A's cached binary
+#   identity: two IDE PROCESSES (Reopen re-execs the IDE, so same-process
+#             project switching never reuses the cache) with IDENTICAL
+#             sources at different paths. Artifact-only assertions (no
+#             OCR): each project gets its own per-path build dir, A's
+#             binary is not overwritten by B's build, B gets its own exe
+#             copy, and A's no-edit re-Run reuses A's own binary.
 # RED with the 5000-char toy hash + process-static nLastHash; GREEN after
 # keying the cache on the FULL editor text + project path.
 set -u
@@ -38,17 +42,18 @@ launch_a() {
   rt_reopen_project
 }
 
-ctrl_r_and_trace() {  # echoes app trace line
-  local BAR w p APPW="" APPPID="" i
+ctrl_r_and_trace() {  # echoes app trace line; OTHERPID (optional) = second IDE to keep out of the way
+  local BAR w p APPW="" APPPID="" i ow
   echo "  [t=$SECONDS] Ctrl+R start"
   BAR=$(rt_find_bar) || fail "IDE bar not found"
+  for ow in $(xdotool search --pid "${OTHERPID:-0}" 2>/dev/null); do xdotool windowunmap "$ow" 2>/dev/null; done
   rt_unmap_all_but "$BAR"; sleep 0.3
   xdotool mousemove 700 12 click 1; sleep 0.4
   xdotool key ctrl+r
   for i in $(seq 1 45); do
     for w in $(xdotool search --name 'Fixture RunHash' 2>/dev/null); do
       p=$(xprop -id "$w" _NET_WM_PID 2>/dev/null | awk '{print $3}')
-      [ -n "$p" ] && [ "$p" != "$IDEPID" ] && { APPW=$w; APPPID=$p; break; }
+      [ -n "$p" ] && [ "$p" != "$IDEPID" ] && [ "$p" != "${OTHERPID:-0}" ] && { APPW=$w; APPPID=$p; break; }
     done
     [ -n "$APPW" ] && break
     sleep 2
@@ -58,6 +63,7 @@ ctrl_r_and_trace() {  # echoes app trace line
   sleep 2
   kill "$APPPID" 2>/dev/null; sleep 1
   rt_map_all
+  for ow in $(xdotool search --pid "${OTHERPID:-0}" 2>/dev/null); do xdotool windowmap "$ow" 2>/dev/null; done
   [ -f "$TRACE" ] && cat "$TRACE"
 }
 
@@ -116,31 +122,75 @@ rt_cleanup
 }
 
 run_identity() {
-launch_a
-# first Run builds project A (fills the process-static cache)
-T1=$(ctrl_r_and_trace)
-echo "trace after project-A Run: ${T1:-<missing>}"
-# --- case identity: same process, point the INI at project B, reopen, Run
-rm -rf "$RUNB"; mkdir -p "$RUNB"
+# Two IDE processes, one display, PID-separated windows, no OCR.
+rm -rf "$RUNA" "$RUNB"; mkdir -p "$RUNA" "$RUNB"
+cp "$FIX"/Project1.hbp "$FIX"/Project1.prg "$FIX"/Form1.prg "$RUNA"/
 cp "$FIX"/Project1.hbp "$FIX"/Project1.prg "$FIX"/Form1.prg "$RUNB"/
-rt_setup "$RUNB"    # rewrites bin/hbbuilder.ini File1 -> project B (same IDE!)
-BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"; sleep 0.3
-xdotool mousemove 20 12 click 1; sleep 0.8
-xdotool mousemove 100 134 click 1; sleep 5
-rt_map_all; sleep 1
-BEXE="$RUNB/$(basename "$RUNB")"
-rm -f "$BEXE"
-T3=$(ctrl_r_and_trace)
-echo "trace after identity Run: ${T3:-<missing>}"
-if [ -f "$BEXE" ]; then
-  echo "  identity: project B got its own exe copy"
+rm -f "$TRACE" "$RUNB/rt_runhash_b" "$RUNB/FixtureRunHash"
+rm -rf /tmp/hbbuilder_build
+ADIR=$(build_dir_for "$RUNA"); BDIR=$(build_dir_for "$RUNB")
+SHARED=/tmp/hbbuilder_build/UserApp
+
+rt_setup "$RUNA"; rt_launch_ide
+PIDA=$RT_IDEPID; IDEPID=$PIDA; OTHERPID=""
+rt_reopen_project
+TA=$(ctrl_r_and_trace)
+echo "trace after project-A Run: ${TA:-<missing>}"
+echo "${TA:-}" | grep -q 'version:VERSION-A' || { echo "  project-A Run did not produce VERSION-A"; FAILN=$((FAILN+1)); }
+[ -f "$ADIR/UserApp" ] && MA1=$(stat -c %Y "$ADIR/UserApp") || MA1=""
+[ -f "$SHARED" ] && MS1=$(stat -c %Y "$SHARED") || MS1=""
+
+rt_setup "$RUNB"; rt_launch_ide
+PIDB=$RT_IDEPID
+if [ -z "$PIDB" ] || [ "$PIDB" = "$PIDA" ]; then
+  echo "  IDENTITY: second IDE did not start as its own process"; FAILN=$((FAILN+1))
+  RT_IDEPID=$PIDA; rt_cleanup; return
+fi
+IDEPID=$PIDB
+rt_reopen_project
+OTHERPID=$PIDA
+TB=$(ctrl_r_and_trace)
+OTHERPID=""
+echo "trace after project-B Run: ${TB:-<missing>}"
+echo "${TB:-}" | grep -q 'version:VERSION-A' || { echo "  project-B Run did not produce VERSION-A"; FAILN=$((FAILN+1)); }
+
+if [ -f "$BDIR/UserApp" ]; then
+  echo "  identity: project B got its OWN per-path build artifact"
 else
-  echo "  IDENTITY: project B got NO exe (quick-path reused project A's build)"
+  echo "  IDENTITY: no per-path build dir for B (shared fixed build dir layout)"
+  FAILN=$((FAILN+1))
+fi
+if [ -n "$MA1" ] && [ "$(stat -c %Y "$ADIR/UserApp" 2>/dev/null)" = "$MA1" ]; then
+  echo "  identity: A's binary untouched by B's build (mtime $MA1)"
+else
+  echo "  IDENTITY: A's build artifact missing or overwritten by B's build"
+  FAILN=$((FAILN+1))
+fi
+if [ -f "$SHARED" ] && [ -n "$MS1" ] && [ "$(stat -c %Y "$SHARED" 2>/dev/null)" != "$MS1" ]; then
+  echo "  IDENTITY-EVIDENCE: shared UserApp overwritten by B's build ($MS1 -> $(stat -c %Y "$SHARED"))"
+fi
+if [ -f "$RUNB/rt_runhash_b" ] || [ -f "$RUNB/FixtureRunHash" ]; then
+  echo "  identity: B project dir has its own exe copy"
+else
+  echo "  IDENTITY: B project dir has no exe copy"; FAILN=$((FAILN+1))
+fi
+
+IDEPID=$PIDA; OTHERPID=$PIDB
+TA2=$(ctrl_r_and_trace)
+OTHERPID=""
+echo "trace after back-to-A no-edit Run: ${TA2:-<missing>}"
+echo "${TA2:-}" | grep -q 'version:VERSION-A' || { echo "  back-to-A Run did not produce VERSION-A"; FAILN=$((FAILN+1)); }
+if [ -n "$MA1" ] && [ "$(stat -c %Y "$ADIR/UserApp" 2>/dev/null)" = "$MA1" ]; then
+  echo "  identity: A's no-edit re-Run reused A's OWN binary (mtime still $MA1)"
+elif [ -n "$MA1" ]; then
+  echo "  IDENTITY: A's binary changed after B ran (cross-project interference)"
   FAILN=$((FAILN+1))
 fi
 
 echo "identity case done (FAILN=$FAILN)"
-rt_cleanup
+kill "$PIDA" "$PIDB" 2>/dev/null; sleep 1
+RT_IDEPID=$PIDB; rt_cleanup
+RT_IDEPID=$PIDA; rt_cleanup
 }
 
 for c in $CASES; do
