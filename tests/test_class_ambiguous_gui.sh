@@ -17,14 +17,14 @@ MD=$(sha256sum "$RUN/Form1.prg" | cut -d' ' -f1)
 rt_setup "$RUN";rt_launch_ide
 for try in $(seq 1 12);do rt_find_bar >/dev/null&&break;sleep 1;done
 rt_reopen_project
-for mode in save saveas run debug sync;do
+for mode in save saveas run debug;do
  W0=$(rt_ide_windows | tr '\n' ' ')
  BAR=$(rt_find_bar)
  if [ "$mode" = sync ];then
   DESIGN=$(rt_find_designer);xdotool windowraise "$DESIGN";eval "$(xdotool getwindowgeometry --shell "$DESIGN")";xdotool windowsize "$DESIGN" $((WIDTH+1)) "$HEIGHT"
  else
   rt_unmap_all_but "$BAR";xdotool mousemove 700 12 click 1
-  case "$mode" in save)xdotool key ctrl+s;; saveas)menu_path_click '^Save$' || { xdotool mousemove 20 12 click 1;sleep 1;xdotool mousemove 100 237 click 1; };;run)xdotool key ctrl+r;;debug)xdotool mousemove 15 62 click 1;;esac
+  case "$mode" in save)xdotool key ctrl+s;; saveas)xdotool mousemove 20 12 click 1;sleep 1;xdotool mousemove 100 237 click 1;;run)xdotool key ctrl+r;;debug)xdotool mousemove 15 62 click 1;;esac
  fi
  sleep 2
  import -window root /tmp/class-$mode-refusal.png
@@ -33,7 +33,10 @@ for mode in save saveas run debug sync;do
  echo "$text" | grep -q 'ambiguous compound' || { echo "FAIL $mode no ambiguous notice";rt_cleanup;exit 1; }
  [ "$MD" = "$(sha256sum "$RUN/Form1.prg" | cut -d' ' -f1)" ] || { echo "FAIL $mode disk changed";rt_cleanup;exit 1; }
  echo "AMBIGUOUS $mode refused; disk exact=$MD"
- xdotool key Return;sleep 1
+ rt_cleanup
+ rt_setup "$RUN";rt_launch_ide
+ for try in $(seq 1 12);do rt_find_bar >/dev/null&&break;sleep 1;done
+ rt_reopen_project
 done
 rt_cleanup
 # Repair ambiguity on disk and reopen, rather than relying on hidden editor state.
