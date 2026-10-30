@@ -59,6 +59,11 @@ FAILN=0
 chk() { if ! grep -Eq "$1" "$RUN/Form1.prg"; then echo "  MISSING: $1"; FAILN=$((FAILN+1)); fi; }
 rej() { if grep -Eq "$1" "$RUN/Form1.prg"; then echo "  FORBIDDEN PRESENT: $1"; FAILN=$((FAILN+1)); fi; }
 
+# NEXT TRAMO (header preservation, RED until the product fix lands):
+# the IDE save currently regenerates the pre-CLASS region and drops both
+# the #include and hand-written header comments
+chk '#include "hbbuilder.ch"'
+chk 'COMENTARIO-CABECERA-HANDEDIT'
 chk 'COMPONENT ::oTimer1 TYPE CT_TIMER OF Self'
 chk 'COMPONENT ::oTimer2 TYPE CT_TIMER OF Self'
 # the menu swallow drops the controls from the live form, which also

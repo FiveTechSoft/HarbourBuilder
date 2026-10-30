@@ -3,6 +3,8 @@
 
 #include "hbbuilder.ch"
 
+// COMENTARIO-CABECERA-HANDEDIT: linea manuscrita pre-CLASS que debe preservarse
+
 CLASS TForm1 FROM TForm
 
    // IDE-managed Components
