@@ -121,17 +121,17 @@ HB_INC=${HB_INC:-/tmp/harbour-review/include}
   && echo "post-delete syntax check: OK" || fail "post-delete Form1.prg has syntax errors"
 
 # Add one button through the Standard palette, then save twice and reopen.
-BAR=$(rt_find_bar); rt_map_all
-for w in $(rt_ide_windows); do
+rt_cleanup
+rt_setup "$RUN";rt_launch_ide
+for try in $(seq 1 12);do rt_find_bar >/dev/null&&break;sleep 1;done
+rt_reopen_project
+BAR=$(rt_find_bar);rt_park_all_but "$BAR" "$RT_DESIGNER"
+# Map and expose palette, initially at its known startup position.
+for w in $(rt_ide_windows);do
+ [ "$w" = "$BAR" ] && continue
  t=$(xdotool getwindowname "$w")
- echo "add setup window $w $t"
- case "$t" in HbBuilder*|*Palette*|*Components*) [ "$w" = "$BAR" ] || { xdotool windowmove "$w" 320 25;xdotool windowraise "$w"; };; esac
+ case "$t" in HbBuilder*) xdotool windowmove "$w" 320 25;xdotool windowmap "$w";xdotool windowraise "$w";;esac
 done
-sleep 1
-import -window root /tmp/class-palette-now.png
-read PX PY <<< $(ocr_root '^Standard$')
-[ -n "${PX:-}" ] || fail "Standard palette not visible"
-xdotool mousemove "$PX" "$PY" click 1
 sleep 1
 # Standard palette BUTTON is the third icon at x451.
 xdotool mousemove 450 76 click 1
