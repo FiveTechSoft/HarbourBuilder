@@ -122,7 +122,7 @@ HDR=$(tesseract /tmp/rt_runtime.png - 2>/dev/null)
 for w in Nombre "$EXPECT_HEADER2" Total; do
   echo "$HDR" | grep -q "$w" || { echo "  browse widget text '$w' not rendered"; FAILN=$((FAILN+1)); }
 done
-echo "$HDR" | grep -q 'Pag2' && { echo "  Pag2 visible on page 1: page membership broken"; FAILN=$((FAILN+1)); }
+echo "$HDR" | grep -qw 'Pag2' && { echo "  Pag2 visible on page 1: page membership broken"; FAILN=$((FAILN+1)); }
 APPX=$X; APPY=$Y
 # click the P2 tab where it actually is: locate its word box by OCR
 rel=$(tesseract /tmp/rt_runtime.png - tsv 2>/dev/null | awk -F'\t' -v tab="$EXPECT_TAB2" '$8+0 > 20 && $12 == tab {print $7" "$8" "$9" "$10; exit}')
@@ -135,7 +135,7 @@ else
 fi
 import -window root -crop "${WIDTH}x${HEIGHT}+${APPX}+${APPY}" /tmp/rt_runtime_p2.png
 P2=$(tesseract /tmp/rt_runtime_p2.png - 2>/dev/null)
-echo "$P2" | grep -q 'Pag2' || { echo "  Pag2 NOT visible after switching to page 2"; FAILN=$((FAILN+1)); }
+echo "$P2" | grep -qw 'Pag2' || { echo "  Pag2 NOT visible after switching to page 2"; FAILN=$((FAILN+1)); }
 rel=$(tesseract /tmp/rt_runtime_p2.png - tsv 2>/dev/null | awk -F'\t' '$8+0 > 20 && $12 ~ /^(P1|Pl)$/ {print $7" "$8" "$9" "$10; exit}')
 if [ -n "$rel" ]; then
   set -- $rel
@@ -145,7 +145,7 @@ else
 fi
 import -window root -crop "${WIDTH}x${HEIGHT}+${APPX}+${APPY}" /tmp/rt_runtime_p1b.png
 P1B=$(tesseract /tmp/rt_runtime_p1b.png - 2>/dev/null)
-echo "$P1B" | grep -q 'Pag2' && { echo "  Pag2 still visible after switching back to page 1"; FAILN=$((FAILN+1)); }
+echo "$P1B" | grep -qw 'Pag2' && { echo "  Pag2 still visible after switching back to page 1"; FAILN=$((FAILN+1)); }
 
 kill "$APPPID" 2>/dev/null
 rm -f "$REPO/bin/icon.png" "$REPO/bin/test.png"
