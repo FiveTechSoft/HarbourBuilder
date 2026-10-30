@@ -16,7 +16,8 @@ HB=/tmp/harbour-review
 HBIN="$HB/bin/linux/gcc"; [ -x "$HBIN/harbour" ] || HBIN="$HB/bin"
 
 rm -rf "$BUILD"; mkdir -p "$BUILD"; rm -f "$RESULT"
-cp "$REPO/tests/test_h8_select.prg" "$REPO/tests/h8_helper.c" "$BUILD/"
+cp "${H8_PRG:-$REPO/tests/test_h8_select.prg}" "$BUILD/test_h8_select.prg"
+cp "$REPO/tests/h8_helper.c" "$BUILD/"
 cp "$REPO/source/core/classes.prg" "$BUILD/"
 cp "$REPO/include/hbbuilder.ch" "$REPO/include/hbide.ch" "$BUILD/"
 
