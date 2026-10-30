@@ -29,7 +29,20 @@ for mode in run debug; do
  if [ -f /tmp/debugmodules-result.txt ]; then echo 'GUI WRITE FAIL: app ran'; rt_cleanup; exit 1; fi
  echo "GUI WRITE $mode refused, no app result"
  xdotool key Return; sleep 1
+ import -window root "/tmp/staging-${mode}-dismissed.png"
+ if tesseract "/tmp/staging-${mode}-dismissed.png" - --psm 6 2>/dev/null | grep -q 'Saving project files'; then
+ echo 'GUI WRITE FAIL: progress remained after dismiss'; rt_cleanup; exit 1
+ fi
+ echo "GUI WRITE $mode modal dismissed, no saving-progress text"
 done
 for dir in "$B" "$D"; do rmdir "$dir/Project1.prg"; done
+rm -f /tmp/debugmodules-result.txt
+BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"
+xdotool mousemove 15 62 click 1
+for try in $(seq 1 40); do [ -f /tmp/debugmodules-result.txt ] && break; sleep 1; done
+if ! grep -q MODULES-EXECUTED /tmp/debugmodules-result.txt 2>/dev/null; then
+ echo 'GUI WRITE FAIL: repaired Debug retry did not execute'; rt_cleanup; exit 1
+fi
+echo 'GUI WRITE repaired Debug retry executed MODULES-EXECUTED'
 rt_cleanup
-echo 'GUI WRITE REFUSAL PASS: Run and Debug'
+echo 'GUI WRITE REFUSAL PASS: Run and Debug, dismissed progress and repaired retry' 
