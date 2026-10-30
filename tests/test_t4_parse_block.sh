@@ -175,4 +175,8 @@ sleep 1
 
 fi
 
-echo "T4BLOCK PASS: unparseable FOLDER PROMPTS and non-numeric COLSIZES both refused; disk byte-identical."
+if [ "$WANT" = "all" ]; then
+  echo "T4BLOCK PASS: unparseable FOLDER PROMPTS and non-numeric COLSIZES both refused; disk byte-identical; pre-existing ITEMS block also notices at open."
+else
+  echo "T4BLOCK CASE $WANT DONE (per-case PASS lines above)"
+fi
