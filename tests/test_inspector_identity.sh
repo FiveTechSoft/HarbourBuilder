@@ -21,9 +21,10 @@ pick(){
  xdotool key Return; sleep 0.7
  eval "$(xdotool getwindowgeometry --shell "$INS")"
  import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" "/tmp/identity_${idx}.png"
+ convert "/tmp/identity_${idx}.png" +repage -resize 200% "/tmp/identity_ocr.png"
  local title txt
  title=$(xdotool getwindowname "$INS")
- txt=$(tesseract "/tmp/identity_${idx}.png" - 2>/dev/null)
+ txt=$(tesseract /tmp/identity_ocr.png - --psm 6 2>/dev/null)
  if [[ "$want" == page* ]]; then
   echo "$txt" | grep -q cCaption || fail "index$idx did not expose page caption"
   echo "$txt" | grep -q nPage || fail "index$idx did not expose page index"
