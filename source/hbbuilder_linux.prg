@@ -4816,10 +4816,11 @@ static function TBRun()
               " -I" + HB_ShellArg( cHbInc ) + " -I" + cBuildDir + ;
               " -o" + cBuildDir + "/main.c 2>&1"
       if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
-      if lError .or. "Error" $ cOutput
+      if lError
          cLog += "    FAILED:" + Chr(10) + cOutput + Chr(10)
          lError := .T.
       else
+         if ! Empty( cOutput ); cLog += cOutput + Chr(10); endif
          cLog += "    OK" + Chr(10)
       endif
    endif
@@ -4832,18 +4833,22 @@ static function TBRun()
               " -I" + HB_ShellArg( cHbInc ) + " -I" + cBuildDir + ;
               " -o" + cBuildDir + "/classes.c 2>&1"
       if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
-      if lError .or. "Error" $ cOutput
+      if lError
          cLog += "    classes FAILED:" + Chr(10) + cOutput + Chr(10)
          lError := .T.
+      elseif ! Empty( cOutput )
+         cLog += cOutput + Chr(10)
       endif
       if ! lError .and. File( cBuildDir + "/hix_runtime.prg" )
          cCmd := HB_ShellArg( cHbBin + "/harbour" ) + " " + cBuildDir + "/hix_runtime.prg -n -w -q" + ;
                  " -I" + HB_ShellArg( cHbInc ) + " -I" + cBuildDir + ;
                  " -o" + cBuildDir + "/hix_runtime.c 2>&1"
          if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
-         if lError .or. "Error" $ cOutput
+         if lError
             cLog += "    hix_runtime FAILED:" + Chr(10) + cOutput + Chr(10)
             lError := .T.
+         elseif ! Empty( cOutput )
+            cLog += cOutput + Chr(10)
          endif
       endif
       if ! lError .and. File( cBuildDir + "/hix_template.prg" )
@@ -4851,9 +4856,11 @@ static function TBRun()
                  " -I" + HB_ShellArg( cHbInc ) + " -I" + cBuildDir + ;
                  " -o" + cBuildDir + "/hix_template.c 2>&1"
          if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
-         if lError .or. "Error" $ cOutput
+         if lError
             cLog += "    hix_template FAILED:" + Chr(10) + cOutput + Chr(10)
             lError := .T.
+         elseif ! Empty( cOutput )
+            cLog += cOutput + Chr(10)
          endif
       endif
       if ! lError; cLog += "    OK" + Chr(10); endif
@@ -5139,10 +5146,11 @@ static function TBDebugRun( lRunToBreak )
            " -I" + HB_ShellArg( cHbInc ) + " -I" + cBuildDir + ;
            " -o" + cBuildDir + "/debug_main.c 2>&1"
    if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
-   if lError .or. "Error" $ cOutput
+   if lError
       cLog += cOutput + Chr(10)
       lError := .t.
    else
+      if ! Empty( cOutput ); cLog += cOutput + Chr(10); endif
       cLog += "    OK" + Chr(10)
    endif
 
