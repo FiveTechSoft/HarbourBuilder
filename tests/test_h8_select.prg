@@ -34,6 +34,10 @@ return
 static procedure H8Asserts( oForm )
    local cOut := "H8 selection assertions" + Chr(10)
    local nW, nV
+   // Fresh widget and model must agree before any selection mutation.
+   nW := H8_ComboGetActive()
+   nV := oForm:oCombo:Value
+   cOut += iif( nW == -1 .and. nV == 0, "OK", "FAIL" ) + " fresh combo: widget=" + hb_ntos(nW) + " value=" + hb_ntos(nV) + Chr(10)
    // combo: programmatic select
    oForm:oCombo:Value := 2
    nW := H8_ComboGetActive()
