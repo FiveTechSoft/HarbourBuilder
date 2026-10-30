@@ -680,12 +680,14 @@ static function CreatePalette()
 
 return nil
 
-static function CreateDesignForm( nX, nY )
+static function CreateDesignForm( nX, nY, cName )
 
-   local cName, nIdx
+   local nIdx
 
-   nIdx := Len( aForms ) + 1
-   cName := "Form" + LTrim( Str( nIdx ) )
+   if cName == nil
+      nIdx := Len( aForms ) + 1
+      cName := "Form" + LTrim( Str( nIdx ) )
+   endif
 
    DEFINE FORM oDesignForm TITLE cName SIZE 562, 315 FONT "Sans", 11
    UI_FormSetPos( oDesignForm:hCpp, nX, nY )
@@ -4207,7 +4209,7 @@ static function OpenProjectFile( cFile, cAction )
       nFormX := nEditorX + Int( ( nEditorW - 400 ) / 2 ) + ( Len(aForms) ) * 20
       nFormY := nEditorTop + Int( ( nEditorH - 300 ) * 0.35 ) + ( Len(aForms) ) * 20
 
-      CreateDesignForm( nFormX, nFormY )
+      CreateDesignForm( nFormX, nFormY, cFormName )
       RestoreFormFromCode( oDesignForm:hCpp, cFormCode )
       oDesignForm:SetDesign( .t. )
       oDesignForm:Show()
