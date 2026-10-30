@@ -1996,6 +1996,24 @@ static function HB_FreezeFormBaseline( i )
 
 return nil
 
+// Standalone files use raw bytes from hb_MemoRead as their baseline. This is
+// a pre-write freshness check, not an atomic compare-and-swap or rollback.
+static function HB_WriteOpenFile( nIdx, cText )
+   local cPath := aOpenFiles[ nIdx ][ 3 ]
+   if ! File( cPath ) .or. !( hb_MemoRead( cPath ) == aOpenFiles[ nIdx ][ 2 ] )
+      MsgInfo( "Save refused: " + cPath + " changed on disk or is missing." + ;
+         Chr(10) + "The editor buffer is kept. Review the disk changes before retrying.", "HbBuilder" )
+      return .F.
+   endif
+   // Unlike MemoWrit, raw hb_MemoWrit does not append a DOS EOF byte that
+   // would make the next raw baseline comparison report a false conflict.
+   if ! hb_MemoWrit( cPath, cText ) .or. !( hb_MemoRead( cPath ) == cText )
+      MsgInfo( "Could not write and verify " + cPath + "; the editor buffer is kept.", "HbBuilder" )
+      return .F.
+   endif
+   aOpenFiles[ nIdx ][ 2 ] := cText
+return .T.
+
 // .T. when every modified File>Open tab is written back to its path
 static function HB_SaveOpenFiles()
 
@@ -2005,8 +2023,7 @@ static function HB_SaveOpenFiles()
       nTab := 1 + Len( aForms ) + Len( aModules ) + i
       cText := CodeEditorGetTabText( hCodeEditor, nTab )
       if !( cText == aOpenFiles[ i ][ 2 ] )
-         if MemoWrit( aOpenFiles[ i ][ 3 ], cText )
-            aOpenFiles[ i ][ 2 ] := cText
+         if HB_WriteOpenFile( i, cText )
             HB_TabMarkKnown( nTab, cText )
          else
             lOk := .F.
@@ -2858,12 +2875,10 @@ static function MenuCloseFile()
       n := UI_MsgYesNoCancel( aOpenFiles[ nIdx ][ 1 ] + " has unsaved changes." + ;
          Chr(10) + "Closing it would discard them.", "Unsaved changes" )
       if n == 1
-         if MemoWrit( aOpenFiles[ nIdx ][ 3 ], cText )
-            aOpenFiles[ nIdx ][ 2 ] := cText
+         if HB_WriteOpenFile( nIdx, cText )
             HB_TabMarkKnown( nTab, cText )
          else
-            MsgInfo( "Could not write " + aOpenFiles[ nIdx ][ 3 ], "HbBuilder" )
-            return nil
+            return nil   // freshness/write helper already reported the refusal
          endif
       elseif n != 2
          return nil
