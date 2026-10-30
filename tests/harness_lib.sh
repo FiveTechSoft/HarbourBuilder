@@ -15,7 +15,12 @@ rt_provenance() {
 rt_setup() {  # $1 = project dir to point the IDE at
   REPO=$(cd "$(dirname "${BASH_SOURCE[1]}")/.." && pwd)
   RT_PROJDIR=$1
-  pgrep -x Xvfb >/dev/null || { Xvfb $RT_DISPLAY -screen 0 1600x1000x24 & sleep 2; }
+  # start Xvfb only when the display does not actually accept connections:
+  # pgrep -x matches ZOMBIE Xvfb entries (their comm survives), which once
+  # made this check skip starting a live server on a dead display
+  if ! DISPLAY=$RT_DISPLAY xdotool getdisplaygeometry >/dev/null 2>&1; then
+    Xvfb $RT_DISPLAY -screen 0 1600x1000x24 & sleep 2
+  fi
   [ -f "$REPO/bin/hbbuilder.ini" ] && cp "$REPO/bin/hbbuilder.ini" /tmp/rt_ini_backup
   printf 'File1=%s\nFile2=\nFile3=\nFile4=\nFile5=\nFile6=\nFile7=\nFile8=\n' \
     "$RT_PROJDIR/Project1.hbp" > "$REPO/bin/hbbuilder.ini"
