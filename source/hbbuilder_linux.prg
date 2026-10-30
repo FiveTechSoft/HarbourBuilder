@@ -913,6 +913,90 @@ static function HB_FindClassDeclLine( aLines, cClass )
 
 return 0
 
+// Only exact designer-shaped DATA declarations are reconciled. All other
+// class lines, including custom DATA/INIT/comments/METHODs, stay verbatim.
+static function HB_DesignerDataName( cLine )
+   local cTrim := AllTrim( cLine ), nComment, cLeft, cRight, aWords, cName, i, c
+   nComment := At( "//", cTrim )
+   if nComment == 0; return ""; endif
+   cLeft := AllTrim( Left( cTrim, nComment - 1 ) )
+   cRight := AllTrim( SubStr( cTrim, nComment + 2 ) )
+   aWords := HB_ATokens( StrTran( cLeft, Chr(9), " " ), " " )
+   if Len( aWords ) != 2 .or. !( Upper( aWords[1] ) == "DATA" ); return ""; endif
+   cName := aWords[2]
+   if Len( cName ) < 2 .or. !( Upper( Left( cName, 1 ) ) == "O" ) .or. Empty( cRight )
+      return ""
+   endif
+   // No INIT, extra declarations or annotations: those belong to the user.
+   for each c in { cName, cRight }
+      for i := 1 to Len( c )
+         if !( IsAlpha( SubStr( c, i, 1 ) ) .or. IsDigit( SubStr( c, i, 1 ) ) .or. SubStr( c, i, 1 ) == "_" )
+            return ""
+         endif
+      next
+   next
+return Upper( SubStr( cName, 2 ) )
+
+static function HB_MergeClassBody( cExisting, nClassLine, cDatas, cDeleted )
+   local aLines := HB_ATokens( cExisting, Chr(10) ), aNew := HB_ATokens( cDatas, Chr(10) )
+   local aSeen := {}, cBody := "", cLine, cName, j, k, e := Chr(13) + Chr(10)
+   local lCreate := .F., cTrim
+   for j := nClassLine + 1 to Len( aLines )
+      cLine := StrTran( aLines[j], Chr(13), "" )
+      cTrim := Upper( AllTrim( cLine ) )
+      if Left( cTrim, 8 ) == "ENDCLASS"; exit; endif
+      cName := HB_DesignerDataName( cLine )
+      if ! Empty( cName ) .and. "|" + cName + "|" $ cDeleted .and. ;
+         HB_IsDeletedButtonData( cLine, cExisting, cName )
+         loop
+      endif
+      // Any existing declaration of a live member prevents a duplicate.
+      // Custom INIT/multiple declaration forms are preserved, not replaced.
+      for k := 1 to Len( aNew )
+         cName := HB_DesignerDataName( aNew[k] )
+         if ! Empty( cName ) .and. HB_ClassDeclaresMember( cLine, "O" + cName )
+            if AScan( aSeen, {|x| x == cName } ) == 0; AAdd( aSeen, cName ); endif
+         endif
+      next
+      if Left( cTrim, 19 ) == "METHOD CREATEFORM()"; lCreate := .T.; endif
+      cBody += cLine + e
+   next
+   for k := 1 to Len( aNew )
+      cLine := StrTran( aNew[k], Chr(13), "" )
+      cName := HB_DesignerDataName( cLine )
+      if ! Empty( cName ) .and. AScan( aSeen, {|x| x == cName } ) == 0
+         cBody += cLine + e
+         AAdd( aSeen, cName )
+      endif
+   next
+   if ! lCreate; cBody += "   METHOD CreateForm()" + e; endif
+return cBody
+
+// A deleted button declaration is owned only when its exact shape and
+// matching original creation statement agree. Other ambiguous declarations
+// remain in the class; an unused DATA never resurrects a visual control.
+static function HB_IsDeletedButtonData( cLine, cExisting, cName )
+   local aLines := HB_ATokens( cExisting, Chr(10) ), cOld, aWords, k
+   if !( AllTrim( SubStr( cLine, At( "//", cLine ) + 2 ) ) == "TButton" ); return .F.; endif
+   for each cOld in aLines
+      aWords := HB_ATokens( StrTran( Upper( AllTrim( cOld ) ), Chr(9), " " ), " " )
+      if Len( aWords ) > 4 .and. aWords[1] == "@"
+         for k := 2 to Len( aWords ) - 1
+            if aWords[k] == "BUTTON" .and. aWords[k+1] == "::O" + cName
+               return .T.
+            endif
+         next
+      endif
+   next
+return .F.
+
+static function HB_ClassDeclaresMember( cLine, cMember )
+   local aWords := HB_ATokens( StrTran( AllTrim( Upper( cLine ) ), Chr(9), " " ), " " )
+   local cDecl
+   if Len( aWords ) < 2 .or. !( aWords[1] == "DATA" ); return .F.; endif
+   cDecl := aWords[2]
+return cDecl == cMember
+
 static function RegenerateFormCode( cName, hForm )
 
    local cCode := "", e := Chr(13) + Chr(10)
@@ -1689,37 +1773,13 @@ static function RegenerateFormCode( cName, hForm )
       cCode += e
    endif
    cCode += "CLASS " + cClass + " FROM TForm" + e
-   cCode += e
-   cCode += "   // IDE-managed Components" + e
-   if ! Empty( cDatas ); cCode += cDatas; endif
-   cCode += e
-   cCode += "   // Event handlers" + e
-   cCode += e
-   cCode += "   METHOD CreateForm()" + e
-
-   // Preserve user-declared METHOD lines from existing code
-   if ! Empty( cExistingCode )
-      aExLines := HB_ATokens( cExistingCode, Chr(10) )
-      lInClass := .F.
-      for j := 1 to Len( aExLines )
-         cExLine := AllTrim( StrTran( aExLines[j], Chr(13), "" ) )
-         if j == nClsLine
-            lInClass := .T.
-            loop
-         endif
-         if lInClass
-            if Upper( Left( cExLine, 8 ) ) == "ENDCLASS"
-               exit
-            endif
-            if Upper( Left( cExLine, 7 ) ) == "METHOD " .and. ;
-               ! ( "CREATEFORM" $ Upper( cExLine ) )
-               cCode += "   " + cExLine + e
-            endif
-         endif
-      next
+   if Empty( cExistingCode )
+      cCode += e + "   // IDE-managed Components" + e + cDatas
+      cCode += e + "   // Event handlers" + e
+      cCode += e + "   METHOD CreateForm()" + e + e
+   else
+      cCode += HB_MergeClassBody( cExistingCode, nClsLine, cDatas, cDeleted )
    endif
-
-   cCode += e
    cCode += "ENDCLASS" + e
    cCode += cSep
    cCode += e
