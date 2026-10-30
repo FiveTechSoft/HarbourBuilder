@@ -4,7 +4,7 @@ REPO=$(cd "$(dirname "$0")/.." && pwd)
 source "$REPO/tests/harness_lib.sh"
 trap 'rt_cleanup' EXIT
 RUN=/tmp/newform_preserve_gui
-mkdir -p "$RUN";cp "$REPO/tests/fixtures/debugmodules/"* "$RUN/"
+rm -rf "$RUN";mkdir -p "$RUN";cp "$REPO/tests/fixtures/debugmodules/"* "$RUN/"
 printf 'function One()\nreturn "BASE-ONE"\n' > "$RUN/One.prg"
 printf 'function Two()\nreturn "BASE-TWO"\n' > "$RUN/Two.prg"
 printf 'function NewModule()\nreturn "MODULE-CONTENT"\n' > "$RUN/NewModule.prg"
