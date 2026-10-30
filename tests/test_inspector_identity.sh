@@ -37,6 +37,24 @@ pick(){
  echo "  selected index$idx expected=$want title=$title"
 }
 case "${1:-browse}" in
+ drop)
+  BAR=$(rt_find_bar)
+  rt_park_all_but "$BAR" "$RT_DESIGNER"
+  read AX AY <<< $(rt_ocr_bar_token '^Additional')
+  [ -n "${AX:-}" ] || fail 'Additional palette missing'
+  xdotool mousemove "$AX" "$AY" click 1; sleep 0.7
+  read TX TY <<< $(rt_ocr_bar_token '^text$')
+  [ -n "${TX:-}" ] || fail 'TLabeledEdit palette missing'
+  xdotool mousemove "$TX" "$TY" click 1; sleep 0.4
+  eval "$(xdotool getwindowgeometry --shell "$RT_DESIGNER")"
+  xdotool mousemove $((X+380)) $((Y+180)) click 1; sleep 1
+  xdotool windowmove "$INS" 0 165; xdotool windowraise "$INS"
+  title=$(xdotool getwindowname "$INS")
+  [ "$title" = 'Inspector: TLabeledEdit' ] || fail "drop selected wrong target: $title"
+  eval "$(xdotool getwindowgeometry --shell "$INS")"
+  import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/identity_drop.png
+  echo "  drop after FOLDER/BROWSE selected $title"
+  ;;
  sequence) pick 1 TButton; pick 13 TFolder; pick 14 page1; pick 15 page2; pick 16 TButton; pick 17 TBrowse; pick 18 column;;
  before) pick 1 TButton;;
  folder) pick 13 TFolder;;
