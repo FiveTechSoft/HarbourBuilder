@@ -32,6 +32,7 @@ static nUIFont       // Default UI font size in pt (scaled)
 static cCurrentFile  // Current file path (empty = untitled)
 static lSwitching := .f.  // Guard against re-entrant SwitchToForm
 static aPictureParseBlocks := {}
+static aSelectionParseBlocks := {}
 static lUpdatingInspectorCombo := .F. // no callbacks during programmatic mirror rebuild
 static lSyncingFromCode := .f.  // Guard: true while syncing code editor -> form
 
@@ -183,6 +184,7 @@ function Main()
    nDPI     := W32_GetScreenDPI()        // 96 = 100%, 144 = 150%, 192 = 200%
    cCurrentFile := ""
    aPictureParseBlocks := {}
+   aSelectionParseBlocks := {}
    aForms := {}
    nActiveForm := 0
    aModules := {}
@@ -1175,7 +1177,7 @@ static function RegenerateFormCode( cName, hForm )
                endif
                cCreate += e
                nVal := UI_GetProp( hCtrl, "nItemIndex" )
-               if ValType( nVal ) == "N" .and. nVal > 0
+               if ValType( nVal ) == "N" .and. nVal >= 0
                   cCreate += '   ::o' + cCtrlName + ':Value := ' + LTrim( Str( nVal ) ) + e
                endif
             case nType == 6  // GroupBox
@@ -1209,7 +1211,7 @@ static function RegenerateFormCode( cName, hForm )
                endif
                cCreate += e
                nVal := UI_GetProp( hCtrl, "nItemIndex" )
-               if ValType( nVal ) == "N" .and. nVal > 0
+               if ValType( nVal ) == "N" .and. nVal >= 0
                   cCreate += '   ::o' + cCtrlName + ':Value := ' + LTrim( Str( nVal ) ) + e
                endif
             case nType == 8  // RadioButton
@@ -2497,6 +2499,7 @@ static function TBNew()
       aForms[i][2]:Destroy()
    next
    aPictureParseBlocks := {}
+   aSelectionParseBlocks := {}
    aForms := {}
    nActiveForm := 0
    aModules := {}
@@ -2537,6 +2540,51 @@ return nil
 // Restore visual controls on a design form by parsing the form .prg code
 // PICTURE expressions are evaluated only by the restricted string inverse.
 // Anything else blocks regeneration/Save rather than replacing the path.
+static function RestoreSelectionAssignment( hForm, cLine )
+   local nPos, cName, cNumber, i, hTarget := 0, nType
+   nPos := At( ":VALUE", Upper( cLine ) )
+   if nPos == 0 .or. !( Left( Upper( cLine ), 3 ) == "::O" )
+      return .F.
+   endif
+   cName := AllTrim( SubStr( cLine, 4, nPos - 4 ) )
+   cNumber := AllTrim( SubStr( cLine, nPos + 6 ) )
+   if !( Left( cNumber, 2 ) == ":=" )
+      AAdd( aSelectionParseBlocks, { hForm, "Value assignment is not a numeric literal" } )
+      return .T.
+   endif
+   cNumber := AllTrim( SubStr( cNumber, 3 ) )
+   for i := 1 to Len( cNumber )
+      if ! IsDigit( SubStr( cNumber, i, 1 ) )
+         AAdd( aSelectionParseBlocks, { hForm, "Value assignment is not a numeric literal" } )
+         return .T.
+      endif
+   next
+   for i := 1 to UI_GetChildCount( hForm )
+      if Upper( UI_GetProp( UI_GetChild( hForm, i ), "cName" ) ) == Upper( cName )
+         hTarget := UI_GetChild( hForm, i )
+         exit
+      endif
+   next
+   if hTarget != 0
+      nType := UI_GetType( hTarget )
+      if ( nType == 5 .or. nType == 7 ) .and. Len( cNumber ) > 0
+         UI_SetProp( hTarget, "nItemIndex", Val( cNumber ) )
+         return .T.
+      endif
+   endif
+   AAdd( aSelectionParseBlocks, { hForm, "Value target is not a resolved ComboBox/ListBox (creation must precede assignment)" } )
+return .T.
+
+static function SelectionParseAllowed( hForm )
+   local row
+   for each row in aSelectionParseBlocks
+      if hForm == nil .or. row[1] == hForm
+         MsgInfo( "Save/sync refused: " + row[2] + ". Fix the Value assignment in the code editor.", "HbBuilder" )
+         return .F.
+      endif
+   next
+return .T.
+
 static function PictureExprEval( cExpr )
    local n := 1, nLen := Len( cExpr ), nStart, nEnd, cDigits
    local lNeedTerm := .T.
@@ -2589,6 +2637,7 @@ return .T.
 
 static function PictureParseAllowed( hForm )
    local row
+   if ! SelectionParseAllowed( hForm ); return .F.; endif
    for each row in aPictureParseBlocks
       if hForm == nil .or. row[1] == hForm
          MsgInfo( "Save/sync refused: " + row[2] + ". Fix the PICTURE clause in the code editor.", "HbBuilder" )
@@ -2617,6 +2666,13 @@ static function RestoreFormFromCode( hForm, cCode )
       return nil
    endif
 
+   for i := Len( aSelectionParseBlocks ) to 1 step -1
+      if aSelectionParseBlocks[i][1] == hForm
+         ADel( aSelectionParseBlocks, i )
+         ASize( aSelectionParseBlocks, Len( aSelectionParseBlocks ) - 1 )
+      endif
+   next
+
    for i := Len( aPictureParseBlocks ) to 1 step -1
       if aPictureParseBlocks[i][1] == hForm
          ADel( aPictureParseBlocks, i )
@@ -2639,12 +2695,8 @@ static function RestoreFormFromCode( hForm, cCode )
          cTrim += " " + StrTran( AllTrim( aLines[ i ] ), Chr(13), "" )
       enddo
 
-      // ::oCtrlName:Value := N  — restore nItemIndex for ListBox/ComboBox
-      if "::o" $ cTrim .and. ":Value :=" $ cTrim .and. hCtrl != 0
-         nPos := At( ":=", cTrim )
-         if nPos > 0
-            UI_SetProp( hCtrl, "nItemIndex", Val( AllTrim( SubStr( cTrim, nPos + 2 ) ) ) )
-         endif
+      // Resolve Value by control identity, never the last created handle.
+      if RestoreSelectionAssignment( hForm, cTrim )
          loop
       endif
 
@@ -3503,6 +3555,7 @@ static function OpenProjectFile( cFile )
       aForms[i][2]:Destroy()
    next
    aPictureParseBlocks := {}
+   aSelectionParseBlocks := {}
    aForms := {}
    nActiveForm := 0
    aModules := {}
@@ -7661,7 +7714,7 @@ return nil
 
 static function RemoveFromProject()
 
-   local aNames := {}, i, nSel
+   local aNames := {}, i, nSel, j, hRemoved
 
    for i := 1 to Len( aForms )
       AAdd( aNames, aForms[i][1] + ".prg (Form)" )
@@ -7683,6 +7736,19 @@ static function RemoveFromProject()
          MsgInfo( "Cannot remove the last item from the project" )
          return nil
       endif
+      hRemoved := aForms[nSel][2]:hCpp
+      for j := Len( aPictureParseBlocks ) to 1 step -1
+         if aPictureParseBlocks[j][1] == hRemoved
+            ADel( aPictureParseBlocks, j )
+            ASize( aPictureParseBlocks, Len( aPictureParseBlocks ) - 1 )
+         endif
+      next
+      for j := Len( aSelectionParseBlocks ) to 1 step -1
+         if aSelectionParseBlocks[j][1] == hRemoved
+            ADel( aSelectionParseBlocks, j )
+            ASize( aSelectionParseBlocks, Len( aSelectionParseBlocks ) - 1 )
+         endif
+      next
       aForms[nSel][2]:Destroy()
       CodeEditorRemoveTab( hCodeEditor, nSel + 1 )
       ADel( aForms, nSel )

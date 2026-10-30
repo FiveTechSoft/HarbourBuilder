@@ -5497,7 +5497,7 @@ return nil
 
 static function RemoveFromProject()
 
-   local aNames := {}, i, nSel
+   local aNames := {}, i, nSel, j, hRemoved
 
    for i := 1 to Len( aForms )
       AAdd( aNames, aForms[i][1] + ".prg (Form)" )
@@ -5520,6 +5520,13 @@ static function RemoveFromProject()
          MsgInfo( "Cannot remove the last item from the project" )
          return nil
       endif
+      hRemoved := aForms[nSel][2]:hCpp
+      for j := Len( aSelectionParseBlocks ) to 1 step -1
+         if aSelectionParseBlocks[j][1] == hRemoved
+            ADel( aSelectionParseBlocks, j )
+            ASize( aSelectionParseBlocks, Len( aSelectionParseBlocks ) - 1 )
+         endif
+      next
       aForms[nSel][2]:Destroy()
       CodeEditorRemoveTab( hCodeEditor, nSel + 1 )
       ADel( aForms, nSel )

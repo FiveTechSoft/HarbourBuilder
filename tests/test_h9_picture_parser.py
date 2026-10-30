@@ -23,6 +23,9 @@ function UI_SetProp(h,p,v)
  HB_SYMBOL_UNUSED(p)
  AAdd(aWrites,{h,v})
 return nil
+function SelectionParseAllowed(h)
+ HB_SYMBOL_UNUSED(h)
+return .T.
 function MsgInfo(t,title)
  HB_SYMBOL_UNUSED(title)
  QOut(t)

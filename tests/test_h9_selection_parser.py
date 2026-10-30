@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Execute actual Mac Value parser with deterministic control handles."""
-import pathlib,subprocess
-r=pathlib.Path(__file__).resolve().parents[1]; s=(r/'source/hbbuilder_macos.prg').read_text();a=s.index('static function RestoreSelectionAssignment');b=s.index('static function RestoreFormFromCode',a);parser=s[a:b]
+import pathlib,subprocess,sys
+r=pathlib.Path(__file__).resolve().parents[1]; platform=sys.argv[1] if len(sys.argv)>1 else 'macos'; s=(r/f'source/hbbuilder_{platform}.prg').read_text();a=s.index('static function RestoreSelectionAssignment');b=s.index('static function RestoreFormFromCode',a);parser=s[a:b].split("static function PictureExprEval")[0]
 p=pathlib.Path('/tmp/h9-selection');p.mkdir(exist_ok=True)
 main='''static aSelectionParseBlocks := {}
 static aWrites := {}
