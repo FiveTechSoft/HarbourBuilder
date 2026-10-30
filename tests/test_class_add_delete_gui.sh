@@ -122,10 +122,12 @@ HB_INC=${HB_INC:-/tmp/harbour-review/include}
 
 # Add one button through the Standard palette, then save twice and reopen.
 BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"
-xdotool mousemove 290 12 click 1
+read PX PY <<< $(rt_ocr_bar_token '^Standard$')
+xdotool mousemove "$PX" "$PY" click 1
 sleep 1
 # Standard palette BUTTON is the third icon at x451.
 xdotool mousemove 450 76 click 1
+sleep 1
 xdotool windowmap "$RT_DESIGNER"; xdotool windowraise "$RT_DESIGNER"
 eval "$(xdotool getwindowgeometry --shell "$RT_DESIGNER")"
 xdotool mousemove $((X+260)) $((Y+220)) click 1
