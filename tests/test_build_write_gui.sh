@@ -4,14 +4,15 @@ REPO=$(cd "$(dirname "$0")/.." && pwd)
 source "$REPO/tests/harness_lib.sh"
 RUN=/tmp/staging_refusal_gui
 rt_provenance
+STAGING_FAIL_FILE=${STAGING_FAIL_FILE:-Project1.prg}
 mkdir -p "$RUN"
 cp "$REPO/tests/fixtures/debugmodules/"* "$RUN/"
 B=/tmp/hbbuilder_build/$(printf '%s' "$RUN/Project1.hbp" | md5sum | cut -d' ' -f1)
 D=/tmp/hbbuilder_debug
 for dir in "$B" "$D"; do
  mkdir -p "$dir"
- if [ -f "$dir/Project1.prg" ]; then rm "$dir/Project1.prg"; fi
- mkdir -p "$dir/Project1.prg"
+ if [ -f "$dir/$STAGING_FAIL_FILE" ]; then rm "$dir/$STAGING_FAIL_FILE"; fi
+ mkdir -p "$dir/$STAGING_FAIL_FILE"
 done
 rm -f /tmp/debugmodules-result.txt
 rt_setup "$RUN"; rt_launch_ide
@@ -35,7 +36,7 @@ for mode in run debug; do
  fi
  echo "GUI WRITE $mode modal dismissed, no saving-progress text"
 done
-for dir in "$B" "$D"; do rmdir "$dir/Project1.prg"; done
+for dir in "$B" "$D"; do rmdir "$dir/$STAGING_FAIL_FILE"; done
 rm -f /tmp/debugmodules-result.txt
 BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"
 xdotool mousemove 700 12 click 1; xdotool key ctrl+r
