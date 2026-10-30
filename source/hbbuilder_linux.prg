@@ -1038,10 +1038,11 @@ static function RegenerateFormCode( cName, hForm )
                cVal := UI_GetProp( hCtrl, "aTabs" )
                if ! Empty( cVal )
                   cCreate += ' PROMPTS '
-                  aHdrs := hb_ATokens( cVal, "|" )
+                  // keep empty tabs: they are real pages (lSkipEmpties=.F.)
+                  aHdrs := hb_ATokens( cVal, "|", .F., .F. )
                   for kk := 1 to Len( aHdrs )
                      if kk > 1; cCreate += ', '; endif
-                     cCreate += '"' + aHdrs[kk] + '"'
+                     cCreate += HB_QHarbourStr( aHdrs[kk] )
                   next
                endif
                cCreate += e
@@ -1166,11 +1167,13 @@ static function RegenerateFormCode( cName, hForm )
                   LTrim(Str(nCW)) + ", " + LTrim(Str(nCH))
                cVal := UI_GetProp( hCtrl, "aColumns" )
                if ! Empty( cVal )
-                  aHdrs := hb_ATokens( cVal, "|" )
+                  // keep empty headers and their spacing: each one is a real
+                  // column (lSkipEmpties=.F., no AllTrim)
+                  aHdrs := hb_ATokens( cVal, "|", .F., .F. )
                   cCreate += ' HEADERS '
                   for kk := 1 to Len( aHdrs )
                      if kk > 1; cCreate += ', '; endif
-                     cCreate += '"' + AllTrim( aHdrs[kk] ) + '"'
+                     cCreate += HB_QHarbourStr( aHdrs[kk] )
                   next
                endif
                nColCount := UI_BrowseColCount( hCtrl )
@@ -1199,7 +1202,7 @@ static function RegenerateFormCode( cName, hForm )
                         aColProps := UI_BrowseGetColProps( hCtrl, kk - 1 )
                         cVal := ""
                         if Len( aColProps ) >= 5; cVal := aColProps[5][2]; endif
-                        cCreate += '"' + cVal + '"'
+                        cCreate += HB_QHarbourStr( cVal )
                      next
                   endif
                endif
@@ -2845,7 +2848,7 @@ static function RestoreFormFromCode( hForm, cCode )
    local cRestU, nClPos, nClEnd, cClVal, cIt2
    local cStrip, nK, nn, cC, cExpr, nQ, nEnd, nOff
    local cItemExpr, k, aTmp
-  local lOkNum, nNDot
+  local lOkNum, nNDot, nClCount, cTabsF, nPagesF, cIdxStr, nBrk
 
    if Empty( cCode ) .or. hForm == 0
       return nil
@@ -3028,22 +3031,46 @@ static function RestoreFormFromCode( hForm, cCode )
                   if At( "OF ::O", Upper( cRest ) ) > 0 .and. ":APAGES[" $ Upper( cRest )
                      cVal := SubStr( cRest, At( "OF ::O", Upper( cRest ) ) + 6 )
                      cFolderName := Left( cVal, At( ":APAGES[", Upper( cVal ) ) - 1 )
-                     nPageIdx := Val( SubStr( cVal, At( ":APAGES[", Upper( cVal ) ) + 8 ) )
+                     // strict numeric page index: "2x" or "2+1" must block,
+                     // not truncate to 2 with Val()
+                     cIdxStr := SubStr( cVal, At( ":APAGES[", Upper( cVal ) ) + 8 )
+                     nBrk := At( "]", cIdxStr )
+                     cIdxStr := iif( nBrk > 0, AllTrim( Left( cIdxStr, nBrk - 1 ) ), "" )
+                     lOkNum := ! Empty( cIdxStr )
+                     for nn := 1 to Len( cIdxStr )
+                        if ! IsDigit( SubStr( cIdxStr, nn, 1 ) )
+                           lOkNum := .F.
+                           exit
+                        endif
+                     next
+                     nPageIdx := iif( lOkNum, Val( cIdxStr ), 0 )
                      hFolder := 0
                      hChildN := UI_GetChildCount( hForm )
                      for kkF := 1 to hChildN
-                        if AllTrim( UI_GetProp( UI_GetChild( hForm, kkF ), "cName" ) ) == cFolderName
+                        // Harbour identifiers are case-insensitive: match the
+                        // folder name the same way (::oFLD1 == ::oFld1)
+                        if Upper( AllTrim( UI_GetProp( UI_GetChild( hForm, kkF ), "cName" ) ) ) == Upper( AllTrim( cFolderName ) )
                            hFolder := UI_GetChild( hForm, kkF )
                            exit
                         endif
                      next
-                     if hFolder != 0 .and. nPageIdx >= 1
+                     // bound the index to the folder's real page count; a
+                     // child on a nonexistent page has no faithful model
+                     nPagesF := 0
+                     if hFolder != 0
+                        cTabsF := UI_GetProp( hFolder, "aTabs" )
+                        if ValType( cTabsF ) == "C" .and. ! Empty( cTabsF )
+                           nPagesF := Len( cTabsF ) - Len( StrTran( cTabsF, "|", "" ) ) + 1
+                        endif
+                     endif
+                     if hFolder != 0 .and. nPageIdx >= 1 .and. nPageIdx <= nPagesF
                         UI_SetPendingPageOwner( hFolder, nPageIdx - 1 )
                      else
                         HB_SetParseBlock( hForm, "Line " + LTrim( Str( i ) ) + ;
                            ", control '" + cAtName + "': page owner '" + ;
-                           cFolderName + "' page " + LTrim( Str( nPageIdx ) ) + ;
-                           " not resolved" )
+                           cFolderName + "' page " + cIdxStr + ;
+                           " not resolved (folder has " + LTrim( Str( nPagesF ) ) + ;
+                           " page(s); the FOLDER line must precede its paged children)" )
                      endif
                   endif
                   hCtrl := 0
@@ -3096,6 +3123,7 @@ static function RestoreFormFromCode( hForm, cCode )
                            nClPos := At( "PROMPTS ", cRestU )
                            if nClPos > 0
                               cIt2 := ""
+                              nClCount := 0
                               for each cItemExpr in HB_SplitTopLevelCommas( SubStr( cRest, nClPos + 7 ) )
                                  cExpr := HB_HarbourStrEval( AllTrim( cItemExpr ) )
                                  if cExpr == nil
@@ -3109,10 +3137,13 @@ static function RestoreFormFromCode( hForm, cCode )
                                        ", control '" + cAtName + ;
                                        "': a PROMPTS item contains '|' (the tab separator)" )
                                  endif
-                                 if ! Empty( cIt2 ); cIt2 += "|"; endif
+                                 // count-based join: an empty item is a real
+                                 // tab and must not collapse the separator
+                                 nClCount++
+                                 if nClCount > 1; cIt2 += "|"; endif
                                  cIt2 += cExpr
                               next
-                              if ! Empty( cIt2 )
+                              if nClCount > 0
                                  UI_SetProp( hCtrl, "aTabs", cIt2 )
                               endif
                            endif
@@ -3132,6 +3163,7 @@ static function RestoreFormFromCode( hForm, cCode )
                               nPos2 := At( " FOOTERS ", cRestU )
                               if nPos2 > 0 .and. nPos2 < nEnd; nEnd := nPos2; endif
                               cIt2 := ""
+                              nClCount := 0
                               for each cItemExpr in HB_SplitTopLevelCommas( SubStr( cRest, nClPos + 8, nEnd - nClPos - 8 ) )
                                  cExpr := HB_HarbourStrEval( AllTrim( cItemExpr ) )
                                  if cExpr == nil
@@ -3145,10 +3177,11 @@ static function RestoreFormFromCode( hForm, cCode )
                                        ", control '" + cAtName + ;
                                        "': a HEADERS item contains '|' (the column separator)" )
                                  endif
-                                 if ! Empty( cIt2 ); cIt2 += "|"; endif
+                                 nClCount++
+                                 if nClCount > 1; cIt2 += "|"; endif
                                  cIt2 += cExpr
                               next
-                              if ! Empty( cIt2 )
+                              if nClCount > 0
                                  UI_SetProp( hCtrl, "aColumns", cIt2 )
                               endif
                            endif
@@ -3158,6 +3191,16 @@ static function RestoreFormFromCode( hForm, cCode )
                               nPos2 := At( " FOOTERS ", cRestU )
                               if nPos2 > 0 .and. nPos2 < nEnd; nEnd := nPos2; endif
                               kk := 0
+                              nClCount := Len( HB_SplitTopLevelCommas( SubStr( cRest, nClPos + 9, nEnd - nClPos - 9 ) ) )
+                              if nClCount > UI_BrowseColCount( hCtrl )
+                                 // more sizes than columns: the surplus has no
+                                 // column to anchor to and would be discarded
+                                 HB_SetParseBlock( hForm, "Line " + LTrim( Str( i ) ) + ;
+                                    ", control '" + cAtName + "': " + ;
+                                    LTrim( Str( nClCount ) ) + " COLSIZES for " + ;
+                                    LTrim( Str( UI_BrowseColCount( hCtrl ) ) ) + ;
+                                    " column(s) (HEADERS must come first and match)" )
+                              endif
                               for each cItemExpr in HB_SplitTopLevelCommas( SubStr( cRest, nClPos + 9, nEnd - nClPos - 9 ) )
                                  // numeric literal: HB_HarbourStrEval only
                                  // evaluates string expressions
@@ -3198,6 +3241,14 @@ static function RestoreFormFromCode( hForm, cCode )
                            nClPos := At( "FOOTERS ", cRestU )
                            if nClPos > 0
                               kk := 0
+                              nClCount := Len( HB_SplitTopLevelCommas( SubStr( cRest, nClPos + 8 ) ) )
+                              if nClCount > UI_BrowseColCount( hCtrl )
+                                 HB_SetParseBlock( hForm, "Line " + LTrim( Str( i ) ) + ;
+                                    ", control '" + cAtName + "': " + ;
+                                    LTrim( Str( nClCount ) ) + " FOOTERS for " + ;
+                                    LTrim( Str( UI_BrowseColCount( hCtrl ) ) ) + ;
+                                    " column(s) (HEADERS must come first and match)" )
+                              endif
                               for each cItemExpr in HB_SplitTopLevelCommas( SubStr( cRest, nClPos + 8 ) )
                                  cExpr := HB_HarbourStrEval( AllTrim( cItemExpr ) )
                                  if cExpr == nil
