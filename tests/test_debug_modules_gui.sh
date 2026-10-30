@@ -20,5 +20,10 @@ for i in $(seq 1 12); do
  xdotool windowraise "$BAR"; xdotool mousemove 90 62 click 1; sleep 0.5
 done
 import -window root /tmp/debugmodules-stepped.png
-[ -f /tmp/debugmodules-result.txt ] && cat /tmp/debugmodules-result.txt
+if [ ! -x /tmp/hbbuilder_debug/DebugApp ] || [ ! -f /tmp/debugmodules-result.txt ]; then
+ echo 'DEBUG MODULE GUI FAIL: executable/result missing'; rt_cleanup; exit 1
+fi
+grep -q 'MODULES-EXECUTED' /tmp/debugmodules-result.txt || { rt_cleanup; exit 1; }
+cat /tmp/debugmodules-result.txt
+echo 'DEBUG MODULE native build+execution PASS (not breakpoint/navigation)' 
 rt_cleanup

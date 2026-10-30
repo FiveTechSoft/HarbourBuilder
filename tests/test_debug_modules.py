@@ -3,17 +3,20 @@
 import pathlib,subprocess
 r=pathlib.Path(__file__).resolve().parents[1];s=(r/'source/hbbuilder_linux.prg').read_text();a=s.index('   // Project1.prg —',s.index('static function TBDebugRun'));b=s.index('   // classes.prg (framework',a)
 src='''static aForms := {{'Form1',nil,''}}
-static aModules := {{'Helpers','OLD',''}}
+static aModules := {{'HelperA','OLD',''},{'HelperB','OLD',''}}
 static aDbgOffsets := {}
 function Main()
  local nCurLine:=7, cAllPrg:='', cMainPrg, cSection, cBuildDir:='/tmp/h9-debug-modules', i, nFail:=0
  MemoWrit(cBuildDir+'/Form1.prg','FORMMARK')
 '''+s[a:b]+''' if !('NEWMODULE' $ cAllPrg); nFail++; endif
  if 'OLD' $ cAllPrg; nFail++; endif
- if Len(aDbgOffsets)!=3
+ if '#include' $ cAllPrg.or.!('MODULE2' $ cAllPrg); nFail++; endif
+ if Len(aDbgOffsets)!=4
  nFail++
  else
- if !(aDbgOffsets[3][2]=='Helpers.prg').or.aDbgOffsets[3][3]!=3.or.aDbgOffsets[3][4]!=1; nFail++; endif
+ if !(aDbgOffsets[3][2]=='HelperA.prg').or.aDbgOffsets[3][3]!=3.or.aDbgOffsets[3][4]!=1; nFail++; endif
+ if !(aDbgOffsets[4][2]=='HelperB.prg').or.aDbgOffsets[4][3]!=4.or.aDbgOffsets[4][4]!=1; nFail++; endif
+ if aDbgOffsets[4][1] != aDbgOffsets[3][1]+4; nFail++; endif
  endif
  QOut('DEBUG MODULE failures='+hb_ntos(nFail))
  QOut(cAllPrg)
@@ -21,7 +24,7 @@ function Main()
 return nil
 function CodeEditorGetTabText(h,t)
  HB_SYMBOL_UNUSED(h)
-return iif(t==1,'MAINMARK',iif(t==3,'NEWMODULE','FORMMARK'))
+return iif(t==1,'MAINMARK',iif(t==3,'#include "hbbuilder.ch"'+Chr(10)+'NEWMODULE'+Chr(10)+'return nil',iif(t==4,'#include "classes.prg"'+Chr(10)+'MODULE2','FORMMARK')))
 function NumLines(c)
 return Len(hb_ATokens(c,Chr(10)))
 '''
