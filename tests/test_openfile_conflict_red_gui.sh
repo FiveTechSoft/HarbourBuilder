@@ -33,7 +33,13 @@ import -window root /tmp/openfile-close-choice.png
 tesseract /tmp/openfile-close-choice.png - --psm 6 2>/dev/null
 rt_map_all;sleep 1
 # Standard Yes/No/Cancel question: select Yes to save the editor buffer.
-xdotool key alt+y;sleep 2
+for w in $(rt_ide_windows);do
+ if [ "$(xdotool getwindowname "$w")" = 'Unsaved changes' ];then
+  xdotool windowmap "$w";xdotool windowraise "$w";eval "$(xdotool getwindowgeometry --shell "$w")"
+  xdotool mousemove $((X+WIDTH/6)) $((Y+HEIGHT-20)) click 1
+ fi
+done
+sleep 2
 cat "$RUN/Standalone.prg"
 if grep -q UNSAVED-EDITOR-WORK "$RUN/Standalone.prg";then echo 'RED external standalone work overwritten on Close->Save';exit 0;fi
 echo 'RED not reproduced';exit 1
