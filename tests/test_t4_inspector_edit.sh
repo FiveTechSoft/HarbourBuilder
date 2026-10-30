@@ -127,8 +127,14 @@ save_and_check() {  # $1 label, rest: grep -F patterns that must be in the file
   local BARW w
   BARW=$(rt_find_bar) || fail "$label: IDE bar not found"
   for w in $(rt_ide_windows); do
-    [ "$w" = "$BARW" ] || xdotool windowmove "$w" 1100 700 2>/dev/null
+    case "$(xdotool getwindowname "$w" 2>/dev/null)" in
+      "Code Editor"|Inspector*|"AI Assistant"|Messages|"Fixture Roundtrip")
+        xdotool windowmove "$w" 1100 700 2>/dev/null;;
+    esac
   done
+  # Never move unnamed GTK popup/menu windows: doing so relocates the
+  # dropdown offscreen. Raise/focus only the actual main menu toplevel.
+  xdotool windowmove "$BARW" 0 0; xdotool windowraise "$BARW"; xdotool windowfocus "$BARW"
   sleep 0.5
   if ! menu_path_click '^Save'; then
     echo "  [$label] menu path failed; using the real Ctrl+S handler with focus on the bar window"
