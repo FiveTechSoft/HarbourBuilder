@@ -777,8 +777,21 @@ static void HBButton_CreateWidget( HBButton * p, GtkWidget * container )
       if( pb )
       {
          int h = p->base.FHeight > 4 ? p->base.FHeight - 8 : 16;
+         int pw, ph, tw, th;
+         if( h < 1 ) h = 1;      /* heights 5..8 would give h<=0: clamp */
          if( h > 32 ) h = 32;
-         GdkPixbuf * scaled = gdk_pixbuf_scale_simple( pb, h, h, GDK_INTERP_BILINEAR );
+         /* no stretch contract for the glyph: fit inside h x h preserving aspect */
+         pw = gdk_pixbuf_get_width( pb );
+         ph = gdk_pixbuf_get_height( pb );
+         tw = h; th = h;
+         if( pw > 0 && ph > 0 )
+         {
+            if( pw >= ph ) th = (int)( (double) h * ph / pw + 0.5 );
+            else           tw = (int)( (double) h * pw / ph + 0.5 );
+            if( tw < 1 ) tw = 1;
+            if( th < 1 ) th = 1;
+         }
+         GdkPixbuf * scaled = gdk_pixbuf_scale_simple( pb, tw, th, GDK_INTERP_BILINEAR );
          g_object_unref( pb );
          if( scaled )
          {
@@ -1260,14 +1273,10 @@ static void HBImage_CreateWidget( HBControl * p, GtkWidget * container )
       GdkPixbuf * pb = gdk_pixbuf_new_from_file( im->FPicture, NULL );
       if( pb )
       {
-         if( im->FStretch && p->FWidth > 0 && p->FHeight > 0 )
-         {
-            GdkPixbuf * scaled = gdk_pixbuf_scale_simple( pb, p->FWidth, p->FHeight, GDK_INTERP_BILINEAR );
-            g_object_unref( pb );
-            pb = scaled;
-         }
-         if( pb ) gtk_image_set_from_pixbuf( GTK_IMAGE(img), pb );
-         if( pb ) g_object_unref( pb );
+         /* natural size only: lStretch stays a stored/exposed property with no
+            render branch until a stretch contract is defined and covered */
+         gtk_image_set_from_pixbuf( GTK_IMAGE(img), pb );
+         g_object_unref( pb );
       }
    }
    gtk_container_add( GTK_CONTAINER(ev), img );
