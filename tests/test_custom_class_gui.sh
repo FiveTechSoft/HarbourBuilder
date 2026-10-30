@@ -43,6 +43,13 @@ for cycle in 1 2; do
   rt_reopen_project
  fi
 done
+# Capture actual code editor class text after reopening/saving.
+rt_map_all
+for w in $(rt_ide_windows);do
+ case "$(xdotool getwindowname "$w")" in "Code Editor") xdotool windowmove "$w" 0 125;xdotool windowsize "$w" 1500 820;xdotool windowraise "$w";xdotool windowfocus "$w";xdotool key ctrl+Home;;esac
+done
+sleep 1
+import -window root /tmp/class-preserved-editor.png
 rt_cleanup
 python3 - "$RUN" <<'PY'
 from pathlib import Path

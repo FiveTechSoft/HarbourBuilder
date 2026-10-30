@@ -13,6 +13,7 @@ p=Path(sys.argv[1]);s=p.read_text();s=s.replace('   DATA oButton1   // TButton',
 
 p.write_text(s)
 PY
+rm -f /tmp/debugmodules-result.txt
 MD=$(sha256sum "$RUN/Form1.prg" | cut -d' ' -f1)
 rt_setup "$RUN";rt_launch_ide
 for try in $(seq 1 12);do rt_find_bar >/dev/null&&break;sleep 1;done
@@ -32,7 +33,8 @@ for mode in save saveas run debug;do
  echo "$mode: $text" | grep -E 'ambiguous|aborted|faithfully' || true
  echo "$text" | grep -q 'ambiguous compound' || { echo "FAIL $mode no ambiguous notice";rt_cleanup;exit 1; }
  [ "$MD" = "$(sha256sum "$RUN/Form1.prg" | cut -d' ' -f1)" ] || { echo "FAIL $mode disk changed";rt_cleanup;exit 1; }
- echo "AMBIGUOUS $mode refused; disk exact=$MD"
+ [ ! -f /tmp/debugmodules-result.txt ] || { echo "FAIL $mode app executed";rt_cleanup;exit 1; }
+ echo "AMBIGUOUS $mode refused; disk exact=$MD no app result"
  rt_cleanup
  rt_setup "$RUN";rt_launch_ide
  for try in $(seq 1 12);do rt_find_bar >/dev/null&&break;sleep 1;done
