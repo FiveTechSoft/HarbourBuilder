@@ -131,7 +131,7 @@ local BEFORE w i
 BEFORE=$(rt_ide_windows | sort -n | tr '
 ' ' ')
 BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"; sleep 0.3
-xdotool mousemove 20 12 click 1; sleep 0.8
+xdotool mousemove 20 12 mousedown 1; sleep 0.4; xdotool mouseup 1; sleep 0.8
 xdotool mousemove 100 134 click 1
 DLG=""
 for i in $(seq 1 8); do
@@ -215,7 +215,7 @@ launch_a
 local BEFORE w i
 BEFORE=$(rt_ide_windows | sort -n | tr '\n' ' ')
 BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"; sleep 0.3
-xdotool mousemove 20 12 click 1; sleep 0.8
+xdotool mousemove 20 12 mousedown 1; sleep 0.4; xdotool mouseup 1; sleep 0.8
 xdotool mousemove 100 134 click 1
 DLG=""
 for i in $(seq 1 6); do
@@ -366,7 +366,7 @@ launch_a
 dirty_the_buffer
 mkdir -p /tmp/rt_saveas_b; rm -f /tmp/rt_saveas_b/*
 BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"; sleep 0.3
-xdotool mousemove 20 12 click 1; sleep 0.8
+xdotool mousemove 20 12 mousedown 1; sleep 0.4; xdotool mouseup 1; sleep 0.8
 click_menu_item 'As'
 sleep 2
 xdotool key ctrl+l; sleep 0.5
@@ -546,7 +546,7 @@ launch_a
 echo 'line one' > /tmp/rt_openme.txt
 # File > Open File...
 BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"; sleep 0.3
-xdotool mousemove 20 12 click 1; sleep 0.8
+xdotool mousemove 20 12 mousedown 1; sleep 0.4; xdotool mouseup 1; sleep 0.8
 click_menu_item 'File'
 sleep 1
 xdotool key ctrl+l; sleep 0.5
@@ -569,7 +569,7 @@ rt_map_all; sleep 0.3
 BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"; sleep 0.3
 local BEFORE w i
 BEFORE=$(rt_ide_windows | sort -n | tr '\n' ' ')
-xdotool mousemove 20 12 click 1; sleep 0.8
+xdotool mousemove 20 12 mousedown 1; sleep 0.4; xdotool mouseup 1; sleep 0.8
 click_menu_item 'Close'
 DLG=""
 for i in $(seq 1 8); do
@@ -589,7 +589,7 @@ else
   # Cancel must keep the file open: closing again prompts again
   BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"; sleep 0.3
   BEFORE=$(rt_ide_windows | sort -n | tr '\n' ' ')
-  xdotool mousemove 20 12 click 1; sleep 0.8
+  xdotool mousemove 20 12 mousedown 1; sleep 0.4; xdotool mouseup 1; sleep 0.8
   click_menu_item 'Close'
   DLG=""
   for i in $(seq 1 8); do
@@ -609,6 +609,111 @@ else
   fi
 fi
 echo "closefile case done (FAILN=$FAILN)"
+rt_cleanup
+}
+
+
+launch_fresh() {  # fresh IDE, startup empty project (never saved)
+  rm -rf "$RUNA"; mkdir -p "$RUNA"; rm -f "$TRACE"
+  rt_setup "$RUNA"
+  rt_launch_ide
+  IDEPID=$RT_IDEPID; OTHERPID=""
+  rt_find_designer >/dev/null || fail "designer window not found"
+  sleep 2
+}
+
+run_newclean() {
+launch_fresh
+# startup empty project, untouched: Exit must NOT prompt (false dirty)
+DLG=$(trigger_and_expect_dialog "ctrl+q")
+if [ -n "$DLG" ]; then
+  echo "  NEWCLEAN: FALSE PROMPT on Exit at clean startup"
+  shot_dialog "$DLG" newclean-startup
+  cancel_dialog "$DLG"; FAILN=$((FAILN+1))
+else
+  sleep 2
+  kill -0 "$IDEPID" 2>/dev/null     && { echo "  NEWCLEAN: IDE did not exit at clean startup"; FAILN=$((FAILN+1)); }     || echo "  newclean: clean startup exits with no prompt"
+fi
+rt_cleanup
+# Ctrl+N (TBNew) on a clean session must also stay clean afterwards
+launch_fresh
+xdotool mousemove 700 12 click 1; sleep 0.4
+xdotool key ctrl+n; sleep 3
+DLG=""
+for w in $(rt_ide_windows); do rt_is_unsaved_dialog "$w" && DLG=$w; done
+if [ -n "$DLG" ]; then
+  echo "  NEWCLEAN: FALSE PROMPT on Ctrl+N over clean startup project"
+  shot_dialog "$DLG" newclean-ctrln
+  cancel_dialog "$DLG"; FAILN=$((FAILN+1))
+else
+  echo "  newclean: Ctrl+N over clean startup prompted nothing (correct)"
+fi
+DLG=$(trigger_and_expect_dialog "ctrl+q")
+if [ -n "$DLG" ]; then
+  echo "  NEWCLEAN: FALSE PROMPT on Exit after clean Ctrl+N"
+  shot_dialog "$DLG" newclean-ctrln-exit
+  cancel_dialog "$DLG"; FAILN=$((FAILN+1))
+else
+  sleep 2
+  kill -0 "$IDEPID" 2>/dev/null     && { echo "  NEWCLEAN: IDE did not exit after clean Ctrl+N"; FAILN=$((FAILN+1)); }     || echo "  newclean: clean Ctrl+N then Exit, no prompt"
+fi
+echo "newclean case done (FAILN=$FAILN)"
+rt_cleanup
+}
+
+run_newresize() {
+launch_fresh
+# real model change on a never-saved project: resize the design form
+local D X Y WIDTH HEIGHT
+D=$(rt_find_designer) || fail "designer window not found"
+BAR=$(rt_find_bar); rt_park_all_but "$D" "$BAR"; sleep 0.5
+eval "$(xdotool getwindowgeometry --shell "$D")"
+xdotool windowsize "$D" $((WIDTH+40)) $((HEIGHT+40)); sleep 2
+rt_map_all; sleep 0.3
+DLG=$(trigger_and_expect_dialog "ctrl+q")
+if [ -z "$DLG" ]; then
+  sleep 2
+  if kill -0 "$IDEPID" 2>/dev/null; then
+    echo "  NEWRESIZE: inconclusive (no prompt, IDE alive)"
+  else
+    echo "  NEWRESIZE: resized never-saved project LOST on Exit (no prompt)"
+  fi
+  FAILN=$((FAILN+1))
+else
+  echo "  newresize: resize of never-saved project flagged dirty (dialog on Exit)"
+  shot_dialog "$DLG" newresize
+  cancel_dialog "$DLG"
+fi
+echo "newresize case done (FAILN=$FAILN)"
+rt_cleanup
+}
+
+run_newrevert() {
+launch_fresh
+# edit then undo on a never-saved project: back to frozen text = clean
+local CED w
+CED=""
+for w in $(rt_ide_windows); do
+  [ "$(xdotool getwindowname "$w" 2>/dev/null)" = "Code Editor" ] && { CED=$w; break; }
+done
+[ -n "$CED" ] || fail "Code Editor window not found"
+BAR=$(rt_find_bar); rt_park_all_but "$CED" "$BAR"; sleep 0.5
+eval "$(xdotool getwindowgeometry --shell "$CED")"
+xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT/2)) click 1; sleep 0.4
+xdotool key ctrl+End; sleep 0.3
+xdotool type --delay 15 'x'; sleep 0.5
+xdotool key ctrl+z; sleep 0.8
+rt_map_all; sleep 0.3
+DLG=$(trigger_and_expect_dialog "ctrl+q")
+if [ -n "$DLG" ]; then
+  echo "  NEWREVERT: FALSE PROMPT after edit+undo on never-saved project"
+  shot_dialog "$DLG" newrevert
+  cancel_dialog "$DLG"; FAILN=$((FAILN+1))
+else
+  sleep 2
+  kill -0 "$IDEPID" 2>/dev/null     && { echo "  NEWREVERT: IDE did not exit after edit+undo"; FAILN=$((FAILN+1)); }     || echo "  newrevert: edit+undo returns to clean (no prompt)"
+fi
+echo "newrevert case done (FAILN=$FAILN)"
 rt_cleanup
 }
 
