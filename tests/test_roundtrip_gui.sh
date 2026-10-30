@@ -168,6 +168,8 @@ if [ "$FAILN" -gt 0 ]; then
   rt_cleanup
   exit 1
 fi
+import -window root /tmp/rt_roundtrip.png
+echo "screenshot: /tmp/rt_roundtrip.png"
 echo "ROUNDTRIP PASS: 2 cycles, real save verified in both, no content lost, fixpoint reached."
 echo "diff original -> cycle2, CRLF-normalized (known non-geometry items only; M7 tracked):"
 diff <(tr -d '\r' < "$CYC/original.prg") <(tr -d '\r' < "$CYC/cycle2.prg") | head -60
