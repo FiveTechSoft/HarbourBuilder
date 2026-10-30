@@ -129,7 +129,10 @@ BAR=$(rt_find_bar)
 # Fresh startup palette remains at its original screen position.
 import -window root /tmp/class-add-start.png
 # Standard palette BUTTON is the third icon at x451.
-xdotool mousemove 450 76 click 1
+read CX CY <<< $(rt_ocr_bar_token '^(Ok|OK)$' 15)
+[ -n "${CX:-}" ] || fail "Button palette icon not found"
+echo "button icon at $CX,$CY"
+xdotool mousemove "$CX" "$CY" click 1
 sleep 1
 sleep 1
 import -window root /tmp/class-add-selected.png
