@@ -14,11 +14,35 @@ static aModules := {{'Helpers','OLD',''}}
 static hCodeEditor := 0
 static nContinued := 0
 function Main()
- local nFail:=0
- if ProbeRun('/tmp/build-write-refusal/run'); nFail++; endif
- if ProbeDebug('/tmp/build-write-refusal/debug'); nFail++; endif
- if nContinued!=0; nFail++; endif
- QOut('BUILD write refusal failures='+hb_ntos(nFail)+' continued='+hb_ntos(nContinued))
+ local nFail:=0, cRoot:='/tmp/build-write-refusal/', cStage, cBad, lResult
+ for each cStage in {'run','debug'}
+ for each cBad in iif(cStage=='run',{'Project1.prg','Form1.prg','Helpers.prg'},{'Project1.prg','Form1.prg'})
+ FErase(cRoot+cStage+'/Project1.prg')
+ FErase(cRoot+cStage+'/Form1.prg')
+ FErase(cRoot+cStage+'/Helpers.prg')
+ DirRemove(cRoot+cStage+'/Project1.prg')
+ DirRemove(cRoot+cStage+'/Form1.prg')
+ DirRemove(cRoot+cStage+'/Helpers.prg')
+ DirMake(cRoot+cStage+'/'+cBad)
+ nContinued:=0
+ lResult:=iif(cStage=='run',ProbeRun(cRoot+cStage),ProbeDebug(cRoot+cStage))
+ if lResult.or.nContinued!=0; nFail++; endif
+ DirRemove(cRoot+cStage+'/'+cBad)
+ next
+ next
+ nContinued:=0
+ if !ProbeRun(cRoot+'run').or.nContinued!=1; nFail++; endif
+ nContinued:=0
+ if !ProbeDebug(cRoot+'debug').or.nContinued!=1; nFail++; endif
+ for each cBad in {'main.prg','debug_main.prg'}
+ DirMake(cRoot+cBad)
+ if HB_BuildWrite(cRoot+cBad,'NEW'); nFail++; endif
+ DirRemove(cRoot+cBad)
+ next
+ MemoWrit(cRoot+'old.prg','OLD')
+ if HB_BuildWrite(cRoot+'missing/sub/old.prg','NEW'); nFail++; endif
+ if !(MemoRead(cRoot+'old.prg')=='OLD'); nFail++; endif
+ QOut('BUILD write refusal cases=8 positive=2 failures='+hb_ntos(nFail))
  ErrorLevel(nFail)
 return nil
 function CodeEditorGetTabText(h,t)
