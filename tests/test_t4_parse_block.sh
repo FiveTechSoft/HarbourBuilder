@@ -79,6 +79,13 @@ run_case() {  # $1 name, $2 sed expr, $3 reason regex expected in dialog OCR
   local MD2=$(md5sum "$RUN/Form1.prg" | cut -d' ' -f1)
   [ "$MD0" = "$MD2" ] || fail "$1: Form1.prg changed on disk after the refused Ctrl+S"
   xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT-14)) click 1; sleep 1
+  for i in 1 2 3 4 5; do
+    xwininfo -id "$DLG2" 2>/dev/null | grep -q IsViewable || break
+    echo "  [$1] SEQ: dialog still modal after dismiss click, retrying"
+    xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT-14)) click 1; sleep 1
+  done
+  xwininfo -id "$DLG2" 2>/dev/null | grep -q IsViewable && fail "$1: second dialog would not dismiss (modal grab)"
+  echo "  [$1] SEQ: second dialog dismissed"
   # repair the corrupted line in the editor; the save must then succeed
   echo "  [$1] SEQ: repairing line $4 in the code editor"
   local CED=""
@@ -93,8 +100,10 @@ run_case() {  # $1 name, $2 sed expr, $3 reason regex expected in dialog OCR
   xdotool key --repeat $(( $4 - 1 )) --repeat-delay 15 Down; sleep 0.5
   xdotool key Home; sleep 0.2
   xdotool key shift+End; sleep 0.2
-  xdotool type --delay 15 "$5"; sleep 0.8
-  xdotool key ctrl+s; sleep 2.5
+  xdotool type --delay 15 "$5"; sleep 2
+  import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/t4neg_$1-repair.png
+  echo "  [$1] SEQ: editor after repair OCR tail: $(tesseract /tmp/t4neg_$1-repair.png - 2>/dev/null | grep -iE 'folder|browse|prompts|colsizes' | head -2 | tr '\n' ' ' | cut -c1-120)"
+  xdotool key ctrl+s; sleep 3
   local MD3=$(md5sum "$RUN/Form1.prg" | cut -d' ' -f1)
   [ "$MD3" != "$MD0" ] || fail "$1: save after repair did not write the file"
   grep -qF "$6" "$RUN/Form1.prg" || fail "$1: repaired line not in the saved file"
@@ -110,5 +119,34 @@ run_case prompts 's/PROMPTS "P1", "P2"/PROMPTS "P1", "P2/' 'PROMPTS' 54 \
 run_case colsizes 's/COLSIZES 90, 60/COLSIZES 90x, 60/' 'COLSIZES' 56 \
   '   @ 240, 460 BROWSE ::oBrw1 OF Self SIZE 165, 150 HEADERS "Nombre", "Edad" COLSIZES 90, 60 FOOTERS "Total", ""' \
   'COLSIZES 90, 60'
+
+# Pre-existing block type at open: if an R2-era ITEMS block also dialogs at
+# open, the at-open notice is the old guard's behavior, not a T4 regression.
+RUN=/tmp/t4neg_items
+rm -rf "$RUN"; mkdir -p "$RUN"
+cp "$FIX"/Project1.hbp "$FIX"/Project1.prg "$FIX"/Form1.prg "$RUN"/
+sed -i 's/ITEMS "Uno", "Di " + Chr( 34 ) + "si" + Chr( 34 ), "Tre, s"/ITEMS "Uno|x", "Tre"/' "$RUN/Form1.prg"
+rt_setup "$RUN"
+rt_launch_ide
+rt_reopen_project
+MD0=$(md5sum "$RUN/Form1.prg" | cut -d' ' -f1)
+DLG=""
+for i in 1 2 3 4 5; do
+  for w in $(rt_ide_windows); do
+    [ "$(xdotool getwindowname "$w" 2>/dev/null)" = "HbBuilder" ] &&       xwininfo -id "$w" 2>/dev/null | grep -q IsViewable && { DLG=$w; break; }
+  done
+  [ -n "$DLG" ] && break
+  sleep 1
+done
+if [ -n "$DLG" ]; then
+  eval "$(xdotool getwindowgeometry --shell "$DLG")"
+  import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/t4neg_items.png
+  echo "  [items] SEQ: at-open dialog=yes OCR: $(tesseract /tmp/t4neg_items.png - 2>/dev/null | tr '\n' ' ' | cut -c1-120)"
+else
+  echo "  [items] SEQ: at-open dialog=no"
+fi
+[ "$(md5sum "$RUN/Form1.prg" | cut -d' ' -f1)" = "$MD0" ] || fail "items: disk changed on open"
+rt_cleanup
+sleep 1
 
 echo "T4BLOCK PASS: unparseable FOLDER PROMPTS and non-numeric COLSIZES both refused; disk byte-identical."
