@@ -1860,6 +1860,7 @@ HB_FUNC( INS_SETFOLDERPAGE )
    if( !d ) return;
    d->hCtrl = (HB_PTRUINT) hb_parnint(2);
    d->nFolderPage = HB_ISNUM(3) ? hb_parni(3) : -1;
+   gtk_window_set_title( GTK_WINDOW(d->window), "Inspector: TFolderPage" );
    d->nRows = 0;
 }
 

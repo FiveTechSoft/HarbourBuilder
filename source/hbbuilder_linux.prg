@@ -726,11 +726,10 @@ static function OnComboSelect( nSel )
       // Form or control
       hTarget := aEntry[2]
    else
-      if nSel == 0
-         hTarget := oDesignForm:hCpp
-      else
-         hTarget := UI_GetChild( oDesignForm:hCpp, nSel )
-      endif
+      // An absent/stale expanded map cannot safely resolve a child index.
+      // Only index zero has an unambiguous identity (the form).
+      if nSel != 0; return nil; endif
+      hTarget := oDesignForm:hCpp
    endif
 
    if hTarget != 0
@@ -2093,7 +2092,7 @@ return cHandler
 
 static function OnComponentDrop( hForm, nType, nL, nT, nW, nH )
 
-   local cName, nCount, hCtrl
+   local cName, nCount, hCtrl, aMap, i, nSel
    static aCnt := nil
    static aNames := { ;
       "Label", "Edit", "Button", "CheckBox", "ComboBox", "GroupBox", ;
@@ -2146,10 +2145,24 @@ static function OnComponentDrop( hForm, nType, nL, nT, nW, nH )
 
    SyncDesignerToCode()
 
-   // Refresh inspector and select the new component
-   InspectorPopulateCombo( hForm )
-   INS_ComboSelect( _InsGetData(), nCount )
-   InspectorRefresh( hCtrl )
+   // Rebuild and mirror the dropped control by identity. Folder pages and
+   // browse columns expand the combo, so child count is not a combo index.
+   lUpdatingInspectorCombo := .T.
+   begin sequence
+      InspectorPopulateCombo( hForm )
+      aMap := InspectorGetComboMap()
+      nSel := 0
+      for i := 1 to Len( aMap )
+         if aMap[i][1] == 1 .and. aMap[i][2] == hCtrl
+            nSel := i - 1
+            exit
+         endif
+      next
+      INS_ComboSelect( _InsGetData(), nSel )
+      InspectorRefresh( hCtrl )
+   always
+      lUpdatingInspectorCombo := .F.
+   end sequence
 
 return nil
 
