@@ -13,7 +13,7 @@ function Main()
  if Len(aDbgOffsets)!=3
  nFail++
  else
- if !(aDbgOffsets[3][2]=='Helpers.prg').or.aDbgOffsets[3][3]!=3; nFail++; endif
+ if !(aDbgOffsets[3][2]=='Helpers.prg').or.aDbgOffsets[3][3]!=3.or.aDbgOffsets[3][4]!=1; nFail++; endif
  endif
  QOut('DEBUG MODULE failures='+hb_ntos(nFail))
  QOut(cAllPrg)

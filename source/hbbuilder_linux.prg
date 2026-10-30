@@ -4778,6 +4778,17 @@ static function TBDebugRun( lRunToBreak )
       nCurLine += NumLines( cSection ) + 1
    next
 
+   // Module tabs follow all form tabs. Read the current editor text, not
+   // the saved module cache, and keep line count stable when stripping includes.
+   for i := 1 to Len( aModules )
+      AAdd( aDbgOffsets, { nCurLine, aModules[i][1] + ".prg", 1 + Len( aForms ) + i, 1 } )
+      cSection := CodeEditorGetTabText( hCodeEditor, 1 + Len( aForms ) + i )
+      cSection := StrTran( StrTran( cSection, '#include "classes.prg"', "" ), ;
+         '#include "hbbuilder.ch"', "" )
+      cAllPrg += cSection + Chr(10)
+      nCurLine += NumLines( cSection ) + 1
+   next
+
    // classes.prg (framework — not in editor)
    AAdd( aDbgOffsets, { nCurLine, "classes.prg", 0, 0 } )
    cSection := MemoRead( cBuildDir + "/classes.prg" )
