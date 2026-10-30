@@ -14,7 +14,7 @@ rt_reopen_project
 BAR=$(rt_find_bar);rt_unmap_all_but "$BAR";xdotool mousemove 700 12 click 1
 xdotool mousemove 20 12 mousedown 1;sleep .5;xdotool mousemove 100 163 mouseup 1
 sleep 1
-xdotool key ctrl+l;xdotool type --delay 1 "$RUN/Standalone.prg";xdotool key Return
+xdotool key ctrl+l;xdotool type --delay 1 "$RUN/Standalone.prg";xdotool key Return;sleep 1;xdotool key Return
 sleep 2
 for w in $(rt_ide_windows);do [ "$(xdotool getwindowname "$w")" = 'Code Editor' ] && ED=$w;done
 xdotool windowmap "$ED";xdotool windowraise "$ED";xdotool windowfocus "$ED";xdotool key ctrl+a
@@ -31,6 +31,7 @@ sleep 1
 for w in $(rt_ide_windows);do echo "window $w $(xdotool getwindowname "$w")";done
 import -window root /tmp/openfile-close-choice.png
 tesseract /tmp/openfile-close-choice.png - --psm 6 2>/dev/null
+rt_map_all;sleep 1
 # Standard Yes/No/Cancel question: select Yes to save the editor buffer.
 xdotool key alt+y;sleep 2
 cat "$RUN/Standalone.prg"
