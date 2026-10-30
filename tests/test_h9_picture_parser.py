@@ -4,6 +4,7 @@ r=pathlib.Path(__file__).resolve().parents[1];s=(r/'source/hbbuilder_win.prg').r
 p=pathlib.Path('/tmp/h9-picture');p.mkdir(exist_ok=True)
 main='''static aPictureParseBlocks := {}
 static aWrites := {}
+static nMessages := 0
 function Main()
  local nFail := 0, cPath := 'a"b.png'
  RestorePictureClause(100,11,'@ 1,1 BITBTN ::oB OF Self SIZE 40,20 PICTURE "icon.png"')
@@ -15,7 +16,10 @@ function Main()
  RestorePictureClause(100,11,'@ 1,1 IMAGE ::oI PICTURE "a" +')
  RestorePictureClause(100,11,'@ 1,1 IMAGE ::oI PICTURE "a" "b"')
  if Len(aWrites) != 2 .or. Len(aPictureParseBlocks) != 5; nFail++; endif
+ if PictureParseAllowed(100,.T.); nFail++; endif
+ if nMessages != 0; nFail++; endif
  if PictureParseAllowed(100); nFail++; endif
+ if nMessages != 1; nFail++; endif
  QOut('H9 PICTURE PARSER failures='+hb_ntos(nFail))
  ErrorLevel(nFail)
 return nil
@@ -28,6 +32,7 @@ function SelectionParseAllowed(h)
 return .T.
 function MsgInfo(t,title)
  HB_SYMBOL_UNUSED(title)
+ nMessages++
  QOut(t)
 return nil
 '''

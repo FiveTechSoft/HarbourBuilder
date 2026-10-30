@@ -5,6 +5,7 @@ r=pathlib.Path(__file__).resolve().parents[1]; platform=sys.argv[1] if len(sys.a
 p=pathlib.Path('/tmp/h9-selection');p.mkdir(exist_ok=True)
 main='''static aSelectionParseBlocks := {}
 static aWrites := {}
+static nMessages := 0
 function Main()
  local nFail := 0
  RestoreSelectionAssignment(100,'::oCOMBO:Value := 2')
@@ -15,7 +16,10 @@ function Main()
  RestoreSelectionAssignment(100,'::oCombo:Value := 1+1')
  RestoreSelectionAssignment(100,'::oMissing:Value := 2')
  if Len(aWrites) != 2 .or. Len(aSelectionParseBlocks) != 3; nFail++; endif
+ if SelectionParseAllowed(100,.T.); nFail++; endif
+ if nMessages != 0; nFail++; endif
  if SelectionParseAllowed(100); nFail++; endif
+ if nMessages != 1; nFail++; endif
  QOut('H9 SELECTION PARSER failures='+hb_ntos(nFail))
  ErrorLevel(nFail)
 return nil
@@ -36,6 +40,7 @@ function UI_SetProp(h,p,v)
 return nil
 function MsgInfo(t,title)
  HB_SYMBOL_UNUSED(title)
+ nMessages++
  QOut(t)
 return nil
 '''
