@@ -176,12 +176,12 @@ echo "TLabeledEdit selected via rubber band and deleted; file clean"
 
 # 3) drop an unserializable TTrackBar (GTK3 palette, "TB"): this type
 # still has no faithful serialization, so the refusal path must engage
-read GX GY <<< $(rt_ocr_bar_token '^GTK3$')
+read GX GY <<< $(rt_ocr_bar_token '^GTK3' 5)   # OCR reads the tab as 'GTK3_-' at conf ~7
 [ -n "${GX:-}" ] || fail "GTK3 palette tab not found"
 xdotool mousemove "$GX" "$GY" click 1; sleep 1
 BX_TOKEN=""
 for re in '^TB$' '^T8$' '^18$'; do
-  read BX_TOKEN BY_TOKEN <<< $(rt_ocr_bar_token "$re")
+  read BX_TOKEN BY_TOKEN <<< $(rt_ocr_bar_token "$re" 5)
   [ -n "${BX_TOKEN:-}" ] && break
   sleep 0.5
 done

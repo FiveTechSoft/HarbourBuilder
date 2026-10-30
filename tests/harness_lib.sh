@@ -45,8 +45,11 @@ rt_launch_ide() {
   echo "IDE pid: $RT_IDEPID (started by this script)"
 }
 
-rt_cleanup() {  # kill only the IDE this script started; restore the INI
-  [ -n "${RT_IDEPID:-}" ] && kill "$RT_IDEPID" 2>/dev/null
+rt_cleanup() {  # kill only the IDE this script started, reap it, restore the INI
+  if [ -n "${RT_IDEPID:-}" ]; then
+    kill "$RT_IDEPID" 2>/dev/null
+    wait "$RT_IDEPID" 2>/dev/null
+  fi
   [ -f /tmp/rt_ini_backup ] && cp /tmp/rt_ini_backup "$REPO/bin/hbbuilder.ini"
 }
 
@@ -105,10 +108,10 @@ rt_reopen_project() {  # File -> Reopen Last Project, then wait for the designer
   [ -n "${RT_DESIGNER:-}" ] || { echo "HARNESS FAIL: designer window not found"; exit 1; }
 }
 
-rt_ocr_bar_token() {  # $1 = regex of the token; prints "x y" centre on stdout
+rt_ocr_bar_token() {  # $1 = regex of the token, $2 = min OCR confidence (default 40)
   local png=/tmp/rt_bar_$$.png
   import -window root -crop "1600x118+0+0" "$png" 2>/dev/null
   tesseract "$png" - tsv 2>/dev/null | \
-    awk -F'\t' -v re="$1" '$12 ~ re && $9+0 > 5 && $10+0 > 5 && $11+0 > 40 {printf "%d %d\n", $7+$9/2, $8+$10/2; exit}'
+    awk -F'\t' -v re="$1" -v mc="${2:-40}" '$12 ~ re && $9+0 > 5 && $10+0 > 5 && $11+0 > mc {printf "%d %d\n", $7+$9/2, $8+$10/2; exit}'
   rm -f "$png"
 }
