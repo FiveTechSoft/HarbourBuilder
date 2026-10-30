@@ -288,6 +288,20 @@ else
   else
     echo "  SAVEFAIL: IDE closed although the save FAILED"; FAILN=$((FAILN+1))
   fi
+  # the failed save must WARN (auditor: silent read-only failure). Find the
+  # warning, capture it as evidence, dismiss it.
+  WARN=""
+  for w in $(rt_ide_windows); do
+    xdotool getwindowname "$w" 2>/dev/null | grep -q '^HbBuilder$' && WARN=$w
+  done
+  if [ -n "$WARN" ]; then
+    echo "  savefail: failure warning dialog present"
+    shot_dialog "$WARN" savefail-warning
+    xdotool windowactivate "$WARN" 2>/dev/null; sleep 0.5; xdotool key Return; sleep 1
+  else
+    echo "  SAVEFAIL: no warning dialog after failed Save (silent failure)"
+    FAILN=$((FAILN+1))
+  fi
   DLG2=$(trigger_and_expect_dialog "ctrl+q")
   if [ -n "$DLG2" ]; then
     echo "  savefail: dirty still set after failed Save (guard prompts again)"
@@ -309,7 +323,12 @@ dirty_the_buffer
 BAR=$(rt_find_bar)
 local BEFORE w i
 BEFORE=$(rt_ide_windows | sort -n | tr '\n' ' ')
-xdotool windowclose "$BAR" 2>/dev/null
+# real WM_DELETE_WINDOW client message (what a window-manager close sends);
+# xdotool windowclose without a WM can hard-kill instead
+if [ ! -x /tmp/wmdel ]; then
+  gcc "$REPO/tests/wmdel.c" -o /tmp/wmdel -I/tmp/gtk-root/usr/include     -L/tmp/gtk-root/usr/lib/x86_64-linux-gnu -lX11 || fail "wmdel build failed"
+fi
+/tmp/wmdel "$BAR"
 DLG=""
 for i in $(seq 1 8); do
   for w in $(rt_ide_windows); do
@@ -330,6 +349,89 @@ else
   FAILN=$((FAILN+1))
 fi
 echo "xclose case done (FAILN=$FAILN)"
+rt_cleanup
+}
+
+click_menu_item() {  # $1 = OCR token; clicks that word in the open File menu
+  import -window root -crop "240x340+0+0" /tmp/dl_menu.png 2>/dev/null
+  local rel
+  rel=$(tesseract /tmp/dl_menu.png - tsv 2>/dev/null | awk -F'\t' -v w="$1" '$12 == w {print $7" "$8" "$9" "$10; exit}')
+  [ -n "$rel" ] || { echo "  [diag] menu token $1 not found:"; tesseract /tmp/dl_menu.png - 2>/dev/null | head -5; return 1; }
+  set -- $rel
+  xdotool mousemove $(($1 + $3/2)) $(($2 + $4/2)) click 1; sleep 1
+}
+
+run_saveas() {
+launch_a
+dirty_the_buffer
+mkdir -p /tmp/rt_saveas_b; rm -f /tmp/rt_saveas_b/*
+BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"; sleep 0.3
+xdotool mousemove 20 12 click 1; sleep 0.8
+click_menu_item 'As'
+sleep 2
+xdotool key ctrl+l; sleep 0.5
+xdotool type --delay 15 '/tmp/rt_saveas_b/Project1.hbp'; sleep 0.5
+xdotool key Return; sleep 3
+rt_map_all; sleep 0.5
+for f in Project1.hbp Project1.prg Form1.prg; do
+  [ -f "/tmp/rt_saveas_b/$f" ] || { echo "  SAVEAS: /tmp/rt_saveas_b/$f not written"; FAILN=$((FAILN+1)); }
+done
+if [ -f /tmp/rt_saveas_b/Form1.prg ]; then
+  grep -q 'VERSION-Y' /tmp/rt_saveas_b/Form1.prg     && echo "  saveas: edited content written to the new path"     || { echo "  SAVEAS: new Form1.prg lacks the edit"; FAILN=$((FAILN+1)); }
+fi
+# auditor defect: deleting the OLD project must not cause a false refusal
+rm -f "$RUNA"/Project1.hbp "$RUNA"/Project1.prg "$RUNA"/Form1.prg
+local BEFORE w
+BEFORE=$(rt_ide_windows | sort -n | tr '\n' ' ')
+xdotool key ctrl+s; sleep 3
+REF=""
+for w in $(rt_ide_windows); do
+  case " $BEFORE " in *" $w "*) ;; *) REF=$w;; esac
+done
+if [ -n "$REF" ]; then
+  echo "  SAVEAS: refusal after old project deleted (identity not transitioned)"
+  shot_dialog "$REF" saveas-refusal; FAILN=$((FAILN+1))
+else
+  echo "  saveas: old project deleted, ctrl+s saved without refusal"
+fi
+echo "saveas case done (FAILN=$FAILN)"
+rt_cleanup
+}
+
+run_occupied() {
+launch_a
+mkdir -p /tmp/rt_occ; rm -f /tmp/rt_occ/*
+echo "foreign hbp"   > /tmp/rt_occ/Project1.hbp
+echo "foreign form"  > /tmp/rt_occ/Form1.prg
+echo "foreign main"  > /tmp/rt_occ/Project1.prg
+md5sum /tmp/rt_occ/* > /tmp/rt_occ.md5
+DLG=$(trigger_and_expect_dialog "ctrl+n")
+[ -n "$DLG" ] && { echo "  OCCUPIED: unexpected prompt at New on a clean project"; cancel_dialog "$DLG"; FAILN=$((FAILN+1)); }
+sleep 2
+BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"; sleep 0.3
+xdotool mousemove 700 12 click 1; sleep 0.4
+xdotool key ctrl+s; sleep 2
+xdotool key ctrl+l; sleep 0.5
+xdotool type --delay 15 '/tmp/rt_occ/Project1.hbp'; sleep 0.5
+xdotool key Return; sleep 2
+WARN=""
+for w in $(rt_ide_windows); do
+  xdotool getwindowname "$w" 2>/dev/null | grep -q '^HbBuilder$' && WARN=$w
+done
+if [ -n "$WARN" ]; then
+  echo "  occupied: overwrite confirmation appeared"
+  shot_dialog "$WARN" occupied-confirm
+  click_dialog_button "$WARN" '^No$'
+  sleep 1
+  if md5sum -c /tmp/rt_occ.md5 >/dev/null 2>&1; then
+    echo "  occupied: No -> foreign files untouched"
+  else
+    echo "  OCCUPIED: foreign files MODIFIED despite answering No"; FAILN=$((FAILN+1))
+  fi
+else
+  echo "  OCCUPIED: no overwrite confirmation for foreign files"; FAILN=$((FAILN+1))
+fi
+echo "occupied case done (FAILN=$FAILN)"
 rt_cleanup
 }
 

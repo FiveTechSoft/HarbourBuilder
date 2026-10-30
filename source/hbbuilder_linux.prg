@@ -679,7 +679,8 @@ static function CreateDesignForm( nX, nY )
    DEFINE FORM oDesignForm TITLE cName SIZE 562, 315 FONT "Sans", 11
    UI_FormSetPos( oDesignForm:hCpp, nX, nY )
 
-   AAdd( aForms, { cName, oDesignForm, GenerateFormCode( cName ), nX, nY } )
+   AAdd( aForms, { cName, oDesignForm, GenerateFormCode( cName ), nX, nY, ;
+      GenerateFormCode( cName ) } )  // slot 6: frozen clean generator output
    nActiveForm := Len( aForms )
 
 return nil
@@ -1911,14 +1912,20 @@ return nil
 // save leaves the baseline unchanged, so the work stays protected.
 static function HB_RecomputeDirty()
 
-   local cDir, i, nTab
+   local cDir, i, nTab, cFrozen
 
    lProjectDirty := .f.
    lOpenFilesDirty := .f.
 
    if Empty( cCurrentFile )
       for nTab := 1 to 1 + Len( aForms ) + Len( aModules ) + Len( aOpenFiles )
-         if ! HB_TabTextIsKnown( nTab, CodeEditorGetTabText( hCodeEditor, nTab ) )
+         cFrozen := CodeEditorGetTabText( hCodeEditor, nTab )
+         if ! HB_TabTextIsKnown( nTab, cFrozen )
+            i := nTab - 1
+            if i >= 1 .and. i <= Len( aForms ) .and. Len( aForms[i] ) >= 6 .and. ;
+               aForms[i][6] != NIL .and. cFrozen == aForms[i][6]
+               loop   // frozen generator output, no user edit
+            endif
             if nTab > 1 + Len( aForms ) + Len( aModules )
                lOpenFilesDirty := .t.
             else
@@ -1935,8 +1942,13 @@ static function HB_RecomputeDirty()
       lProjectDirty := .t.
    endif
    for i := 1 to Len( aForms )
-      if ! HB_DiskBaseMatch( cDir + aForms[ i ][ 1 ] + ".prg", CodeEditorGetTabText( hCodeEditor, 1 + i ) )
-         lProjectDirty := .t.
+      cFrozen := CodeEditorGetTabText( hCodeEditor, 1 + i )
+      if ! HB_DiskBaseMatch( cDir + aForms[ i ][ 1 ] + ".prg", cFrozen )
+         // exact-text mismatch is still clean when it equals the frozen
+         // load-time generator output (normalization, no user edit)
+         if Len( aForms[i] ) < 6 .or. aForms[i][6] == NIL .or. !( cFrozen == aForms[i][6] )
+            lProjectDirty := .t.
+         endif
       endif
    next
    for i := 1 to Len( aModules )
@@ -2111,7 +2123,7 @@ static function WireDesignForm()
 
 return nil
 
-static function SyncDesignerToCode( lFromSave )
+static function SyncDesignerToCode( lFromSave, lShadow )
 
    local cNewCode, cOldCode, cMethods, nPos, nPos2
    local cVal, cKey, cCh, aExLines, nE, nP1, kk, lFound, lRetB := .F.
@@ -2119,6 +2131,9 @@ static function SyncDesignerToCode( lFromSave )
    local cSep := "//" + Replicate( "-", 68 )
 
    if lFromSave == nil; lFromSave := .F.; endif
+   // lShadow: compute what the generator would write and RETURN it without
+   // touching model, editor or deletion records (clean-baseline probe)
+   if lShadow == nil; lShadow := .F.; endif
 
    if nActiveForm < 1 .or. nActiveForm > Len( aForms ); return nil; endif
 
@@ -2258,7 +2273,7 @@ static function SyncDesignerToCode( lFromSave )
       next
       // auto-syncs (resize, inspector) warn only when the refusal set changes;
       // an explicit save always warns
-      if lFromSave .or. !( cNewCode == s_cLastRefusal )
+      if ! lShadow .and. ( lFromSave .or. !( cNewCode == s_cLastRefusal ) )
          MsgInfo( "Save aborted: these controls cannot be saved faithfully and" + ;
             Chr(10) + "would be lost on reopen:" + Chr(10) + Chr(10) + cNewCode + ;
             Chr(10) + "Keep them in code, or use a supported control type.", ;
@@ -2266,13 +2281,18 @@ static function SyncDesignerToCode( lFromSave )
       endif
       s_cLastRefusal := cNewCode
       lSyncingFromCode := .f.
-      return nil
+      return If( lShadow, "", nil )
    endif
    s_cLastRefusal := ""
 
    // Append preserved METHOD implementations
    if ! Empty( cMethods )
       cNewCode += Chr(13) + Chr(10) + cMethods
+   endif
+
+   if lShadow
+      lSyncingFromCode := .f.
+      return cNewCode
    endif
 
    // the regenerated code is being applied: now it is safe to consume the
@@ -2760,6 +2780,10 @@ static function TBNew()
    HB_DiskBaseReset()
    lProjectDirty := .f.
    lOpenFilesDirty := .f.
+
+   nActiveForm := 1
+   if Len( aForms[1] ) < 6; AAdd( aForms[1], NIL ); endif
+   aForms[1][6] := SyncDesignerToCode( .T., .T. )
 
    lSyncingFromCode := .t.
    InspectorRefresh( oDesignForm:hCpp )
@@ -3687,6 +3711,16 @@ static function OpenProjectFile( cFile, cAction )
 
    lSyncingFromCode := .f.
 
+   // Frozen clean text per form: the generator output for the just-loaded
+   // model. A later model-unchanged sync (window clamp, programmatic move)
+   // rewrites the editor to exactly this text; it carries no user edit.
+   for i := 1 to Len( aForms )
+      if Len( aForms[i] ) < 6; AAdd( aForms[i], NIL ); endif
+      nActiveForm := i
+      oDesignForm := aForms[i][2]
+      aForms[i][6] := SyncDesignerToCode( .T., .T. )
+   next
+
    if Len( aForms ) > 0
       nActiveForm := 1
       oDesignForm := aForms[1][2]
@@ -3869,6 +3903,9 @@ static function TBSave()
       if MemoWrit( cDir + aForms[i][1] + ".prg", aForms[i][3] )
          HB_DiskBaseSet( cDir + aForms[i][1] + ".prg", aForms[i][3] )
          HB_TabMarkKnown( 1 + i, aForms[i][3] )
+         if Len( aForms[i] ) >= 6
+            aForms[i][6] := aForms[i][3]
+         endif
       else
          lAllOk := .F.
          cFailed += cDir + aForms[i][1] + ".prg" + Chr(10)
