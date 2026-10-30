@@ -117,11 +117,25 @@ for w in Nombre Edad Total; do
 done
 echo "$HDR" | grep -q 'Pag2' && { echo "  Pag2 visible on page 1: page membership broken"; FAILN=$((FAILN+1)); }
 APPX=$X; APPY=$Y
-xdotool mousemove $((APPX+510)) $((APPY+72)) click 1; sleep 1
+# click the P2 tab where it actually is: locate its word box by OCR
+rel=$(tesseract /tmp/rt_runtime.png - tsv 2>/dev/null | awk -F'\t' '$8+0 > 20 && $12 ~ /^P2$/ {print $7" "$8" "$9" "$10; exit}')
+if [ -n "$rel" ]; then
+  set -- $rel
+  echo "  P2 tab at +$1,+$2 ${3}x${4}; clicking its center"
+  xdotool mousemove $((APPX+$1+$3/2)) $((APPY+$2+$4/2)) click 1; sleep 1
+else
+  echo "  P2 tab not found by OCR; page switch not attempted"; FAILN=$((FAILN+1))
+fi
 import -window root -crop "${WIDTH}x${HEIGHT}+${APPX}+${APPY}" /tmp/rt_runtime_p2.png
 P2=$(tesseract /tmp/rt_runtime_p2.png - 2>/dev/null)
 echo "$P2" | grep -q 'Pag2' || { echo "  Pag2 NOT visible after switching to page 2"; FAILN=$((FAILN+1)); }
-xdotool mousemove $((APPX+470)) $((APPY+72)) click 1; sleep 1
+rel=$(tesseract /tmp/rt_runtime_p2.png - tsv 2>/dev/null | awk -F'\t' '$8+0 > 20 && $12 ~ /^(P1|Pl)$/ {print $7" "$8" "$9" "$10; exit}')
+if [ -n "$rel" ]; then
+  set -- $rel
+  xdotool mousemove $((APPX+$1+$3/2)) $((APPY+$2+$4/2)) click 1; sleep 1
+else
+  echo "  P1 tab not found by OCR for the switch back"; FAILN=$((FAILN+1))
+fi
 import -window root -crop "${WIDTH}x${HEIGHT}+${APPX}+${APPY}" /tmp/rt_runtime_p1b.png
 P1B=$(tesseract /tmp/rt_runtime_p1b.png - 2>/dev/null)
 echo "$P1B" | grep -q 'Pag2' && { echo "  Pag2 still visible after switching back to page 1"; FAILN=$((FAILN+1)); }
