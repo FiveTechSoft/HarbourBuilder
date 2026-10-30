@@ -171,4 +171,38 @@ edit_row aColumns 'Nombre|Anos'
 verify_buffer 'Anos'
 save_and_check browse 'HEADERS "Nombre", "Anos"' 'COLSIZES 90, 60' 'FOOTERS "Total", ""' 'PROMPTS "P1", "Pag2X"'
 
-echo "T4INSP PASS: inspector edits of aTabs/aColumns regenerate faithfully; structure preserved"
+# Fresh IDE process loading the saved files: inspect actual persisted arrays.
+rt_cleanup
+rt_launch_ide
+rt_reopen_project
+INS=""
+for w in $(rt_ide_windows); do
+  case "$(xdotool getwindowname "$w" 2>/dev/null)" in Inspector*) INS=$w; break;; esac
+done
+[ -n "$INS" ] || fail "Inspector missing after reopening saved project"
+check_array() {
+  local PROP=$1 WANT1=$2 WANT2=$3 rel ARR="" w
+  pick_combo "$4"
+  rel=$(tesseract /tmp/t4insp_win.png - tsv 2>/dev/null | awk -F'\t' -v p="$PROP" '$12 == p {printf "%d %d",$7+$9/2,$8+$10/2;exit}')
+  # Capture current properties after combo selection, not the earlier form.
+  eval "$(xdotool getwindowgeometry --shell "$INS")"
+  import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/t4insp_reopen_props.png
+  rel=$(tesseract /tmp/t4insp_reopen_props.png - tsv 2>/dev/null | awk -F'\t' -v p="$PROP" '$12 == p {printf "%d %d",$7+$9/2,$8+$10/2;exit}')
+  [ -n "$rel" ] || fail "$PROP missing after reopen"
+  set -- $rel
+  xdotool mousemove $((X+$1)) $((Y+$2)) click 1; xdotool key Return; sleep 1
+  for w in $(rt_ide_windows); do
+    [ "$(xdotool getwindowname "$w" 2>/dev/null)" = "Array Editor" ] && { ARR=$w; break; }
+  done
+  [ -n "$ARR" ] || fail "$PROP Array Editor missing after reopen"
+  eval "$(xdotool getwindowgeometry --shell "$ARR")"
+  import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/t4insp_reopen_${PROP}.png
+  tesseract /tmp/t4insp_reopen_${PROP}.png - 2>/dev/null | grep -qiF "$WANT1" || fail "$PROP first item lost after reopen"
+  tesseract /tmp/t4insp_reopen_${PROP}.png - 2>/dev/null | grep -qiF "$WANT2" || fail "$PROP second item lost after reopen"
+  echo "  [reopen Inspector] $PROP contains $WANT1 / $WANT2"
+  xdotool key Escape; sleep 0.5
+}
+check_array aTabs P1 Pag2X 'TFolder$'
+check_array aColumns Nombre Anos 'TBrowse$'
+rt_cleanup
+echo "T4INSP PASS: inspector edits, generated buffer, Save and fresh-process Inspector reopen verified"

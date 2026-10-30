@@ -8,7 +8,10 @@
 # Run from the repo root. Evidence screenshot lands in /tmp/rt_runtime.png.
 set -u
 REPO=$(cd "$(dirname "$0")/.." && pwd)
-FIX="$REPO/tests/fixtures/roundtrip"
+FIX="${RUNTIME_FIXTURE:-$REPO/tests/fixtures/roundtrip}"
+EXPECT_TABS="${EXPECT_TABS:-P1|P2}"
+EXPECT_TAB2="${EXPECT_TAB2:-P2}"
+EXPECT_HEADER2="${EXPECT_HEADER2:-Edad}"
 RUN=/tmp/rt_run
 source "$REPO/tests/harness_lib.sh"
 fail() { echo "RUNTIME FAIL: $1"; rt_cleanup; exit 1; }
@@ -79,7 +82,7 @@ if [ -f /tmp/fixture_trace.log ]; then
     || { echo "  trace wrong: $(cat /tmp/fixture_trace.log)"; FAILN=$((FAILN+1)); }
   # T4: folder tabs, browse columns and page-2 child wiring, read from the
   # live runtime controls (not from the Harbour-side DATA mirrors)
-  for want in 'folder-tabs:P1|P2' 'browse-cols:2' 'page2-btn:Pag2' 'page2-owner:folder' 'page2-page:1'; do
+  for want in "folder-tabs:$EXPECT_TABS" 'browse-cols:2' 'page2-btn:Pag2' 'page2-owner:folder' 'page2-page:1'; do
     grep -qF "$want" /tmp/fixture_trace.log \
       || { echo "  T4 trace missing: $want (got: $(cat /tmp/fixture_trace.log | tr '\n' ' '))"; FAILN=$((FAILN+1)); }
   done
@@ -112,13 +115,13 @@ fi
 # 5. T4 widget reality: browse headers/footer really rendered, and the
 # page-2 button is visible ONLY after switching the folder to page 2.
 HDR=$(tesseract /tmp/rt_runtime.png - 2>/dev/null)
-for w in Nombre Edad Total; do
+for w in Nombre "$EXPECT_HEADER2" Total; do
   echo "$HDR" | grep -q "$w" || { echo "  browse widget text '$w' not rendered"; FAILN=$((FAILN+1)); }
 done
 echo "$HDR" | grep -q 'Pag2' && { echo "  Pag2 visible on page 1: page membership broken"; FAILN=$((FAILN+1)); }
 APPX=$X; APPY=$Y
 # click the P2 tab where it actually is: locate its word box by OCR
-rel=$(tesseract /tmp/rt_runtime.png - tsv 2>/dev/null | awk -F'\t' '$8+0 > 20 && $12 ~ /^P2$/ {print $7" "$8" "$9" "$10; exit}')
+rel=$(tesseract /tmp/rt_runtime.png - tsv 2>/dev/null | awk -F'\t' -v tab="$EXPECT_TAB2" '$8+0 > 20 && $12 == tab {print $7" "$8" "$9" "$10; exit}')
 if [ -n "$rel" ]; then
   set -- $rel
   echo "  P2 tab at +$1,+$2 ${3}x${4}; clicking its center"
