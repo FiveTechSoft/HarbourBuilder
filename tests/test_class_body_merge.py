@@ -23,6 +23,10 @@ function Main()
  if !( 'DATA oAdded' $ cOut ); nFail++; endif
  if 'DATA oKeep   //' $ cOut; nFail++; endif
  if !(HB_MergeClassBody('CLASS TForm1'+e+cOut+'ENDCLASS'+e,1,cNew,'|')==cOut); nFail++; endif
+ if !HB_ClassDeclaresMember('DATA oKeep// x','OKEEP'); nFail++; endif
+ s_aUnserializable:={}
+ if Len(HB_MergeClassBody('CLASS TForm1'+e+'DATA nUser INIT 3'+e,1,cNew,'|'))!=0.or.Empty(s_aUnserializable);nFail++;endif
+ s_aUnserializable:={}
  if !HB_ClassDeclaresMember('DATA oOther, oAdded INIT nil','OADDED').or.Len(s_aUnserializable)!=1; nFail++; endif
  QOut(cOut)
  QOut('CLASS BODY exact custom lines/add/delete/fixpoint failures='+hb_ntos(nFail))
