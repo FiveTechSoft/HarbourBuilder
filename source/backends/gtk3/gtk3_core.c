@@ -8252,6 +8252,8 @@ HB_FUNC( CODEEDITORREMOVETAB )
    if( !ed || !ed->tabBar || nTab < 0 || nTab >= ed->nTabs || ed->nTabs <= 1 )
       return;
 
+   SaveCurrentTabText( ed );
+
    /* Free the text for this tab */
    if( ed->tabTexts[nTab] ) { free( ed->tabTexts[nTab] ); ed->tabTexts[nTab] = NULL; }
 
@@ -8270,14 +8272,15 @@ HB_FUNC( CODEEDITORREMOVETAB )
    g_signal_handlers_block_matched( ed->tabBar, G_SIGNAL_MATCH_FUNC,
       0, 0, NULL, (gpointer)on_editor_tab_switched, NULL );
    gtk_notebook_remove_page( GTK_NOTEBOOK(ed->tabBar), nTab );
+   /* Keep the same logical tab when an earlier page was removed. If the
+    * active page itself was removed, select its predecessor (or first). */
+   if( ed->nActiveTab > nTab )
+      --ed->nActiveTab;
+   else if( ed->nActiveTab == nTab )
+      ed->nActiveTab = nTab > 0 ? nTab - 1 : 0;
+   gtk_notebook_set_current_page( GTK_NOTEBOOK(ed->tabBar), ed->nActiveTab );
    g_signal_handlers_unblock_matched( ed->tabBar, G_SIGNAL_MATCH_FUNC,
       0, 0, NULL, (gpointer)on_editor_tab_switched, NULL );
-
-   /* Adjust active tab if needed */
-   if( ed->nActiveTab >= ed->nTabs )
-      ed->nActiveTab = ed->nTabs - 1;
-   if( ed->nActiveTab == nTab && ed->nActiveTab > 0 )
-      ed->nActiveTab--;
 
    /* Refresh Scintilla with the new active tab's text */
    if( ed->sciWidget && ed->nActiveTab >= 0 && ed->nActiveTab < ed->nTabs )

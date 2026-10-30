@@ -37,6 +37,18 @@ import -window root /tmp/remove-module-dirty-after.png
 python3 - "$RUN" <<'CHECK'
 from pathlib import Path
 import sys
-p=Path(sys.argv[1]);a=(p/'before-editor.txt').read_text();b=(p/'after-editor.txt').read_text();print('BEFORE',repr(a));print('AFTER',repr(b));assert 'UNSAVED-STANDALONE-WORK' in a;assert a!=b
-print('RED removing another module discards active standalone unsaved editor text')
+p=Path(sys.argv[1]);a=(p/'before-editor.txt').read_text();b=(p/'after-editor.txt').read_text();print('BEFORE',repr(a));print('AFTER',repr(b));assert 'UNSAVED-STANDALONE-WORK' in a;assert a==b
+print('GREEN removing another module preserves active standalone exact unsaved text')
 CHECK
+# Close Save must still address the standalone after its index shifted.
+BAR=$(rt_find_bar);rt_unmap_all_but "$BAR";xdotool mousemove 700 12 click 1
+xdotool mousemove 20 12 mousedown 1;sleep .5;xdotool mousemove 100 187 mouseup 1;sleep 1
+DLG=''
+for w in $(rt_ide_windows);do [ "$(xdotool getwindowname "$w")" = 'Unsaved changes' ] && DLG=$w;done
+[ -n "$DLG" ] || { echo 'FAIL dirty protection missing';exit 1; }
+xdotool windowmap "$DLG";xdotool windowraise "$DLG";eval "$(xdotool getwindowgeometry --shell "$DLG")"
+xdotool mousemove $((X+WIDTH/6)) $((Y+HEIGHT-20)) click 1;sleep 1
+cmp "$RUN/before-editor.txt" "$RUN/Standalone.prg" || exit 1
+grep -q 'function HelperA' "$RUN/HelperA.prg" || exit 1
+grep -q 'function HelperB' "$RUN/HelperB.prg" || exit 1
+echo 'CLOSE SAVE correct standalone destination; removed and remaining module disks unchanged'
