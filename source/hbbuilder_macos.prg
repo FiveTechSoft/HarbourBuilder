@@ -83,6 +83,7 @@ function Main()
    nScreenW := MAC_GetScreenWidth()
    nScreenH := MAC_GetScreenHeight()
    cCurrentFile := ""
+   aSelectionParseBlocks := {}
    aForms := {}
    nActiveForm := 0
    aModules := {}
@@ -3903,6 +3904,7 @@ static function TBNew()
       UI_FormClose( aForms[i][2]:hCpp )
       aForms[i][2]:Destroy()
    next
+   aSelectionParseBlocks := {}
    aForms := {}
    nActiveForm := 0
    aModules := {}
@@ -5429,7 +5431,7 @@ return nil
 static function TBSaveAs()
    local cFile
    if ! SelectionParseAllowed( nil ); return .F.; endif
-   cFile := MAC_SaveFileDialog( "Save As", "hbp" )
+   cFile := MAC_SaveFileDialog( "Save As", "Project1", "hbp" )
    if ! Empty( cFile )
       cCurrentFile := cFile
       TBSave()
@@ -5875,6 +5877,7 @@ static function OpenProjectFile( cFile )
       UI_FormHide( aForms[i][2]:hCpp )
       aForms[i][2]:Destroy()
    next
+   aSelectionParseBlocks := {}
    aForms := {}
    nActiveForm := 0
    aModules := {}

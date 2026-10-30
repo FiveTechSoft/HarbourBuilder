@@ -11,6 +11,7 @@ def branch(platform,start,end):
 maccombo=branch('macos','            case nType == 5  // ComboBox','            case nType == 6  // GroupBox')
 maclist=branch('macos','            case nType == 7  // ListBox','            case nType == 8  // RadioButton')
 winpic=branch('win','            case nType == 12  // BitBtn','            case nType == 14  // Image')
+winimage=branch('win','            case nType == 14  // Image','            case nType == 15  // Shape')
 pre='''#include "hbide.ch"
 static nFails := 0
 function Main()
@@ -21,6 +22,8 @@ function Main()
  Check('Mac List Value 2', '::oProbe:Value := 2' $ c)
  c := EmitWin(12)
  Check('Win BitBtn picture', ('PICTURE ' + HB_QHarbourStr('icon.png')) $ c)
+ c := EmitWin(14)
+ Check('Win Image picture', ('PICTURE ' + HB_QHarbourStr('icon.png')) $ c)
  QOut('H9 EMITTER failures=' + hb_ntos(nFails))
  ErrorLevel(nFails)
 return nil
@@ -48,7 +51,7 @@ function UI_ComboGetItem(h,n)
  HB_SYMBOL_UNUSED(h)
 return iif(n==1,'Uno','Dos')
 '''
-src=pre+'function EmitMac(nType)\n'+locals+' do case\n'+maccombo+maclist+' endcase\nreturn cCreate\n'+'function EmitWin(nType)\n'+locals+' do case\n'+winpic+' endcase\nreturn cCreate\n'+post
+src=pre+'function EmitMac(nType)\n'+locals+' do case\n'+maccombo+maclist+' endcase\nreturn cCreate\n'+'function EmitWin(nType)\n'+locals+' do case\n'+winpic+winimage+' endcase\nreturn cCreate\n'+post
 out=pathlib.Path('/tmp/h9-emitter');out.mkdir(exist_ok=True);(out/'probe.prg').write_text(src)
 hb=pathlib.Path(os.environ.get('HBDIR','/tmp/harbour-review'))
 cmd=[str(hb/'bin/linux/gcc/hbmk2'),str(out/'probe.prg'),str(root/'source/hbbuilder_common.prg'),str(root/'tests/messages_stubs.prg'),'-I'+str(root/'include'),'-gtstd','-quiet','-q','-o'+str(out/'probe')]

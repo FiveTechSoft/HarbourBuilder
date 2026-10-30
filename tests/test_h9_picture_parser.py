@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import pathlib,subprocess
-r=pathlib.Path(__file__).resolve().parents[1];s=(r/'source/hbbuilder_win.prg').read_text();a=s.index('static function RestorePictureClause');b=s.index('static function RestoreFormFromCode',a)
+r=pathlib.Path(__file__).resolve().parents[1];s=(r/'source/hbbuilder_win.prg').read_text();a=s.index('static function PictureExprEval');b=s.index('static function RestoreFormFromCode',a)
 p=pathlib.Path('/tmp/h9-picture');p.mkdir(exist_ok=True)
 main='''static aPictureParseBlocks := {}
 static aWrites := {}
@@ -11,7 +11,10 @@ function Main()
  if Len(aWrites) != 2 .or. !(aWrites[1][2]=='icon.png') .or. !(aWrites[2][2]==cPath); nFail++; endif
  RestorePictureClause(100,11,'@ 1,1 BITBTN ::oB PICTURE GetPath()')
  RestorePictureClause(100,11,'@ 1,1 BITBTN ::oB PICTURE "unterminated')
- if Len(aWrites) != 2 .or. Len(aPictureParseBlocks) != 2; nFail++; endif
+ RestorePictureClause(100,11,'@ 1,1 IMAGE ::oI PICTURE Chr(foo)')
+ RestorePictureClause(100,11,'@ 1,1 IMAGE ::oI PICTURE "a" +')
+ RestorePictureClause(100,11,'@ 1,1 IMAGE ::oI PICTURE "a" "b"')
+ if Len(aWrites) != 2 .or. Len(aPictureParseBlocks) != 5; nFail++; endif
  if PictureParseAllowed(100); nFail++; endif
  QOut('H9 PICTURE PARSER failures='+hb_ntos(nFail))
  ErrorLevel(nFail)

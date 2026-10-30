@@ -182,6 +182,7 @@ function Main()
    nScreenH := W32_GetScreenHeight()
    nDPI     := W32_GetScreenDPI()        // 96 = 100%, 144 = 150%, 192 = 200%
    cCurrentFile := ""
+   aPictureParseBlocks := {}
    aForms := {}
    nActiveForm := 0
    aModules := {}
@@ -2495,6 +2496,7 @@ static function TBNew()
    for i := 1 to Len( aForms )
       aForms[i][2]:Destroy()
    next
+   aPictureParseBlocks := {}
    aForms := {}
    nActiveForm := 0
    aModules := {}
@@ -2535,12 +2537,49 @@ return nil
 // Restore visual controls on a design form by parsing the form .prg code
 // PICTURE expressions are evaluated only by the restricted string inverse.
 // Anything else blocks regeneration/Save rather than replacing the path.
+static function PictureExprEval( cExpr )
+   local n := 1, nLen := Len( cExpr ), nStart, nEnd, cDigits
+   local lNeedTerm := .T.
+   do while n <= nLen
+      if SubStr( cExpr, n, 1 ) $ ( " " + Chr(9) )
+         n++
+         loop
+      endif
+      if ! lNeedTerm
+         if !( SubStr( cExpr, n, 1 ) == "+" ); return nil; endif
+         lNeedTerm := .T.
+         n++
+         loop
+      endif
+      if SubStr( cExpr, n, 1 ) == '"'
+         nEnd := At( '"', SubStr( cExpr, n + 1 ) )
+         if nEnd == 0; return nil; endif
+         n += nEnd + 1
+      elseif Upper( SubStr( cExpr, n, 4 ) ) == "CHR("
+         n += 4
+         nStart := n
+         do while n <= nLen .and. IsDigit( SubStr( cExpr, n, 1 ) )
+            n++
+         enddo
+         cDigits := SubStr( cExpr, nStart, n - nStart )
+         if Len( cDigits ) == 0 .or. Val( cDigits ) > 255 .or. !( SubStr( cExpr, n, 1 ) == ")" )
+            return nil
+         endif
+         n++
+      else
+         return nil
+      endif
+      lNeedTerm := .F.
+   enddo
+   if lNeedTerm; return nil; endif
+return HB_HarbourStrEval( cExpr )
+
 static function RestorePictureClause( hForm, hCtrl, cLine )
    local nPos := At( " PICTURE ", Upper( HB_StripStrings( cLine ) ) )
    local cExpr, xValue
    if nPos == 0; return .T.; endif
    cExpr := AllTrim( SubStr( cLine, nPos + 9 ) )
-   xValue := HB_HarbourStrEval( cExpr )
+   xValue := PictureExprEval( cExpr )
    if xValue == nil
       AAdd( aPictureParseBlocks, { hForm, "PICTURE expression not understood" } )
       return .F.
@@ -3463,6 +3502,7 @@ static function OpenProjectFile( cFile )
    for i := 1 to Len( aForms )
       aForms[i][2]:Destroy()
    next
+   aPictureParseBlocks := {}
    aForms := {}
    nActiveForm := 0
    aModules := {}
