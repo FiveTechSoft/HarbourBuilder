@@ -690,7 +690,7 @@ rt_cleanup
 
 run_newrevert() {
 launch_fresh
-# edit then undo on a never-saved project: back to frozen text = clean
+# edit then exact revert (BackSpace) on a never-saved project: back to frozen text = clean
 local CED w
 CED=""
 for w in $(rt_ide_windows); do
@@ -702,16 +702,16 @@ eval "$(xdotool getwindowgeometry --shell "$CED")"
 xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT/2)) click 1; sleep 0.4
 xdotool key ctrl+End; sleep 0.3
 xdotool type --delay 15 'x'; sleep 0.5
-xdotool key ctrl+z; sleep 0.8
+xdotool key BackSpace; sleep 0.8
 rt_map_all; sleep 0.3
 DLG=$(trigger_and_expect_dialog "ctrl+q")
 if [ -n "$DLG" ]; then
-  echo "  NEWREVERT: FALSE PROMPT after edit+undo on never-saved project"
+  echo "  NEWREVERT: FALSE PROMPT after edit+revert on never-saved project"
   shot_dialog "$DLG" newrevert
   cancel_dialog "$DLG"; FAILN=$((FAILN+1))
 else
   sleep 2
-  kill -0 "$IDEPID" 2>/dev/null     && { echo "  NEWREVERT: IDE did not exit after edit+undo"; FAILN=$((FAILN+1)); }     || echo "  newrevert: edit+undo returns to clean (no prompt)"
+  kill -0 "$IDEPID" 2>/dev/null     && { echo "  NEWREVERT: IDE did not exit after edit+revert"; FAILN=$((FAILN+1)); }     || echo "  newrevert: edit+revert returns to clean (no prompt)"
 fi
 echo "newrevert case done (FAILN=$FAILN)"
 rt_cleanup
