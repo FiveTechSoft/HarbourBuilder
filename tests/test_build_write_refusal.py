@@ -23,7 +23,7 @@ function Main()
  DirRemove(cRoot+cStage+'/Project1.prg')
  DirRemove(cRoot+cStage+'/Form1.prg')
  DirRemove(cRoot+cStage+'/Helpers.prg')
- DirMake(cRoot+cStage+'/'+cBad)
+ hb_DirCreate(cRoot+cStage+'/'+cBad)
  nContinued:=0
  lResult:=iif(cStage=='run',ProbeRun(cRoot+cStage),ProbeDebug(cRoot+cStage))
  if lResult.or.nContinued!=0; nFail++; endif
@@ -35,7 +35,7 @@ function Main()
  nContinued:=0
  if !ProbeDebug(cRoot+'debug').or.nContinued!=1; nFail++; endif
  for each cBad in {'main.prg','debug_main.prg'}
- DirMake(cRoot+cBad)
+ hb_DirCreate(cRoot+cBad)
  if HB_BuildWrite(cRoot+cBad,'NEW'); nFail++; endif
  DirRemove(cRoot+cBad)
  next
