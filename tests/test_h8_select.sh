@@ -18,7 +18,7 @@ HBIN="$HB/bin/linux/gcc"; [ -x "$HBIN/harbour" ] || HBIN="$HB/bin"
 rm -rf "$BUILD"; mkdir -p "$BUILD"; rm -f "$RESULT"
 cp "$REPO/tests/test_h8_select.prg" "$REPO/tests/h8_helper.c" "$BUILD/"
 cp "$REPO/source/core/classes.prg" "$BUILD/"
-cp "$REPO/include/hbbuilder.ch" "$BUILD/" 2>/dev/null || cp "$REPO"/source/*.ch "$BUILD/" 2>/dev/null
+cp "$REPO/include/hbbuilder.ch" "$REPO/include/hbide.ch" "$BUILD/"
 
 cd "$BUILD" || exit 1
 for m in test_h8_select classes; do
