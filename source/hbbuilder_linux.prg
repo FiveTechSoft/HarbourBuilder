@@ -4418,6 +4418,20 @@ static function HB_StageFramework( cProjDir, cBuildDir, lDebug )
    next
 return .T.
 
+// hb_FCopy preserves source attributes, including executable bits. Verify
+// the copied bytes too; a failed copy must not feed stale objects to Link.
+static function HB_BuildCopy( cSource, cDest )
+   if hb_DirExists( cSource ) .or. hb_DirExists( cDest ) .or. ;
+      ! File( cSource ) .or. hb_FCopy( cSource, cDest ) != 0
+      MsgInfo( "Build aborted: could not copy " + cSource + " to " + cDest, "HbBuilder" )
+      return .F.
+   endif
+   if !( hb_MemoRead( cSource ) == hb_MemoRead( cDest ) )
+      MsgInfo( "Build aborted: copied bytes differ at " + cDest, "HbBuilder" )
+      return .F.
+   endif
+return .T.
+
 static function TBRun()
 
    local cBuildDir, cOutput, cLog, i, lError
@@ -4923,7 +4937,9 @@ static function TBDebugRun( lRunToBreak )
       cCmd := "gcc -c -O2 -I" + cHbInc + " " + cProjDir + ;
          "/source/backends/gtk3/gtk3_db_real.c -o " + cBuildDir + "/hbdb_real.o 2>&1"
       cLog += GTK_ShellExec( cCmd )
-      GTK_ShellExec( "cp " + cProjDir + "/source/gtk3_inspector.o " + cBuildDir + "/" )
+      if ! HB_BuildCopy( cProjDir + "/source/gtk3_inspector.o", cBuildDir + "/gtk3_inspector.o" )
+         return .F.
+      endif
       if ! File( cBuildDir + "/dbghook.o" ) .or. ! File( cBuildDir + "/gtk3_core.o" ) .or. ;
          ! File( cBuildDir + "/hbdb_real.o" )
          lError := .T.

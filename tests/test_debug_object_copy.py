@@ -9,6 +9,15 @@ function Main()
  local nFail:=0
  if Probe('/tmp/debug-object-copy/repo','/tmp/debug-object-copy/build'); nFail++; endif
  if nContinued!=0; nFail++; endif
+ DirRemove('/tmp/debug-object-copy/build/gtk3_inspector.o')
+ nContinued:=0
+ if !Probe('/tmp/debug-object-copy/repo','/tmp/debug-object-copy/build').or.nContinued!=1; nFail++; endif
+ if !(hb_MemoRead('/tmp/debug-object-copy/build/gtk3_inspector.o')=='NEW'+Chr(0)+'OBJ'); nFail++; endif
+ FErase('/tmp/debug-object-copy/repo/source/gtk3_inspector.o')
+ hb_MemoWrit('/tmp/debug-object-copy/build/gtk3_inspector.o','OLD')
+ nContinued:=0
+ if Probe('/tmp/debug-object-copy/repo','/tmp/debug-object-copy/build').or.nContinued!=0; nFail++; endif
+ if !(hb_MemoRead('/tmp/debug-object-copy/build/gtk3_inspector.o')=='OLD'); nFail++; endif
  QOut('DEBUG object copy failures='+hb_ntos(nFail)+' continued='+hb_ntos(nContinued))
  ErrorLevel(nFail)
 return nil
