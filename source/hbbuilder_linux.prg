@@ -1091,7 +1091,7 @@ static function RegenerateFormCode( cName, hForm )
                endif
                cCreate += e
                nVal := UI_GetProp( hCtrl, "nItemIndex" )
-               if ValType( nVal ) == "N" .and. nVal > 0
+               if ValType( nVal ) == "N" .and. nVal >= 0
                   cCreate += '   ::o' + cCtrlName + ':Value := ' + LTrim( Str( nVal ) ) + e
                endif
             case nType == 21  // ListView (TListView)
@@ -1131,7 +1131,7 @@ static function RegenerateFormCode( cName, hForm )
                endif
                cCreate += e
                nVal := UI_GetProp( hCtrl, "nItemIndex" )
-               if ValType( nVal ) == "N" .and. nVal > 0
+               if ValType( nVal ) == "N" .and. nVal >= 0
                   cCreate += '   ::o' + cCtrlName + ':Value := ' + LTrim( Str( nVal ) ) + e
                endif
             case nType == 6
@@ -2859,9 +2859,44 @@ static function TBNew()
 return nil
 
 // Restore visual controls on a design form by parsing the form .prg code
+static function RestoreSelectionAssignment( hForm, cLine )
+   local nPos, cName, cNumber, i, hTarget := 0, nType
+   nPos := At( ":VALUE", Upper( cLine ) )
+   if nPos == 0 .or. !( Left( Upper( cLine ), 3 ) == "::O" )
+      return .F.
+   endif
+   cName := AllTrim( SubStr( cLine, 4, nPos - 4 ) )
+   cNumber := AllTrim( SubStr( cLine, nPos + 6 ) )
+   if !( Left( cNumber, 2 ) == ":=" )
+      HB_SetParseBlock( hForm, "Value assignment is not a numeric literal" )
+      return .T.
+   endif
+   cNumber := AllTrim( SubStr( cNumber, 3 ) )
+   for i := 1 to Len( cNumber )
+      if ! IsDigit( SubStr( cNumber, i, 1 ) )
+         HB_SetParseBlock( hForm, "Value assignment is not a numeric literal" )
+         return .T.
+      endif
+   next
+   for i := 1 to UI_GetChildCount( hForm )
+      if Upper( UI_GetProp( UI_GetChild( hForm, i ), "cName" ) ) == Upper( cName )
+         hTarget := UI_GetChild( hForm, i )
+         exit
+      endif
+   next
+   if hTarget != 0
+      nType := UI_GetType( hTarget )
+      if ( nType == 5 .or. nType == 7 ) .and. Len( cNumber ) > 0
+         UI_SetProp( hTarget, "nItemIndex", Val( cNumber ) )
+         return .T.
+      endif
+   endif
+   HB_SetParseBlock( hForm, "Value target is not a resolved ComboBox/ListBox (creation must precede assignment)" )
+return .T.
+
 static function RestoreFormFromCode( hForm, cCode )
 
-   local aLines, cLine, cTrim, i, nType
+   local aLines, cLine, cTrim, i, nType, lInCreateForm
    local nT, nL, nW, nH, cText, cName, hCtrl
    local nPos, nPos2, cTitle, cVal, kk, nCount, cTypeStr
    local cFolderName, hFolder, nPageIdx, kkF, hChildN
@@ -2890,9 +2925,21 @@ static function RestoreFormFromCode( hForm, cCode )
 
    aLines := HB_ATokens( StrTran( cCode, Chr(13), "" ), Chr(10) )
 
+   lInCreateForm := .F.
    for i := 1 to Len( aLines )
       cLine := aLines[i]
       cTrim := AllTrim( cLine )
+
+      if "METHOD CREATEFORM" $ Upper( cTrim )
+         lInCreateForm := .T.
+      elseif HB_IsKeywordLine( Upper( cTrim ), "METHOD" ) .or. ;
+             HB_IsKeywordLine( Upper( cTrim ), "FUNCTION" ) .or. ;
+             HB_IsKeywordLine( Upper( cTrim ), "STATIC FUNCTION" )
+         lInCreateForm := .F.
+      endif
+      if lInCreateForm .and. RestoreSelectionAssignment( hForm, cTrim )
+         loop
+      endif
 
       // Parse form properties: ::cTitle, ::nWidth, ::nHeight, ::nLeft, ::nTop, ::nClrPane
       if '::cTitle' $ cTrim .and. ':=' $ cTrim

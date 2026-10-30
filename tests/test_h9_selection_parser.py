@@ -44,6 +44,10 @@ function MsgInfo(t,title)
  QOut(t)
 return nil
 '''
+if platform=='linux':
+ parser=parser.split('static function RestoreFormFromCode')[0]
+ main=main.replace('static aSelectionParseBlocks := {}','static aSelectionParseBlocks := {}')
+ main += "function HB_SetParseBlock(h,t)\n AAdd(aSelectionParseBlocks,{h,t})\nreturn nil\nfunction SelectionParseAllowed(h,lQuiet)\n if Len(aSelectionParseBlocks)>0\n if !(lQuiet==.T.); MsgInfo('blocked','test'); endif\n return .F.\n endif\nreturn .T.\n"
 (p/'probe.prg').write_text(main+parser)
 print('commit:',subprocess.check_output(['git','rev-parse','HEAD'],cwd=r,text=True).strip(),flush=True)
 subprocess.run(['/tmp/harbour-review/bin/linux/gcc/hbmk2',str(p/'probe.prg'),'-gtstd','-q','-quiet','-o'+str(p/'probe')],check=True)
