@@ -4,7 +4,7 @@ set -u
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 source "$REPO/tests/harness_lib.sh"
 ORIGINAL_REPO=$REPO
-ROOT='/tmp/harbourbuilder installed space'
+ROOT=${IDE_TEST_ROOT:-'/tmp/harbourbuilder installed space'}
 RUN=/tmp/ide_root_space_gui
 mkdir -p "$ROOT/bin" "$RUN"
 cp "$REPO/bin/hbbuilder_linux" "$ROOT/bin/"
