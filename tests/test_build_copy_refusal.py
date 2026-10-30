@@ -13,6 +13,19 @@ function Main()
  if ProbeRun('/tmp/build-copy-refusal/repo','/tmp/build-copy-refusal/run'); nFail++; endif
  if ProbeDebug('/tmp/build-copy-refusal/repo','/tmp/build-copy-refusal/debug'); nFail++; endif
  if nContinued!=0; nFail++; endif
+ FErase('/tmp/build-copy-refusal/run/classes.prg/old')
+ DirRemove('/tmp/build-copy-refusal/run/classes.prg')
+ FErase('/tmp/build-copy-refusal/debug/classes.prg/old')
+ DirRemove('/tmp/build-copy-refusal/debug/classes.prg')
+ if !ProbeRun('/tmp/build-copy-refusal/repo','/tmp/build-copy-refusal/run'); nFail++; endif
+ if !ProbeDebug('/tmp/build-copy-refusal/repo','/tmp/build-copy-refusal/debug'); nFail++; endif
+ FErase('/tmp/build-copy-refusal/repo/source/hix_runtime.prg')
+ MemoWrit('/tmp/build-copy-refusal/run/hix_runtime.c','STALE')
+ MemoWrit('/tmp/build-copy-refusal/run/hix_runtime.o','STALE')
+ if !ProbeRun('/tmp/build-copy-refusal/repo','/tmp/build-copy-refusal/run'); nFail++; endif
+ if File('/tmp/build-copy-refusal/run/hix_runtime.prg').or.File('/tmp/build-copy-refusal/run/hix_runtime.c').or.File('/tmp/build-copy-refusal/run/hix_runtime.o'); nFail++; endif
+ FErase('/tmp/build-copy-refusal/repo/include/hbide.ch')
+ if ProbeRun('/tmp/build-copy-refusal/repo','/tmp/build-copy-refusal/run'); nFail++; endif
  QOut('COPY failure refusal failures='+hb_ntos(nFail)+' continued='+hb_ntos(nContinued))
  ErrorLevel(nFail)
 return nil

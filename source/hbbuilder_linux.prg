@@ -4375,20 +4375,31 @@ static function HB_BuildWrite( cFile, cText )
 return .T.
 
 // Read and verify exact bytes instead of unchecked shell cp. A missing
-// runtime asset blocks the build, so an older staged copy is never reused.
+// required asset blocks the build; absent optional assets clear stale copies.
 static function HB_StageFramework( cProjDir, cBuildDir, lDebug )
    local aAssets := { { "/source/core/classes.prg", "/classes.prg" }, ;
       { "/source/hix_runtime.prg", "/hix_runtime.prg" }, ;
       { "/source/hix_template.prg", "/hix_template.prg" }, ;
       { "/include/hbbuilder.ch", "/hbbuilder.ch" }, ;
       { "/include/hbide.ch", "/hbide.ch" } }
-   local row, cSource, cDest, cBytes, nHandle
+   local row, cSource, cDest, cBytes, nHandle, cOld, cExt, lOptional
    if lDebug
       AAdd( aAssets, { "/source/debugger/dbgclient.prg", "/dbgclient.prg" } )
    endif
    for each row in aAssets
       cSource := cProjDir + row[1]
       cDest := cBuildDir + row[2]
+      lOptional := row[2] == "/hix_runtime.prg" .or. row[2] == "/hix_template.prg"
+      if lOptional .and. ! File( cSource )
+         for each cExt in { ".prg", ".c", ".o" }
+            cOld := Left( cDest, Len( cDest ) - 4 ) + cExt
+            if hb_DirExists( cOld ) .or. ( File( cOld ) .and. FErase( cOld ) != 0 )
+               MsgInfo( "Build aborted: could not remove stale framework " + cOld, "HbBuilder" )
+               return .F.
+            endif
+         next
+         loop
+      endif
       nHandle := FOpen( cSource )
       if nHandle == -1
          MsgInfo( "Build aborted: could not read framework " + cSource, "HbBuilder" )
