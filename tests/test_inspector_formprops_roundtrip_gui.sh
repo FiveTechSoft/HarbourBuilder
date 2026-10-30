@@ -4,16 +4,19 @@
 # Inspector (phase1 non-default, phase2 default-return) and lSizable via a
 # file round-trip (phase3: the GTK Inspector does not offer lSizable, so it
 # is injected on disk and must survive an IDE load+save).
-#   phase1: defaults in file -> set 4 non-default values via the Inspector
-#           -> save -> assert all four lines present exactly once -> reopen
-#           -> Inspector screenshot (values loaded from disk) -> re-save
-#           fixpoint.
-#   phase2: (project left by phase1) -> set the 4 back to defaults -> save
-#           -> assert none of the four lines is emitted (default-return)
-#           and title/geometry survive -> reopen -> re-save fixpoint.
-# No argument runs phase1+phase2 in one IDE session.
-# RED at introduction: the serializer emitted none of the four lines, so
-# phase1 fails listing every silently-lost prop.
+#   phase1: defaults in file -> set the 3 enum props non-default via the
+#           Inspector -> save -> assert each line present exactly once and
+#           no spurious ::lSizable -> reopen -> Inspector screenshot
+#           (values loaded from disk) -> re-save fixpoint.
+#   phase2: (project left by phase1) -> set the 3 enums back to defaults
+#           -> save -> assert none of the three lines is emitted
+#           (default-return) and title/geometry survive -> reopen ->
+#           re-save fixpoint.
+#   phase3: inject ::lSizable := .T. on disk -> IDE load+save -> assert
+#           preserved exactly once -> re-save fixpoint.
+# No argument runs phase1+phase2+phase3 in one IDE session.
+# RED at introduction: the serializer emitted none of these lines, so
+# phase1/phase3 fail listing every silently-lost prop.
 set -u
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 RUN=/tmp/inspector_formprops
