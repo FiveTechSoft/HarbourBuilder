@@ -1029,6 +1029,7 @@ static function RegenerateFormCode( cName, hForm )
    local cClass := "T" + cName
    local i, nCount, hCtrl, cCtrlName, cCtrlClass, nType
    local nW, nH, nFL, nFT, cTitle, nClr, cAppTitle := ""
+   local nWS, nBS, nFS, lSizable
    local nL, nT, nCW, nCH, cText
    local cDatas := "", cCreate := "", cEvents := ""
    local cExistingCode, aEvents, j, cEvName, cEvSuffix, cHandlerName
@@ -1099,10 +1100,19 @@ static function RegenerateFormCode( cName, hForm )
       nClr   := UI_GetProp( hForm, "nClrPane" )
       cAppTitle := UI_GetProp( hForm, "cAppTitle" )
       if ValType( cAppTitle ) != "C"; cAppTitle := ""; endif
+      nWS := UI_GetProp( hForm, "nWindowState" )
+      if ValType( nWS ) != "N"; nWS := 0; endif
+      nBS := UI_GetProp( hForm, "nBorderStyle" )
+      if ValType( nBS ) != "N"; nBS := 2; endif
+      nFS := UI_GetProp( hForm, "nFormStyle" )
+      if ValType( nFS ) != "N"; nFS := 0; endif
+      lSizable := UI_GetProp( hForm, "lSizable" )
+      if ValType( lSizable ) != "L"; lSizable := .F.; endif
    else
       cTitle := cName
       nFL := 0; nFT := 0; nW := 400; nH := 300
       nClr   := 15790320
+      nWS := 0; nBS := 2; nFS := 0; lSizable := .F.
    endif
 
    // First pass: map each hCtrl → cCtrlName for OF ::oFolder:aPages[N] emit
@@ -1627,6 +1637,20 @@ static function RegenerateFormCode( cName, hForm )
    if ! Empty( cAppTitle )
       cHdrChunk += '   ::cAppTitle := ' + HB_QHarbourStr( cAppTitle ) + e
    endif
+   // Non-default form window props; without these an Inspector edit of any of
+   // them was silently lost on save
+   if nWS != 0
+      cHdrChunk += "   ::nWindowState := " + LTrim(Str(nWS)) + e
+   endif
+   if nBS != 2
+      cHdrChunk += "   ::nBorderStyle := " + LTrim(Str(nBS)) + e
+   endif
+   if nFS != 0
+      cHdrChunk += "   ::nFormStyle := " + LTrim(Str(nFS)) + e
+   endif
+   if lSizable
+      cHdrChunk += "   ::lSizable := .T." + e
+   endif
 
    if Empty( cExistingCode )
       cBody := cHdrChunk
@@ -1714,7 +1738,9 @@ static function RegenerateFormCode( cName, hForm )
          endif
          if cLhs == "::CTITLE" .or. cLhs == "::NLEFT" .or. cLhs == "::NTOP" .or. ;
             cLhs == "::NWIDTH" .or. cLhs == "::NHEIGHT" .or. ;
-            cLhs == "::NCLRPANE" .or. cLhs == "::CAPPTITLE"
+            cLhs == "::NCLRPANE" .or. cLhs == "::CAPPTITLE" .or. ;
+            cLhs == "::NWINDOWSTATE" .or. cLhs == "::NBORDERSTYLE" .or. ;
+            cLhs == "::NFORMSTYLE" .or. cLhs == "::LSIZABLE"
             if ! lHdrOut
                cBody += cHdrChunk
                lHdrOut := .T.
@@ -3234,7 +3260,9 @@ static function RestoreFormFromCode( hForm, cCode )
       if nPos > 0
          cExpr := Upper( AllTrim( Left( cTrim, nPos - 1 ) ) )
          if cExpr == "::NWIDTH" .or. cExpr == "::NHEIGHT" .or. ;
-            cExpr == "::NLEFT" .or. cExpr == "::NTOP" .or. cExpr == "::NCLRPANE"
+            cExpr == "::NLEFT" .or. cExpr == "::NTOP" .or. cExpr == "::NCLRPANE" .or. ;
+            cExpr == "::NWINDOWSTATE" .or. cExpr == "::NBORDERSTYLE" .or. ;
+            cExpr == "::NFORMSTYLE"
             nFormNumber := HB_FormNumberEval( AllTrim( SubStr( cTrim, nPos + 2 ) ), cExpr == "::NCLRPANE" )
             if ValType( nFormNumber ) == "N"
                UI_SetProp( hForm, SubStr( cExpr, 3 ), nFormNumber )
@@ -3242,6 +3270,10 @@ static function RestoreFormFromCode( hForm, cCode )
                HB_SetParseBlock( hForm, "Line " + LTrim( Str( i ) ) + ;
                   ": form numeric value cannot be represented faithfully: " + cTrim )
             endif
+            loop
+         endif
+         if cExpr == "::LSIZABLE"
+            UI_SetProp( hForm, "lSizable", AllTrim( SubStr( cTrim, nPos + 2 ) ) == ".T." )
             loop
          endif
       endif
