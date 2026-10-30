@@ -133,6 +133,7 @@ sed -i 's/VERSION-A/VERSION-Z/' "$RUNA/Form1.prg"
 echo "  [t=$SECONDS] external disk edit VERSION-A -> VERSION-Z (buffer dirty)"
 sleep 1
 # Ctrl+R: contract says REFUSE (conflict). Count app windows for a while.
+BEFORE=$(rt_ide_windows | sort -n | tr '\n' ' ')
 BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"; sleep 0.3
 xdotool mousemove 700 12 click 1; sleep 0.4
 xdotool key ctrl+r
@@ -147,8 +148,7 @@ for i in $(seq 1 8); do
 done
 DLG=""
 for w in $(rt_ide_windows); do
-  t=$(xdotool getwindowname "$w" 2>/dev/null)
-  case "$t" in *HbBuilder*|*onflict*|*xternal*) DLG=$w;; esac
+  case " $BEFORE " in *" $w "*) ;; *) DLG=$w;; esac
 done
 rt_map_all
 if [ -n "$APPW" ]; then

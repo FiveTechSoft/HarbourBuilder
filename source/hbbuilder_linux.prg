@@ -26,6 +26,7 @@ static hMessagesPanel // Build / debug output panel
 static nScreenW      // Screen width
 static nScreenH      // Screen height
 static cCurrentFile  // Current file path (empty = untitled)
+static aDiskBase := {}  // {path, md5} of project sources as loaded/last saved
 
 // Project form list (C++Builder: each form = a unit)
 // Each entry: { cName, oForm, cCode, nFormX, nFormY }
@@ -2543,6 +2544,7 @@ static function TBNew()
    CodeEditorSetTabText( hCodeEditor, 2, aForms[1][3] )
    CodeEditorSelectTab( hCodeEditor, 2 )
    cCurrentFile := ""
+   HB_DiskBaseReset()
 
    InspectorRefresh( oDesignForm:hCpp )
    InspectorPopulateCombo( oDesignForm:hCpp )
@@ -3319,6 +3321,35 @@ static function RestoreFormFromCode( hForm, cCode )
 
 return nil
 
+// External-edit freshness guard: content baselines (md5) of every project
+// source at load/last save. Any drift means the file changed outside the
+// IDE; Run then refuses instead of silently building stale buffer content.
+static function HB_DiskBaseReset()
+   aDiskBase := {}
+return nil
+
+static function HB_DiskBaseSet( cPath, cContent )
+   local i
+   for i := 1 to Len( aDiskBase )
+      if aDiskBase[i][1] == cPath
+         aDiskBase[i][2] := hb_MD5( cContent )
+         return nil
+      endif
+   next
+   AAdd( aDiskBase, { cPath, hb_MD5( cContent ) } )
+return nil
+
+// First project file whose on-disk content differs from the baseline
+// (or that vanished), else "".
+static function HB_DiskBaseCheck()
+   local i
+   for i := 1 to Len( aDiskBase )
+      if ! File( aDiskBase[i][1] ) .or. !( hb_MD5( MemoRead( aDiskBase[i][1] ) ) == aDiskBase[i][2] )
+         return aDiskBase[i][1]
+      endif
+   next
+return ""
+
 static function TBOpen()
    local cFile := GTK_OpenFileDialog( "Open HbBuilder Project", "hbp" )
    if Empty( cFile ); return nil; endif
@@ -3336,6 +3367,9 @@ static function OpenProjectFile( cFile )
       MsgInfo( "Could not read project: " + cFile )
       return nil
    endif
+
+   HB_DiskBaseReset()
+   HB_DiskBaseSet( cFile, cContent )
 
    cDir := HB_ProjectDirFromFile( cFile )
 
@@ -3368,6 +3402,7 @@ static function OpenProjectFile( cFile )
    cFormCode := MemoRead( cDir + "Project1.prg" )
    if ! Empty( cFormCode )
       CodeEditorSetTabText( hCodeEditor, 1, cFormCode )
+      HB_DiskBaseSet( cDir + "Project1.prg", cFormCode )
    endif
 
    for i := 1 to Len( aFormNames )
@@ -3375,6 +3410,7 @@ static function OpenProjectFile( cFile )
 
       cFormCode := MemoRead( cDir + cFormName + ".prg" )
       if Empty( cFormCode ); loop; endif
+      HB_DiskBaseSet( cDir + cFormName + ".prg", cFormCode )
 
       nFormX := nEditorX + Int( ( nEditorW - 400 ) / 2 ) + ( Len(aForms) ) * 20
       nFormY := nEditorTop + Int( ( nEditorH - 300 ) * 0.35 ) + ( Len(aForms) ) * 20
@@ -3401,6 +3437,7 @@ static function OpenProjectFile( cFile )
       cFormName := aModuleNames[i]
       cFormCode := MemoRead( cDir + cFormName + ".prg" )
       if Empty( cFormCode ); loop; endif
+      HB_DiskBaseSet( cDir + cFormName + ".prg", cFormCode )
       AAdd( aModules, { cFormName, cFormCode, cDir + cFormName + ".prg" } )
       CodeEditorAddTab( hCodeEditor, cFormName + ".prg" )
       CodeEditorSetTabText( hCodeEditor, HB_ModuleEditorTab( Len( aForms ), Len( aModules ) ), cFormCode )
@@ -3499,17 +3536,21 @@ static function TBSave()
 
    cHbp := HB_BuildHbpFromProject( aForms, aModules )
    MemoWrit( cCurrentFile, cHbp )
+   HB_DiskBaseSet( cCurrentFile, cHbp )
 
    MemoWrit( cDir + "Project1.prg", CodeEditorGetTabText( hCodeEditor, 1 ) )
+   HB_DiskBaseSet( cDir + "Project1.prg", CodeEditorGetTabText( hCodeEditor, 1 ) )
 
    for i := 1 to Len( aForms )
       MemoWrit( cDir + aForms[i][1] + ".prg", aForms[i][3] )
+      HB_DiskBaseSet( cDir + aForms[i][1] + ".prg", aForms[i][3] )
    next
 
    // Write each module .prg
    for i := 1 to Len( aModules )
       aModules[i][2] := CodeEditorGetTabText( hCodeEditor, 1 + Len(aForms) + i )
       MemoWrit( cDir + aModules[i][1] + ".prg", aModules[i][2] )
+      HB_DiskBaseSet( cDir + aModules[i][1] + ".prg", aModules[i][2] )
    next
 
    AddRecentProject( cCurrentFile )
@@ -3603,11 +3644,23 @@ static function TBRun()
 
    local cBuildDir, cOutput, cLog, i, lError
    local cHbDir, cHbBin, cHbInc, cHbLib, cProjDir
-   local cAllPrg, cCmd, cHashSrc, cT, cHash, cDestDir, cAppExe, cAppTitle
+   local cAllPrg, cCmd, cHashSrc, cT, cHash, cDestDir, cAppExe, cAppTitle, cExtern
    static cLastHash := ""
 
    // refuse to compile/run stale code after a refused sync
    if ! HB_CheckFormsSerializable()
+      return nil
+   endif
+
+   // refuse to run when a project file changed on disk since load/last
+   // save: the build would silently use stale buffer content. No
+   // auto-reload: the disk->editor->model circuit is not proven safe, so
+   // the user resolves it explicitly (reopen = load external, save =
+   // overwrite).
+   cExtern := HB_DiskBaseCheck()
+   if ! Empty( cExtern )
+      MsgInfo( "Run refused: " + cExtern + " changed on disk since it was loaded." + ;
+               " Reopen the project to load the external changes, or save to overwrite them.", "HbBuilder" )
       return nil
    endif
 
