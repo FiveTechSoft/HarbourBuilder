@@ -320,8 +320,7 @@ function Main()
    // Set up editor tabs: Project1.prg (tab 1) + Form1.prg (tab 2)
    HB_SetTabText( 1, GenerateProjectCode() )
    CodeEditorAddTab( hCodeEditor, "Form1.prg" )
-   SyncDesignerToCode()
-   HB_SetTabText( 2, aForms[1][3] )
+   HB_FreezeFormBaseline( 1 )
    CodeEditorSelectTab( hCodeEditor, 2 )
 
    CodeEditorOnTabChange( hCodeEditor, { |hEd, nTab| OnEditorTabChange( hEd, nTab ) } )
@@ -679,8 +678,9 @@ static function CreateDesignForm( nX, nY )
    DEFINE FORM oDesignForm TITLE cName SIZE 562, 315 FONT "Sans", 11
    UI_FormSetPos( oDesignForm:hCpp, nX, nY )
 
-   AAdd( aForms, { cName, oDesignForm, GenerateFormCode( cName ), nX, nY, ;
-      GenerateFormCode( cName ) } )  // slot 6: frozen clean generator output
+   AAdd( aForms, { cName, oDesignForm, GenerateFormCode( cName ), nX, nY, NIL } )
+   // slot 6 stays NIL until HB_FreezeFormBaseline aligns it with the editor:
+   // a frozen text the editor never showed would flag a clean start as dirty
    nActiveForm := Len( aForms )
 
 return nil
@@ -1866,6 +1866,32 @@ static function HB_SetTabText( nTab, cText )
    HB_TabMarkKnown( nTab, cText )
 return nil
 
+// Freeze the clean baseline of a freshly created form: align editor text,
+// stored model code and the frozen slot so all three hold the generator
+// output for the initial model. The editor's first real change then differs
+// from the frozen text and is detected; a model-unchanged sync regenerates
+// exactly this text and stays clean.
+static function HB_FreezeFormBaseline( i )
+
+   local cR, nPrev := nActiveForm
+
+   if i < 1 .or. i > Len( aForms ); return nil; endif
+   if Len( aForms[i] ) < 6; AAdd( aForms[i], NIL ); endif
+   nActiveForm := i
+   oDesignForm := aForms[i][2]
+   cR := SyncDesignerToCode( .T., .T. )
+   if ! Empty( cR )
+      aForms[i][3] := cR
+      aForms[i][6] := cR
+      HB_SetTabText( i + 1, cR )
+   else
+      // sync refused: the clean baseline is what the editor shows now
+      aForms[i][6] := CodeEditorGetTabText( hCodeEditor, i + 1 )
+   endif
+   nActiveForm := nPrev
+
+return nil
+
 // .T. when every modified File>Open tab is written back to its path
 static function HB_SaveOpenFiles()
 
@@ -2581,6 +2607,7 @@ static function MenuNewForm()
    CodeEditorAddTab( hCodeEditor, aForms[ nActiveForm ][ 1 ] + ".prg" )
    HB_SetTabText( nActiveForm + 1, aForms[ nActiveForm ][ 3 ] )
    CodeEditorSelectTab( hCodeEditor, nActiveForm + 1 )
+   HB_FreezeFormBaseline( nActiveForm )
 
    HB_SetTabText( 1, GenerateProjectCode() )
 
@@ -2790,8 +2817,7 @@ static function TBNew()
    lOpenFilesDirty := .f.
 
    nActiveForm := 1
-   if Len( aForms[1] ) < 6; AAdd( aForms[1], NIL ); endif
-   aForms[1][6] := SyncDesignerToCode( .T., .T. )
+   HB_FreezeFormBaseline( 1 )
 
    lSyncingFromCode := .t.
    InspectorRefresh( oDesignForm:hCpp )
