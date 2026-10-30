@@ -29,7 +29,7 @@ import -window root /tmp/addmodule-menu.png
 if [ "${SCOUT:-0}" = 1 ];then exit 0;fi
 xdotool key Escape
 # Use the existing OCR menu helper, not an assumed Project menu coordinate.
-menu_path_click '^Add Module' '^Project' || { echo 'FAIL Add Module menu missing';exit 1; }
+menu_path_click '^Add Module' || { echo 'FAIL Add Module menu missing';exit 1; }
 sleep 1;xdotool key ctrl+l;xdotool type --delay 1 "$RUN/NewModule.prg";xdotool key Return;sleep 1;xdotool key Return;sleep 2
 rt_map_all;xdotool windowmove "$ED" 0 125;xdotool windowsize "$ED" 1500 820;xdotool windowraise "$ED";xdotool windowfocus "$ED"
 import -window root /tmp/addmodule-after.png
