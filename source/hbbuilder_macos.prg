@@ -1879,11 +1879,18 @@ static function RestoreFormFromCode( hForm, cCode )
    cCode := StrTran( cCode, Chr(13), "" )
    aLines := HB_ATokens( cCode, Chr(10) )
 
+   lInCreateForm := .F.
    for i := 1 to Len( aLines )
       cLine := aLines[i]
       cTrim := AllTrim( cLine )
 
-      if RestoreSelectionAssignment( hForm, cTrim )
+      // Runtime handler assignments are preserved code, not designer state.
+      if "METHOD CREATEFORM" $ Upper( cTrim )
+         lInCreateForm := .T.
+      elseif Upper( cTrim ) == "RETURN NIL"
+         lInCreateForm := .F.
+      endif
+      if lInCreateForm .and. RestoreSelectionAssignment( hForm, cTrim )
          loop
       endif
 

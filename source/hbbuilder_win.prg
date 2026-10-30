@@ -2648,7 +2648,7 @@ return .T.
 
 static function RestoreFormFromCode( hForm, cCode )
 
-   local aLines, cLine, cTrim, i, nType, kk
+   local aLines, cLine, cTrim, i, nType, kk, lInCreateForm
    local nT, nL, nW, nH, cText, cName, hCtrl, cVal, cRest
    local nPos, nPos2, cTitle, nCh, cProp, cTypeStr
    local cFolderName, hFolder, nPageIdx, kkF, hChildN
@@ -2682,6 +2682,7 @@ static function RestoreFormFromCode( hForm, cCode )
 
    aLines := HB_ATokens( cCode, Chr(10) )
 
+   lInCreateForm := .F.
    for i := 1 to Len( aLines )
       cLine := aLines[i]
       cTrim := StrTran( AllTrim( cLine ), Chr(13), "" )
@@ -2696,7 +2697,13 @@ static function RestoreFormFromCode( hForm, cCode )
       enddo
 
       // Resolve Value by control identity, never the last created handle.
-      if RestoreSelectionAssignment( hForm, cTrim )
+      // Runtime handler assignments are preserved code, not designer state.
+      if "METHOD CREATEFORM" $ Upper( cTrim )
+         lInCreateForm := .T.
+      elseif Upper( cTrim ) == "RETURN NIL"
+         lInCreateForm := .F.
+      endif
+      if lInCreateForm .and. RestoreSelectionAssignment( hForm, cTrim )
          loop
       endif
 
