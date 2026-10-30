@@ -1,6 +1,8 @@
 #!/bin/bash
 # Destructive-save refusal: drop a control the generator cannot serialize
-# (Additional palette, "text" = TLabeledEdit, CT 32) onto the fixture form.
+# (GTK3 palette, TrackBar icon = TTrackBar, CT 34) onto the fixture form.
+# (TLabeledEdit/CT32 was the old probe; B8 made it serializable, so the
+# refusal probe is TTrackBar, which remains intentionally unserializable.)
 # Asserts: (1) the save-abort dialog appears naming the control;
 # (2) Form1.prg on disk stays byte-identical; (3) an explicit Ctrl+S after
 # the abort is refused too (dialog again, file still identical).
@@ -24,13 +26,14 @@ W0=$(rt_ide_windows | tr '\n' ' ')
 BAR=$(rt_find_bar)
 rt_park_all_but "$BAR" "$RT_DESIGNER"; sleep 0.5
 
-# Additional palette tab, then the "text" (TLabeledEdit) component button
-read AX AY <<< $(rt_ocr_bar_token '^Additional')
-[ -n "${AX:-}" ] || fail "Additional palette tab not found"
-xdotool mousemove "$AX" "$AY" click 1; sleep 1
-read TX TY <<< $(rt_ocr_bar_token '^text$')
-[ -n "${TX:-}" ] || fail "text (TLabeledEdit) component button not found"
-xdotool mousemove "$TX" "$TY" click 1; sleep 0.8
+# GTK3 palette tab (OCR reads it as 'GTK3_-' at conf ~7), then the TrackBar
+# icon by verified pixel: the GTK3 palette is icon-only, 60px pitch from
+# x=412 at y=81 -> TB = (712, 81). If the click misses, the mandatory abort
+# dialog names the control type that actually dropped: no false green.
+read GX GY <<< $(rt_ocr_bar_token '^GTK3' 5)
+[ -n "${GX:-}" ] || fail "GTK3 palette tab not found"
+xdotool mousemove "$GX" "$GY" click 1; sleep 1
+xdotool mousemove 712 81 click 1; sleep 0.8
 
 eval "$(xdotool getwindowgeometry --shell "$RT_DESIGNER")"
 xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT/2)) click 1; sleep 2.5
@@ -51,7 +54,7 @@ import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/refusal-dialog.png
 TXT=$(tesseract /tmp/refusal-dialog.png - 2>/dev/null)
 echo "dialog OCR: $(echo "$TXT" | tr '\n' ' ')"
 echo "$TXT" | grep -qi 'Save aborted' || fail "dialog is not the save-abort notice"
-echo "$TXT" | grep -qE 'type (32|S2)' || fail "dialog does not name the control type"
+echo "$TXT" | grep -qE 'type (34|S4)' || fail "dialog does not name the control type"
 MD1=$(md5sum "$RUN/Form1.prg" | cut -d' ' -f1)
 [ "$MD0" = "$MD1" ] || fail "Form1.prg changed on disk after the refused sync"
 
