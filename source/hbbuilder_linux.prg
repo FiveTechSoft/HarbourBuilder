@@ -3603,7 +3603,7 @@ static function TBRun()
 
    local cBuildDir, cOutput, cLog, i, lError
    local cHbDir, cHbBin, cHbInc, cHbLib, cProjDir
-   local cAllPrg, cCmd, cAllCode, cHash, cDestDir, cAppExe, cAppTitle
+   local cAllPrg, cCmd, cHashSrc, cT, cHash, cDestDir, cAppExe, cAppTitle
    static cLastHash := ""
 
    // refuse to compile/run stale code after a refused sync
@@ -3619,19 +3619,28 @@ static function TBRun()
    cBuildDir := "/tmp/hbbuilder_build/" + iif( Empty( cCurrentFile ), "_default", hb_MD5( cCurrentFile ) )
 
    // Quick check: if nothing changed since last successful build, just run
-   cAllCode := CodeEditorGetTabText( hCodeEditor, 1 )
+   cT := CodeEditorGetTabText( hCodeEditor, 1 )
+   cHashSrc := "P" + Chr(1) + cCurrentFile
+   cHashSrc += Chr(1) + "Project1.prg" + Chr(1) + Str( Len( cT ) ) + Chr(1) + cT
    for i := 1 to Len( aForms )
-      cAllCode += aForms[i][3]
+      cT := aForms[i][3]
+      cHashSrc += Chr(1) + aForms[i][1] + ".prg" + Chr(1) + Str( Len( cT ) ) + Chr(1) + cT
    next
    for i := 1 to Len( aModules )
-      cAllCode += CodeEditorGetTabText( hCodeEditor, 1 + Len(aForms) + i )
+      cT := CodeEditorGetTabText( hCodeEditor, 1 + Len(aForms) + i )
+      cHashSrc += Chr(1) + aModules[i][1] + Chr(1) + Str( Len( cT ) ) + Chr(1) + cT
    next
-   // Full-content cache key: MD5 of project identity + all sources.
-   // Cache invalidation only, not a cryptographic use. The previous key
+   // Full-content cache key with unambiguous framing: project identity
+   // plus per-source name/length/content, so moving code across source
+   // boundaries also changes the key. Cache invalidation only, not
+   // cryptographic; it does not attest binary integrity or external
+   // compiler/config changes. cCurrentFile comes from the GTK open/save
+   // dialogs (absolute); a symlinked or differently-spelled path only
+   // causes a harmless extra rebuild, never a stale run. The previous key
    // (length + weighted sum of the first 5000 chars) missed edits past
    // char 5000, and the fixed shared build dir could run another
    // project's binary.
-   cHash := hb_MD5( cCurrentFile + Chr(10) + cAllCode )
+   cHash := hb_MD5( cHashSrc )
    if cHash == cLastHash .and. ! Empty( cLastHash ) .and. ;
       File( cBuildDir + "/UserApp" ) .and. ;
       File( cBuildDir + "/.srchash" ) .and. MemoRead( cBuildDir + "/.srchash" ) == cHash

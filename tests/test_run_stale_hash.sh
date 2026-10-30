@@ -149,8 +149,8 @@ for c in $CASES; do
 done
 
 if [ "$FAILN" -eq 0 ]; then
-  echo "RUNHASH PASS: tail edits beyond char 5000 rebuild with the new app effect; a same-text project at a new path gets its own build and exe."
+  echo "RUNHASH PASS (cases executed: $CASES)"
 else
-  echo "RUNHASH FAIL: $FAILN problem(s)"
+  echo "RUNHASH FAIL (cases executed: $CASES): $FAILN problem(s)"
   exit 1
 fi
