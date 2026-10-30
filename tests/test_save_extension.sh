@@ -22,26 +22,25 @@ try_save() {  # $1 = typed path, $2 = expected resulting file
   xdotool key ctrl+s; sleep 2.5
   xdotool key ctrl+l; sleep 0.8
   xdotool type --delay 15 "$TYPED"; sleep 0.5
-  # a typed name matching the filter confirms on the first Return; a name
-  # without it (or different case) only completes in the location bar and
-  # needs a second Return to accept
-  xdotool key Return; sleep 1.5
-  xdotool key Return; sleep 2.5
+  xdotool key Return; sleep 3
   if [ -f "$WANT" ]; then
     echo "  saveext: typed [$TYPED] -> $WANT OK"
   else
-    echo "  SAVEEXT: typed [$TYPED] did not produce $WANT:"; ls -la "$DEST" "$DEST/proj.hbp" 2>/dev/null
+    echo "  SAVEEXT: typed [$TYPED] did not produce $WANT:"; ls -laR "$DEST" 2>/dev/null
     FAILN=$((FAILN+1))
   fi
   rt_cleanup
 }
 
-rm -rf "$DEST"; mkdir -p "$DEST/proj.hbp"   # dir whose NAME contains .hbp
-try_save "$DEST/foo.hbp"        "$DEST/foo.hbp"
-[ -f "$DEST/foo.hbp.hbp" ] && { echo "  SAVEEXT: double extension foo.hbp.hbp"; FAILN=$((FAILN+1)); }
-try_save "$DEST/sinext"         "$DEST/sinext.hbp"
-try_save "$DEST/UPPER.HBP"      "$DEST/UPPER.HBP"
-[ -f "$DEST/UPPER.HBP.hbp" ] && { echo "  SAVEEXT: double extension UPPER.HBP.hbp"; FAILN=$((FAILN+1)); }
+# each case gets its own empty target dir: saving a new project next to
+# existing member files (Project1.prg) from a previous case would hit the
+# app's overwrite prompt, which is a different feature than this test covers
+rm -rf "$DEST"; mkdir -p "$DEST"/c{1,2,3,4} "$DEST/proj.hbp"   # dir whose NAME contains .hbp
+try_save "$DEST/c1/foo.hbp"        "$DEST/c1/foo.hbp"
+[ -f "$DEST/c1/foo.hbp.hbp" ] && { echo "  SAVEEXT: double extension foo.hbp.hbp"; FAILN=$((FAILN+1)); }
+try_save "$DEST/c2/sinext"         "$DEST/c2/sinext.hbp"
+try_save "$DEST/c3/UPPER.HBP"      "$DEST/c3/UPPER.HBP"
+[ -f "$DEST/c3/UPPER.HBP.hbp" ] && { echo "  SAVEEXT: double extension UPPER.HBP.hbp"; FAILN=$((FAILN+1)); }
 try_save "$DEST/proj.hbp/inner" "$DEST/proj.hbp/inner.hbp"
 
 # full project written next to the normalized name + clean session
