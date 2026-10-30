@@ -4673,18 +4673,22 @@ static function TBRun()
               " " + cBuildDir + "/main.c -o " + cBuildDir + "/main.o 2>&1"
       if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
       if lError
-         cLog += "    FAILED:" + Chr(10) + cOutput + Chr(10)
+         cLog += "    FAILED (main.c):" + Chr(10) + cOutput + Chr(10)
       elseif ! Empty( cOutput )
          // Successful compilers may print warnings. Keep them visible.
          cLog += cOutput + Chr(10)
       endif
-      GTK_ShellExec( "rm -f " + cBuildDir + "/classes.o" )
-      cCmd := "gcc -c -O2 -Wno-unused-value -I" + cHbInc + ;
-              " " + cBuildDir + "/classes.c -o " + cBuildDir + "/classes.o 2>&1"
-      if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
-      if lError .or. ! File( cBuildDir + "/classes.o" )
-         cLog += "    FAILED (classes.c):" + Chr(10) + cOutput + Chr(10)
-         lError := .T.
+      if ! lError
+         GTK_ShellExec( "rm -f " + cBuildDir + "/classes.o" )
+         cCmd := "gcc -c -O2 -Wno-unused-value -I" + cHbInc + ;
+                 " " + cBuildDir + "/classes.c -o " + cBuildDir + "/classes.o 2>&1"
+         if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
+         if lError .or. ! File( cBuildDir + "/classes.o" )
+            cLog += "    FAILED (classes.c):" + Chr(10) + cOutput + Chr(10)
+            lError := .T.
+         elseif ! Empty( cOutput )
+            cLog += cOutput + Chr(10)
+         endif
       endif
       if ! lError .and. File( cBuildDir + "/hix_runtime.c" )
          GTK_ShellExec( "rm -f " + cBuildDir + "/hix_runtime.o" )
@@ -4694,6 +4698,8 @@ static function TBRun()
          if lError .or. ! File( cBuildDir + "/hix_runtime.o" )
             cLog += "    FAILED (hix_runtime.c):" + Chr(10) + cOutput + Chr(10)
             lError := .T.
+         elseif ! Empty( cOutput )
+            cLog += cOutput + Chr(10)
          endif
       endif
       if ! lError .and. File( cBuildDir + "/hix_template.c" )
@@ -4704,6 +4710,8 @@ static function TBRun()
          if lError .or. ! File( cBuildDir + "/hix_template.o" )
             cLog += "    FAILED (hix_template.c):" + Chr(10) + cOutput + Chr(10)
             lError := .T.
+         elseif ! Empty( cOutput )
+            cLog += cOutput + Chr(10)
          endif
       endif
       if ! lError; cLog += "    OK" + Chr(10); endif
