@@ -10,6 +10,7 @@ python3 - "$RUN/Form1.prg" <<'FIX'
 from pathlib import Path
 import sys
 p=Path(sys.argv[1]);s=p.read_text();i=s.index('return nil');s=s[:i]+'   // Event wiring\n   ::oButton1:OnClick := {|| CustomBusinessAction(Self)}\n   CustomStartupSideEffect(Self)\n'+s[i:];s+='\nfunction CustomBusinessAction(oForm)\n HB_SYMBOL_UNUSED(oForm)\n MemoWrit("/tmp/rewire-binding-sentinel.txt","CLICK")\nreturn nil\nfunction CustomStartupSideEffect(oForm)\n HB_SYMBOL_UNUSED(oForm)\n MemoWrit("/tmp/rewire-startup-sentinel.txt","STARTUP")\nreturn nil\n';p.write_text(s)
+q=p.parent/'Project1.prg';q.write_text('#include "hbbuilder.ch"\nprocedure Main()\n local oApp:=TApplication():New(),oForm:=TForm1():New()\n oApp:CreateForm(oForm)\n HelperA()\n oForm:oButton1:OnClick:Eval()\nreturn\n')
 FIX
 rm -f /tmp/rewire-startup-sentinel.txt /tmp/rewire-binding-sentinel.txt
 rt_provenance
