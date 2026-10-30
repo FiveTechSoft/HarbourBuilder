@@ -30,7 +30,7 @@ syntax_check() {  # $1=case $2=file ; the ACTUAL saved original, no artifacts
 
 run_save_case() {  # $1=case  (tabclass helperclass blockcomment createclass)
   local c=$1 FIX="$FIXBASE/$1" RUN=/tmp/rt_preclass_$1
-  local BAR M1 F ncls ninc lhelp lform
+  local BAR M1 F ncls ninc lhelp lform MARKER
   rm -rf "$RUN"; mkdir -p "$RUN"
   cp "$FIX"/Project1.hbp "$FIX"/Project1.prg "$FIX"/Form1.prg "$RUN"/
   rt_setup "$RUN"
@@ -58,7 +58,12 @@ run_save_case() {  # $1=case  (tabclass helperclass blockcomment createclass)
   [ "$ncls" = "1" ] || { echo "  CASE $c: form class declaration lines = $ncls, expected 1 (duplication?)"; FAILN=$((FAILN+1)); }
   ninc=$(grep -c '#include "hbbuilder.ch"' "$F")
   [ "$ninc" = "1" ] || { echo "  CASE $c: #include lines = $ninc, expected 1"; FAILN=$((FAILN+1)); }
-  grep -q "COMENTARIO-PRECLASS-$(echo "$c" | tr a-z A-Z)" "$F" \
+  MARKER=""
+  case "$c" in
+    tabclass) MARKER=TAB;; helperclass) MARKER=HELPER;;
+    blockcomment) MARKER=BLOCK;; createclass) MARKER=CREATE;;
+  esac
+  grep -q "COMENTARIO-PRECLASS-$MARKER" "$F" \
     || { echo "  CASE $c: header comment missing"; FAILN=$((FAILN+1)); }
   grep -q 'BUTTON ::oButton1 PROMPT' "$F" \
     || { echo "  CASE $c: generated BUTTON line missing"; FAILN=$((FAILN+1)); }
