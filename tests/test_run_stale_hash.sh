@@ -30,8 +30,9 @@ launch_a() {
   rt_reopen_project
 }
 
-ctrl_r_and_trace() {  # $1=expected-version-or-empty; echoes app trace line
+ctrl_r_and_trace() {  # echoes app trace line
   local BAR w p APPW="" APPPID="" i
+  echo "  [t=$SECONDS] Ctrl+R start"
   BAR=$(rt_find_bar) || fail "IDE bar not found"
   rt_unmap_all_but "$BAR"; sleep 0.3
   xdotool mousemove 700 12 click 1; sleep 0.4
@@ -45,6 +46,7 @@ ctrl_r_and_trace() {  # $1=expected-version-or-empty; echoes app trace line
     sleep 2
   done
   [ -n "$APPW" ] || fail "app window did not appear after Ctrl+R"
+  echo "  [t=$SECONDS] app window up"
   sleep 2
   kill "$APPPID" 2>/dev/null; sleep 1
   rt_map_all
@@ -60,7 +62,6 @@ echo "${T1:-}" | grep -q 'version:VERSION-A' \
   || { echo "  first Run did not produce the VERSION-A effect"; FAILN=$((FAILN+1)); }
 
 # --- case tail: edit the code tab BEYOND char 5000 (VERSION-A -> VERSION-B)
-sed 's/VERSION-A/VERSION-B/' "$FIX/Form1.prg" > /tmp/rt_runhash_v2.prg
 CED=""
 for w in $(rt_ide_windows); do
   [ "$(xdotool getwindowname "$w" 2>/dev/null)" = "Code Editor" ] && { CED=$w; break; }
@@ -69,8 +70,15 @@ done
 BAR=$(rt_find_bar); rt_park_all_but "$CED" "$BAR"; sleep 0.5
 eval "$(xdotool getwindowgeometry --shell "$CED")"
 xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT/2)) click 1; sleep 0.5
-xdotool key ctrl+a; sleep 0.5
-xdotool type --delay 3 --file /tmp/rt_runhash_v2.prg; sleep 2
+echo "  [t=$SECONDS] tail edit start"
+xdotool key ctrl+End; sleep 0.3
+xdotool key Up; sleep 0.2
+xdotool key Home; sleep 0.2
+xdotool key shift+End; sleep 0.2
+xdotool type --delay 15 'return "VERSION-B"'; sleep 1
+import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/rh_tail_edit.png 2>/dev/null
+tesseract /tmp/rh_tail_edit.png - 2>/dev/null | grep -q 'VERSION-B'   || { tesseract /tmp/rh_tail_edit.png - 2>/dev/null | tail -3; fail "tail edit did not land in the editor (harness)"; }
+echo "  [t=$SECONDS] tail edit verified visible"
 T2=$(ctrl_r_and_trace)
 echo "trace after tail-edit Run: ${T2:-<missing>}"
 echo "${T2:-}" | grep -q 'version:VERSION-B' \
