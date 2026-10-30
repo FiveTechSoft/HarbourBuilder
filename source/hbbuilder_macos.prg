@@ -4563,6 +4563,8 @@ static function TBDebugRun( lRunToBreakpoint )
       lRunToBreakpoint := .T.
    endif
 
+   if ! SelectionParseAllowed( nil ); return .F.; endif
+
    SaveActiveFormCode()
 
    cBuildDir := "/tmp/hbbuilder_debug"
@@ -5425,7 +5427,9 @@ return nil
 // === Save As ===
 
 static function TBSaveAs()
-   local cFile := MAC_SaveFileDialog( "Save As", "hbp" )
+   local cFile
+   if ! SelectionParseAllowed( nil ); return .F.; endif
+   cFile := MAC_SaveFileDialog( "Save As", "hbp" )
    if ! Empty( cFile )
       cCurrentFile := cFile
       TBSave()

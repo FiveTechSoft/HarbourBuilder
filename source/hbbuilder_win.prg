@@ -5601,6 +5601,8 @@ static function TBDebugRun( lRunToBreak )
 
    if lRunToBreak == nil; lRunToBreak := .F.; endif
 
+   if ! PictureParseAllowed( nil ); return .F.; endif
+
    SaveActiveFormCode()
    SyncDesignerToCode()  // Ensure event bindings are up to date
    W32_SetWaitCursor( .T. )
@@ -7512,6 +7514,7 @@ return nil
 // === Save As ===
 
 static function TBSaveAs()
+   if ! PictureParseAllowed( nil ); return .F.; endif
    cCurrentFile := ""
    TBSave()
 return nil
