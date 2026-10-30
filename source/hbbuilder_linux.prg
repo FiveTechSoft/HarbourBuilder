@@ -5109,8 +5109,8 @@ static function TBDebugRun( lRunToBreak )
    // Step 3: Harbour compile → C
    cLog += "[3] Harbour compile..." + Chr(10)
 
-   cCmd := cHbBin + "/harbour " + cBuildDir + "/debug_main.prg -b -n -w -q" + ;
-           " -I" + cHbInc + " -I" + cBuildDir + ;
+   cCmd := HB_ShellArg( cHbBin + "/harbour" ) + " " + cBuildDir + "/debug_main.prg -b -n -w -q" + ;
+           " -I" + HB_ShellArg( cHbInc ) + " -I" + cBuildDir + ;
            " -o" + cBuildDir + "/debug_main.c 2>&1"
    if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
    if lError .or. "Error" $ cOutput
@@ -5124,7 +5124,7 @@ static function TBDebugRun( lRunToBreak )
    if ! lError
       cLog += "[4] C compile..." + Chr(10)
 
-      cCmd := "gcc -c -O0 -g -Wno-unused-value -I" + cHbInc + ;
+      cCmd := "gcc -c -O0 -g -Wno-unused-value -I" + HB_ShellArg( cHbInc ) + ;
               " " + cBuildDir + "/debug_main.c" + ;
               " -o " + cBuildDir + "/debug_main.o 2>&1"
       if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
@@ -5142,18 +5142,18 @@ static function TBDebugRun( lRunToBreak )
       cLog += "[5] dbghook + runtime backend + DB bindings..." + Chr(10)
       GTK_ShellExec( "rm -f " + cBuildDir + "/dbghook.o " + cBuildDir + ;
          "/gtk3_core.o " + cBuildDir + "/hbdb_real.o" )
-      cCmd := "gcc -c -O2 -I" + cHbInc + ;
+      cCmd := "gcc -c -O2 -I" + HB_ShellArg( cHbInc ) + ;
          " " + cProjDir + "/source/debugger/dbghook.c -o " + cBuildDir + "/dbghook.o 2>&1"
       if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
       cLog += cOutput
-      cCmd := "gcc -c -O2 -DHIX_PRGRUNTIME -I" + cHbInc + ;
+      cCmd := "gcc -c -O2 -DHIX_PRGRUNTIME -I" + HB_ShellArg( cHbInc ) + ;
          " -I" + cProjDir + "/include $(pkg-config --cflags gtk+-3.0)" + ;
          " $(pkg-config --exists webkit2gtk-4.1 2>/dev/null && echo '-DHAVE_WEBKIT2GTK '$(pkg-config --cflags webkit2gtk-4.1) || " + ;
          " (pkg-config --exists webkit2gtk-4.0 2>/dev/null && echo '-DHAVE_WEBKIT2GTK '$(pkg-config --cflags webkit2gtk-4.0) || echo ''))" + ;
          " " + cProjDir + "/source/backends/gtk3/gtk3_core.c -o " + cBuildDir + "/gtk3_core.o 2>&1"
       if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
       cLog += cOutput
-      cCmd := "gcc -c -O2 -I" + cHbInc + " " + cProjDir + ;
+      cCmd := "gcc -c -O2 -I" + HB_ShellArg( cHbInc ) + " " + cProjDir + ;
          "/source/backends/gtk3/gtk3_db_real.c -o " + cBuildDir + "/hbdb_real.o 2>&1"
       if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
       cLog += cOutput
@@ -5185,7 +5185,7 @@ static function TBDebugRun( lRunToBreak )
               " " + cBuildDir + "/gtk3_core.o" + ;
               " " + cBuildDir + "/gtk3_inspector.o" + ;
               " " + cBuildDir + "/hbdb_real.o" + ;
-              " -L" + cHbLib + ;
+              " -L" + HB_ShellArg( cHbLib ) + ;
               " -Wl,--start-group" + ;
               " -lhbvm -lhbrtl -lhbcommon -lhbcpage -lhblang" + ;
               " -lhbmacro -lhbpp -lhbrdd -lhbcplr -lhbdebug" + ;
