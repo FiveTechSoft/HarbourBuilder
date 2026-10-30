@@ -1583,7 +1583,7 @@ static function RegenerateFormCode( cName, hForm )
    // where it was. Custom lines therefore never change their relative order
    // and never execute twice. Controls absent from the old code (added in the
    // designer) are flushed before the wiring section.
-   cHdrChunk := '   ::cTitle  := "' + cTitle + '"' + e
+   cHdrChunk := '   ::cTitle  := ' + HB_QHarbourStr( cTitle ) + e
    cHdrChunk += "   ::nLeft   := " + LTrim(Str(nFL)) + e
    cHdrChunk += "   ::nTop    := " + LTrim(Str(nFT)) + e
    cHdrChunk += "   ::nWidth  := " + LTrim(Str(nW)) + e
@@ -3029,12 +3029,14 @@ static function RestoreFormFromCode( hForm, cCode )
       endif
 
       // Parse form properties: ::cTitle, ::nWidth, ::nHeight, ::nLeft, ::nTop, ::nClrPane
-      if '::cTitle' $ cTrim .and. ':=' $ cTrim
-         nPos := At( '"', cTrim )
-         nPos2 := RAt( '"', cTrim )
-         if nPos > 0 .and. nPos2 > nPos
-            cTitle := SubStr( cTrim, nPos + 1, nPos2 - nPos - 1 )
-            UI_SetProp( hForm, "cText", cTitle )
+      nPos := At( ":=", cTrim )
+      if nPos > 0 .and. Upper( AllTrim( Left( cTrim, nPos - 1 ) ) ) == "::CTITLE"
+         cExpr := HB_HarbourStrEval( AllTrim( SubStr( cTrim, nPos + 2 ) ) )
+         if ValType( cExpr ) == "C"
+            UI_SetProp( hForm, "cText", cExpr )
+         else
+            HB_SetParseBlock( hForm, "Line " + LTrim( Str( i ) ) + ;
+               ": form title expression is not a supported string: " + cTrim )
          endif
          loop
       endif
