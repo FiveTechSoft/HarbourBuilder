@@ -4838,19 +4838,30 @@ static function TBDebugRun( lRunToBreak )
       endif
    endif
 
-   // Step 5: Compile dbghook.c + reuse prebuilt gtk3_core.o and gtk3_inspector.o
+   // Debug embeds hix_runtime.prg, so compile the backend with the same
+   // HIX_PRGRUNTIME switch as Run. IDE objects have different symbols.
    if ! lError
-      cLog += "[5] dbghook + backend (prebuilt)..." + Chr(10)
-
+      cLog += "[5] dbghook + runtime backend + DB bindings..." + Chr(10)
+      GTK_ShellExec( "rm -f " + cBuildDir + "/dbghook.o " + cBuildDir + ;
+         "/gtk3_core.o " + cBuildDir + "/hbdb_real.o" )
       cCmd := "gcc -c -O2 -I" + cHbInc + ;
-              " " + cProjDir + "/source/debugger/dbghook.c" + ;
-              " -o " + cBuildDir + "/dbghook.o 2>&1"
-      GTK_ShellExec( cCmd )
-
-      // Reuse prebuilt gtk3_core.o and gtk3_inspector.o from IDE build
-      GTK_ShellExec( "cp " + cProjDir + "/source/gtk3_core.o " + cBuildDir + "/" )
+         " " + cProjDir + "/source/debugger/dbghook.c -o " + cBuildDir + "/dbghook.o 2>&1"
+      cLog += GTK_ShellExec( cCmd )
+      cCmd := "gcc -c -O2 -DHIX_PRGRUNTIME -I" + cHbInc + ;
+         " -I" + cProjDir + "/include $(pkg-config --cflags gtk+-3.0)" + ;
+         " $(pkg-config --exists webkit2gtk-4.1 2>/dev/null && echo '-DHAVE_WEBKIT2GTK '$(pkg-config --cflags webkit2gtk-4.1) || " + ;
+         " (pkg-config --exists webkit2gtk-4.0 2>/dev/null && echo '-DHAVE_WEBKIT2GTK '$(pkg-config --cflags webkit2gtk-4.0) || echo ''))" + ;
+         " " + cProjDir + "/source/backends/gtk3/gtk3_core.c -o " + cBuildDir + "/gtk3_core.o 2>&1"
+      cLog += GTK_ShellExec( cCmd )
+      cCmd := "gcc -c -O2 -I" + cHbInc + " " + cProjDir + ;
+         "/source/backends/gtk3/gtk3_db_real.c -o " + cBuildDir + "/hbdb_real.o 2>&1"
+      cLog += GTK_ShellExec( cCmd )
       GTK_ShellExec( "cp " + cProjDir + "/source/gtk3_inspector.o " + cBuildDir + "/" )
-      cLog += "    OK" + Chr(10)
+      if ! File( cBuildDir + "/dbghook.o" ) .or. ! File( cBuildDir + "/gtk3_core.o" ) .or. ;
+         ! File( cBuildDir + "/hbdb_real.o" )
+         lError := .T.
+         cLog += "    FAILED: runtime backend object missing" + Chr(10)
+      endif
    endif
 
    // Detect WebKit2GTK for linker flags (same logic as build_linux.sh)
@@ -4870,6 +4881,7 @@ static function TBDebugRun( lRunToBreak )
               " " + cBuildDir + "/dbghook.o" + ;
               " " + cBuildDir + "/gtk3_core.o" + ;
               " " + cBuildDir + "/gtk3_inspector.o" + ;
+              " " + cBuildDir + "/hbdb_real.o" + ;
               " -L" + cHbLib + ;
               " -Wl,--start-group" + ;
               " -lhbvm -lhbrtl -lhbcommon -lhbcpage -lhblang" + ;
