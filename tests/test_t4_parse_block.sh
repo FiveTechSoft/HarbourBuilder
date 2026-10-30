@@ -103,7 +103,23 @@ run_case() {  # $1 name, $2 sed expr, $3 reason regex expected in dialog OCR
   xdotool type --delay 15 "$5"; sleep 2
   import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/t4neg_$1-repair.png
   echo "  [$1] SEQ: editor after repair OCR tail: $(tesseract /tmp/t4neg_$1-repair.png - 2>/dev/null | grep -iE 'folder|browse|prompts|colsizes' | head -2 | tr '\n' ' ' | cut -c1-120)"
-  xdotool key ctrl+s; sleep 3
+  # save via the real File -> Save menu: the Ctrl+S accel lives on the main
+  # window's menu and is not delivered when the Code Editor toplevel has focus
+  menu_path_click '^Save' || fail "$1: File > Save menu path not clickable"
+  sleep 2
+  # any dialog here (third refusal, freshness guard) is product behavior: capture it
+  local DLG3=""
+  for w in $(rt_ide_windows); do
+    [ "$(xdotool getwindowname "$w" 2>/dev/null)" = "HbBuilder" ] && \
+      xwininfo -id "$w" 2>/dev/null | grep -q IsViewable && { DLG3=$w; break; }
+  done
+  if [ -n "$DLG3" ]; then
+    eval "$(xdotool getwindowgeometry --shell "$DLG3")"
+    import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/t4neg_$1-dlg3.png
+    echo "  [$1] SEQ: dialog after repaired save OCR: $(tesseract /tmp/t4neg_$1-dlg3.png - 2>/dev/null | tr '\n' ' ' | cut -c1-140)"
+    fail "$1: save still refused after a verified repair (dialog captured)"
+  fi
+  import -window root /tmp/t4neg_$1-aftersave.png
   local MD3=$(md5sum "$RUN/Form1.prg" | cut -d' ' -f1)
   [ "$MD3" != "$MD0" ] || fail "$1: save after repair did not write the file"
   grep -qF "$6" "$RUN/Form1.prg" || fail "$1: repaired line not in the saved file"
@@ -113,13 +129,17 @@ run_case() {  # $1 name, $2 sed expr, $3 reason regex expected in dialog OCR
   sleep 1
 }
 
+WANT="${1:-all}"
+[ "$WANT" = "all" ] || [ "$WANT" = "prompts" ] || exit 0
 run_case prompts 's/PROMPTS "P1", "P2"/PROMPTS "P1", "P2/' 'PROMPTS' 54 \
   '   @ 60, 460 FOLDER ::oFld1 OF Self SIZE 165, 160 PROMPTS "P1", "P2"' \
   'PROMPTS "P1", "P2"'
+[ "$WANT" = "all" ] || [ "$WANT" = "colsizes" ] || exit 0
 run_case colsizes 's/COLSIZES 90, 60/COLSIZES 90x, 60/' 'COLSIZES' 56 \
   '   @ 240, 460 BROWSE ::oBrw1 OF Self SIZE 165, 150 HEADERS "Nombre", "Edad" COLSIZES 90, 60 FOOTERS "Total", ""' \
   'COLSIZES 90, 60'
 
+[ "$WANT" = "all" ] || [ "$WANT" = "items" ] || exit 0
 # Pre-existing block type at open: if an R2-era ITEMS block also dialogs at
 # open, the at-open notice is the old guard's behavior, not a T4 regression.
 RUN=/tmp/t4neg_items
