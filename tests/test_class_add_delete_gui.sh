@@ -121,8 +121,10 @@ HB_INC=${HB_INC:-/tmp/harbour-review/include}
   && echo "post-delete syntax check: OK" || fail "post-delete Form1.prg has syntax errors"
 
 # Add one button through the Standard palette, then save twice and reopen.
-BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"
+BAR=$(rt_find_bar); rt_map_all
+sleep 1
 read PX PY <<< $(rt_ocr_bar_token '^Standard$')
+[ -n "${PX:-}" ] || fail "Standard palette not visible"
 xdotool mousemove "$PX" "$PY" click 1
 sleep 1
 # Standard palette BUTTON is the third icon at x451.
