@@ -4,7 +4,7 @@ GTK prompts/progress are stubs; shell assignment and process exit are real.
 No download or real compiler build is performed.
 """
 from pathlib import Path
-import subprocess,tempfile,os
+import subprocess,tempfile,os,sys
 r=Path(__file__).resolve().parents[1]
 s=(r/'source/hbbuilder_linux.prg').read_text()
 a=s.index('static function EnsureHarbour(');b=s.index('// Staging is not a save:',a)
@@ -12,7 +12,7 @@ body=s[a:b]
 print('commit:',subprocess.check_output(['git','rev-parse','HEAD'],cwd=r,text=True).strip(),flush=True)
 with tempfile.TemporaryDirectory(prefix='hb-install-probe-') as t:
  p=Path(t);src=p/'source';(src/'config').mkdir(parents=True);(src/'config/global.mk').write_text('fixture')
- bindir=p/'tools';bindir.mkdir();prefix=p/'home with spaces'/'harbour'
+ bindir=p/'tools';bindir.mkdir();prefix=p/(sys.argv[1] if len(sys.argv)>1 else 'home with spaces')/'harbour'
  make=bindir/'make';make.write_text('#!/bin/sh\nprintf "%s" "$HB_INSTALL_PREFIX" > "$INSTALL_RECORD"\n[ -n "$HB_INSTALL_PREFIX" ] || exit 7\nmkdir -p "$HB_INSTALL_PREFIX/bin"\ntouch "$HB_INSTALL_PREFIX/bin/harbour"\n');make.chmod(0o755)
  # Only replace the fixed source location to avoid touching /tmp/harbour-src.
  body=body.replace('"/tmp/harbour-src"','"'+str(src)+'"')
@@ -39,7 +39,8 @@ function GTK_ShellExec(c)
  hb_processRun('/bin/sh '+script,,@out,@err)
 return out+err
 '''
- (p/'probe.prg').write_text(main+body)
+ q=s.index('static function HB_ShellArg(');e=s.index('static function HB_BuildExec(',q)
+ (p/'probe.prg').write_text(main+body+s[q:e])
  subprocess.run(['/tmp/harbour-review/bin/linux/gcc/hbmk2',str(p/'probe.prg'),'-gtstd','-q','-quiet','-o'+str(p/'probe')],check=True)
  env=dict(os.environ,PATH=str(bindir)+':'+os.environ['PATH'],INSTALL_RECORD=str(p/'record'),PROBE_SCRIPT=str(p/'shell.sh'))
  z=subprocess.run([str(p/'probe'),str(prefix)],env=env,text=True,capture_output=True)

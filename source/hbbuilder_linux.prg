@@ -4519,7 +4519,7 @@ static function EnsureHarbour( cHbDir )
 
    // Build and install Harbour
    GTK_ProgressOpen( "Building Harbour...", 0 )
-   cOutput := GTK_ShellExec( "cd " + cHbSrc + " && HB_INSTALL_PREFIX=" + cHbDir + ;
+   cOutput := GTK_ShellExec( "cd " + cHbSrc + " && HB_INSTALL_PREFIX=" + HB_ShellArg( cHbDir ) + ;
       " make -j$(nproc) install 2>&1" )
    GTK_ProgressClose()
 
