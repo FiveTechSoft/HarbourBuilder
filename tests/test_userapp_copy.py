@@ -8,6 +8,9 @@ function Main()
  local nFail:=0
  if Probe('/tmp/userapp-copy/build','/tmp/userapp-copy/dest/','Program'); nFail++; endif
  if nContinued!=0; nFail++; endif
+ DirRemove('/tmp/userapp-copy/dest/Program')
+ nContinued:=0
+ if !Probe('/tmp/userapp-copy/build','/tmp/userapp-copy/dest/','Program').or.nContinued!=1; nFail++; endif
  QOut('USERAPP publication failures='+hb_ntos(nFail)+' continued='+hb_ntos(nContinued))
  ErrorLevel(nFail)
 return nil
@@ -31,5 +34,8 @@ if 'static function HB_PublishUserApp' in s:
 print('commit:',subprocess.check_output(['git','rev-parse','HEAD'],cwd=r,text=True).strip(),flush=True)
 subprocess.run(['/tmp/harbour-review/bin/linux/gcc/hbmk2',str(p/'probe.prg'),'-gtstd','-q','-quiet','-o'+str(p/'probe')],check=True)
 rc=subprocess.run([str(p/'probe')]).returncode
-print('source mode',oct(f.stat().st_mode&0o777),flush=True)
+dest=p/'dest/Program'
+print('source mode',oct(f.stat().st_mode&0o777),'dest mode',oct(dest.stat().st_mode&0o777),flush=True)
+if (dest.stat().st_mode&0o777)!=0o755: rc=rc or 1
+if subprocess.check_output([str(dest)])!=b'COPIED': rc=rc or 1
 raise SystemExit(rc)

@@ -4432,6 +4432,19 @@ static function HB_BuildCopy( cSource, cDest )
    endif
 return .T.
 
+static function HB_PublishUserApp( cSource, cDest )
+   local nSourceAttr := 0, nDestAttr := 0
+   if ! HB_BuildCopy( cSource, cDest )
+      return .F.
+   endif
+   if ! hb_FGetAttr( cSource, @nSourceAttr ) .or. ;
+      ! hb_FGetAttr( cDest, @nDestAttr ) .or. ;
+      !( nSourceAttr == nDestAttr )
+      MsgInfo( "Run aborted: copied executable permissions differ at " + cDest, "HbBuilder" )
+      return .F.
+   endif
+return .T.
+
 static function TBRun()
 
    local cBuildDir, cOutput, cLog, i, lError
@@ -4735,8 +4748,6 @@ static function TBRun()
    if lError
       IDE_ShowBuildResult( "Build Failed", cLog, lError )
    else
-      cLastHash := cHash
-      MemoWrit( cBuildDir + "/.srchash", cHash )
       cLog += Chr(10) + "Build succeeded. Running..." + Chr(10)
       IDE_SetMessages( cLog )
       if ! Empty( cCurrentFile )
@@ -4752,8 +4763,12 @@ static function TBRun()
             cAppTitle := SubStr( cAppTitle, RAt( "/", cAppTitle ) + 1 )
          endif
          cAppExe := iif( ! Empty( cAppTitle ), cAppTitle, "UserApp" )
-         GTK_ShellExec( "cp " + cBuildDir + "/UserApp " + cDestDir + cAppExe + " 2>/dev/null" )
+         if ! HB_PublishUserApp( cBuildDir + "/UserApp", cDestDir + cAppExe )
+            return .F.
+         endif
       endif
+      cLastHash := cHash
+      MemoWrit( cBuildDir + "/.srchash", cHash )
       GTK_ShellExec( cBuildDir + "/UserApp 2>/tmp/userapp_debug.log &" )
    endif
 
