@@ -558,9 +558,21 @@ done
 [ -n "$CED" ] || fail "Code Editor window not found"
 BAR=$(rt_find_bar); rt_park_all_but "$CED" "$BAR"; sleep 0.5
 eval "$(xdotool getwindowgeometry --shell "$CED")"
+# verify the opened document is really the active tab before editing
+OK=""
+for i in $(seq 1 6); do
+  xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT/2)) click 1; sleep 0.4
+  xdotool key ctrl+Home; sleep 0.3
+  import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/dl_opened.png 2>/dev/null
+  tesseract /tmp/dl_opened.png - 2>/dev/null | grep -q 'line one' && { OK=1; break; }
+  sleep 1.5
+done
+[ -n "$OK" ] || { echo "  CLOSEFILE: /tmp/rt_openme.txt not shown in editor (harness)"; tesseract /tmp/dl_opened.png - 2>/dev/null | grep -v '^$' | head -4; FAILN=$((FAILN+1)); rt_cleanup; return; }
 xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT/2)) click 1; sleep 0.4
 xdotool key ctrl+End; sleep 0.3
 xdotool type --delay 15 '// edited'; sleep 1
+import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/dl_edited.png 2>/dev/null
+tesseract /tmp/dl_edited.png - 2>/dev/null | grep -q 'edited'   || { echo "  CLOSEFILE: edit did not land (harness)"; tesseract /tmp/dl_edited.png - 2>/dev/null | tail -3; FAILN=$((FAILN+1)); rt_cleanup; return; }
 rt_map_all; sleep 0.3
 # File > Close File -> expect Save/Discard/Cancel
 local BEFORE w i
