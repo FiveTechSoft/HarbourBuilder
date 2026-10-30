@@ -142,8 +142,13 @@ GEOM_BAD=$(diff <(tr -d '\r' < "$CYC/original.prg") <(tr -d '\r' < "$CYC/cycle2.
   grep -vE '^[<>] +DATA o(Label1|Edit1|Chk1|Combo1|Group1|Radio1|Image1|Memo1|List1|Ledit1) +// [A-Za-z0-9_]+$' | \
   grep -vE '^[<>] // Form1\.prg$' | \
   grep -vE '^[<>] // Form1\.prg - FIXTURE roundtrip v3: order preservation \+ side-effect calls$' | \
-  grep -vE '^[<>] +// Event wiring$' | \
   grep -v $'\x1A' || true)
+# T6: the "// Event wiring" marker must survive both cycles (auditor T6:
+# it disappeared when the form had only manual wiring, i.e. cEvents empty)
+for C in 1 2; do
+  grep -q '// Event wiring' "$CYC/cycle$C.prg" || { echo "  T6: '// Event wiring' marker lost in cycle$C"; FAILN=$((FAILN+1)); }
+done
+
 if [ -n "$GEOM_BAD" ]; then
   echo "  UNEXPECTED DRIFT original -> cycle2:"
   echo "$GEOM_BAD" | head -20
@@ -156,7 +161,7 @@ if [ "$FAILN" -gt 0 ]; then
   exit 1
 fi
 echo "ROUNDTRIP PASS: 2 cycles, real save verified in both, no content lost, fixpoint reached."
-echo "diff original -> cycle2, CRLF-normalized (known non-geometry items only; M7/T6 tracked):"
+echo "diff original -> cycle2, CRLF-normalized (known non-geometry items only; M7 tracked):"
 diff <(tr -d '\r' < "$CYC/original.prg") <(tr -d '\r' < "$CYC/cycle2.prg") | head -60
 rt_cleanup
 exit 0
