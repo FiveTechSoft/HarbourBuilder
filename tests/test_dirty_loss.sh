@@ -61,6 +61,10 @@ buffer_shows() {  # $1 = token; 0 if the code editor tail shows it
   tesseract /tmp/dl_check.png - 2>/dev/null | grep -q "$1"
 }
 
+rt_is_unsaved_dialog() {  # $1 = window id; 0 if titled like the protection dialog
+  xdotool getwindowname "$1" 2>/dev/null | grep -qi 'unsaved'
+}
+
 trigger_and_expect_dialog() {  # $1 = key sequence; echoes dialog window id
   local BEFORE BAR w i
   BEFORE=$(rt_ide_windows | sort -n | tr '\n' ' ')
@@ -70,7 +74,7 @@ trigger_and_expect_dialog() {  # $1 = key sequence; echoes dialog window id
   DLG=""
   for i in $(seq 1 8); do
     for w in $(rt_ide_windows); do
-      case " $BEFORE " in *" $w "*) ;; *) DLG=$w;; esac
+      case " $BEFORE " in *" $w "*) ;; *) rt_is_unsaved_dialog "$w" && DLG=$w;; esac
     done
     [ -n "$DLG" ] && break
     sleep 2
@@ -97,7 +101,7 @@ xdotool mousemove 100 134 click 1
 DLG=""
 for i in $(seq 1 8); do
   for w in $(rt_ide_windows); do
-    case " $BEFORE " in *" $w "*) ;; *) DLG=$w;; esac
+    case " $BEFORE " in *" $w "*) ;; *) rt_is_unsaved_dialog "$w" && DLG=$w;; esac
   done
   [ -n "$DLG" ] && break
   sleep 2
