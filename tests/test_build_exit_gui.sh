@@ -52,6 +52,9 @@ for w in $(rt_ide_windows); do
  case "$(xdotool getwindowname "$w")" in *Messages*|*Compiler*) xdotool windowmap "$w"; xdotool windowmove "$w" 0 125; xdotool windowsize "$w" 1300 700; xdotool windowraise "$w";; esac
 done
 sleep 1
+if [ "$MODE" = debug ] && [ "$FAIL_STAGE" = link ]; then
+ xdotool mousemove 300 300 click 1; xdotool key ctrl+End; sleep 1
+fi
 import -window root /tmp/build-exit-$MODE-refused.png
 tesseract /tmp/build-exit-$MODE-refused.png - --psm 6 2>/dev/null | tee "$RUN/ocr"
 grep -q 'exited 7' "$RUN/ocr" || { rt_cleanup; exit 1; }
