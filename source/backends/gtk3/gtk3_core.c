@@ -2402,9 +2402,29 @@ static gboolean on_window_configure( GtkWidget * widget, GdkEventConfigure * eve
    }
    if( form->base.FWidth != event->width || form->base.FHeight != event->height )
    {
-      form->base.FWidth = event->width;
-      form->base.FHeight = event->height;
-      changed = 1;
+      int adoptW = 1, adoptH = 1;
+      if( form->FDesignMode )
+      {
+         /* M6: GTK enforces the toplevel's min-content size. When the design
+            size is smaller than the content extent, the window is forced
+            larger and a naive write-back corrupts the model (480->520/530;
+            verified: ev == prefmin exactly, and the forced value tracks the
+            lowest child extent). A min-size geometry hint does NOT lift the
+            clamp (verified empirically). So: a configure exactly AT the
+            enforced minimum on an axis whose model value is below that
+            minimum is enforcement, not a user resize - keep the design size
+            on that axis. Tradeoff, documented: an explicit resize exactly
+            TO the content minimum reads as enforcement, but the window
+            physically cannot be smaller, so the saved design size remains
+            the faithful intent. */
+         gint mnw = 0, mnh = 0;
+         gtk_widget_get_preferred_width( widget, &mnw, NULL );
+         gtk_widget_get_preferred_height( widget, &mnh, NULL );
+         if( event->width  == mnw && mnw > form->base.FWidth )  adoptW = 0;
+         if( event->height == mnh && mnh > form->base.FHeight ) adoptH = 0;
+      }
+      if( adoptW ) { form->base.FWidth  = event->width;  changed = 1; }
+      if( adoptH ) { form->base.FHeight = event->height; changed = 1; }
    }
 
    if( changed && form->FOnResize && HB_IS_BLOCK( form->FOnResize ) )
