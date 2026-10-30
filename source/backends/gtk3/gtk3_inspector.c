@@ -1392,6 +1392,7 @@ HB_FUNC( INS_REFRESHWITHDATA )
       char title[128];
       snprintf( title, sizeof(title), "Inspector: %s", cls ? cls : "" );
       gtk_window_set_title( GTK_WINDOW(d->window), title );
+      fprintf(stderr, "INS_TRACE refresh %s\n",title);
    }
 
    InsBuildRows( d, pArray );
@@ -1853,6 +1854,7 @@ HB_FUNC( INS_SETFOLDERPAGE )
    if( !d ) return;
    d->hCtrl = (HB_PTRUINT) hb_parnint(2);
    d->nFolderPage = HB_ISNUM(3) ? hb_parni(3) : -1;
+   fprintf(stderr, "INS_TRACE folderpage %d\n",d->nFolderPage);
    d->nRows = 0;
 }
 

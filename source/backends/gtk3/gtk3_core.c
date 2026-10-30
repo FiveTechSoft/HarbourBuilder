@@ -2475,7 +2475,10 @@ static gboolean on_window_configure( GtkWidget * widget, GdkEventConfigure * eve
    }
 
    if( changed && form->FOnResize && HB_IS_BLOCK( form->FOnResize ) )
+   {
+      fprintf(stderr, "INS_TRACE configure resize callback %d,%d %dx%d\n", form->base.FLeft, form->base.FTop, form->base.FWidth, form->base.FHeight);
       hb_itemDo( form->FOnResize, 0 );
+   }
 
    return FALSE;
 }
