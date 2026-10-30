@@ -13,7 +13,7 @@ import sys
 p=Path(sys.argv[1]);s=p.read_text();s=s.replace('   // IDE-managed Components','''   // USER CLASS DECLARATIONS - exact text must survive
    DATA nCounter INIT 42 // USER-COUNTER
    DATA cNote INIT "keep  spaces" // USER-NOTE
-   DATA oButton1 INIT nil // USER-OWNED-CONTROL
+   DATA oButton1// USER-OWNED-CONTROL
 
    // IDE-managed Components''',1)
 s=s.replace('   DATA oButton1   // TButton\n','',1)
@@ -61,7 +61,7 @@ n=0
 ac=a[a.index('CLASS TForm1'):a.index('ENDCLASS')];bc=b[b.index('CLASS TForm1'):b.index('ENDCLASS')]
 if ac!=bc: print('FAIL entire CLASS body changed');n+=1
 if b.count('DATA oButton1')!=1:print('FAIL duplicate control DATA');n+=1
-for token in ['   DATA nCounter INIT 42 // USER-COUNTER','   DATA cNote INIT "keep  spaces" // USER-NOTE','   DATA oButton1 INIT nil // USER-OWNED-CONTROL','   METHOD UserCounter()','METHOD UserCounter() CLASS TForm1','   // USER-METHOD-BODY','return ::nCounter']:
+for token in ['   DATA nCounter INIT 42 // USER-COUNTER','   DATA cNote INIT "keep  spaces" // USER-NOTE','   DATA oButton1// USER-OWNED-CONTROL','   METHOD UserCounter()','METHOD UserCounter() CLASS TForm1','   // USER-METHOD-BODY','return ::nCounter']:
  ok=token in b;print(('PRESERVED ' if ok else 'LOST ')+token)
  if not ok:n+=1
 print('CUSTOM CLASS GUI loss_count='+str(n))
