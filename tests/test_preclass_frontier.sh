@@ -83,7 +83,7 @@ run_save_case() {  # $1=case  (tabclass helperclass blockcomment createclass)
         || { echo "  CASE $c: block-comment close lost"; FAILN=$((FAILN+1)); }
       ;;
     createclass)
-      grep -q 'CREATE CLASS' "$F" \
+      grep -qE '^CREATE CLASS' "$F" \
         && { echo "  CASE $c: CREATE CLASS line must be consumed, not copied"; FAILN=$((FAILN+1)); }
       ;;
   esac
