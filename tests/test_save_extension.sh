@@ -22,7 +22,11 @@ try_save() {  # $1 = typed path, $2 = expected resulting file
   xdotool key ctrl+s; sleep 2.5
   xdotool key ctrl+l; sleep 0.8
   xdotool type --delay 15 "$TYPED"; sleep 0.5
-  xdotool key Return; sleep 3
+  # a typed name matching the filter confirms on the first Return; a name
+  # without it (or different case) only completes in the location bar and
+  # needs a second Return to accept
+  xdotool key Return; sleep 1.5
+  xdotool key Return; sleep 2.5
   if [ -f "$WANT" ]; then
     echo "  saveext: typed [$TYPED] -> $WANT OK"
   else
