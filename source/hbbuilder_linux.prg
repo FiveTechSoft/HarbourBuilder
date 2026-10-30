@@ -1537,8 +1537,12 @@ static function RegenerateFormCode( cName, hForm )
             next
             if ! Empty( cEvents )
                cBody += "   // Event wiring" + e + cEvents
-               lBodyStarted := .T.
+            else
+               // the old code had the marker: keep it even when the IDE has
+               // no registered events (manual wiring only) - auditor T6
+               cBody += "   // Event wiring" + e
             endif
+            lBodyStarted := .T.
             lWireOut := .T.
             loop
          endif
