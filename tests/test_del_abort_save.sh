@@ -273,7 +273,7 @@ grep -q 'BUTTON ::oButton1' "$RUN/Form1.prg" && fail "deleted button line still 
 grep -q 'DATA oButton1' "$RUN/Form1.prg" && fail "deleted button DATA still present after save"
 grep -q 'Aceptar' "$RUN/Form1.prg" && fail "deleted button prompt still present after save"
 grep -q 'Entra un numero:' "$RUN/Form1.prg" || fail "unrelated SAY line lost"
-grep -q 'SAY ::oSay1 PROMPT "Entra un numero:" SIZE 140, 24' "$RUN/Form1.prg" ||   fail "SAY height lost on save (expected SIZE 140, 24 preserved)"
+grep -q 'SAY ::oSay1 PROMPT "Entra un numero:" OF Self SIZE 140, 24' "$RUN/Form1.prg" ||   fail "SAY height lost on save (expected SIZE 140, 24 preserved)"
 grep -q 'KEEP-ME: do not delete' "$RUN/Form1.prg" || fail "hand-written marker line lost"
 echo "--- resulting Form1.prg ---"; cat "$RUN/Form1.prg"
 
