@@ -2,8 +2,9 @@
 # Wine GUI probe: MULTI-FORM save/reload parity (win32 IDE under Wine + Xvfb).
 # Leg1: drop+propedit label on Form1, Save As fixture, File>New Form, drop+propedit
 #   on Form2, Save -> assert Form1.prg/Form2.prg/Project1.prg(2x CreateForm)/.hbp.
-# Leg2: restart, Open fixture (both form windows must reappear), RAISE Form2 via
-#   title bar (forms overlap; a bare click hits the frontmost window), click its
+# Leg2: restart, Open fixture (both form windows must reappear), ACTIVATE Form2
+#   via View > Forms (clicking an inactive form's window does NOT activate it -
+#   observed wrong-destination risk: the edit then lands in Form1), click its
 #   label, controlled edit, Save -> assert edit reached disk, Form1.prg unchanged,
 #   then a second Save must be a fixpoint. No OCR assertions.
 set -u
@@ -104,7 +105,7 @@ sha1sum "$RUN/Form1.prg" | awk '{print $1}' > "$RUN/f1_leg1.sha"
 sha1sum "$RUN/Form2.prg" | awk '{print $1}' > "$RUN/f2_leg1.sha"
 echo "  leg1 OK: Form1($(wc -c < "$RUN/Form1.prg")B)+Form2($(wc -c < "$RUN/Form2.prg")B)+Project1+hbp"
 
-# --- leg 2: restart, open, raise Form2, controlled edit, save, fixpoint ---
+# --- leg 2: restart, open, activate Form2 (View>Forms), edit, save, fixpoint ---
 cleanup; sleep 2
 launch
 dismiss_curl
@@ -154,4 +155,4 @@ cmp -s "$RUN/f1_leg1.sha" <(sha1sum "$RUN/Form1.prg" | awk '{print $1}') || fail
 save_click
 cmp -s "$RUN/f2_leg2.sha" <(sha1sum "$RUN/Form2.prg" | awk '{print $1}') || fail "second save not a fixpoint (Form2.prg)"
 import -window root "$RUN/reopened.png" 2>/dev/null
-echo "WINE MULTIFORM PASS: F1 edit -> save -> NewForm -> F2 edit -> save(4 files) -> restart -> open(both forms) -> raise F2 -> edit -> save -> fixpoint (RUN=$RUN)"
+echo "WINE MULTIFORM PASS: F1 edit -> save -> NewForm -> F2 edit -> save(4 files) -> restart -> open(both forms) -> activate F2 (View>Forms) -> edit -> save -> fixpoint (RUN=$RUN)"
