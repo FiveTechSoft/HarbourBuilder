@@ -38,6 +38,7 @@ static aDbgOffsets   // line offset tracking for debug_main.prg sections
 static lSyncingFromCode := .f.  // Guard: prevents re-entrant loop when syncing code→form
 static s_aUnserializable := {}  // Visual controls the generator cannot serialize; non-empty aborts a destructive save
 static s_cLastRefusal := ""  // rate-limit: do not re-show the same refusal on every auto-sync
+static s_cUnidentClass := ""  // form whose class declaration could not be identified (refusal signal)
 static s_aParseBlocked := {}   // R3: { { hForm, cReason }, ... } - forms whose code could not be fully understood on load
 
 static function HB_SetParseBlock( hForm, cReason )
@@ -813,6 +814,73 @@ static function HB_IsReturnStmt( cKeyU )
           ( Len( cKeyU ) == 6 .or. ! ( IsAlpha( SubStr( cKeyU, 7, 1 ) ) .or. ;
             IsDigit( SubStr( cKeyU, 7, 1 ) ) .or. SubStr( cKeyU, 7, 1 ) == "_" ) )
 
+// Return the 1-based index of the line that declares class cClass
+// ("CLASS TForm1" or "CREATE CLASS TForm1"), 0 when not found.
+// Recognition uses token boundaries: the CLASS keyword followed by
+// whitespace (space or tab) and exactly the class identifier, so a TAB
+// after CLASS matches but "CLASS TForm1Extra" does not. Lines inside a
+// /* ... */ block comment, the rest of a // comment line, and
+// continuation lines of a trailing ";" are never candidates.
+// Declared limits: a /* or // inside a string literal on the same line
+// can confuse the comment scan, and a class produced by macro expansion
+// or #pragma text is not visible here; both end in a refusal, never in
+// a silent loss.
+static function HB_FindClassDeclLine( aLines, cClass )
+
+   local j, cLine, cCode, nAt, nB, nL, nEnd, aTok
+   local lInBlock := .F., lCont := .F.
+   local cCls := Upper( cClass )
+
+   for j := 1 to Len( aLines )
+      cLine := StrTran( aLines[ j ], Chr(13), "" )
+      // strip comments from this line, tracking /* ... */ across lines
+      cCode := ""
+      nAt := 1
+      do while nAt <= Len( cLine )
+         if lInBlock
+            nEnd := At( "*/", SubStr( cLine, nAt ) )
+            if nEnd == 0
+               nAt := Len( cLine ) + 1
+            else
+               lInBlock := .F.
+               nAt += nEnd + 1
+            endif
+            loop
+         endif
+         nB := At( "/*", SubStr( cLine, nAt ) )
+         nL := At( "//", SubStr( cLine, nAt ) )
+         if nB > 0 .and. ( nL == 0 .or. nB < nL )
+            cCode += SubStr( cLine, nAt, nB - 1 ) + " "
+            lInBlock := .T.
+            nAt += nB + 1
+            loop
+         endif
+         if nL > 0
+            cCode += SubStr( cLine, nAt, nL - 1 )
+            exit
+         endif
+         cCode += SubStr( cLine, nAt )
+         exit
+      enddo
+      cCode := AllTrim( cCode )
+      if Empty( cCode )
+         loop
+      endif
+      if lCont
+         lCont := Right( cCode, 1 ) == ";"
+         loop
+      endif
+      aTok := HB_ATokens( Upper( cCode ), " " + Chr(9) )
+      if ( Len( aTok ) >= 2 .and. aTok[ 1 ] == "CLASS" .and. aTok[ 2 ] == cCls ) .or. ;
+         ( Len( aTok ) >= 3 .and. aTok[ 1 ] == "CREATE" .and. aTok[ 2 ] == "CLASS" .and. ;
+           aTok[ 3 ] == cCls )
+         return j
+      endif
+      lCont := Right( cCode, 1 ) == ";"
+   next
+
+return 0
+
 static function RegenerateFormCode( cName, hForm )
 
    local cCode := "", e := Chr(13) + Chr(10)
@@ -829,12 +897,13 @@ static function RegenerateFormCode( cName, hForm )
    local aExL2, cTL, cTU, lInCF, aPreserved := {}, aWiringOld := {}, cKey
    local cCh, cLhs, aEmittedLines := {}, nE, cDeleted
    local aChunks := {}, cBody, cHdrChunk, lHdrOut, lWireOut, lSkipMenu, cMenuEnd
-   local cName2, nP1, nP2, lFound, nCk, lBodyStarted, cPreClass
+   local cName2, nP1, nP2, lFound, nCk, lBodyStarted, cPreClass, nClsLine
    local aMenuNodes, nMI, cMNode, aMFields, nLv, cCap, cScut, cHndl
    local nPendingLevels, nPL, cInd, bIsPopup, aNextF
    local aMenuHandlers := {}, lHasHandlers
 
    s_aUnserializable := {}
+   s_cUnidentClass := ""
 
    // Controls deleted in the designer this session (Delete/BackSpace key):
    // the backend recorded their names; the merge below must DROP their
@@ -1541,10 +1610,17 @@ static function RegenerateFormCode( cName, hForm )
    cPreClass := ""
    if ! Empty( cExistingCode )
       aExLines := HB_ATokens( cExistingCode, Chr(10) )
-      for j := 1 to Len( aExLines )
-         if Upper( Left( AllTrim( StrTran( aExLines[j], Chr(13), "" ) ), 6 ) ) == "CLASS "
-            exit
-         endif
+      nClsLine := HB_FindClassDeclLine( aExLines, cClass )
+      if nClsLine == 0
+         // The form class declaration cannot be identified in the
+         // existing code. Copying the whole file would duplicate it and
+         // falling back to the generated header would silently drop the
+         // unknown preface, so refuse: the caller aborts the sync/save
+         // and the file on disk stays untouched.
+         s_cUnidentClass := cName
+         return ""
+      endif
+      for j := 1 to nClsLine - 1
          cPreClass += StrTran( aExLines[j], Chr(13), "" ) + e
       next
    endif
@@ -1570,7 +1646,7 @@ static function RegenerateFormCode( cName, hForm )
       lInClass := .F.
       for j := 1 to Len( aExLines )
          cExLine := AllTrim( StrTran( aExLines[j], Chr(13), "" ) )
-         if Upper( Left( cExLine, 6 ) ) == "CLASS " .and. Upper( cClass ) $ Upper( cExLine )
+         if j == nClsLine
             lInClass := .T.
             loop
          endif
@@ -1964,6 +2040,25 @@ static function SyncDesignerToCode( lFromSave )
 
    // Regenerate CLASS + CreateForm
    cNewCode := RegenerateFormCode( aForms[ nActiveForm ][ 1 ], oDesignForm:hCpp )
+
+   // R4: the form class declaration could not be identified in the
+   // existing code. Applying the regenerated code would duplicate the
+   // file or silently drop the unknown preface, so refuse the sync/save
+   // like any other unfaithful save.
+   if ! Empty( s_cUnidentClass )
+      if lFromSave .or. !( s_cUnidentClass == s_cLastRefusal )
+         s_cLastRefusal := s_cUnidentClass
+         MsgInfo( "Save/sync aborted: the declaration of the form class " + ;
+            s_cUnidentClass + Chr(10) + ;
+            "could not be identified in the existing code." + Chr(10) + ;
+            "Applying the regenerated code would duplicate the file or" + ;
+            Chr(10) + "silently drop the lines before the class." + ;
+            Chr(10) + Chr(10) + ;
+            "Fix the CLASS line in the code editor, then try again.", "HbBuilder" )
+      endif
+      lSyncingFromCode := .f.
+      return nil
+   endif
 
    // Never report success while losing controls: abort the destructive save
    if ! Empty( s_aUnserializable )
@@ -3324,6 +3419,9 @@ static function HB_CheckFormsSerializable()
          ! Empty( HB_ParseBlockFor( aForms[ nActiveForm ][ 2 ]:hCpp ) )
          return .F.   // refusal dialog already shown by SyncDesignerToCode
       endif
+      if ! Empty( s_cUnidentClass )
+         return .F.   // refusal dialog already shown by SyncDesignerToCode
+      endif
    endif
    // non-active forms keep live designer objects: check them too before
    // their stored code is written to disk or compiled
@@ -3339,6 +3437,13 @@ static function HB_CheckFormsSerializable()
             return .F.
          endif
          RegenerateFormCode( aForms[ i ][ 1 ], aForms[ i ][ 2 ]:hCpp )
+         if ! Empty( s_cUnidentClass )
+            MsgInfo( "Operation aborted: form " + aForms[ i ][ 1 ] + ;
+               " has no identifiable form class declaration in its code;" + ;
+               Chr(10) + "saving would duplicate or silently drop code." + ;
+               Chr(10) + "Open it and fix the CLASS line first.", "HbBuilder" )
+            return .F.
+         endif
          if ! Empty( s_aUnserializable )
             MsgInfo( "Operation aborted: form " + aForms[ i ][ 1 ] + ;
                " holds controls that cannot be saved faithfully." + Chr(10) + ;
