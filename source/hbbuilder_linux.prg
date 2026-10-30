@@ -2163,9 +2163,17 @@ static function WireDesignForm()
    UI_FormOnComponentDrop( oDesignForm:hCpp, ;
       { |hForm, nType, nL, nT, nW, nH| OnComponentDrop( hForm, nType, nL, nT, nW, nH ) } )
 
-   oDesignForm:OnResize := { || SyncDesignerToCode(), ;
-      InspectorRefresh( oDesignForm:hCpp ) }
+   oDesignForm:OnResize := { || SyncDesignerToCode(), RefreshInspectorSelection() }
 
+return nil
+
+// GTK can resize the designer when a folder page becomes visible. Keep
+// the expanded Inspector target (page/column/control), not the form fallback.
+static function RefreshInspectorSelection()
+   local nSel := INS_ComboGetSel( _InsGetData() )
+   if ! lUpdatingInspectorCombo .and. nSel >= 0
+      OnComboSelect( nSel )
+   endif
 return nil
 
 static function SyncDesignerToCode( lFromSave, lShadow )
