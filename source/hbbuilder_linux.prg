@@ -1904,6 +1904,54 @@ static function HB_RecomputeOpenFilesDirty()
 
 return nil
 
+// Rebuild both dirty flags from ground truth: editor tab text vs the
+// disk baseline of each project file, the stored original of File>Open
+// tabs, or - for a never-saved project - the last known programmatic
+// text. Edit-then-revert and plain open stay clean; a failed or refused
+// save leaves the baseline unchanged, so the work stays protected.
+static function HB_RecomputeDirty()
+
+   local cDir, i, nTab
+
+   lProjectDirty := .f.
+   lOpenFilesDirty := .f.
+
+   if Empty( cCurrentFile )
+      for nTab := 1 to 1 + Len( aForms ) + Len( aModules ) + Len( aOpenFiles )
+         if ! HB_TabTextIsKnown( nTab, CodeEditorGetTabText( hCodeEditor, nTab ) )
+            if nTab > 1 + Len( aForms ) + Len( aModules )
+               lOpenFilesDirty := .t.
+            else
+               lProjectDirty := .t.
+            endif
+         endif
+      next
+      return nil
+   endif
+
+   cDir := HB_ProjectDirFromFile( cCurrentFile )
+
+   if ! HB_DiskBaseMatch( cDir + "Project1.prg", CodeEditorGetTabText( hCodeEditor, 1 ) )
+      lProjectDirty := .t.
+   endif
+   for i := 1 to Len( aForms )
+      if ! HB_DiskBaseMatch( cDir + aForms[ i ][ 1 ] + ".prg", CodeEditorGetTabText( hCodeEditor, 1 + i ) )
+         lProjectDirty := .t.
+      endif
+   next
+   for i := 1 to Len( aModules )
+      if ! HB_DiskBaseMatch( cDir + aModules[ i ][ 1 ] + ".prg", CodeEditorGetTabText( hCodeEditor, 1 + Len( aForms ) + i ) )
+         lProjectDirty := .t.
+      endif
+   next
+   for i := 1 to Len( aOpenFiles )
+      if !( CodeEditorGetTabText( hCodeEditor, 1 + Len( aForms ) + Len( aModules ) + i ) == aOpenFiles[ i ][ 2 ] )
+         lOpenFilesDirty := .t.
+      endif
+   next
+
+return nil
+
 // Unsaved-work guard for destructive paths (New/Open/Reopen/Exit/close).
 // Returns .T. only when the action may proceed: nothing unsaved, the user
 // chose Save and every write succeeded, or the user explicitly chose
@@ -1911,6 +1959,8 @@ return nil
 static function HB_ConfirmDiscardChanges( cAction )
 
    local n
+
+   HB_RecomputeDirty()
 
    if ! lProjectDirty .and. ! lOpenFilesDirty
       return .T.
@@ -1920,9 +1970,11 @@ static function HB_ConfirmDiscardChanges( cAction )
       cAction + " would discard them.", "Unsaved changes" )
 
    if n == 1
-      // Save, then continue only if every write really succeeded
+      // Save, then continue only if every write really succeeded:
+      // baselines move only on real writes, so recompute is ground truth
       TBSave()
       HB_SaveOpenFiles()
+      HB_RecomputeDirty()
       return ( ! lProjectDirty .and. ! lOpenFilesDirty )
    elseif n == 2
       return .T.
@@ -3510,6 +3562,16 @@ static function HB_DiskBaseCheck()
       endif
    next
 return ""
+
+// .T. when cText matches the stored disk baseline of cPath
+static function HB_DiskBaseMatch( cPath, cText )
+   local i
+   for i := 1 to Len( aDiskBase )
+      if aDiskBase[i][1] == cPath
+         return hb_MD5( cText ) == aDiskBase[i][2]
+      endif
+   next
+return .F.
 
 static function TBOpen()
    local cFile := GTK_OpenFileDialog( "Open HbBuilder Project", "hbp" )

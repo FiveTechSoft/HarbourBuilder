@@ -28,6 +28,11 @@ launch_a() {
 }
 
 dirty_the_buffer() {  # tail edit VERSION-A -> VERSION-Y, OCR-verified; sets CED
+  set_buffer_version 'return "VERSION-Y"'
+}
+
+set_buffer_version() {  # $1 = exact replacement line; OCR-verified; sets CED
+  local WANT="$1" TOK
   CED=""
   for w in $(rt_ide_windows); do
     [ "$(xdotool getwindowname "$w" 2>/dev/null)" = "Code Editor" ] && { CED=$w; break; }
@@ -43,12 +48,13 @@ dirty_the_buffer() {  # tail edit VERSION-A -> VERSION-Y, OCR-verified; sets CED
   xdotool key Up; sleep 0.2
   xdotool key Home; sleep 0.2
   xdotool key shift+End; sleep 0.2
-  xdotool type --delay 15 'return "VERSION-Y"'; sleep 1
+  xdotool type --delay 15 "$WANT"; sleep 1
   import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/dl_edit.png 2>/dev/null
-  tesseract /tmp/dl_edit.png - 2>/dev/null | grep -q 'VERSION-Y' \
+  TOK=$(echo "$WANT" | grep -o 'VERSION-[A-Z]')
+  tesseract /tmp/dl_edit.png - 2>/dev/null | grep -q "$TOK" \
     || { tesseract /tmp/dl_edit.png - 2>/dev/null | tail -3; fail "buffer edit did not land (harness)"; }
   xdotool windowmove "$D" "$DX" "$DY"; sleep 0.3
-  echo "  [t=$SECONDS] buffer dirtied (VERSION-Y, unsaved)"
+  echo "  [t=$SECONDS] buffer set to $TOK (unsaved)"
 }
 
 buffer_shows() {  # $1 = token; 0 if the code editor tail shows it
@@ -88,6 +94,14 @@ trigger_and_expect_dialog() {  # $1 = key sequence; echoes dialog window id
   done
   rt_map_all; sleep 0.5
   echo "$DLG"
+}
+
+shot_dialog() {  # $1 = dialog id, $2 = case tag: real capture for the report
+  local X Y WIDTH HEIGHT
+  [ -n "$1" ] || return 0
+  eval "$(xdotool getwindowgeometry --shell "$1")"
+  import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" "/tmp/dl_dialog_$2.png" 2>/dev/null
+  echo "  [capture] /tmp/dl_dialog_$2.png (${WIDTH}x${HEIGHT}+${X}+${Y})"
 }
 
 cancel_dialog() {  # $1 = dialog window id: Escape, verify closed, else click Cancel
@@ -130,6 +144,7 @@ done
 rt_map_all; sleep 0.5
 if [ -n "$DLG" ]; then
   echo "  reopen: protection dialog appeared"
+  shot_dialog "$DLG" reopen
   cancel_dialog "$DLG"
   buffer_shows 'VERSION-Y' \
     && echo "  reopen+Cancel: unsaved buffer preserved (VERSION-Y)" \
@@ -153,6 +168,7 @@ dirty_the_buffer
 DLG=$(trigger_and_expect_dialog "ctrl+q")
 if [ -n "$DLG" ]; then
   echo "  exit: protection dialog appeared"
+  shot_dialog "$DLG" exit
   cancel_dialog "$DLG"
   kill -0 "$IDEPID" 2>/dev/null \
     && echo "  exit+Cancel: IDE still running" \
@@ -179,6 +195,7 @@ dirty_the_buffer
 DLG=$(trigger_and_expect_dialog "ctrl+n")
 if [ -n "$DLG" ]; then
   echo "  newapp: protection dialog appeared"
+  shot_dialog "$DLG" newapp
   cancel_dialog "$DLG"
   buffer_shows 'VERSION-Y' \
     && echo "  newapp+Cancel: unsaved buffer preserved (VERSION-Y)" \
@@ -190,6 +207,129 @@ else
   FAILN=$((FAILN+1))
 fi
 echo "newapp case done (FAILN=$FAILN)"
+rt_cleanup
+}
+
+run_cleanopen() {
+launch_a
+local BEFORE w i
+BEFORE=$(rt_ide_windows | sort -n | tr '\n' ' ')
+BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"; sleep 0.3
+xdotool mousemove 20 12 click 1; sleep 0.8
+xdotool mousemove 100 134 click 1
+DLG=""
+for i in $(seq 1 6); do
+  for w in $(rt_ide_windows); do
+    case " $BEFORE " in *" $w "*) ;; *) rt_is_unsaved_dialog "$w" && DLG=$w;; esac
+  done
+  [ -n "$DLG" ] && break
+  sleep 2
+done
+rt_map_all; sleep 0.5
+if [ -n "$DLG" ]; then
+  echo "  CLEANOPEN: FALSE PROMPT on Reopen (no edits were made)"
+  cancel_dialog "$DLG"; FAILN=$((FAILN+1))
+else
+  echo "  cleanopen: Reopen proceeded without prompt (nothing to lose)"
+fi
+DLG=$(trigger_and_expect_dialog "ctrl+q")
+if [ -n "$DLG" ]; then
+  echo "  CLEANOPEN: FALSE PROMPT on Exit (no edits were made)"
+  cancel_dialog "$DLG"; FAILN=$((FAILN+1))
+else
+  sleep 2
+  kill -0 "$IDEPID" 2>/dev/null     && { echo "  CLEANOPEN: ctrl+q did not close the clean IDE"; FAILN=$((FAILN+1)); }     || echo "  cleanopen: Exit closed immediately, no false prompt"
+fi
+echo "cleanopen case done (FAILN=$FAILN)"
+rt_cleanup
+}
+
+run_revert() {
+launch_a
+dirty_the_buffer
+set_buffer_version 'return "VERSION-A"'
+DLG=$(trigger_and_expect_dialog "ctrl+q")
+if [ -n "$DLG" ]; then
+  echo "  REVERT: FALSE PROMPT on Exit after reverting to the exact saved text"
+  shot_dialog "$DLG" revert
+  cancel_dialog "$DLG"; FAILN=$((FAILN+1))
+else
+  sleep 2
+  kill -0 "$IDEPID" 2>/dev/null     && { echo "  REVERT: ctrl+q did not close after exact revert"; FAILN=$((FAILN+1)); }     || echo "  revert: edit+revert is clean; Exit closed with no prompt"
+fi
+echo "revert case done (FAILN=$FAILN)"
+rt_cleanup
+}
+
+click_dialog_button() {  # $1 = dialog id, $2 = OCR name regex
+  local DLGID="$1" WANT="$2" X Y WIDTH HEIGHT rel
+  xdotool windowmap "$DLGID" 2>/dev/null; sleep 0.3
+  eval "$(xdotool getwindowgeometry --shell "$DLGID")"
+  import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/dl_btn.png 2>/dev/null
+  rel=$(tesseract /tmp/dl_btn.png - tsv 2>/dev/null | awk -F'\t' -v w="$WANT" '$12 ~ w {print $7" "$8" "$9" "$10; exit}')
+  [ -n "$rel" ] || { echo "  [diag] button $WANT not found"; return 1; }
+  set -- $rel
+  xdotool mousemove $((X + $1 + $3/2)) $((Y + $2 + $4/2)) click 1; sleep 1
+}
+
+run_savefail() {
+launch_a
+chmod a-w "$RUNA"/* 2>/dev/null
+dirty_the_buffer
+DLG=$(trigger_and_expect_dialog "ctrl+q")
+if [ -z "$DLG" ]; then
+  echo "  SAVEFAIL: no protection dialog on Exit"; FAILN=$((FAILN+1))
+else
+  shot_dialog "$DLG" savefail1
+  click_dialog_button "$DLG" '^Save$'   # writes must fail (read-only files)
+  sleep 2
+  if kill -0 "$IDEPID" 2>/dev/null; then
+    echo "  savefail: IDE still running after failed Save (did not continue)"
+  else
+    echo "  SAVEFAIL: IDE closed although the save FAILED"; FAILN=$((FAILN+1))
+  fi
+  DLG2=$(trigger_and_expect_dialog "ctrl+q")
+  if [ -n "$DLG2" ]; then
+    echo "  savefail: dirty still set after failed Save (guard prompts again)"
+    shot_dialog "$DLG2" savefail2
+    cancel_dialog "$DLG2"
+    kill -0 "$IDEPID" 2>/dev/null       || { echo "  SAVEFAIL: IDE closed despite Cancel"; FAILN=$((FAILN+1)); }
+  else
+    echo "  SAVEFAIL: dirty flag lost after failed Save (no second prompt)"; FAILN=$((FAILN+1))
+  fi
+fi
+chmod u+w "$RUNA"/* 2>/dev/null
+echo "savefail case done (FAILN=$FAILN)"
+rt_cleanup
+}
+
+run_xclose() {
+launch_a
+dirty_the_buffer
+BAR=$(rt_find_bar)
+local BEFORE w i
+BEFORE=$(rt_ide_windows | sort -n | tr '\n' ' ')
+xdotool windowclose "$BAR" 2>/dev/null
+DLG=""
+for i in $(seq 1 8); do
+  for w in $(rt_ide_windows); do
+    case " $BEFORE " in *" $w "*) ;; *) rt_is_unsaved_dialog "$w" && DLG=$w;; esac
+  done
+  [ -n "$DLG" ] && break
+  sleep 2
+done
+if [ -n "$DLG" ]; then
+  echo "  xclose: protection dialog appeared on window X"
+  shot_dialog "$DLG" xclose
+  cancel_dialog "$DLG"
+  kill -0 "$IDEPID" 2>/dev/null     && echo "  xclose+Cancel: IDE still running"     || { echo "  XCLOSE: IDE closed despite Cancel"; FAILN=$((FAILN+1)); }
+  buffer_shows 'VERSION-Y'     && echo "  xclose+Cancel: unsaved buffer preserved (VERSION-Y)"     || { echo "  XCLOSE: buffer lost despite Cancel"; FAILN=$((FAILN+1)); }
+else
+  sleep 1
+  kill -0 "$IDEPID" 2>/dev/null     && echo "  XCLOSE: windowclose did nothing (no WM route to delete-event?)"     || echo "  XCLOSE-UNGUARDED: IDE closed via window X with unsaved changes, no prompt"
+  FAILN=$((FAILN+1))
+fi
+echo "xclose case done (FAILN=$FAILN)"
 rt_cleanup
 }
 
