@@ -92,14 +92,15 @@ echo "$OCR" | grep -q 'modificado' || { echo "  edit effect missing"; FAILN=$((F
 # capture proves the pixbuf rendered, not just the property survived.
 if [ "$PICTURE_FILES" = "yes" ]; then COPIED="with" ; else COPIED="without"; fi
 echo "  picture check ($COPIED image files in the app cwd):"
-MAG=$(convert /tmp/rt_runtime.png -fill white -opaque 'rgb(255,0,255)' -fill black +opaque white -colorspace gray -format "%[fx:mean*100]" info: 2>/dev/null)
-CYA=$(convert /tmp/rt_runtime.png -fill white -opaque 'rgb(0,255,255)' -fill black +opaque white -colorspace gray -format "%[fx:mean*100]" info: 2>/dev/null)
-echo "  magenta(test.png IMAGE)=${MAG}% cyan(icon.png BITBTN)=${CYA}% of window pixels"
+HIST=$(convert /tmp/rt_runtime.png -format "%c" histogram:info:- 2>/dev/null)
+MAG=$(echo "$HIST" | awk -F: '/255,0,255/{gsub(/ /,"",$1); s+=$1} END{print s+0}')
+CYA=$(echo "$HIST" | awk -F: '/0,255,255/{gsub(/ /,"",$1); s+=$1} END{print s+0}')
+echo "  exact-color pixels: magenta(test.png IMAGE, 32x32=1024 nominal)=$MAG cyan(icon.png BITBTN, 16x16=256 nominal)=$CYA"
 if [ "$PICTURE_FILES" = "yes" ]; then
-  awk -v m="$MAG" 'BEGIN{exit !(m+0 >= 0.3)}' || { echo "  IMAGE test.png not rendered (magenta < 0.3%)"; FAILN=$((FAILN+1)); }
-  awk -v c="$CYA" 'BEGIN{exit !(c+0 >= 0.05)}' || { echo "  BITBTN icon.png not rendered (cyan < 0.05%)"; FAILN=$((FAILN+1)); }
+  [ "$MAG" -ge 400 ] || { echo "  IMAGE test.png not rendered (magenta px < 400)"; FAILN=$((FAILN+1)); }
+  [ "$CYA" -ge 80 ]  || { echo "  BITBTN icon.png not rendered (cyan px < 80)"; FAILN=$((FAILN+1)); }
 else
-  awk -v m="$MAG" 'BEGIN{exit !(m+0 < 0.3)}' || { echo "  CONTROL FAIL: magenta present without the image file (check cannot detect absence)"; FAILN=$((FAILN+1)); }
+  [ "$MAG" -lt 50 ] || { echo "  CONTROL FAIL: magenta present without the image file (check cannot detect absence)"; FAILN=$((FAILN+1)); }
 fi
 
 kill "$APPPID" 2>/dev/null
