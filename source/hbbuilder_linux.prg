@@ -1920,12 +1920,20 @@ static function HB_RecomputeDirty()
    if Empty( cCurrentFile )
       for nTab := 1 to 1 + Len( aForms ) + Len( aModules ) + Len( aOpenFiles )
          cFrozen := CodeEditorGetTabText( hCodeEditor, nTab )
-         if ! HB_TabTextIsKnown( nTab, cFrozen )
-            i := nTab - 1
-            if i >= 1 .and. i <= Len( aForms ) .and. Len( aForms[i] ) >= 6 .and. ;
-               aForms[i][6] != NIL .and. cFrozen == aForms[i][6]
+   i := nTab - 1
+         if i >= 1 .and. i <= Len( aForms ) .and. Len( aForms[i] ) >= 6 .and. ;
+            aForms[i][6] != NIL
+            // form tab with a frozen generator baseline: the baseline is the
+            // ground truth. A sync after a real model change marks its output
+            // known, so the known-check alone would hide the change.
+            if cFrozen == aForms[i][6]
                loop   // frozen generator output, no user edit
+            else
+               lProjectDirty := .t.
+               loop
             endif
+         endif
+         if ! HB_TabTextIsKnown( nTab, cFrozen )
             if nTab > 1 + Len( aForms ) + Len( aModules )
                lOpenFilesDirty := .t.
             else
@@ -3840,11 +3848,11 @@ static function TBSave()
       MsgInfo( "Save refused: " + cExtern + " changed on disk since it was loaded." + ;
                " Reopen the project to load the external changes" + ;
                " (unsaved IDE edits are lost on reload).", "HbBuilder" )
-      return nil
+      return .F.
    endif
 
    if ! HB_CheckFormsSerializable()
-      return nil
+      return .F.
    endif
 
    SaveActiveFormCode()
