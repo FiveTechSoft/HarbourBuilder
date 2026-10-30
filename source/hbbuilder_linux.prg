@@ -821,10 +821,15 @@ static function HB_IsReturnStmt( cKeyU )
 // after CLASS matches but "CLASS TForm1Extra" does not. Lines inside a
 // /* ... */ block comment, the rest of a // comment line, and
 // continuation lines of a trailing ";" are never candidates.
-// Declared limits: a /* or // inside a string literal on the same line
-// can confuse the comment scan, and a class produced by macro expansion
-// or #pragma text is not visible here; both end in a refusal, never in
-// a silent loss.
+// Declared limits, verified with standalone runs of this function:
+// a /* inside a string literal on a code line makes the scan enter
+// comment mode and miss the real class: the save is REFUSED (a false
+// positive, never a loss). A line starting with the class text inside
+// a real block comment is correctly skipped (comment ends at */ even
+// inside quotes, exactly like the Harbour compiler, so a */ inside
+// quoted text inside a comment can only confuse the scan in a file the
+// compiler itself rejects). A class produced by macro expansion or
+// #pragma text is not visible here: also a refusal.
 static function HB_FindClassDeclLine( aLines, cClass )
 
    local j, cLine, cCode, nAt, nB, nL, nEnd, aTok
