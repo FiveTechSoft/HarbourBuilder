@@ -14,14 +14,10 @@ EC=$?;echo standalone_compiler_exit=$EC
 [ "$EC" = 0 ] || exit 1
 rt_setup "$RUN";rt_launch_ide
 for try in $(seq 1 12);do rt_find_bar >/dev/null&&break;sleep 1;done
-rt_reopen_project
 if [ "${EXPECT:-red}" = failure ];then
- # Load a real invalid program, preserving any prior executable for stale-run check.
- printf '
-this is invalid Harbour syntax !
-' >> "$RUN/Project1.prg"
- rt_reopen_project
+ printf '\nthis is invalid Harbour syntax !\n' >> "$RUN/Project1.prg"
 fi
+rt_reopen_project
 rm -f /tmp/debugmodules-result.txt
 BAR=$(rt_find_bar);rt_unmap_all_but "$BAR";xdotool mousemove 700 12 click 1
 if [ "${MODE:-run}" = debug ];then xdotool mousemove 15 62 click 1;else xdotool key ctrl+r;fi
@@ -38,7 +34,7 @@ if [ "${EXPECT:-red}" = failure ];then
  echo 'Real invalid Harbour compile refused; no app sentinel'
  cp "$REPO/tests/fixtures/debugmodules/Project1.prg" "$RUN/Project1.prg"
  sed -i '1i #stdout Error-count=0 informational build note' "$RUN/Project1.prg"
- rt_reopen_project
+ rt_map_all;rt_expose_bar;rt_reopen_project
  BAR=$(rt_find_bar);rt_unmap_all_but "$BAR";xdotool mousemove 700 12 click 1
  if [ "${MODE:-run}" = debug ];then xdotool mousemove 15 62 click 1;else xdotool key ctrl+r;fi
  for try in $(seq 1 70);do [ -f /tmp/debugmodules-result.txt ]&&break;sleep 1;done
