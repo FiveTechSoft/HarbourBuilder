@@ -50,6 +50,6 @@ BAR=$(rt_find_bar);rt_unmap_all_but "$BAR";xdotool mousemove 700 12 click 1;xdot
 python3 - "$RUN" <<'CHECK'
 from pathlib import Path
 import sys
-p=Path(sys.argv[1]);h=(p/'HelperA.prg').read_text();print('HelperA after NewForm Save:',repr(h[:150]));assert 'CLASS TForm2 FROM TForm' in h
-print('RED NewForm overwrites existing module slot and saves form source into HelperA.prg')
+p=Path(sys.argv[1]);h=(p/'HelperA.prg').read_text();print('HelperA after NewForm Save:',repr(h[:150]));assert 'function HelperB()' in h;assert 'UNSAVED-One' in (p/'HelperB.prg').read_text()
+print('RED NewForm destroys HelperA buffer, shifts HelperB into HelperA file and unsaved standalone into HelperB file')
 CHECK
