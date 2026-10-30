@@ -5992,7 +5992,13 @@ static function HB_ConfirmRemoveProjectTab( nTab, nForm )
    // Loaded form normalization is clean only at its frozen baseline.
    if nForm > 0 .and. Len( aForms[ nForm ] ) >= 6 .and. ;
       aForms[ nForm ][ 6 ] != nil
-      if cText == aForms[ nForm ][ 6 ]; lDirty := .F.; endif
+      if Empty( cCurrentFile )
+         // Designer sync marks text known even after a real model change.
+         // A never-saved form must compare with its creation baseline.
+         lDirty := !( cText == aForms[ nForm ][ 6 ] )
+      elseif cText == aForms[ nForm ][ 6 ]
+         lDirty := .F.
+      endif
    endif
    if ! lDirty; return .T.; endif
    n := UI_MsgYesNoCancel( "This project item has unsaved changes." + Chr(10) + ;
