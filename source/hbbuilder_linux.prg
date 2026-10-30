@@ -2190,7 +2190,7 @@ static function SyncDesignerToCode( lFromSave, lShadow )
       cParseBlock := HB_ParseBlockFor( aForms[ nActiveForm ][ 2 ]:hCpp )
    endif
    if ! Empty( cParseBlock )
-      if lFromSave .or. !( cParseBlock == s_cLastRefusal )
+      if ! lShadow .and. ( lFromSave .or. !( cParseBlock == s_cLastRefusal ) )
          s_cLastRefusal := cParseBlock
          MsgInfo( "Save/sync aborted: this form has an expression that could not be" + ;
             Chr(10) + "understood when the code was loaded:" + Chr(10) + Chr(10) + ;
@@ -2285,7 +2285,7 @@ static function SyncDesignerToCode( lFromSave, lShadow )
    // file or silently drop the unknown preface, so refuse the sync/save
    // like any other unfaithful save.
    if ! Empty( s_cUnidentClass )
-      if lFromSave .or. !( s_cUnidentClass == s_cLastRefusal )
+      if ! lShadow .and. ( lFromSave .or. !( s_cUnidentClass == s_cLastRefusal ) )
          s_cLastRefusal := s_cUnidentClass
          MsgInfo( "Save/sync aborted: the declaration of the form class " + ;
             s_cUnidentClass + Chr(10) + ;
