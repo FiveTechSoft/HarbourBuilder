@@ -557,7 +557,11 @@ for attempt in 1 2; do
   done
   if [ -n "$CH" ]; then
     echo "  [diag] chooser window $CH: $(xdotool getwindowname "$CH" 2>/dev/null)"
-    xdotool windowmap "$CH" 2>/dev/null; xdotool windowraise "$CH" 2>/dev/null; xdotool windowactivate "$CH" 2>/dev/null; sleep 0.6
+    xdotool windowmap "$CH" 2>/dev/null; xdotool windowraise "$CH" 2>/dev/null
+    # no WM focus follows click only: click inside the chooser to focus it
+    eval "$(xdotool getwindowgeometry --shell "$CH" 2>/dev/null)"
+    xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT/2)) click 1; sleep 0.5
+    xdotool windowactivate "$CH" 2>/dev/null; sleep 0.4
   else
     echo "  [diag] no chooser window appeared (attempt $attempt)"
   fi
@@ -576,7 +580,14 @@ for attempt in 1 2; do
   xdotool key ctrl+Home; sleep 0.3
   import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/dl_opened.png 2>/dev/null
   tesseract /tmp/dl_opened.png - 2>/dev/null | grep -q 'line one' && break
-  echo "  [diag] open attempt $attempt did not land; chooser OCR:"; tesseract /tmp/dl_chooser.png - 2>/dev/null | grep -v '^$' | head -4
+  echo "  [diag] open attempt $attempt did not land"
+  if [ -n "$CH" ] && xdotool getwindowname "$CH" >/dev/null 2>&1; then
+    echo "  [diag] chooser still open; cancelling it before retry"
+    xdotool windowraise "$CH" 2>/dev/null
+    eval "$(xdotool getwindowgeometry --shell "$CH" 2>/dev/null)"
+    xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT/2)) click 1; sleep 0.3
+    xdotool key Escape; sleep 0.8
+  fi
 done
 # edit the opened file tab
 CED=""
