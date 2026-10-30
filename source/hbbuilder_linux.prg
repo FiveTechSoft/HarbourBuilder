@@ -923,7 +923,7 @@ static function RegenerateFormCode( cName, hForm )
             case nType == 1
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' SAY ::o' + cCtrlName + ' PROMPT ' + HB_QHarbourStr( cText ) + ' OF Self SIZE ' + ;
-                  LTrim(Str(nCW)) + e
+                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
             case nType == 2
                if cCtrlClass == "TMemo"
                   // TMemo shares CT_EDIT in the gtk3 backend (UI_MemoNew);
@@ -1219,6 +1219,10 @@ static function RegenerateFormCode( cName, hForm )
                   enddo
                   cCreate += '   END POPUPMENU' + e
                endif
+            case nType == CT_LABELEDEDIT
+               cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
+                  ' LABELEDEDIT ::o' + cCtrlName + ' VAR ' + HB_QHarbourStr( cText ) + ' OF Self SIZE ' + ;
+                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
             otherwise
                if nType >= CT_TIMER  // Non-visual component
                   cCreate += '   COMPONENT ::o' + cCtrlName + ' TYPE CT_' + ;
@@ -2576,6 +2580,9 @@ static function RestoreFormFromCode( hForm, cCode )
                      case cAtCmd == "GET" .or. cAtCmd == "EDIT"
                         hCtrl := UI_EditNew( hForm, cAtText, nAtX, nAtY, ;
                            iif( nAtW > 0, nAtW, 200 ), iif( nAtH > 0, nAtH, 24 ) )
+                     case cAtCmd == "LABELEDEDIT"
+                        hCtrl := UI_LabeledEditNew( hForm, cAtText, nAtX, nAtY, ;
+                           iif( nAtW > 0, nAtW, 120 ), iif( nAtH > 0, nAtH, 24 ) )
                      case cAtCmd == "CHECKBOX"
                         hCtrl := UI_CheckBoxNew( hForm, cAtText, nAtX, nAtY, ;
                            iif( nAtW > 0, nAtW, 100 ), iif( nAtH > 0, nAtH, 20 ) )

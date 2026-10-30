@@ -279,6 +279,30 @@ METHOD New( oParent, cText, nLeft, nTop, nWidth, nHeight ) CLASS TEdit
 return Self
 
 //----------------------------------------------------------------------------//
+// TLabeledEdit
+//----------------------------------------------------------------------------//
+
+CLASS TLabeledEdit INHERIT TControl
+
+   ACCESS Value      INLINE UI_GetProp( ::hCpp, "cText" )
+   ASSIGN Value( c ) INLINE UI_SetProp( ::hCpp, "cText", c )
+
+   METHOD New( oParent, cText, nLeft, nTop, nWidth, nHeight )
+
+ENDCLASS
+
+METHOD New( oParent, cText, nLeft, nTop, nWidth, nHeight ) CLASS TLabeledEdit
+
+   if cText == nil;   cText := ""; endif
+   if nWidth == nil;  nWidth := 120; endif
+   if nHeight == nil; nHeight := 24; endif
+
+   ::oParent := oParent
+   ::hCpp := UI_LabeledEditNew( oParent:hCpp, cText, nLeft, nTop, nWidth, nHeight )
+
+return Self
+
+//----------------------------------------------------------------------------//
 // TMemo
 //----------------------------------------------------------------------------//
 

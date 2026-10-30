@@ -15,6 +15,7 @@ CLASS TForm1 FROM TForm
    DATA oImage1    // TImage
    DATA oMemo1     // TMemo
    DATA oList1     // TListBox
+   DATA oLedit1    // TLabeledEdit
 
    // Event handlers
 
@@ -44,6 +45,7 @@ METHOD CreateForm() CLASS TForm1
    @ 300, 20 BITBTN ::oBitBtn1 PROMPT "ConIcono" OF Self SIZE 110, 32 PICTURE "icon.png"
    @ 350, 20 IMAGE ::oImage1 OF Self SIZE 64, 64 PICTURE "test.png"
    @ 430, 20 MEMO ::oMemo1 VAR "linea1" OF Self SIZE 240, 80
+   @ 60, 320 LABELEDEDIT ::oLedit1 VAR "editable" OF Self SIZE 160, 24
    @ 430, 300 LISTBOX ::oList1 OF Self SIZE 160, 90 ITEMS "Alfa", "Beta"
    ::oList1:Value := 2
 

@@ -262,6 +262,14 @@
    => ;
       <oCtrl> := TMaskEdit():New( <oParent>, <cMask>, <nLeft>, <nTop>, <nWidth>, <nHeight> )
 
+// LabeledEdit
+#xcommand @ <nTop>, <nLeft> LABELEDEDIT <oCtrl> ;
+      [ VAR <cText> ] ;
+      [ OF <oParent> ] ;
+      [ SIZE <nWidth> [, <nHeight>] ] ;
+   => ;
+      <oCtrl> := TLabeledEdit():New( <oParent>, <cText>, <nLeft>, <nTop>, <nWidth>, <nHeight> )
+
 // Bevel
 #xcommand @ <nTop>, <nLeft> BEVEL <oCtrl> ;
       OF <oParent> ;

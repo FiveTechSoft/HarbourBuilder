@@ -79,6 +79,7 @@ rej() {  # $1 = pattern that must NOT appear
 
 chk 'BUTTON ::oButton1 PROMPT "Aceptar"'
 chk 'SAY ::oLabel1 PROMPT "Etiqueta fija"'
+chk 'LABELEDEDIT ::oLedit1 VAR "editable" OF Self SIZE 160, 24'
 chk 'GET ::oEdit1 VAR "texto inicial"'
 chk 'CHECKBOX ::oChk1 PROMPT "Marcado".* CHECKED'
 chk 'COMBOBOX ::oCombo1 .* ITEMS "Uno", "Di " \+ Chr\(34\) \+ "si" \+ Chr\(34\), "Tre, s"'
@@ -122,15 +123,14 @@ fi
 GEOM_BAD=$(diff <(tr -d '\r' < "$CYC/original.prg") <(tr -d '\r' < "$CYC/cycle2.prg") | grep -E '^[<>]' | \
   grep -vE '^[<>] +::nHeight := (480|530)$' | \
   grep -vE '^[<>] +@ 430, 300 LISTBOX ::oList1 OF Self SIZE 160, (90|100) ITEMS "Alfa", "Beta"$' | \
-  # Known generator limitation (pre-existing, same family as the M6/M7
-  # drift): SAY lines are regenerated width-only - a hand-written SAY
-  # height (SIZE w, h) is honored on load (UI_LabelNew applies it, default
-  # 15 when absent) but is NOT re-saved, so after one save the height
-  # falls back to the 15px default on next load. Tracked here, not fixed
-  # in this batch.
+  # SAY lines are regenerated with their explicit height (the width-only
+  # emission that dropped a hand-written SAY height was fixed in this
+  # batch): the fixture line is width-only, so the saved form gains the
+  # height the parser applied (default 15 when absent).
+  grep -vE '^[<>] +@ 20, 160 SAY ::oLabel1 PROMPT "Etiqueta fija" OF Self SIZE 200(, 15)?$' | \
   grep -vE '^[<>] +@ 140, 20 COMBOBOX ::oCombo1 OF Self SIZE 180, 26 ITEMS "Uno", "Di " \+ Chr\( ?34 ?\) \+ "si" \+ Chr\( ?34 ?\), "Tre, s"$' | \
 
-  grep -vE '^[<>] +DATA o(Label1|Edit1|Chk1|Combo1|Group1|Radio1|Image1|Memo1|List1) +// [A-Za-z0-9_]+$' | \
+  grep -vE '^[<>] +DATA o(Label1|Edit1|Chk1|Combo1|Group1|Radio1|Image1|Memo1|List1|Ledit1) +// [A-Za-z0-9_]+$' | \
   grep -vE '^[<>] // Form1\.prg$' | \
   grep -vE '^[<>] // Form1\.prg - FIXTURE roundtrip v3: order preservation \+ side-effect calls$' | \
   grep -vE '^[<>] +// Event wiring$' | \

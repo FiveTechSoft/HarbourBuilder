@@ -2,7 +2,7 @@
 # Delete -> abort -> resolve -> save.
 # Proves the designer-delete record is NOT consumed by an aborted save
 # (peek during merge, consume only at apply): delete Button1, explicit save
-# refused (unserializable TLabeledEdit dropped first), disk must still
+# refused (unserializable TTrackBar dropped first), disk must still
 # contain the button line; then remove the cause, save, and the button must
 # be gone (no verbatim resurrection) with hand-written lines intact.
 # Note: the auto-sync refusal dialog is rate-limited (same refusal set is
@@ -10,14 +10,17 @@
 # (lFromSave always warns) plus file immutability, not via a second auto
 # dialog.
 #
-# KNOWN BLOCKER (defect B8, confirmed product-side, out of this batch):
-# a dropped TLabeledEdit is a composite whose GtkEntry child consumes plain
-# clicks and whose rubber-band selection only surfaces its TLabel child,
-# so the control cannot be selected/deleted as a root in the designer.
-# Because the type is also not serializable, every save of the form is
-# refused while it exists and the only way out is closing the project
-# without saving. Step 4 therefore stays RED here: the script cannot
-# resolve the abort cause through the designer UI until B8 is fixed.
+# DEFECT B8 (FIXED): a dropped TLabeledEdit used to block every save of the
+# form - it had no faithful serialization and could not be selected as a
+# root in the designer (its windowed GtkWidget ate the design clicks), so
+# the only way out was closing the project without saving. The fix makes
+# the type serializable ('@ ... LABELEDEDIT ::oX VAR ... OF Self SIZE w, h',
+# parsed back on load) and keeps the design overlay topmost after
+# in-session widget creation, so the control can be rubber-band selected
+# and deleted. Steps 1-2 prove both halves: the dropped LabeledEdit
+# serializes on save (no refusal) and is then selected via rubber band and
+# deleted through the designer UI. The refusal scenario below uses
+# TTrackBar, which remains intentionally unserializable.
 set -u
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 FIX="$REPO/tests/fixtures/roundtrip"
@@ -117,7 +120,9 @@ bar_ctrl_s() { # focus the main bar (as test_save_refusal.sh does) then Ctrl+S
   xdotool key ctrl+s; sleep 2
 }
 
-# 1) drop an unserializable TLabeledEdit (Additional palette, "text")
+# 1) B8 serialization half: drop a TLabeledEdit (Additional palette,
+# "text"); it must now sync and SAVE normally (no refusal dialog), and the
+# file must gain a faithful LABELEDEDIT line
 read AX AY <<< $(rt_ocr_bar_token '^Additional')
 [ -n "${AX:-}" ] || fail "Additional palette tab not found"
 xdotool mousemove "$AX" "$AY" click 1; sleep 1
@@ -129,11 +134,66 @@ eval "$(xdotool getwindowgeometry --shell "$RT_DESIGNER")"
 # the later rubber-band intersects only this control
 DROPX=$((X+250)); DROPY=$((Y+200))
 xdotool mousemove "$DROPX" "$DROPY" click 1; sleep 2.5
+if D=$(wait_dialog); then
+  eval "$(xdotool getwindowgeometry --shell "$D")"
+  import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/das-dialog1.png 2>/dev/null
+  echo "unexpected dialog OCR: $(tesseract /tmp/das-dialog1.png - 2>/dev/null | tr '\n' ' ')"
+  fail "dropping a TLabeledEdit was still refused (B8 not fixed)"
+fi
+# auto-sync updates the editor buffer only; an explicit save writes the file
+bar_ctrl_s
+if D=$(wait_dialog); then
+  eval "$(xdotool getwindowgeometry --shell "$D")"
+  import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/das-dialog1.png 2>/dev/null
+  echo "unexpected dialog OCR: $(tesseract /tmp/das-dialog1.png - 2>/dev/null | tr '\n' ' ')"
+  fail "saving with a TLabeledEdit on the form was refused (B8 not fixed)"
+fi
+grep -q 'LABELEDEDIT ::oLabeledEdit1' "$RUN/Form1.prg" ||   { echo "--- Form1.prg after drop ---"; cat "$RUN/Form1.prg";     fail "dropped TLabeledEdit not serialized (no LABELEDEDIT line after sync)"; }
+grep -q 'DATA oLabeledEdit1   // TLabeledEdit' "$RUN/Form1.prg" ||   fail "dropped TLabeledEdit missing its DATA line"
+echo "dropped TLabeledEdit serialized: $(grep 'LABELEDEDIT' "$RUN/Form1.prg" | head -1)"
+
+# 2) B8 selection half: the dropped LabeledEdit must be selectable as a
+# root and deletable through the designer UI (its windowed widget used to
+# eat the design clicks). Rubber-band it, check the inspector, Delete.
+inspector_title() {
+  local w t
+  for w in $(rt_ide_windows); do
+    t=$(xdotool getwindowname "$w" 2>/dev/null)
+    case "$t" in "Inspector:"*) echo "$t"; return 0;; esac
+  done
+}
+SX=$((DROPX+180)); SY=$((DROPY+80)); EX=$((DROPX-20)); EY=$((DROPY-20))
+xdotool mousemove "$SX" "$SY" mousedown 1; sleep 0.3
+xdotool mousemove $((SX-80)) $((SY-40)); sleep 0.2
+xdotool mousemove $((SX-160)) $((SY-80)); sleep 0.2
+xdotool mousemove "$EX" "$EY" mouseup 1; sleep 1
+T=$(inspector_title); echo "after rubber-band, inspector: $T"
+[ "$T" = "Inspector: TLabeledEdit" ] ||   fail "rubber-band did not select the dropped TLabeledEdit (got '$T')"
+xdotool key Delete; sleep 2.5
+bar_ctrl_s
+grep -q 'LABELEDEDIT' "$RUN/Form1.prg" &&   fail "LABELEDEDIT line still present after designer delete + save"
+echo "TLabeledEdit selected via rubber band and deleted; file clean"
+
+# 3) drop an unserializable TTrackBar (GTK3 palette, "TB"): this type
+# still has no faithful serialization, so the refusal path must engage
+read GX GY <<< $(rt_ocr_bar_token '^GTK3$')
+[ -n "${GX:-}" ] || fail "GTK3 palette tab not found"
+xdotool mousemove "$GX" "$GY" click 1; sleep 1
+BX_TOKEN=""
+for re in '^TB$' '^T8$' '^18$'; do
+  read BX_TOKEN BY_TOKEN <<< $(rt_ocr_bar_token "$re")
+  [ -n "${BX_TOKEN:-}" ] && break
+  sleep 0.5
+done
+[ -n "${BX_TOKEN:-}" ] || fail "TB (TTrackBar) component button not found"
+xdotool mousemove "$BX_TOKEN" "$BY_TOKEN" click 1; sleep 0.8
+DROPX=$((X+380)); DROPY=$((Y+300))
+xdotool mousemove "$DROPX" "$DROPY" click 1; sleep 2.5
 D=$(wait_dialog) || fail "no abort dialog after dropping unserializable control"
 echo "abort-on-drop dialog up (expected)"; dismiss_dialog "$D"
 [ "$(md5sum "$RUN/Form1.prg" | cut -d' ' -f1)" = "$MD0" ] || fail "file changed after drop abort"
 
-# 2) click Button1 and delete it
+# 4) click Button1 and delete it
 BX=""
 for i in 1 2 3 4; do
   read BX BY <<< $(ocr_win "$RT_DESIGNER" '^Aceptar$')
@@ -156,7 +216,7 @@ read BX2 BY2 <<< $(ocr_win "$RT_DESIGNER" '^Aceptar$')
 [ -z "${BX2:-}" ] || fail "Button1 still visible after Delete"
 echo "Button1 deleted from designer (prompt gone)"
 
-# 3) explicit save must be REFUSED, disk intact, delete record preserved
+# 5) explicit save must be REFUSED, disk intact, delete record preserved
 bar_ctrl_s
 D=$(wait_dialog) || fail "explicit Ctrl+S with unserializable control was not refused"
 eval "$(xdotool getwindowgeometry --shell "$D")"
@@ -170,33 +230,22 @@ grep -q 'BUTTON ::oButton1' "$RUN/Form1.prg" || \
 dismiss_dialog "$D"
 echo "explicit save refused; disk intact; button line still on disk"
 
-# 4) resolve the cause: delete the TLabeledEdit. A plain click does not
-# select it (its GtkEntry child consumes the press), so rubber-band it:
-# press on empty form space right-below the drop point and drag across the
-# control; the release handler selects intersecting controls.
-inspector_title() {
-  local w t
-  for w in $(rt_ide_windows); do
-    t=$(xdotool getwindowname "$w" 2>/dev/null)
-    case "$t" in "Inspector:"*) echo "$t"; return 0;; esac
-  done
-}
-# Rubber-band the dropped control: press on empty form space right-below
-# the drop point and drag across it; the release handler selects every
-# intersecting control (a plain click is eaten by the composite's GtkEntry).
+# 6) resolve the cause: rubber-band the dropped TTrackBar and delete it
+# (the release handler selects every intersecting control)
 SX=$((DROPX+180)); SY=$((DROPY+80)); EX=$((DROPX-20)); EY=$((DROPY-20))
 xdotool mousemove "$SX" "$SY" mousedown 1; sleep 0.3
 xdotool mousemove $((SX-80)) $((SY-40)); sleep 0.2
 xdotool mousemove $((SX-160)) $((SY-80)); sleep 0.2
 xdotool mousemove "$EX" "$EY" mouseup 1; sleep 1
 T=$(inspector_title); echo "after rubber-band, inspector: $T"
+[ "$T" = "Inspector: TTrackBar" ] ||   fail "rubber-band did not select the dropped TTrackBar (got '$T')"
 echo "pre-delete active=$(xdotool getactivewindow 2>/dev/null || echo none)"
 xdotool key Delete; sleep 2.5
 T=$(inspector_title); echo "after cause delete, inspector: $T"
 import -window root /tmp/das_after_cause_delete.png 2>/dev/null
 echo "screenshot: /tmp/das_after_cause_delete.png"
 
-# 5) save must now apply; both deletions reflected, hand-written lines intact
+# 7) save must now apply; both deletions reflected, hand-written lines intact
 bar_ctrl_s
 if D2=$(wait_dialog); then
   eval "$(xdotool getwindowgeometry --shell "$D2")"
@@ -210,6 +259,7 @@ grep -q 'BUTTON ::oButton1' "$RUN/Form1.prg" && fail "deleted button line still 
 grep -q 'DATA oButton1' "$RUN/Form1.prg" && fail "deleted button DATA still present after save"
 grep -q 'Aceptar' "$RUN/Form1.prg" && fail "deleted button prompt still present after save"
 grep -q 'Entra un numero:' "$RUN/Form1.prg" || fail "unrelated SAY line lost"
+grep -q 'SAY ::oSay1 PROMPT "Entra un numero:" SIZE 140, 24' "$RUN/Form1.prg" ||   fail "SAY height lost on save (expected SIZE 140, 24 preserved)"
 grep -q 'KEEP-ME: do not delete' "$RUN/Form1.prg" || fail "hand-written marker line lost"
 echo "--- resulting Form1.prg ---"; cat "$RUN/Form1.prg"
 

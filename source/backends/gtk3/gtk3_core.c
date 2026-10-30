@@ -441,6 +441,19 @@ static void HbApplyPendingPageOwner( HBControl * pCtrl )
 static void HBControl_CreateWidget( HBControl * child, GtkWidget * fixed, const char * fontDesc );
 static GtkWidget * HBTabControl2_GetPageFixed( HBControl * p, int nPage );
 
+/* Keep the design-mode overlay topmost: a control whose GTK widget owns a
+   GdkWindow (GtkEntry, GtkTextView, GtkTreeView, ...) created while the
+   designer is live stacks above the overlay window and then eats the design
+   clicks over it (no selection, no rubber-band start, Delete unreachable).
+   Raising the overlay window after each in-session widget creation keeps
+   the design surface usable for every control type. */
+static void HBForm_RaiseDesignOverlay( HBForm * form )
+{
+   if( form && form->FDesignMode && form->FOverlay &&
+       gtk_widget_get_window( form->FOverlay ) )
+      gdk_window_raise( gtk_widget_get_window( form->FOverlay ) );
+}
+
 static void HBControl_AddChild( HBControl * parent, HBControl * child )
 {
    if( parent->FChildCount < MAX_CHILDREN )
@@ -467,7 +480,10 @@ static void HBControl_AddChild( HBControl * parent, HBControl * child )
             if( page ) container = page;
          }
          if( container )
+         {
             HBControl_CreateWidget( child, container, form->FFormFontDesc );
+            HBForm_RaiseDesignOverlay( form );
+         }
       }
    }
 }
@@ -2173,6 +2189,7 @@ static gboolean on_overlay_button_release( GtkWidget * widget, GdkEventButton * 
          }
 
          /* Keep focus on overlay so keyboard shortcuts (arrows, Delete) work */
+         HBForm_RaiseDesignOverlay( form );
          if( form->FOverlay )
             gtk_widget_grab_focus( form->FOverlay );
       }
@@ -14172,6 +14189,7 @@ HB_FUNC( UI_FORMREALIZECHILDREN )
       HBControl_CreateWidget( c, container, f->FFormFontDesc );
    }
    gtk_widget_show_all( f->FFixed );
+   HBForm_RaiseDesignOverlay( f );
 }
 
 /* CodeEditorMarkLines( hEditor, nFromLine, nToLine, nBgrColor )

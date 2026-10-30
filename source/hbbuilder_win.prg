@@ -1479,6 +1479,10 @@ static function RegenerateFormCode( cName, hForm )
                      next
                   endif
                endif
+            case nType == 32  // LabeledEdit
+               cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
+                  ' LABELEDEDIT ::o' + cCtrlName + ' VAR ' + HB_QHarbourStr( cText ) + ' OF Self SIZE ' + ;
+                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
             otherwise
                if IsNonVisual( nType )
                   cCreate += '   COMPONENT ::o' + cCtrlName + ' TYPE ' + ;
@@ -3066,6 +3070,14 @@ static function RestoreFormFromCode( hForm, cCode )
                if nPos2 > 0; cText := SubStr( cTrim, nPos + 5, nPos2 - 1 ); endif
             endif
             hCtrl := UI_EditNew( hForm, cText, nL, nT, nW, nH )
+         case " LABELEDEDIT " $ Upper( cTrim )
+            cText := ""
+            nPos := At( 'VAR "', cTrim )
+            if nPos > 0
+               nPos2 := At( '"', SubStr( cTrim, nPos + 5 ) )
+               if nPos2 > 0; cText := SubStr( cTrim, nPos + 5, nPos2 - 1 ); endif
+            endif
+            hCtrl := UI_LabeledEditNew( hForm, cText, nL, nT, nW, nH )
          case " CHECKBOX " $ Upper( cTrim )
             hCtrl := UI_CheckBoxNew( hForm, cText, nL, nT, nW, nH )
             if " CHECKED" $ Upper( cTrim ) .and. hCtrl != 0

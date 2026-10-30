@@ -922,6 +922,22 @@ HB_FUNC( UI_EDITNEW )
    RetCtrl( p );
 }
 
+/* UI_LabeledEditNew( hParent, cText, nLeft, nTop, nWidth, nHeight ) --> hCtrl */
+HB_FUNC( UI_LABELEDEDITNEW )
+{
+   TForm * pForm = GetForm(1);
+   TLabeledEdit * p = new TLabeledEdit();
+
+   if( HB_ISCHAR(2) ) p->SetText( hb_parc(2) );
+   if( HB_ISNUM(3) )  p->FLeft = hb_parni(3);
+   if( HB_ISNUM(4) )  p->FTop = hb_parni(4);
+   if( HB_ISNUM(5) )  p->FWidth = hb_parni(5);
+   if( HB_ISNUM(6) )  p->FHeight = hb_parni(6);
+
+   if( pForm ) pForm->AddChild( p );
+   RetCtrl( p );
+}
+
 /* UI_MemoNew( hParent, cText, nLeft, nTop, nWidth, nHeight ) --> hCtrl */
 HB_FUNC( UI_MEMONEW )
 {
