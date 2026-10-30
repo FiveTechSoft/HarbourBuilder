@@ -10,7 +10,7 @@ B=/tmp/hbbuilder_build/$(printf '%s' "$RUN/Project1.hbp" | md5sum | cut -d' ' -f
 D=/tmp/hbbuilder_debug
 for dir in "$B" "$D"; do
  mkdir -p "$dir"
- rm -f "$dir/Project1.prg"
+ if [ -f "$dir/Project1.prg" ]; then rm "$dir/Project1.prg"; fi
  mkdir -p "$dir/Project1.prg"
 done
 rm -f /tmp/debugmodules-result.txt
@@ -36,6 +36,14 @@ for mode in run debug; do
  echo "GUI WRITE $mode modal dismissed, no saving-progress text"
 done
 for dir in "$B" "$D"; do rmdir "$dir/Project1.prg"; done
+rm -f /tmp/debugmodules-result.txt
+BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"
+xdotool mousemove 700 12 click 1; xdotool key ctrl+r
+for try in $(seq 1 60); do [ -f /tmp/debugmodules-result.txt ] && break; sleep 1; done
+if ! grep -q MODULES-EXECUTED /tmp/debugmodules-result.txt 2>/dev/null; then
+ echo 'GUI WRITE FAIL: repaired Run retry did not execute'; rt_cleanup; exit 1
+fi
+echo 'GUI WRITE repaired Run retry executed MODULES-EXECUTED'
 rm -f /tmp/debugmodules-result.txt
 BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"
 xdotool mousemove 15 62 click 1

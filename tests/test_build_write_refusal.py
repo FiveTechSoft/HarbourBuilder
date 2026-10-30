@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Compile actual Run/Debug source staging prefixes and fail real disk writes."""
-import pathlib,subprocess
+import pathlib,subprocess,shutil
 r=pathlib.Path(__file__).resolve().parents[1];s=(r/'source/hbbuilder_linux.prg').read_text()
-p=pathlib.Path('/tmp/build-write-refusal');p.mkdir(exist_ok=True)
+p=pathlib.Path('/tmp/build-write-refusal')
+if p.exists(): shutil.rmtree(p)
+p.mkdir()
 parts=[]
 for name,fn,start in [('Run','TBRun','   // Step 1: Save files'),('Debug','TBDebugRun','   // Step 1: Save user code')]:
  a=s.index(start,s.index('static function '+fn+'('));b=s.index('   GTK_ShellExec( "cp ',a)
