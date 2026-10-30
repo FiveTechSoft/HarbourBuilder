@@ -10521,6 +10521,63 @@ static int s_dbgClientFD = -1;
 static char s_dbgRecvBuf[8192];
 static int  s_dbgRecvLen = 0;
 
+/* Only this owner reaps the active child. Until waitpid reports exit, an
+ * exited child remains a zombie, so its PID cannot be reused for a signal. */
+static GPid s_dbgChildPID = 0;
+
+static void DbgChildReaped( GPid pid, gint status, gpointer data )
+{
+   (void)status; (void)data;
+   g_spawn_close_pid( pid );
+}
+
+static int DbgChildAlive( void )
+{
+   int status;
+   pid_t result;
+   if( !s_dbgChildPID ) return 0;
+   do { result = waitpid( s_dbgChildPID, &status, WNOHANG ); }
+   while( result < 0 && errno == EINTR );
+   if( result == 0 ) return 1;
+   /* An error is not proof of ownership: never signal in that case. */
+   g_spawn_close_pid( s_dbgChildPID );
+   s_dbgChildPID = 0;
+   return 0;
+}
+
+static void DbgChildStop( void )
+{
+   int i;
+   if( !DbgChildAlive() ) return;
+   kill( s_dbgChildPID, SIGTERM );
+   for( i = 0; i < 25 && DbgChildAlive(); ++i ) g_usleep( 10000 );
+   if( DbgChildAlive() )
+   {
+      GPid pid = s_dbgChildPID;
+      kill( pid, SIGKILL );
+      /* Do not block on an uninterruptible child. This watch only reaps;
+       * it never signals, and the active owner relinquishes the PID now. */
+      s_dbgChildPID = 0;
+      g_child_watch_add( pid, DbgChildReaped, NULL );
+   }
+}
+
+static void DbgChildSetup( gpointer data )
+{
+   int fd;
+   (void)data;
+   fd = open( "/tmp/hb_debugapp.txt", O_WRONLY | O_CREAT | O_TRUNC, 0600 );
+   if( fd >= 0 ) { dup2( fd, STDERR_FILENO ); if( fd != STDERR_FILENO ) close( fd ); }
+}
+
+static int DbgChildStart( const char * path, GError ** error )
+{
+   gchar * argv[] = { (gchar *)path, NULL };
+   DbgChildStop();
+   return g_spawn_async( NULL, argv, NULL, G_SPAWN_DO_NOT_REAP_CHILD,
+                        DbgChildSetup, NULL, &s_dbgChildPID, error );
+}
+
 static int DbgServerStart( int port )
 {
    int fd = socket( AF_INET, SOCK_STREAM, 0 );
@@ -10556,7 +10613,7 @@ static int DbgServerAccept( double timeoutSec )
       /* Pump GTK events while waiting */
       while( gtk_events_pending() )
          gtk_main_iteration_do( FALSE );
-      if( s_dbgState == DBG_STOPPED ) return -1;
+      if( s_dbgState == DBG_STOPPED || !DbgChildAlive() ) return -1;
       elapsed += 0.25;
    }
    return -1;
@@ -10641,7 +10698,7 @@ HB_FUNC( IDE_DEBUGSTART2 )
 
    /* Clean up any previous debug session */
    DbgServerStop();
-   system( "killall DebugApp 2>/dev/null" );
+   DbgChildStop();
 
    if( s_dbgOnPause ) { hb_itemRelease( s_dbgOnPause ); s_dbgOnPause = NULL; }
    if( pOnPause ) s_dbgOnPause = hb_itemNew( pOnPause );
@@ -10662,11 +10719,20 @@ HB_FUNC( IDE_DEBUGSTART2 )
    DbgOutput( "=== Debug session started (socket) ===\n" );
    DbgOutput( "Listening on port 19800...\n" );
 
-   /* Launch user executable */
+   /* Launch only our child, without a shell or a process-name kill. */
    {
-      char cmd[1024];
-      snprintf( cmd, sizeof(cmd), "\"%s\" 2>/tmp/hb_debugapp.txt &", cExePath );
-      system( cmd );
+      GError * error = NULL;
+      if( !DbgChildStart( cExePath, &error ) )
+      {
+         DbgOutput( "ERROR: Could not launch debug process: " );
+         DbgOutput( error ? error->message : "unknown error" );
+         DbgOutput( "\n" );
+         if( error ) g_error_free( error );
+         DbgServerStop();
+         s_dbgState = DBG_IDLE;
+         hb_retl( HB_FALSE );
+         return;
+      }
    }
    DbgOutput( "Launched debug process. Waiting for connection...\n" );
 
@@ -10678,8 +10744,9 @@ HB_FUNC( IDE_DEBUGSTART2 )
    if( DbgServerAccept( 30.0 ) != 0 )
    {
       fprintf(stderr, "IDE-DBG: accept FAILED\n");
-      DbgOutput( "ERROR: Client did not connect within 30s\n" );
+      DbgOutput( "ERROR: Debug client did not connect (exit, stop or timeout)\n" );
       DbgServerStop();
+      DbgChildStop();
       s_dbgState = DBG_IDLE;
       hb_retl( HB_FALSE );
       return;
@@ -10824,8 +10891,8 @@ HB_FUNC( IDE_DEBUGSTART2 )
    DbgServerSend( "QUIT" );
    DbgServerStop();
 
-   /* Kill any remaining DebugApp process */
-   system( "killall DebugApp 2>/dev/null" );
+   /* Stop only the child owned by this debug session. */
+   DbgChildStop();
 
    s_dbgState = DBG_IDLE;
    s_dbgRecvLen = 0;
