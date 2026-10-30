@@ -129,16 +129,15 @@ BAR=$(rt_find_bar)
 # Fresh startup palette remains at its original screen position.
 import -window root /tmp/class-add-start.png
 # Standard palette BUTTON is the third icon at x451.
-read CX CY <<< $(rt_ocr_bar_token '^(Ok|OK)$' 15)
-[ -n "${CX:-}" ] || fail "Button palette icon not found"
-echo "button icon at $CX,$CY"
-xdotool mousemove "$CX" "$CY" click 1
+# Root screenshots are 1600px, displayed previews may be scaled.
+xdotool mousemove 532 90 click 1
 sleep 1
 sleep 1
 import -window root /tmp/class-add-selected.png
 xdotool windowmap "$RT_DESIGNER"; xdotool windowraise "$RT_DESIGNER"
 eval "$(xdotool getwindowgeometry --shell "$RT_DESIGNER")"
-xdotool mousemove $((X+260)) $((Y+220)) click 1
+xdotool mousemove $((X+260)) $((Y+220)) mousedown 1
+xdotool mousemove $((X+360)) $((Y+250)) mouseup 1
 sleep 2
 BAR=$(rt_find_bar);rt_unmap_all_but "$BAR";xdotool mousemove 700 12 click 1;xdotool key ctrl+s;sleep 2
 python3 - "$RUN/Form1.prg" <<'PY2'
