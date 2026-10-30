@@ -28,3 +28,21 @@ sleep 1;xdotool key ctrl+l;xdotool type --delay 1 "$RUN/NewModule.prg";xdotool k
 rt_map_all;xdotool windowmove "$ED" 0 125;xdotool windowsize "$ED" 1500 820;xdotool windowraise "$ED";xdotool windowfocus "$ED"
 import -window root /tmp/addmodule-after.png
 # Save tab snapshots by selecting from actual notebook x positions after inspection.
+xdotool windowraise "$ED";xdotool windowfocus "$ED";xdotool mousemove 350 250 click 1;xdotool key ctrl+a ctrl+c;sleep 1
+xclip -selection clipboard -o > "$RUN/slot5-after.txt"
+xdotool mousemove 530 142 click 1;sleep 1;xdotool windowraise "$ED";xdotool windowfocus "$ED";xdotool mousemove 350 250 click 1
+printf CLIPBOARD-UNCHANGED | xclip -selection clipboard
+xdotool key ctrl+a ctrl+c;sleep 1
+xclip -selection clipboard -o > "$RUN/slot6-after.txt"
+python3 - "$RUN" <<'CHECK'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1]);a=(p/'before-editor.txt').read_text();b=(p/'slot5-after.txt').read_text();c=(p/'slot6-after.txt').read_text()
+assert 'UNSAVED-STANDALONE-WORK' in a
+print('BEFORE standalone bytes',len(a))
+print('AFTER old standalone tab content:',repr(b))
+print('AFTER appended tab clipboard:',repr(c))
+assert 'MODULE-CONTENT' in b,'module did not replace old standalone tab'
+assert 'UNSAVED-STANDALONE-WORK' not in b+c,'unexpected preservation'
+print('RED module add overwrites dirty standalone editor slot and appends empty tab')
+CHECK
