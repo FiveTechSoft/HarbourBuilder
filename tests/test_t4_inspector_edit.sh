@@ -198,7 +198,9 @@ check_array() {
   eval "$(xdotool getwindowgeometry --shell "$ARR")"
   import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/t4insp_reopen_${PROP}.png
   convert /tmp/t4insp_reopen_${PROP}.png +repage -crop 300x100+0+0 +repage -resize 300% /tmp/t4insp_reopen_text.png
-  tesseract /tmp/t4insp_reopen_text.png - --psm 6 2>/dev/null | grep -qiF "$WANT1" || fail "$PROP first item lost after reopen"
+  local FIRST_RE="$WANT1"
+  [ "$WANT1" = P1 ] && FIRST_RE='P[1l]'
+  tesseract /tmp/t4insp_reopen_text.png - --psm 6 2>/dev/null | grep -qiE "^${FIRST_RE}$" || fail "$PROP first item not confirmed by OCR after reopen"
   tesseract /tmp/t4insp_reopen_text.png - --psm 6 2>/dev/null | grep -qiF "$WANT2" || fail "$PROP second item lost after reopen"
   echo "  [reopen Inspector] $PROP contains $WANT1 / $WANT2"
   xdotool key Escape; sleep 0.5
