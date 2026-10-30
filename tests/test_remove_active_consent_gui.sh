@@ -9,6 +9,8 @@ mkdir -p "$RUN"
 cp "$REPO/tests/fixtures/debugmodules/"* "$RUN/"
 printf 'function Standalone()\nreturn "BASE"\n' > "$RUN/Standalone.prg"
 printf 'function NewModule()\nreturn "MODULE-CONTENT"\n' > "$RUN/NewModule.prg"
+cp "$RUN/Project1.hbp" "$RUN/hbp-before"
+cp "$RUN/HelperA.prg" "$RUN/disk-before"
 rt_provenance
 rt_setup "$RUN";rt_launch_ide
 for try in $(seq 1 12);do rt_find_bar >/dev/null&&break;sleep 1;done
@@ -41,13 +43,26 @@ for w in $(rt_ide_windows);do [ "$(xdotool getwindowname "$w")" = 'Unsaved chang
 [ -n "$DLG" ] || { echo 'FAIL unsaved prompt absent';exit 1; }
 xdotool windowmap "$DLG";xdotool windowraise "$DLG";eval "$(xdotool getwindowgeometry --shell "$DLG")"
 import -window root /tmp/remove-consent-prompt.png
-case "${CHOICE:-cancel}" in save) K=1;;discard) K=3;;cancel) K=5;;esac
+if [ "${CHOICE:-cancel}" = failure ];then printf '\n// EXTERNAL-WORK\n' >> "$RUN/HelperA.prg";fi
+case "${CHOICE:-cancel}" in save|failure) K=1;;discard) K=3;;cancel) K=5;;esac
 xdotool mousemove $((X+K*WIDTH/6)) $((Y+HEIGHT-20)) click 1;sleep 2
 rt_map_all;xdotool windowraise "$ED";xdotool windowfocus "$ED"
-if [ "${CHOICE:-cancel}" = cancel ];then
+if [ "${CHOICE:-cancel}" = failure ];then
+ for w in $(rt_ide_windows);do
+  if [ "$(xdotool getwindowname "$w")" = HbBuilder ];then xdotool windowmap "$w";xdotool windowraise "$w";xdotool windowfocus "$w";xdotool key Return;fi
+ done
+ rt_map_all;xdotool windowraise "$ED";xdotool windowfocus "$ED";xdotool key ctrl+a ctrl+c;sleep 1
+ xclip -selection clipboard -o > "$RUN/module-after.txt"
+ cmp "$RUN/module-before.txt" "$RUN/module-after.txt" || exit 1
+ cmp "$RUN/hbp-before" "$RUN/Project1.hbp" || exit 1
+ grep -q EXTERNAL-WORK "$RUN/HelperA.prg" || exit 1
+ echo 'SAVE refusal aborts removal; buffer HBP and external disk preserved'
+elif [ "${CHOICE:-cancel}" = cancel ];then
  xdotool key ctrl+a ctrl+c;sleep 1;xclip -selection clipboard -o > "$RUN/module-after.txt"
  cmp "$RUN/module-before.txt" "$RUN/module-after.txt" || exit 1
- echo 'CANCEL preserves exact unsaved module buffer'
+ cmp "$RUN/hbp-before" "$RUN/Project1.hbp" || exit 1
+ cmp "$RUN/disk-before" "$RUN/HelperA.prg" || exit 1
+ echo 'CANCEL preserves exact unsaved module buffer HBP disk'
 else
  if [ "$CHOICE" = save ];then grep -q UNSAVED-MODULE-WORK "$RUN/HelperA.prg" || exit 1;echo 'SAVE before removal persisted module edit';else
   ! grep -q UNSAVED-MODULE-WORK "$RUN/HelperA.prg" || exit 1;echo 'DISCARD explicitly removed edit without disk write'
