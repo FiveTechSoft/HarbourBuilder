@@ -3158,11 +3158,13 @@ static function RestoreFormFromCode( hForm, cCode )
                               if nPos2 > 0 .and. nPos2 < nEnd; nEnd := nPos2; endif
                               kk := 0
                               for each cItemExpr in HB_SplitTopLevelCommas( SubStr( cRest, nClPos + 9, nEnd - nClPos - 9 ) )
-                                 cExpr := HB_HarbourStrEval( AllTrim( cItemExpr ) )
-                                 if ValType( cExpr ) == "N"
+                                 // numeric literal: HB_HarbourStrEval only
+                                 // evaluates string expressions
+                                 cClVal := AllTrim( cItemExpr )
+                                 if IsDigit( Left( cClVal, 1 ) ) .or. Left( cClVal, 1 ) == "-"
                                     kk++
                                     if kk <= UI_BrowseColCount( hCtrl )
-                                       UI_BrowseSetColProp( hCtrl, kk - 1, "nWidth", cExpr )
+                                       UI_BrowseSetColProp( hCtrl, kk - 1, "nWidth", Val( cClVal ) )
                                     endif
                                  else
                                     HB_SetParseBlock( hForm, "Line " + LTrim( Str( i ) ) + ;
