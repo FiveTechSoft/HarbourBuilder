@@ -2724,7 +2724,21 @@ return nil
 static function MenuNewForm()
 
    local nFormX, nFormY, nInsW, nEditorX, nEditorW, nEditorH
-   local nInsTop, nEditorTop
+   local nInsTop, nEditorTop, nTabPos
+
+   // Reserve the tab before changing the form model or hiding its window.
+   // New forms precede every module and standalone file in the index map.
+   nTabPos := Len( aForms ) + 2
+   if ! CodeEditorInsertTab( hCodeEditor, nTabPos, ;
+         "Form" + LTrim( Str( Len( aForms ) + 1 ) ) + ".prg" )
+      MsgInfo( "Could not add form: the editor has no room for another tab.", "HbBuilder" )
+      return nil
+   endif
+   do while Len( s_aTabKnown ) < nTabPos - 1
+      AAdd( s_aTabKnown, nil )
+   enddo
+   ASize( s_aTabKnown, Len( s_aTabKnown ) + 1 )
+   AIns( s_aTabKnown, nTabPos )
 
    SaveActiveFormCode()
 
@@ -2749,7 +2763,6 @@ static function MenuNewForm()
 
    WireDesignForm()
 
-   CodeEditorAddTab( hCodeEditor, aForms[ nActiveForm ][ 1 ] + ".prg" )
    HB_SetTabText( nActiveForm + 1, aForms[ nActiveForm ][ 3 ] )
    CodeEditorSelectTab( hCodeEditor, nActiveForm + 1 )
    HB_FreezeFormBaseline( nActiveForm )
