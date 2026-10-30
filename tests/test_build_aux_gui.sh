@@ -24,7 +24,8 @@ run_app(){
 }
 run_app
 FIRST=$(stat -c %Y "$B/UserApp")
-for w in $(rt_ide_windows); do case "$(xdotool getwindowname "$w")" in *Messages*|*Compiler*) xdotool windowmap "$w"; xdotool windowraise "$w";; esac; done
+for w in $(rt_ide_windows); do case "$(xdotool getwindowname "$w")" in *Messages*|*Compiler*) xdotool windowmap "$w"; xdotool windowmove "$w" 0 125; xdotool windowsize "$w" 1350 700; xdotool windowraise "$w";; esac; done
+sleep 1
 import -window root /tmp/aux-warning.png
 # Compiler log is displayed in the messages panel, scroll to its end if needed.
 text=$(tesseract /tmp/aux-warning.png - --psm 6 2>/dev/null)

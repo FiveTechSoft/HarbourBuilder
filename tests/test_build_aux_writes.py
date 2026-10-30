@@ -19,4 +19,15 @@ return nil
 (p/'diagnostic.prg').mkdir();(p/'probe.prg').write_text(main)
 print('commit:',subprocess.check_output(['git','rev-parse','HEAD'],cwd=r,text=True).strip(),flush=True)
 subprocess.run(['/tmp/harbour-review/bin/linux/gcc/hbmk2',str(p/'probe.prg'),'-gtstd','-q','-quiet','-o'+str(p/'probe')],check=True)
-raise SystemExit(subprocess.run([str(p/'probe')]).returncode)
+negative = subprocess.run([str(p/'probe')]).returncode
+if negative:
+ raise SystemExit(negative)
+(p/'diagnostic.prg').rmdir();(p/'.srchash').rmdir()
+positive = main.replace("if !('diagnostic copy not written' $ cLog).or.!('build cache not written' $ cLog); nFail++; endif", "if Len(cLog)!=0; nFail++; endif").replace("if Len(cLastHash)!=0; nFail++; endif", "if !(cLastHash=='CURRENT'); nFail++; endif")
+(p/'probe.prg').write_text(positive)
+subprocess.run(['/tmp/harbour-review/bin/linux/gcc/hbmk2',str(p/'probe.prg'),'-gtstd','-q','-quiet','-o'+str(p/'probe')],check=True)
+status=subprocess.run([str(p/'probe')]).returncode
+assert (p/'diagnostic.prg').read_bytes()==b'NEW'
+assert (p/'.srchash').read_bytes()==b'CURRENT'
+print('AUX POSITIVE exact diagnostic/cache bytes checked; exit='+str(status),flush=True)
+raise SystemExit(status)
