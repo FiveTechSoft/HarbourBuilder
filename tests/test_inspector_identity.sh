@@ -37,6 +37,7 @@ pick(){
  echo "  selected index$idx expected=$want title=$title"
 }
 case "${1:-browse}" in
+ sequence) pick 1 TButton; pick 13 TFolder; pick 14 page1; pick 15 page2; pick 16 TButton; pick 17 TBrowse; pick 18 column;;
  before) pick 1 TButton;;
  folder) pick 13 TFolder;;
  page1) pick 14 page1;;
