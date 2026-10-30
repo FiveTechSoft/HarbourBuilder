@@ -14,6 +14,8 @@ winpic=branch('win','            case nType == 12  // BitBtn','            case 
 winimage=branch('win','            case nType == 14  // Image','            case nType == 15  // Shape')
 macradio=branch('macos','            case nType == 8  // RadioButton','            case nType == 24  // Memo')
 winradio=branch('win','            case nType == 8  // RadioButton','            case nType == 12  // BitBtn')
+macimage=branch('macos','            case nType == 14  // Image','            case nType == 16  // Bevel')
+macpic=branch('macos','            case nType == 12 .or. nType == 13  // BitBtn / SpeedButton','            case nType == 20  // TreeView')
 pre='''#include "hbide.ch"
 static nFails := 0
 static nSelection := 2
@@ -40,6 +42,8 @@ function Main()
  Check('Win Radio unchecked', !(' CHECKED' $ EmitWin(8)))
  for each path in {' ', 'a"b.png', 'dir/file with spaces.png', 'line'+Chr(10)+'break'}
     cPicture := path
+    Check('Mac BitBtn quoted path', ('PICTURE '+HB_QHarbourStr(path)) $ EmitMac(12))
+    Check('Mac Image quoted path', ('PICTURE '+HB_QHarbourStr(path)) $ EmitMac(14))
     Check('Win BitBtn quoted path', ('PICTURE '+HB_QHarbourStr(path)) $ EmitWin(12))
     Check('Win Image quoted path', ('PICTURE '+HB_QHarbourStr(path)) $ EmitWin(14))
  next
@@ -71,7 +75,7 @@ function UI_ComboGetItem(h,n)
  HB_SYMBOL_UNUSED(h)
 return iif(n==1,'Uno','Dos')
 '''
-src=pre+'function EmitMac(nType)\n'+locals+' do case\n'+maccombo+maclist+macradio+' endcase\nreturn cCreate\n'+'function EmitWin(nType)\n'+locals+' do case\n'+winradio+winpic+winimage+' endcase\nreturn cCreate\n'+post
+src=pre+'function EmitMac(nType)\n'+locals+' do case\n'+maccombo+maclist+macradio+macimage+macpic+' endcase\nreturn cCreate\n'+'function EmitWin(nType)\n'+locals+' do case\n'+winradio+winpic+winimage+' endcase\nreturn cCreate\n'+post
 out=pathlib.Path('/tmp/h9-emitter');out.mkdir(exist_ok=True);(out/'probe.prg').write_text(src)
 hb=pathlib.Path(os.environ.get('HBDIR','/tmp/harbour-review'))
 cmd=[str(hb/'bin/linux/gcc/hbmk2'),str(out/'probe.prg'),str(root/'source/hbbuilder_common.prg'),str(root/'tests/messages_stubs.prg'),'-I'+str(root/'include'),'-gtstd','-quiet','-q','-o'+str(out/'probe')]
