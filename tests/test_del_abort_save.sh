@@ -9,6 +9,15 @@
 # shown once), so the abort is asserted via the explicit bar-focused Ctrl+S
 # (lFromSave always warns) plus file immutability, not via a second auto
 # dialog.
+#
+# KNOWN BLOCKER (defect B8, confirmed product-side, out of this batch):
+# a dropped TLabeledEdit is a composite whose GtkEntry child consumes plain
+# clicks and whose rubber-band selection only surfaces its TLabel child,
+# so the control cannot be selected/deleted as a root in the designer.
+# Because the type is also not serializable, every save of the form is
+# refused while it exists and the only way out is closing the project
+# without saving. Step 4 therefore stays RED here: the script cannot
+# resolve the abort cause through the designer UI until B8 is fixed.
 set -u
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 FIX="$REPO/tests/fixtures/roundtrip"
