@@ -1828,11 +1828,13 @@ static function RestoreSelectionAssignment( hForm, cLine )
    AAdd( aSelectionParseBlocks, { hForm, "Value target is not a resolved ComboBox/ListBox (creation must precede assignment)" } )
 return .T.
 
-static function SelectionParseAllowed( hForm )
+static function SelectionParseAllowed( hForm, lQuiet )
    local row
    for each row in aSelectionParseBlocks
       if hForm == nil .or. row[1] == hForm
+         if !( lQuiet == .T. )
          MsgInfo( "Save/sync refused: " + row[2] + ". Fix the Value assignment in the code editor.", "HbBuilder" )
+         endif
          return .F.
       endif
    next
@@ -1887,7 +1889,9 @@ static function RestoreFormFromCode( hForm, cCode )
       // Runtime handler assignments are preserved code, not designer state.
       if "METHOD CREATEFORM" $ Upper( cTrim )
          lInCreateForm := .T.
-      elseif Upper( cTrim ) == "RETURN NIL"
+      elseif HB_IsKeywordLine( Upper( cTrim ), "METHOD" ) .or. ;
+             HB_IsKeywordLine( Upper( cTrim ), "FUNCTION" ) .or. ;
+             HB_IsKeywordLine( Upper( cTrim ), "STATIC FUNCTION" )
          lInCreateForm := .F.
       endif
       if lInCreateForm .and. RestoreSelectionAssignment( hForm, cTrim )
@@ -3543,7 +3547,7 @@ static function SyncDesignerToCode()
       return nil
    endif
 
-   if ! SelectionParseAllowed( oDesignForm:hCpp ); return .F.; endif
+   if ! SelectionParseAllowed( oDesignForm:hCpp, .T. ); return .F.; endif
 
    // Get existing code to preserve METHOD implementations
    cOldCode := CodeEditorGetTabText( hCodeEditor, nActiveForm + 1 )
