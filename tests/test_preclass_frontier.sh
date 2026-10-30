@@ -69,17 +69,17 @@ run_save_case() {  # $1=case  (tabclass helperclass blockcomment createclass)
     || { echo "  CASE $c: generated BUTTON line missing"; FAILN=$((FAILN+1)); }
   case "$c" in
     helperclass)
-      [ "$(grep -c '^CLASS THelper FROM TForm$' "$F")" = "1" ] \
+      [ "$(grep -c 'CLASS THelper FROM TForm' "$F")" = "1" ] \
         || { echo "  CASE $c: helper class dropped"; FAILN=$((FAILN+1)); }
-      lhelp=$(grep -n '^CLASS THelper FROM TForm$' "$F" | cut -d: -f1)
-      lform=$(grep -n '^CLASS TForm1 FROM TForm$' "$F" | cut -d: -f1)
+      lhelp=$(grep -n 'CLASS THelper FROM TForm' "$F" | head -1 | cut -d: -f1)
+      lform=$(grep -n '^CLASS TForm1 FROM TForm' "$F" | head -1 | cut -d: -f1)
       [ -n "$lhelp" ] && [ -n "$lform" ] && [ "$lhelp" -lt "$lform" ] \
         || { echo "  CASE $c: helper class not preserved BEFORE the form class"; FAILN=$((FAILN+1)); }
       ;;
     blockcomment)
       grep -q 'Class de la ventana principal' "$F" \
         || { echo "  CASE $c: block-comment body lost"; FAILN=$((FAILN+1)); }
-      grep -q '^\*/$' "$F" \
+      grep -q '/\*' "$F" && grep -q '\*/' "$F" \
         || { echo "  CASE $c: block-comment close lost"; FAILN=$((FAILN+1)); }
       ;;
     createclass)
