@@ -2808,10 +2808,19 @@ static function MenuAddModule()
       cCode := "// " + cName + ".prg" + Chr(10)
    endif
 
+   // Insert before standalone files. Append+SetTabText overwrote the first
+   // standalone buffer when any such tabs were already open.
+   nTabPos := 2 + Len( aForms ) + Len( aModules )
+   if ! CodeEditorInsertTab( hCodeEditor, nTabPos, cName + ".prg" )
+      MsgInfo( "Could not add module: the editor has no room for another tab.", "HbBuilder" )
+      return nil
+   endif
+   do while Len( s_aTabKnown ) < nTabPos - 1
+      AAdd( s_aTabKnown, nil )
+   enddo
+   ASize( s_aTabKnown, Len( s_aTabKnown ) + 1 )
+   AIns( s_aTabKnown, nTabPos )
    AAdd( aModules, { cName, cCode, cFile } )
-
-   nTabPos := 1 + Len( aForms ) + Len( aModules )
-   CodeEditorAddTab( hCodeEditor, cName + ".prg" )
    HB_SetTabText( nTabPos, cCode )
    CodeEditorSelectTab( hCodeEditor, nTabPos )
 

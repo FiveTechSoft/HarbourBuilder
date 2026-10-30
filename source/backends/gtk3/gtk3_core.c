@@ -8080,6 +8080,41 @@ HB_FUNC( CODEEDITORADDTAB )
    hb_retni( ed->nTabs );
 }
 
+/* Insert a blank tab without replacing or re-saving the active buffer.
+ * Used when project modules must precede already-open standalone files. */
+HB_FUNC( CODEEDITORINSERTTAB )
+{
+   CODEEDITOR * ed = (CODEEDITOR *)(HB_PTRUINT) hb_parnint(1);
+   int pos = hb_parni(2) - 1, i;
+   char * text;
+   GtkWidget * page, * label;
+   if( !ed || !ed->tabBar || !HB_ISCHAR(3) ||
+       ed->nTabs >= CE_MAX_TABS || pos < 0 || pos > ed->nTabs )
+   { hb_retl(0); return; }
+   text = strdup( "" );
+   if( !text ) { hb_retl(0); return; }
+   SaveCurrentTabText( ed );
+   g_signal_handlers_block_matched( ed->tabBar, G_SIGNAL_MATCH_FUNC,
+      0, 0, NULL, (gpointer)on_editor_tab_switched, NULL );
+   for( i = ed->nTabs; i > pos; --i )
+   {
+      memcpy( ed->tabNames[i], ed->tabNames[i-1], sizeof(ed->tabNames[i]) );
+      ed->tabTexts[i] = ed->tabTexts[i-1];
+   }
+   snprintf( ed->tabNames[pos], sizeof(ed->tabNames[pos]), "%s", hb_parc(3) );
+   ed->tabTexts[pos] = text;
+   ++ed->nTabs;
+   if( ed->nActiveTab >= pos ) ++ed->nActiveTab;
+   page = gtk_box_new( GTK_ORIENTATION_HORIZONTAL, 0 );
+   label = gtk_label_new( hb_parc(3) );
+   gtk_notebook_insert_page( GTK_NOTEBOOK(ed->tabBar), page, label, pos );
+   gtk_widget_show_all( page );
+   gtk_notebook_set_current_page( GTK_NOTEBOOK(ed->tabBar), ed->nActiveTab );
+   g_signal_handlers_unblock_matched( ed->tabBar, G_SIGNAL_MATCH_FUNC,
+      0, 0, NULL, (gpointer)on_editor_tab_switched, NULL );
+   hb_retl(1);
+}
+
 /* CodeEditorSetTabText( hEditor, nTab, cText ) */
 HB_FUNC( CODEEDITORSETTABTEXT )
 {
