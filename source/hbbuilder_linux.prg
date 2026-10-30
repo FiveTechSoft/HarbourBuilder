@@ -3026,8 +3026,52 @@ static function HB_FormTitleExprEval( cExpr )
    if lNeedTerm; return nil; endif
 return HB_HarbourStrEval( cExpr )
 
+// Validate the entire literal before conversion; the model stores integers.
+static function HB_FormNumberEval( cExpr, lColor )
+   local c := AllTrim( cExpr ), nSign := 1, n := 0, i, ch, nDigit
+   local lDot := .F., nDigits := 0, nAfterDot := 0
+   if Left( c, 1 ) == "+" .or. Left( c, 1 ) == "-"
+      if Left( c, 1 ) == "-"; nSign := -1; endif
+      c := AllTrim( SubStr( c, 2 ) )
+   endif
+   if Empty( c ); return nil; endif
+   if Upper( Left( c, 2 ) ) == "0X"
+      if Len( c ) <= 2; return nil; endif
+      for i := 3 to Len( c )
+         nDigit := At( Upper( SubStr( c, i, 1 ) ), "0123456789ABCDEF" ) - 1
+         if nDigit < 0; return nil; endif
+         n := n * 16 + nDigit
+         if n > 4294967295; return nil; endif
+      next
+   else
+      for i := 1 to Len( c )
+         ch := SubStr( c, i, 1 )
+         if IsDigit( ch )
+            nDigits++
+            if lDot; nAfterDot++; endif
+         elseif ch == "." .and. ! lDot
+            lDot := .T.
+         else
+            return nil
+         endif
+      next
+      if nDigits == 0 .or. ( lDot .and. nAfterDot == 0 ); return nil; endif
+      n := Val( c )
+      if n > 4294967295 .or. n != Int( n ); return nil; endif
+   endif
+   n *= nSign
+   if n < -2147483648; return nil; endif
+   if lColor
+      // Match the backend unsigned cast, including the -1 default sentinel.
+      if n < 0; n += 4294967296; endif
+   elseif n > 2147483647
+      return nil
+   endif
+return n
+
 static function RestoreFormFromCode( hForm, cCode )
 
+   local nFormNumber
    local aLines, cLine, cTrim, i, nType, lInCreateForm
    local nT, nL, nW, nH, cText, cName, hCtrl
    local nPos, nPos2, cTitle, cVal, kk, nCount, cTypeStr
@@ -3087,25 +3131,19 @@ static function RestoreFormFromCode( hForm, cCode )
          endif
          loop
       endif
-      if '::nWidth' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
-         UI_SetProp( hForm, "nWidth", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
-         loop
-      endif
-      if '::nHeight' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
-         UI_SetProp( hForm, "nHeight", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
-         loop
-      endif
-      if '::nLeft' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
-         UI_SetProp( hForm, "nLeft", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
-         loop
-      endif
-      if '::nTop' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
-         UI_SetProp( hForm, "nTop", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
-         loop
-      endif
-      if '::nClrPane' $ cTrim .and. ':=' $ cTrim .and. ! "::o" $ cTrim
-         UI_SetProp( hForm, "nClrPane", Val( AllTrim( SubStr( cTrim, At( ":=", cTrim ) + 2 ) ) ) )
-         loop
+      if nPos > 0
+         cExpr := Upper( AllTrim( Left( cTrim, nPos - 1 ) ) )
+         if cExpr == "::NWIDTH" .or. cExpr == "::NHEIGHT" .or. ;
+            cExpr == "::NLEFT" .or. cExpr == "::NTOP" .or. cExpr == "::NCLRPANE"
+            nFormNumber := HB_FormNumberEval( AllTrim( SubStr( cTrim, nPos + 2 ) ), cExpr == "::NCLRPANE" )
+            if ValType( nFormNumber ) == "N"
+               UI_SetProp( hForm, SubStr( cExpr, 3 ), nFormNumber )
+            else
+               HB_SetParseBlock( hForm, "Line " + LTrim( Str( i ) ) + ;
+                  ": form numeric value cannot be represented faithfully: " + cTrim )
+            endif
+            loop
+         endif
       endif
 
       // Parse non-visual components: COMPONENT ::oName TYPE nType OF Self
