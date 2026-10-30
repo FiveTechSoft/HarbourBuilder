@@ -370,7 +370,7 @@ xdotool mousemove 20 12 click 1; sleep 0.8
 click_menu_item 'As'
 sleep 2
 xdotool key ctrl+l; sleep 0.5
-xdotool type --delay 15 '/tmp/rt_saveas_b/Project1.hbp'; sleep 0.5
+xdotool type --delay 15 '/tmp/rt_saveas_b/Project1'; sleep 0.5
 xdotool key Return; sleep 3
 rt_map_all; sleep 0.5
 for f in Project1.hbp Project1.prg Form1.prg; do
@@ -412,7 +412,7 @@ BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"; sleep 0.3
 xdotool mousemove 700 12 click 1; sleep 0.4
 xdotool key ctrl+s; sleep 2
 xdotool key ctrl+l; sleep 0.5
-xdotool type --delay 15 '/tmp/rt_occ/Project1.hbp'; sleep 0.5
+xdotool type --delay 15 '/tmp/rt_occ/Project1'; sleep 0.5
 xdotool key Return; sleep 2
 WARN=""
 for w in $(rt_ide_windows); do
