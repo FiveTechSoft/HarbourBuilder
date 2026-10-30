@@ -19,7 +19,7 @@ rt_reopen_project
 INS=""
 for i in 1 2 3 4 5; do
   for w in $(rt_ide_windows); do
-    [ "$(xdotool getwindowname "$w" 2>/dev/null)" = "Inspector" ] && { INS=$w; break; }
+    case "$(xdotool getwindowname "$w" 2>/dev/null)" in Inspector*) INS=$w; break;; esac
   done
   [ -n "$INS" ] && break
   sleep 1
@@ -77,6 +77,9 @@ save_and_check() {  # $1 label, rest: grep -F patterns that must be in the file
   [ -n "${CED:-}" ] && xdotool windowmove "$CED" 0 500 2>/dev/null
   xdotool windowmove "$INS" 0 600 2>/dev/null
   [ -n "${RT_DESIGNER:-}" ] && xdotool windowmove "$RT_DESIGNER" 0 700 2>/dev/null
+  for w in $(rt_ide_windows); do
+    case "$(xdotool getwindowname "$w" 2>/dev/null)" in "AI Assistant") xdotool windowmove "$w" 1100 700 2>/dev/null;; esac
+  done
   sleep 0.5
   menu_path_click '^Save' || fail "$label: File > Save not clickable"
   sleep 2
