@@ -870,7 +870,8 @@ static function HB_FindClassDeclLine( aLines, cClass )
          lCont := Right( cCode, 1 ) == ";"
          loop
       endif
-      aTok := HB_ATokens( Upper( cCode ), " " + Chr(9) )
+      // HB_ATokens takes a single delimiter character: normalize tabs first
+      aTok := HB_ATokens( StrTran( Upper( cCode ), Chr(9), " " ), " " )
       if ( Len( aTok ) >= 2 .and. aTok[ 1 ] == "CLASS" .and. aTok[ 2 ] == cCls ) .or. ;
          ( Len( aTok ) >= 3 .and. aTok[ 1 ] == "CREATE" .and. aTok[ 2 ] == "CLASS" .and. ;
            aTok[ 3 ] == cCls )
