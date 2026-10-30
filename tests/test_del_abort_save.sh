@@ -80,7 +80,6 @@ rt_setup "$RUN"
 rt_launch_ide
 rt_reopen_project
 
-MD0=$(md5sum "$RUN/Form1.prg" | cut -d' ' -f1)
 W0=$(rt_ide_windows | tr '\n' ' ')
 BAR=$(rt_find_bar)
 rt_park_all_but "$BAR" "$RT_DESIGNER"; sleep 0.5
@@ -173,6 +172,13 @@ xdotool key Delete; sleep 2.5
 bar_ctrl_s
 grep -q 'LABELEDEDIT' "$RUN/Form1.prg" &&   fail "LABELEDEDIT line still present after designer delete + save"
 echo "TLabeledEdit selected via rubber band and deleted; file clean"
+
+# Baseline for the abort checks: the file AFTER the last legitimate save.
+# Now that the LabeledEdit drop+save succeeds (B8 fix), the generator
+# legitimately normalizes hand-written lines (e.g. the fixture's SAY gains
+# its OF Self clause), so a pre-save md5 could never match again; the
+# abort checks must compare against the post-save file.
+MD0=$(md5sum "$RUN/Form1.prg" | cut -d' ' -f1)
 
 # 3) drop an unserializable TTrackBar (GTK3 palette, "TB"): this type
 # still has no faithful serialization, so the refusal path must engage
