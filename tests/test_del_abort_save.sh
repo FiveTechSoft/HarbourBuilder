@@ -237,10 +237,13 @@ echo "explicit save refused; disk intact; button line still on disk"
 
 # 6) resolve the cause: rubber-band the dropped TTrackBar and delete it
 # (the release handler selects every intersecting control)
-SX=$((DROPX+180)); SY=$((DROPY+80)); EX=$((DROPX-20)); EY=$((DROPY-20))
+# Band must start INSIDE the form (520 wide): the drop is at X+380, so a
+# start at DROPX+180 lands at X+560 - past the form's right edge (X+520),
+# on dead root space, and the band never begins (verified on screenshot).
+SX=$((DROPX+110)); SY=$((DROPY+55)); EX=$((DROPX-25)); EY=$((DROPY-25))
 xdotool mousemove "$SX" "$SY" mousedown 1; sleep 0.3
-xdotool mousemove $((SX-80)) $((SY-40)); sleep 0.2
-xdotool mousemove $((SX-160)) $((SY-80)); sleep 0.2
+xdotool mousemove $((SX-60)) $((SY-30)); sleep 0.2
+xdotool mousemove $((SX-110)) $((SY-55)); sleep 0.2
 xdotool mousemove "$EX" "$EY" mouseup 1; sleep 1
 T=$(inspector_title); echo "after rubber-band, inspector: $T"
 [ "$T" = "Inspector: TTrackBar" ] ||   fail "rubber-band did not select the dropped TTrackBar (got '$T')"
