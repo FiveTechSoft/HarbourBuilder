@@ -935,9 +935,9 @@ static function RegenerateFormCode( cName, hForm )
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' GET ::o' + cCtrlName + ' VAR "' + cText + '" OF ' + cParent + ' SIZE ' + ;
                   LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
-            case nType == 32  // LabeledEdit
+            case nType == CT_LABELEDEDIT
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
-                  ' LABELEDEDIT ::o' + cCtrlName + ' VAR "' + cText + '" OF ' + cParent + ' SIZE ' + ;
+                  ' LABELEDEDIT ::o' + cCtrlName + ' VAR ' + HB_QHarbourStr( cText ) + ' OF ' + cParent + ' SIZE ' + ;
                   LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
             case nType == 3  // Button
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
@@ -1785,7 +1785,7 @@ static function RestoreFormFromCode( hForm, cCode )
 
    local aLines, cLine, cTrim, i, j, nType, nCount, lInCreateForm
    local nT, nL, nW, nH, cText, cName, hCtrl
-   local nPos, nPos2, cTitle, cVal, cPropName, kk, nColCount
+   local nPos, nPos2, cTitle, cVal, cPropName, kk, nColCount, cRest
    local cFldName, cFldType, cFldPrompt, cFldField, cFldFormat
    local cFldFont, nFldFontSize, lFldBold, lFldItalic, nFldAlign
    local cBandName, hBandCtrl, cFldSerial, cExistFields
@@ -2470,12 +2470,19 @@ static function RestoreFormFromCode( hForm, cCode )
             endif
             hCtrl := UI_EditNew( hForm, cText, nL, nT, nW, nH )
          case " LABELEDEDIT " $ Upper( cTrim )
-            // Extract VAR "..."
+            // Extract the VAR expression and evaluate it with the restricted
+            // inverse of HB_QHarbourStr; an expression in any other shape
+            // leaves the text empty instead of truncating at the first quote.
             cText := ""
-            nPos := At( 'VAR "', cTrim )
+            nPos := At( "VAR ", Upper( HB_StripStrings( cTrim ) ) )
             if nPos > 0
-               nPos2 := At( '"', SubStr( cTrim, nPos + 5 ) )
-               if nPos2 > 0; cText := SubStr( cTrim, nPos + 5, nPos2 - 1 ); endif
+               cVal := SubStr( cTrim, nPos + 4 )
+               cRest := Upper( HB_StripStrings( cVal ) )
+               nPos2 := At( " OF ", cRest )
+               if nPos2 == 0; nPos2 := At( " SIZE ", cRest ); endif
+               if nPos2 > 0; cVal := Left( cVal, nPos2 - 1 ); endif
+               cVal := HB_HarbourStrEval( AllTrim( cVal ) )
+               if cVal != nil; cText := cVal; endif
             endif
             hCtrl := UI_LabeledEditNew( hForm, cText, nL, nT, nW, nH )
          case " CHECKBOX " $ Upper( cTrim )

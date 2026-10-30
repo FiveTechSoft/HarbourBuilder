@@ -127,7 +127,8 @@ GEOM_BAD=$(diff <(tr -d '\r' < "$CYC/original.prg") <(tr -d '\r' < "$CYC/cycle2.
   # emission that dropped a hand-written SAY height was fixed in this
   # batch): the fixture line is width-only, so the saved form gains the
   # height the parser applied (default 15 when absent).
-  grep -vE '^[<>] +@ 20, 160 SAY ::oLabel1 PROMPT "Etiqueta fija" OF Self SIZE 200(, 15)?$' | \
+  grep -vE '^< +@ 20, 160 SAY ::oLabel1 PROMPT "Etiqueta fija" OF Self SIZE 200$' | \
+  grep -vE '^> +@ 20, 160 SAY ::oLabel1 PROMPT "Etiqueta fija" OF Self SIZE 200, 15$' | \
   grep -vE '^[<>] +@ 140, 20 COMBOBOX ::oCombo1 OF Self SIZE 180, 26 ITEMS "Uno", "Di " \+ Chr\( ?34 ?\) \+ "si" \+ Chr\( ?34 ?\), "Tre, s"$' | \
 
   grep -vE '^[<>] +DATA o(Label1|Edit1|Chk1|Combo1|Group1|Radio1|Image1|Memo1|List1|Ledit1) +// [A-Za-z0-9_]+$' | \
