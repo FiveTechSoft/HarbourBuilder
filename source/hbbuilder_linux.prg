@@ -4672,9 +4672,11 @@ static function TBRun()
       cCmd := "gcc -c -O2 -Wno-unused-value -I" + cHbInc + ;
               " " + cBuildDir + "/main.c -o " + cBuildDir + "/main.o 2>&1"
       if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
-      if lError .or. ! Empty( cOutput )
+      if lError
          cLog += "    FAILED:" + Chr(10) + cOutput + Chr(10)
-         lError := .T.
+      elseif ! Empty( cOutput )
+         // Successful compilers may print warnings. Keep them visible.
+         cLog += cOutput + Chr(10)
       endif
       GTK_ShellExec( "rm -f " + cBuildDir + "/classes.o" )
       cCmd := "gcc -c -O2 -Wno-unused-value -I" + cHbInc + ;

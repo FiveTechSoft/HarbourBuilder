@@ -4,6 +4,7 @@ REPO=$(cd "$(dirname "$0")/.." && pwd)
 source "$REPO/tests/harness_lib.sh"
 MODE=${MODE:-run}
 export FAIL_STAGE=${FAIL_STAGE:-compile}
+export WARN_ONLY=${WARN_ONLY:-0}
 RUN=/tmp/build_exit_gui
 rt_provenance
 mkdir -p "$RUN/tools"
@@ -16,6 +17,9 @@ if [ -f /tmp/build_exit_gui/fail ]; then
  else
   case "$*" in *main.c*) echo "$*" >> /tmp/build_exit_gui/refusals; exit 7;; esac
  fi
+fi
+if [ "$WARN_ONLY" = 1 ]; then
+ case "$*" in *main.c*) echo "warning: compiler-success-regression-probe" >&2;; esac
 fi
 exec /usr/bin/gcc "$@"
 EOF
@@ -34,6 +38,18 @@ for try in $(seq 1 50); do [ -f /tmp/debugmodules-result.txt ] && break; sleep 1
 grep -q MODULES-EXECUTED /tmp/debugmodules-result.txt || { rt_cleanup; exit 1; }
 OBJ=main.o
 [ "$MODE" != debug ] || OBJ=debug_main.o
+if [ "$WARN_ONLY" = 1 ]; then
+ for w in $(rt_ide_windows); do
+  case "$(xdotool getwindowname "$w")" in *Messages*|*Compiler*) xdotool windowmap "$w"; xdotool windowmove "$w" 0 125; xdotool windowsize "$w" 1300 700; xdotool windowraise "$w";; esac
+ done
+ sleep 1
+ import -window root /tmp/build-warning-success.png
+ tesseract /tmp/build-warning-success.png - --psm 6 2>/dev/null | tee "$RUN/warning-ocr"
+ grep -q compiler-success-regression-probe "$RUN/warning-ocr" || { rt_cleanup; exit 1; }
+ rt_cleanup
+ echo 'GUI warning with exit0 preserved and valid app executed PASS'
+ exit 0
+fi
 OLD=$(sha256sum "$B/$OBJ" | cut -d' ' -f1)
 rm -f "$B/.srchash" /tmp/debugmodules-result.txt
 touch "$RUN/fail"
