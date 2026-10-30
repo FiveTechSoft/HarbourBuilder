@@ -66,6 +66,16 @@ static function HB_ParseBlockFor( hForm )
    next
 return ""
 
+static function HB_ClearParseBlock( hForm )
+   local k
+   for k := Len( s_aParseBlocked ) to 1 step -1
+      if s_aParseBlocked[k][1] == hForm
+         ADel( s_aParseBlocked, k )
+         ASize( s_aParseBlocked, Len( s_aParseBlocked ) - 1 )
+      endif
+   next
+return nil
+
 function Main()
 
    local oTB, oFile, oEdit, oSearch, oView, oProject, oRun, oFormat, oComp, oTools, oHelp
@@ -76,6 +86,7 @@ function Main()
    nScreenW := GTK_GetScreenWidth()
    nScreenH := GTK_GetScreenHeight()
    cCurrentFile := ""
+   s_aParseBlocked := {}
    aForms := {}
    nActiveForm := 0
    aModules := {}
@@ -2816,6 +2827,7 @@ static function TBNew()
    for i := 1 to Len( aForms )
       aForms[i][2]:Destroy()
    next
+   s_aParseBlocked := {}
    aForms := {}
    nActiveForm := 0
    aModules := {}
@@ -2907,21 +2919,13 @@ static function RestoreFormFromCode( hForm, cCode )
    local nAtX, nAtY, nAtW, nAtH, cAtCmd, cAtName, cAtText, cRest, cAtSize
    local cRestU, nClPos, nClEnd, cClVal, cIt2
    local cStrip, nK, nn, cC, cExpr, nQ, nEnd, nOff
-   local cItemExpr, k, aTmp
+   local cItemExpr
   local lOkNum, nNDot, nClCount, cTabsF, nPagesF, cIdxStr, nBrk
 
+   HB_ClearParseBlock( hForm )
    if Empty( cCode ) .or. hForm == 0
       return nil
    endif
-
-   // this form parses cleanly unless a failure below re-blocks it (R3)
-   aTmp := {}
-   for k := 1 to Len( s_aParseBlocked )
-      if s_aParseBlocked[ k ][ 1 ] != hForm
-         AAdd( aTmp, s_aParseBlocked[ k ] )
-      endif
-   next
-   s_aParseBlocked := aTmp
 
    aLines := HB_ATokens( StrTran( cCode, Chr(13), "" ), Chr(10) )
 
@@ -3958,6 +3962,7 @@ static function OpenProjectFile( cFile, cAction )
    for i := 1 to Len( aForms )
       aForms[i][2]:Destroy()
    next
+   s_aParseBlocked := {}
    aForms := {}
    nActiveForm := 0
    aModules := {}
@@ -5581,6 +5586,7 @@ static function RemoveFromProject()
          MsgInfo( "Cannot remove the last item from the project" )
          return nil
       endif
+      HB_ClearParseBlock( aForms[nSel][2]:hCpp )
       aForms[nSel][2]:Destroy()
       CodeEditorRemoveTab( hCodeEditor, nSel + 1 )
       HB_TabRemoveKnown( nSel + 1 )
