@@ -74,11 +74,11 @@ edit_row() {  # $1 prop name, $2 new value
 
 save_and_check() {  # $1 label, rest: grep -F patterns that must be in the file
   local label=$1; shift
-  [ -n "${CED:-}" ] && xdotool windowmove "$CED" 0 500 2>/dev/null
-  xdotool windowmove "$INS" 0 600 2>/dev/null
-  [ -n "${RT_DESIGNER:-}" ] && xdotool windowmove "$RT_DESIGNER" 0 700 2>/dev/null
+  # park EVERY non-bar IDE window: any of them can cover the menu bar at 0,0
+  local BARW w
+  BARW=$(rt_find_bar) || fail "$label: IDE bar not found"
   for w in $(rt_ide_windows); do
-    case "$(xdotool getwindowname "$w" 2>/dev/null)" in "AI Assistant") xdotool windowmove "$w" 1100 700 2>/dev/null;; esac
+    [ "$w" = "$BARW" ] || xdotool windowmove "$w" 1100 700 2>/dev/null
   done
   sleep 0.5
   menu_path_click '^Save' || fail "$label: File > Save not clickable"
