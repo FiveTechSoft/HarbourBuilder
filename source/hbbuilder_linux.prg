@@ -2724,8 +2724,9 @@ static function ToggleFormCode()
 return nil
 
 // Forms and modules share the project source filename namespace.
-static function HB_NextFormName( aFormRows, aModuleRows )
+static function HB_NextFormName( aFormRows, aModuleRows, cDir )
    local n := Len( aFormRows ) + 1, cName, row, lUsed
+   if cDir == nil; cDir := ""; endif
    do while .T.
       cName := "Form" + LTrim( Str( n ) )
       lUsed := .F.
@@ -2736,6 +2737,9 @@ static function HB_NextFormName( aFormRows, aModuleRows )
          for each row in aModuleRows
             if Upper( row[ 1 ] ) == Upper( cName ); lUsed := .T.; exit; endif
          next
+      endif
+      if ! lUsed .and. ! Empty( cDir )
+         lUsed := File( cDir + cName + ".prg" ) .or. hb_DirExists( cDir + cName + ".prg" )
       endif
       if ! lUsed; return cName; endif
       n++
@@ -2749,7 +2753,8 @@ static function MenuNewForm()
 
    // Reserve the tab before changing the form model or hiding its window.
    // New forms precede every module and standalone file in the index map.
-   cName := HB_NextFormName( aForms, aModules )
+   cName := HB_NextFormName( aForms, aModules, ;
+      iif( Empty( cCurrentFile ), "", HB_ProjectDirFromFile( cCurrentFile ) ) )
    nTabPos := Len( aForms ) + 2
    if ! CodeEditorInsertTab( hCodeEditor, nTabPos, ;
          cName + ".prg" )

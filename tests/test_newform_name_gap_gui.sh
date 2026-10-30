@@ -12,6 +12,7 @@ from pathlib import Path
 import sys
 p=Path(sys.argv[1]);s=(p/'Form2.prg').read_text().replace('Form2','Form3').replace('PRECLASS-F2','UNIQUE-FORM3-KEEP');(p/'Form3.prg').write_text(s)
 (p/'Project1.hbp').write_text('Project1\nForm1\nForm3\n')
+(p/'Form4.prg').write_text('UNLOADED-EXTERNAL-FILE-KEEP')
 FIX
 rt_provenance;rt_setup "$RUN";rt_launch_ide
 for try in $(seq 1 12);do rt_find_bar >/dev/null&&break;sleep 1;done
@@ -41,5 +42,7 @@ if sys.argv[2]=='red':
 else:
  names=[x for x in h.splitlines() if x.startswith('Form')];assert len(names)==3 and len(set(x.lower() for x in names))==3
  assert 'UNIQUE-FORM3-KEEP' in f
+ assert (p/'Form4.prg').read_text()=='UNLOADED-EXTERNAL-FILE-KEEP'
+ assert 'Form5' in names
  print('GREEN new name unique; existing Form3 source preserved')
 CHECK
