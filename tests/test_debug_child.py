@@ -10,9 +10,17 @@ p=Path('/tmp/debug-child-test');p.mkdir(exist_ok=True)
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 '''+s[a:b]+'''
+static int s_dbgServerFD=-1,s_dbgClientFD=-1,s_dbgState=0;
+#define DBG_STOPPED 4
+static int gtk_events_pending(void){return 0;}
+static void gtk_main_iteration_do(int b){(void)b;}
+'''+s[s.index('static int DbgServerStart( int port )'):s.index('static void DbgServerSend( const char * cmd )')]+''' 
 int main(){
- int status, i; GPid owned; GError *error=NULL;
+ int status, i; GPid owned; struct sigaction act; sigaction(SIGCHLD,NULL,&act);
+ printf("SIGCHLD default=%d ignored=%d no_cldwait=%d\n",act.sa_handler==SIG_DFL,act.sa_handler==SIG_IGN,!!(act.sa_flags&SA_NOCLDWAIT)); GError *error=NULL;
  pid_t other=fork(); if(other==0){sleep(30);_exit(0);}
  if(!DbgChildStart("/tmp/debug-child-test/child",&error))return 1;
  owned=s_dbgChildPID; g_usleep(50000);
@@ -26,6 +34,14 @@ int main(){
  unsetenv("FAST");
  if(DbgChildStart("/tmp/debug-child-test/missing",&error))return 6;
  if(error)g_error_free(error);
+ if(DbgServerStart(0)!=0)return 7;
+ setenv("FAST","1",1);if(!DbgChildStart("/tmp/debug-child-test/child",&error))return 8;
+ if(DbgServerAccept(1.0)==0)return 9;DbgChildStop();
+ unsetenv("FAST");if(!DbgChildStart("/tmp/debug-child-test/child",&error))return 10;
+ s_dbgState=DBG_STOPPED;if(DbgServerAccept(1.0)==0)return 11;DbgChildStop();
+ s_dbgState=0;if(!DbgChildStart("/tmp/debug-child-test/child",&error))return 12;
+ if(DbgServerAccept(.5)==0)return 13;DbgChildStop();close(s_dbgServerFD);
+ puts("PASS actual accept loop: child exits; stop flag; timeout; owned cleanup");
  kill(other,SIGTERM);waitpid(other,&status,0);
  puts("PASS owned TERM/KILL bounded; reap; already exited; duplicate cleanup; exec failure; unrelated survives");return 0;
 }
