@@ -102,19 +102,29 @@ rt_expose_bar() {  # move non-bar HbBuilder windows off the menu bar area
 # the button is held, and mouseup activates the item under the cursor.
 # $1 = OCR regex for the item; opens File at (30,12) and releases on the item.
 menu_path_click() {
-  local ITEMRE="$1" rel
+  local ITEMRE="$1" rel try
   rt_expose_bar >/dev/null
-  xdotool mousemove 30 12 mousedown 1; sleep 0.7
-  import -window root -crop "400x400+0+0" /tmp/rt_menu.png 2>/dev/null
-  rel=$(tesseract /tmp/rt_menu.png - tsv 2>/dev/null | awk -F'\t' -v w="$ITEMRE" '$8+0 > 20 && $12 ~ w {print $7" "$8" "$9" "$10; exit}')
-  if [ -z "$rel" ]; then
-    xdotool mouseup 1; sleep 0.3
-    echo "  [diag] menu item $ITEMRE not found:"; tesseract /tmp/rt_menu.png - 2>/dev/null | grep -v '^$' | head -8
-    return 1
-  fi
-  set -- $rel
-  xdotool mousemove $(($1 + $3/2)) $(($2 + $4/2)); sleep 0.4
-  xdotool mouseup 1; sleep 1
+  for try in 1 2 3 4; do
+    xdotool mousemove 30 12 mousedown 1; sleep 0.7
+    import -window root -crop "400x400+0+0" /tmp/rt_menu.png 2>/dev/null
+    # the dropdown is really open only if its anchor item is visible
+    if ! tesseract /tmp/rt_menu.png - 2>/dev/null | grep -q 'Reopen'; then
+      xdotool mouseup 1; sleep 0.6
+      echo "  [diag] menu dropdown did not open (try $try)"
+      continue
+    fi
+    rel=$(tesseract /tmp/rt_menu.png - tsv 2>/dev/null | awk -F'\t' -v w="$ITEMRE" '$8+0 > 20 && $12 ~ w {print $7" "$8" "$9" "$10; exit}')
+    if [ -z "$rel" ]; then
+      xdotool mouseup 1; sleep 0.6
+      echo "  [diag] menu item $ITEMRE not found (try $try):"; tesseract /tmp/rt_menu.png - 2>/dev/null | grep -v '^$' | head -8
+      continue
+    fi
+    set -- $rel
+    xdotool mousemove $(($1 + $3/2)) $(($2 + $4/2)); sleep 0.4
+    xdotool mouseup 1; sleep 1
+    return 0
+  done
+  return 1
 }
 
 rt_unmap_all_but() {
