@@ -702,7 +702,7 @@ done
 BAR=$(rt_find_bar); rt_park_all_but "$CED" "$BAR"; sleep 0.5
 eval "$(xdotool getwindowgeometry --shell "$CED")"
 import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/dl_tabs.png 2>/dev/null
-rel=$(tesseract /tmp/dl_tabs.png - tsv 2>/dev/null | awk -F'\t' '$12 ~ /Project1/ {print $7" "$8" "$9" "$10; exit}')
+rel=$(tesseract /tmp/dl_tabs.png - tsv 2>/dev/null | awk -F'\t' '$12 ~ /Project/ {print $7" "$8" "$9" "$10; exit}')
 [ -n "$rel" ] || { echo "  [diag] Project1 tab not found by OCR"; tesseract /tmp/dl_tabs.png - 2>/dev/null | head -3; rt_cleanup; FAILN=$((FAILN+1)); return; }
 set -- $rel
 xdotool mousemove $((X + $1 + $3/2)) $((Y + $2 + $4/2)) click 1; sleep 0.8
