@@ -3603,8 +3603,8 @@ static function TBRun()
 
    local cBuildDir, cOutput, cLog, i, lError
    local cHbDir, cHbBin, cHbInc, cHbLib, cProjDir
-   local cAllPrg, cCmd, cAllCode, nHash, cDestDir, cAppExe, cAppTitle
-   static nLastHash := 0
+   local cAllPrg, cCmd, cAllCode, cHash, cDestDir, cAppExe, cAppTitle
+   static cLastHash := ""
 
    // refuse to compile/run stale code after a refused sync
    if ! HB_CheckFormsSerializable()
@@ -3616,7 +3616,7 @@ static function TBRun()
    // Re-sync all forms so new event handlers get wired into CreateForm()
    RewireAllFormEvents()
 
-   cBuildDir := "/tmp/hbbuilder_build"
+   cBuildDir := "/tmp/hbbuilder_build/" + iif( Empty( cCurrentFile ), "_default", hb_MD5( cCurrentFile ) )
 
    // Quick check: if nothing changed since last successful build, just run
    cAllCode := CodeEditorGetTabText( hCodeEditor, 1 )
@@ -3626,11 +3626,15 @@ static function TBRun()
    for i := 1 to Len( aModules )
       cAllCode += CodeEditorGetTabText( hCodeEditor, 1 + Len(aForms) + i )
    next
-   nHash := Len( cAllCode )
-   for i := 1 to Min( Len( cAllCode ), 5000 )
-      nHash := nHash + Asc( SubStr( cAllCode, i, 1 ) ) * i
-   next
-   if nHash == nLastHash .and. nLastHash != 0 .and. File( cBuildDir + "/UserApp" )
+   // Full-content cache key: MD5 of project identity + all sources.
+   // Cache invalidation only, not a cryptographic use. The previous key
+   // (length + weighted sum of the first 5000 chars) missed edits past
+   // char 5000, and the fixed shared build dir could run another
+   // project's binary.
+   cHash := hb_MD5( cCurrentFile + Chr(10) + cAllCode )
+   if cHash == cLastHash .and. ! Empty( cLastHash ) .and. ;
+      File( cBuildDir + "/UserApp" ) .and. ;
+      File( cBuildDir + "/.srchash" ) .and. MemoRead( cBuildDir + "/.srchash" ) == cHash
       GTK_ShellExec( cBuildDir + "/UserApp 2>/tmp/userapp_debug.log &" )
       return nil
    endif
@@ -3867,7 +3871,8 @@ static function TBRun()
    if lError
       IDE_ShowBuildResult( "Build Failed", cLog, lError )
    else
-      nLastHash := nHash
+      cLastHash := cHash
+      MemoWrit( cBuildDir + "/.srchash", cHash )
       cLog += Chr(10) + "Build succeeded. Running..." + Chr(10)
       IDE_SetMessages( cLog )
       if ! Empty( cCurrentFile )
