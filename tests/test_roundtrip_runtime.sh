@@ -77,6 +77,12 @@ FAILN=0
 if [ -f /tmp/fixture_trace.log ]; then
   grep -q 'after-edit1:texto inicial' /tmp/fixture_trace.log \
     || { echo "  trace wrong: $(cat /tmp/fixture_trace.log)"; FAILN=$((FAILN+1)); }
+  # T4: folder tabs, browse columns and page-2 child wiring, read from the
+  # live runtime controls (not from the Harbour-side DATA mirrors)
+  for want in 'folder-tabs:P1|P2' 'browse-cols:2' 'page2-btn:Pag2' 'page2-owner:folder' 'page2-page:1'; do
+    grep -qF "$want" /tmp/fixture_trace.log \
+      || { echo "  T4 trace missing: $want (got: $(cat /tmp/fixture_trace.log | tr '\n' ' '))"; FAILN=$((FAILN+1)); }
+  done
 else
   echo "  trace log missing"; FAILN=$((FAILN+1))
 fi

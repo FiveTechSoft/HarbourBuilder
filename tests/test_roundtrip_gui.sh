@@ -101,6 +101,13 @@ chk 'FixtureTrace\( "after-edit1", ::oEdit1 \)'
 chk '::oLabel1:cText := FixtureCaption\( ::oCombo1 \)'
 chk 'function FixtureTrace'
 chk 'function FixtureCaption'
+# T4: folder/browse structure must survive both cycles
+chk 'DATA oFld1 +// TFolder'
+chk 'DATA oBrw1 +// TBrowse'
+chk 'DATA oBtnPg2 +// TButton'
+chk 'FOLDER ::oFld1 OF Self SIZE 165, 160 PROMPTS "P1", "P2"'
+chk 'BUTTON ::oBtnPg2 PROMPT "Pag2" OF ::oFld1:aPages\[2\] SIZE 90, 26'
+chk 'BROWSE ::oBrw1 OF Self SIZE 165, 150 HEADERS "Nombre", "Edad" COLSIZES 90, 60 FOOTERS "Total", ""'
 rej '// ::o(Radio1|BitBtn1|Image1|Memo1)'
 rej 'Value := 1'
 

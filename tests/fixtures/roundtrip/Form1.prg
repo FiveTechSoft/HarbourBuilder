@@ -57,6 +57,8 @@ METHOD CreateForm() CLASS TForm1
    FixtureTraceRaw( "folder-tabs:" + UI_GetProp( ::oFld1:hCpp, "aTabs" ) )
    FixtureTraceRaw( "browse-cols:" + hb_ValToStr( UI_BrowseColCount( ::oBrw1:hCpp ) ) )
    FixtureTraceRaw( "page2-btn:" + UI_GetProp( ::oBtnPg2:hCpp, "cText" ) )
+   FixtureTraceRaw( "page2-owner:" + iif( UI_GetCtrlOwner( ::oBtnPg2:hCpp ) == ::oFld1:hCpp, "folder", "other" ) )
+   FixtureTraceRaw( "page2-page:" + hb_ValToStr( UI_GetCtrlPage( ::oBtnPg2:hCpp ) ) )
 
    // comentario manual del usuario
    ::oEdit1:cText := "modificado"

@@ -2845,6 +2845,7 @@ static function RestoreFormFromCode( hForm, cCode )
    local cRestU, nClPos, nClEnd, cClVal, cIt2
    local cStrip, nK, nn, cC, cExpr, nQ, nEnd, nOff
    local cItemExpr, k, aTmp
+  local lOkNum, nNDot
 
    if Empty( cCode ) .or. hForm == 0
       return nil
@@ -3161,7 +3162,28 @@ static function RestoreFormFromCode( hForm, cCode )
                                  // numeric literal: HB_HarbourStrEval only
                                  // evaluates string expressions
                                  cClVal := AllTrim( cItemExpr )
-                                 if IsDigit( Left( cClVal, 1 ) ) .or. Left( cClVal, 1 ) == "-"
+                                 // strict numeric literal: digits, one '.',
+                                 // optional leading sign; expressions or
+                                 // trailing junk block the write, they are
+                                 // not silently converted with Val()
+                                 lOkNum := ! Empty( cClVal )
+                                 nNDot := 0
+                                 for nn := 1 to Len( cClVal )
+                                    cC := SubStr( cClVal, nn, 1 )
+                                    if IsDigit( cC )
+                                    elseif cC == "."
+                                       nNDot++
+                                       if nNDot > 1
+                                          lOkNum := .F.
+                                          exit
+                                       endif
+                                    elseif ( cC == "-" .or. cC == "+" ) .and. nn == 1
+                                    else
+                                       lOkNum := .F.
+                                       exit
+                                    endif
+                                 next
+                                 if lOkNum
                                     kk++
                                     if kk <= UI_BrowseColCount( hCtrl )
                                        UI_BrowseSetColProp( hCtrl, kk - 1, "nWidth", Val( cClVal ) )
