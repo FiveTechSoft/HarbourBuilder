@@ -3020,6 +3020,31 @@ static function RestoreFormFromCode( hForm, cCode )
                         nAtW := Val( cAtSize )
                      endif
                   endif
+                  // OF ::oFolder:aPages[N] -> pending page owner BEFORE
+                  // creating the control so AddChild tags (FPageOwner,FPageIndex).
+                  // Unresolvable owner blocks the write instead of silently
+                  // re-parenting the child to Self (T4).
+                  if At( "OF ::O", Upper( cRest ) ) > 0 .and. ":APAGES[" $ Upper( cRest )
+                     cVal := SubStr( cRest, At( "OF ::O", Upper( cRest ) ) + 6 )
+                     cFolderName := Left( cVal, At( ":APAGES[", Upper( cVal ) ) - 1 )
+                     nPageIdx := Val( SubStr( cVal, At( ":APAGES[", Upper( cVal ) ) + 8 ) )
+                     hFolder := 0
+                     hChildN := UI_GetChildCount( hForm )
+                     for kkF := 1 to hChildN
+                        if AllTrim( UI_GetProp( UI_GetChild( hForm, kkF ), "cName" ) ) == cFolderName
+                           hFolder := UI_GetChild( hForm, kkF )
+                           exit
+                        endif
+                     next
+                     if hFolder != 0 .and. nPageIdx >= 1
+                        UI_SetPendingPageOwner( hFolder, nPageIdx - 1 )
+                     else
+                        HB_SetParseBlock( hForm, "Line " + LTrim( Str( i ) ) + ;
+                           ", control '" + cAtName + "': page owner '" + ;
+                           cFolderName + "' page " + LTrim( Str( nPageIdx ) ) + ;
+                           " not resolved" )
+                     endif
+                  endif
                   hCtrl := 0
                   do case
                      case cAtCmd == "BUTTON"
@@ -3062,7 +3087,114 @@ static function RestoreFormFromCode( hForm, cCode )
                         // save (M6 root cause of the 90->100 drift)
                         hCtrl := UI_ListBoxNew( hForm, nAtX, nAtY, ;
                            iif( nAtW > 0, nAtW, 120 ), iif( nAtH > 0, nAtH, 100 ) )
+                     case cAtCmd == "FOLDER"
+                        hCtrl := UI_TabControlNew( hForm, nAtX, nAtY, ;
+                           iif( nAtW > 0, nAtW, 300 ), iif( nAtH > 0, nAtH, 200 ) )
+                        if hCtrl != 0
+                           cRestU := Upper( HB_StripStrings( cRest ) )
+                           nClPos := At( "PROMPTS ", cRestU )
+                           if nClPos > 0
+                              cIt2 := ""
+                              for each cItemExpr in HB_SplitTopLevelCommas( SubStr( cRest, nClPos + 7 ) )
+                                 cExpr := HB_HarbourStrEval( AllTrim( cItemExpr ) )
+                                 if cExpr == nil
+                                    HB_SetParseBlock( hForm, "Line " + LTrim( Str( i ) ) + ;
+                                       ", control '" + cAtName + ;
+                                       "': PROMPTS expression not understood" )
+                                    cExpr := ""
+                                 endif
+                                 if "|" $ cExpr
+                                    HB_SetParseBlock( hForm, "Line " + LTrim( Str( i ) ) + ;
+                                       ", control '" + cAtName + ;
+                                       "': a PROMPTS item contains '|' (the tab separator)" )
+                                 endif
+                                 if ! Empty( cIt2 ); cIt2 += "|"; endif
+                                 cIt2 += cExpr
+                              next
+                              if ! Empty( cIt2 )
+                                 UI_SetProp( hCtrl, "aTabs", cIt2 )
+                              endif
+                           endif
+                        endif
+                     case cAtCmd == "BROWSE"
+                        hCtrl := UI_BrowseNew( hForm, nAtX, nAtY, ;
+                           iif( nAtW > 0, nAtW, 400 ), iif( nAtH > 0, nAtH, 200 ) )
+                        if hCtrl != 0
+                           cRestU := Upper( HB_StripStrings( cRest ) )
+                           // HEADERS first: it creates the columns that
+                           // COLSIZES/FOOTERS then tune
+                           nClPos := At( "HEADERS ", cRestU )
+                           if nClPos > 0
+                              nEnd := Len( cRest ) + 1
+                              nPos2 := At( " COLSIZES ", cRestU )
+                              if nPos2 > 0 .and. nPos2 < nEnd; nEnd := nPos2; endif
+                              nPos2 := At( " FOOTERS ", cRestU )
+                              if nPos2 > 0 .and. nPos2 < nEnd; nEnd := nPos2; endif
+                              cIt2 := ""
+                              for each cItemExpr in HB_SplitTopLevelCommas( SubStr( cRest, nClPos + 8, nEnd - nClPos - 8 ) )
+                                 cExpr := HB_HarbourStrEval( AllTrim( cItemExpr ) )
+                                 if cExpr == nil
+                                    HB_SetParseBlock( hForm, "Line " + LTrim( Str( i ) ) + ;
+                                       ", control '" + cAtName + ;
+                                       "': HEADERS expression not understood" )
+                                    cExpr := ""
+                                 endif
+                                 if "|" $ cExpr
+                                    HB_SetParseBlock( hForm, "Line " + LTrim( Str( i ) ) + ;
+                                       ", control '" + cAtName + ;
+                                       "': a HEADERS item contains '|' (the column separator)" )
+                                 endif
+                                 if ! Empty( cIt2 ); cIt2 += "|"; endif
+                                 cIt2 += cExpr
+                              next
+                              if ! Empty( cIt2 )
+                                 UI_SetProp( hCtrl, "aColumns", cIt2 )
+                              endif
+                           endif
+                           nClPos := At( "COLSIZES ", cRestU )
+                           if nClPos > 0
+                              nEnd := Len( cRest ) + 1
+                              nPos2 := At( " FOOTERS ", cRestU )
+                              if nPos2 > 0 .and. nPos2 < nEnd; nEnd := nPos2; endif
+                              kk := 0
+                              for each cItemExpr in HB_SplitTopLevelCommas( SubStr( cRest, nClPos + 9, nEnd - nClPos - 9 ) )
+                                 cExpr := HB_HarbourStrEval( AllTrim( cItemExpr ) )
+                                 if ValType( cExpr ) == "N"
+                                    kk++
+                                    if kk <= UI_BrowseColCount( hCtrl )
+                                       UI_BrowseSetColProp( hCtrl, kk - 1, "nWidth", cExpr )
+                                    endif
+                                 else
+                                    HB_SetParseBlock( hForm, "Line " + LTrim( Str( i ) ) + ;
+                                       ", control '" + cAtName + ;
+                                       "': COLSIZES entry not numeric" )
+                                 endif
+                              next
+                           endif
+                           nClPos := At( "FOOTERS ", cRestU )
+                           if nClPos > 0
+                              kk := 0
+                              for each cItemExpr in HB_SplitTopLevelCommas( SubStr( cRest, nClPos + 8 ) )
+                                 cExpr := HB_HarbourStrEval( AllTrim( cItemExpr ) )
+                                 if cExpr == nil
+                                    HB_SetParseBlock( hForm, "Line " + LTrim( Str( i ) ) + ;
+                                       ", control '" + cAtName + ;
+                                       "': FOOTERS expression not understood" )
+                                    cExpr := ""
+                                 endif
+                                 kk++
+                                 if kk <= UI_BrowseColCount( hCtrl )
+                                    UI_BrowseSetColProp( hCtrl, kk - 1, "cFooterText", cExpr )
+                                 endif
+                              next
+                           endif
+                        endif
                   endcase
+                  if hCtrl == 0
+                     // unknown keyword: no control claimed the pending page
+                     // owner; clear it so it cannot leak into the next control
+                     UI_SetPendingPageOwner( 0, 0 )
+                  endif
                   if hCtrl != 0 .and. ! Empty( cAtName )
                      UI_SetProp( hCtrl, "cName", cAtName )
                   endif
