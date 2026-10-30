@@ -1852,16 +1852,16 @@ static function RestoreFormFromCode( hForm, cCode )
    local nQ1, nQ2, nQ3, nQ4, nQ5, cPopCap, cItCap, cItHndl, cItAccl, nAct, nAccl
    local nPar, nPar2, nPar3, nCC, jjC, hC
 
-   if Empty( cCode ) .or. hForm == 0
-      return nil
-   endif
-
    for i := Len( aSelectionParseBlocks ) to 1 step -1
       if aSelectionParseBlocks[i][1] == hForm
          ADel( aSelectionParseBlocks, i )
          ASize( aSelectionParseBlocks, Len( aSelectionParseBlocks ) - 1 )
       endif
    next
+
+   if Empty( cCode ) .or. hForm == 0
+      return nil
+   endif
 
    // Join Harbour line-continuations (`;` at end of line) so clauses
    // spanning multiple lines (e.g. COMBOBOX ... ; ITEMS ...) parse as one.

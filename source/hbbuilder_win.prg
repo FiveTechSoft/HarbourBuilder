@@ -2662,10 +2662,6 @@ static function RestoreFormFromCode( hForm, cCode )
    local nQ1, nQ2, nQ3, nQ4, nQ5, nAct, nAccl, nPar, nPar2, nPar3
    local nCC, jjC, hC
 
-   if Empty( cCode ) .or. hForm == 0
-      return nil
-   endif
-
    for i := Len( aSelectionParseBlocks ) to 1 step -1
       if aSelectionParseBlocks[i][1] == hForm
          ADel( aSelectionParseBlocks, i )
@@ -2679,6 +2675,10 @@ static function RestoreFormFromCode( hForm, cCode )
          ASize( aPictureParseBlocks, Len( aPictureParseBlocks ) - 1 )
       endif
    next
+
+   if Empty( cCode ) .or. hForm == 0
+      return nil
+   endif
 
    aLines := HB_ATokens( cCode, Chr(10) )
 
