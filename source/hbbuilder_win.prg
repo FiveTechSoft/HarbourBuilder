@@ -927,7 +927,7 @@ static function OnComboSelect( nSel )
 
       if aEntry[1] == 2  // Browse column
          // aEntry = { 2, hBrowse, nColIdx }
-         UI_FormSelectCtrl( oDesignForm:hCpp, aEntry[2] )
+         SelectInspectorTarget( aEntry[2] )
          InspectorRefreshColumn( aEntry[2], aEntry[3] )
          return nil
       endif
@@ -938,7 +938,7 @@ static function OnComboSelect( nSel )
          cTabs := UI_GetProp( aEntry[2], "aTabs" )
          aLabels := iif( Empty( cTabs ), {}, hb_ATokens( cTabs, "|" ) )
          cCap := iif( aEntry[3]+1 <= Len(aLabels), aLabels[aEntry[3]+1], "" )
-         UI_FormSelectCtrl( oDesignForm:hCpp, aEntry[2] )
+         SelectInspectorTarget( aEntry[2] )
          UI_TabControlSetSel( aEntry[2], aEntry[3] )
          hIns := _InsGetData()
          INS_SetFolderPage( hIns, aEntry[2], aEntry[3] )
@@ -957,7 +957,7 @@ static function OnComboSelect( nSel )
    endif
 
    if hTarget != 0
-      UI_FormSelectCtrl( oDesignForm:hCpp, hTarget )
+      SelectInspectorTarget( hTarget )
       InspectorRefresh( hTarget )
    endif
 
@@ -967,6 +967,8 @@ static function OnDesignSelChange( hCtrl )
 
    local hTarget
    static lInSelChange := .F.
+
+   if lUpdatingInspectorCombo; return nil; endif
 
    // Re-entrant guard: selecting a combo row below fires the combo-changed
    // handler, which selects in the designer and notifies sel-change again.
@@ -2112,6 +2114,22 @@ return nil
 // Wire all design-mode callbacks on the active form
 // Programmatic rebuilds must not act as a new user selection. Pages and
 // columns expand the combo, so resolve the control's identity in its map.
+static function SelectInspectorTarget( hTarget )
+   lUpdatingInspectorCombo := .T.
+   begin sequence
+      UI_FormSelectCtrl( oDesignForm:hCpp, hTarget )
+   always
+      lUpdatingInspectorCombo := .F.
+   end sequence
+return nil
+
+static function RefreshInspectorSelection()
+   local nSel := INS_ComboGetSel( _InsGetData() )
+   if ! lUpdatingInspectorCombo .and. nSel >= 0
+      OnComboSelect( nSel )
+   endif
+return nil
+
 static function MirrorInspectorControl( hForm, hTarget )
    local aMap, i, nSel := 0
    if hTarget == nil .or. hTarget == 0; return nil; endif
@@ -2143,8 +2161,7 @@ static function WireDesignForm()
       { |hForm, nType, nL, nT, nW, nH| OnComponentDrop( hForm, nType, nL, nT, nW, nH ) } )
 
    // Two-way: sync code + inspector when form is moved/resized
-   oDesignForm:OnResize := { || SyncDesignerToCode(), ;
-      InspectorRefresh( oDesignForm:hCpp ) }
+   oDesignForm:OnResize := { || SyncDesignerToCode(), RefreshInspectorSelection() }
 
    // When design form gets focus from another app, bring IDE to front
    // Uses WM_ACTIVATEAPP (not WM_ACTIVATE) to avoid blocking resize
@@ -3469,8 +3486,7 @@ static function OpenProjectFile( cFile )
       // Two-way: sync code + inspector when form is moved/resized.
       // Was wired in TBNew but missing here - that's why dragging the
       // design form after Open never updated ::nLeft / ::nTop before save.
-      oDesignForm:OnResize := { || SyncDesignerToCode(), ;
-         InspectorRefresh( oDesignForm:hCpp ) }
+      oDesignForm:OnResize := { || SyncDesignerToCode(), RefreshInspectorSelection() }
    next
 
    // Load modules

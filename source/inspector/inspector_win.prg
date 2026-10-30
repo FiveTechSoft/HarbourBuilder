@@ -3762,6 +3762,12 @@ HB_FUNC( INS_COMBOSELECT )
       SendMessage( d->hCombo, CB_SETCURSEL, hb_parni(2), 0 );
 }
 
+HB_FUNC( INS_COMBOGETSEL )
+{
+   INSDATA * d = (INSDATA *) (HB_PTRUINT) hb_parnint(1);
+   hb_retni( d && d->hCombo ? (int) SendMessage( d->hCombo, CB_GETCURSEL, 0, 0 ) : -1 );
+}
+
 /* INS_ComboClear( hInsData ) */
 HB_FUNC( INS_COMBOCLEAR )
 {

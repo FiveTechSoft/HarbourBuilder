@@ -2513,6 +2513,12 @@ HB_FUNC( INS_COMBOSELECT )
  * INS_ComboClear( hInsData )
  * ====================================================================== */
 
+HB_FUNC( INS_COMBOGETSEL )
+{
+   INSDATA * d = (INSDATA *)(HB_PTRUINT) hb_parnint(1);
+   hb_retni( d && d->combo ? (int) [d->combo indexOfSelectedItem] : -1 );
+}
+
 HB_FUNC( INS_COMBOCLEAR )
 {
    INSDATA * d = (INSDATA *)(HB_PTRUINT) hb_parnint(1);
