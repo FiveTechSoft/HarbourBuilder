@@ -7,7 +7,7 @@ if p.exists(): shutil.rmtree(p)
 p.mkdir()
 parts=[]
 for name,fn,start in [('Run','TBRun','   // Step 1: Save files'),('Debug','TBDebugRun','   // Step 1: Save user code')]:
- a=s.index(start,s.index('static function '+fn+'('));b=s.index('   GTK_ShellExec( "cp ',a)
+ a=s.index(start,s.index('static function '+fn+'('));b=s.index('   if ! HB_StageFramework( cProjDir',a)
  parts.append('function Probe'+name+'(cBuildDir)\n local cLog:=\'\', i\n'+s[a:b]+''' nContinued++
 return .T.
 ''')
@@ -63,7 +63,7 @@ return nil
 '''
 for stage in ['run','debug']:
  (p/stage/'Project1.prg').mkdir(parents=True,exist_ok=True)
-a=s.index('static function HB_BuildWrite(');b=s.index('static function TBRun()',a)
+a=s.index('static function HB_BuildWrite(');b=s.index('static function HB_StageFramework',a)
 (p/'probe.prg').write_text(main+''.join(parts)+s[a:b])
 print('commit:',subprocess.check_output(['git','rev-parse','HEAD'],cwd=r,text=True).strip(),flush=True)
 subprocess.run(['/tmp/harbour-review/bin/linux/gcc/hbmk2',str(p/'probe.prg'),'-gtstd','-q','-quiet','-o'+str(p/'probe')],check=True)

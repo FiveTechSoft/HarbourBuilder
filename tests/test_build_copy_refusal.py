@@ -50,7 +50,7 @@ for stage in ['run','debug']:
  q=p/stage/'classes.prg';q.mkdir(parents=True);(q/'old').write_text('OLD')
 helper=''
 if 'static function HB_StageFramework' in s:
- a=s.index('static function HB_StageFramework');b=s.index('static function TBRun',a);helper=s[a:b]
+ a=s.index('static function HB_StageFramework');b=s.index('static function HB_BuildCopy',a);helper=s[a:b]
 (p/'probe.prg').write_text(main+''.join(parts)+helper)
 print('commit:',subprocess.check_output(['git','rev-parse','HEAD'],cwd=r,text=True).strip(),flush=True)
 subprocess.run(['/tmp/harbour-review/bin/linux/gcc/hbmk2',str(p/'probe.prg'),'-gtstd','-q','-quiet','-o'+str(p/'probe')],check=True)

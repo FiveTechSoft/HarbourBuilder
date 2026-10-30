@@ -36,7 +36,7 @@ return nil
 (p/'repo/source').mkdir(parents=True);(p/'repo/source/gtk3_inspector.o').write_bytes(b'NEW\0OBJ');(p/'build/gtk3_inspector.o').mkdir(parents=True)
 helper=''
 if 'static function HB_BuildCopy' in s:
- a=s.index('static function HB_BuildCopy');b=s.index('static function TBRun',a);helper=s[a:b]
+ a=s.index('static function HB_BuildCopy');b=s.index('static function HB_PublishUserApp',a);helper=s[a:b]
 (p/'probe.prg').write_text(main+helper)
 print('commit:',subprocess.check_output(['git','rev-parse','HEAD'],cwd=r,text=True).strip(),flush=True)
 subprocess.run(['/tmp/harbour-review/bin/linux/gcc/hbmk2',str(p/'probe.prg'),'-gtstd','-q','-quiet','-o'+str(p/'probe')],check=True)
