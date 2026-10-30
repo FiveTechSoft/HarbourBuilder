@@ -4600,7 +4600,9 @@ static function TBRun()
       GTK_ProgressClose()
       return .F.
    endif
-   MemoWrit( "/tmp/hbbuilder_debug_main.prg", cAllPrg )
+   if ! MemoWrit( "/tmp/hbbuilder_debug_main.prg", cAllPrg )
+      cLog += "WARNING: diagnostic copy not written: /tmp/hbbuilder_debug_main.prg" + Chr(10)
+   endif
 
    // Step 3: Compile Harbour code
    if ! lError
@@ -4774,7 +4776,12 @@ static function TBRun()
       IDE_SetMessages( cLog )
       if ! HB_PublishProjectApp( cBuildDir ); return .F.; endif
       cLastHash := cHash
-      MemoWrit( cBuildDir + "/.srchash", cHash )
+      if ! MemoWrit( cBuildDir + "/.srchash", cHash ) .or. ;
+         !( MemoRead( cBuildDir + "/.srchash" ) == cHash )
+         cLastHash := ""
+         cLog += "WARNING: build cache not written: " + cBuildDir + "/.srchash; next Run will rebuild." + Chr(10)
+      endif
+      IDE_SetMessages( cLog )
       GTK_ShellExec( cBuildDir + "/UserApp 2>/tmp/userapp_debug.log &" )
    endif
 

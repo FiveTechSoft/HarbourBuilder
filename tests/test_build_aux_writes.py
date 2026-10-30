@@ -6,7 +6,7 @@ a=s.index('   MemoWrit( "/tmp/hbbuilder_debug_main.prg"',s.index('static functio
 a=s.index('      cLastHash := cHash',s.index('      if ! HB_PublishProjectApp( cBuildDir )',s.index('   if lError\n      IDE_ShowBuildResult( "Build Failed"',s.index('static function TBRun'))));b=s.index('      GTK_ShellExec( cBuildDir + "/UserApp',a);cache=s[a:b]
 main='''function Main()
  local cLog:='', cAllPrg:='NEW', cHash:='CURRENT', cLastHash:='OLD', cBuildDir:='/tmp/build-aux-writes', nFail:=0
-'''+diag+cache+''' if Len(cLog)==0; nFail++; endif
+'''+diag+cache+''' if !('diagnostic copy not written' $ cLog).or.!('build cache not written' $ cLog); nFail++; endif
  if Len(cLastHash)!=0; nFail++; endif
  QOut(cLog)
  QOut('AUX WRITE failures='+hb_ntos(nFail)+' cache='+cLastHash)
