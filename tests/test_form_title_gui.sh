@@ -3,6 +3,15 @@
 set -u
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 source "$REPO/tests/harness_lib.sh"
+trap 'rt_cleanup' EXIT
+rt_find_designer(){
+ local w t
+ for w in $(rt_ide_windows);do
+  t=$(xdotool getwindowname "$w")
+  case "$t" in *Fixture*|*USER-EXTRA*) echo "$w";return 0;;esac
+ done
+ return 1
+}
 TITLE_CASE=${TITLE_CASE:-quote}
 export TITLE_CASE
 RUN=/tmp/form_title_gui_$TITLE_CASE
