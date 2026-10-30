@@ -26,7 +26,7 @@ for m in test_h8_select classes; do
   gcc -c -O2 -Wno-unused-value -I"$HB/include" "$m.c" -o "$m.o" || { echo "H8 FAIL: gcc $m"; exit 1; }
 done
 gcc -c -O2 -I"$HB/include" $(pkg-config --cflags gtk+-3.0) h8_helper.c -o h8_helper.o || { echo "H8 FAIL: gcc h8_helper"; exit 1; }
-gcc -o H8Test test_h8_select.o classes.o h8_helper.o "$REPO/source/gtk3_core.o" "$REPO/source/hbdb_real.o" \
+gcc -o H8Test test_h8_select.o classes.o h8_helper.o "$REPO/source/gtk3_core.o" "$REPO/source/hbdb_real.o" "$REPO/source/hbbuilder_common.o" \
   -L"$HB/lib/linux/gcc" -L"$HB/lib" -Wl,--start-group \
   -lhbvm -lhbrtl -lhbcommon -lhbcpage -lhblang -lhbmacro -lhbpp -lhbrdd -lhbcplr -lhbdebug \
   -lhbct -lhbextern -lrddntx -lrddnsx -lrddcdx -lrddfpt -lhbhsx -lhbsix -lhbusrrdd \

@@ -3,6 +3,7 @@
  * so it needs no gtk3_core internals. */
 #include <gtk/gtk.h>
 #include <hbapi.h>
+#include <hbapiitm.h>
 
 static GtkWidget * g_combo = NULL, * g_tree = NULL;
 
