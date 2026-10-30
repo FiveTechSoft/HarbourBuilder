@@ -898,7 +898,7 @@ static function RegenerateFormCode( cName, hForm )
    local aExL2, cTL, cTU, lInCF, aPreserved := {}, aWiringOld := {}, cKey
    local cCh, cLhs, aEmittedLines := {}, nE, cDeleted
    local aChunks := {}, cBody, cHdrChunk, lHdrOut, lWireOut, lSkipMenu, cMenuEnd
-   local cName2, nP1, nP2, lFound, nCk, lBodyStarted, cPreClass, nClsLine
+   local cName2, nP1, nP2, lFound, nCk, lBodyStarted, cPreClass, nClsLine, nClsFormIdx
    local aMenuNodes, nMI, cMNode, aMFields, nLv, cCap, cScut, cHndl
    local nPendingLevels, nPL, cInd, bIsPopup, aNextF
    local aMenuHandlers := {}, lHasHandlers
@@ -925,11 +925,29 @@ static function RegenerateFormCode( cName, hForm )
    endif
 
    // Read existing code to find declared event handlers
+   // R5: read the TARGET form's own editor tab, never the active form's.
+   // HB_CheckFormsSerializable calls this for every open form; using the
+   // active tab for a non-active form matched another form's class (false
+   // refusal) and before the refusal existed it merged that form's
+   // preface and METHODs into the wrong file. The per-form tab holds the
+   // live text, so a dirty editor is read fresh, not from a stale store.
+   // hForm == 0 means a NEW form: never inherit any tab's code.
    cExistingCode := ""
-   // hForm == 0 means a NEW form: never inherit the active tab's code,
-   // or custom lines from another form would contaminate the fresh one
-   if hForm != 0 .and. nActiveForm > 0 .and. nActiveForm <= Len( aForms )
-      cExistingCode := CodeEditorGetTabText( hCodeEditor, nActiveForm + 1 )
+   if hForm != 0
+      nClsFormIdx := 0
+      for j := 1 to Len( aForms )
+         if ValType( aForms[ j ][ 2 ] ) == "O" .and. ;
+            ValType( aForms[ j ][ 2 ]:hCpp ) == "N" .and. aForms[ j ][ 2 ]:hCpp == hForm
+            nClsFormIdx := j
+            exit
+         endif
+      next
+      if nClsFormIdx == 0
+         // no own tab to read: refuse rather than contaminate or drop
+         s_cUnidentClass := cName
+         return ""
+      endif
+      cExistingCode := CodeEditorGetTabText( hCodeEditor, nClsFormIdx + 1 )
    endif
 
    if hForm != 0
