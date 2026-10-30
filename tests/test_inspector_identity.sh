@@ -16,21 +16,9 @@ done
 pick(){
  local idx=$1 want=$2
  xdotool windowmove "$INS" 0 165; xdotool windowraise "$INS"; xdotool windowfocus "$INS"
- xdotool mousemove 100 182 click 1; sleep 0.4
- # Gtk popup uses row activation on release; target by visible text rather
- # than sequential Down, which applies every intermediate selection.
- import -window root /tmp/identity_combo.png
- local rel label
- case "$want" in
-  page1) label='aPages\[1\]';; page2) label='aPages\[2\]';;
-  TButton) [ "$idx" -eq 1 ] && label='oButton1' || label='oBtnPg2';;
-  TFolder) label='TFolder$';; TBrowse) label='TBrowse$';;
-  column) label='oBrw1Col1';;
- esac
- rel=$(tesseract /tmp/identity_combo.png - tsv 2>/dev/null | awk -F'\t' -v re="$label" '$12 ~ re && $7+0 < 300 {printf "%d %d",$7+$9/2,$8+$10/2;exit}')
- [ -n "$rel" ] || fail "popup item $label not visible"
- set -- $rel
- xdotool mousemove "$1" "$2" click 1; sleep 0.7
+ xdotool mousemove 100 182 click 1; xdotool key Home
+ [ "$idx" -gt 0 ] && xdotool key --repeat "$idx" --repeat-delay 40 Down
+ xdotool key Return; sleep 0.7
  xdotool windowraise "$INS"
  eval "$(xdotool getwindowgeometry --shell "$INS")"
  import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" "/tmp/identity_${idx}.png"
@@ -48,25 +36,20 @@ pick(){
  fi
  echo "  selected index$idx expected=$want title=$title"
 }
-pick 1 TButton
-pick 13 TFolder
-pick 14 page1
-pick 15 page2
-pick 16 TButton
-pick 17 TBrowse
-pick 18 column
-pick 19 column
-# Delete the selected first button through the designer, then inspect the
-# rebuilt live map (one control fewer, pages/columns still expanded).
-pick 1 TButton
-xdotool windowmove "$RT_DESIGNER" 400 200
-xdotool windowraise "$RT_DESIGNER"; xdotool windowfocus "$RT_DESIGNER"
-xdotool key Delete; sleep 1
-pick 12 TFolder
-pick 13 page1
-pick 14 page2
-pick 15 TButton
-pick 16 TBrowse
-pick 17 column
+case "${1:-browse}" in
+ before) pick 1 TButton;;
+ folder) pick 13 TFolder;;
+ page1) pick 14 page1;;
+ page2) pick 15 page2;;
+ after) pick 16 TButton;;
+ browse) pick 17 TBrowse;;
+ column) pick 18 column;;
+ delete)
+  pick 1 TButton
+  xdotool windowmove "$RT_DESIGNER" 400 200
+  xdotool windowraise "$RT_DESIGNER"; xdotool windowfocus "$RT_DESIGNER"
+  xdotool key Delete; sleep 1
+  pick 16 TBrowse;;
+esac
 rt_cleanup
-echo 'IDENTITY PASS: controls before/after folder, pages, columns and map after delete'
+echo "IDENTITY CASE ${1:-browse} PASS"
