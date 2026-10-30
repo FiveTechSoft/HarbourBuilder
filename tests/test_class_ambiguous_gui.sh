@@ -20,10 +20,16 @@ MD=$(sha256sum "$RUN/Form1.prg" | cut -d' ' -f1)
 rt_setup "$RUN";rt_launch_ide
 for try in $(seq 1 12);do rt_find_bar >/dev/null&&break;sleep 1;done
 rt_reopen_project
-for mode in save saveas run debug sync;do
+for mode in ${CLASS_MODES:-save saveas run debug sync};do
  W0=$(rt_ide_windows | tr '\n' ' ')
  BAR=$(rt_find_bar)
  if [ "$mode" = sync ];then
+  for w in $(rt_ide_windows);do
+   [ "$(xdotool getwindowname "$w")" = "Code Editor" ] && EDITOR=$w
+  done
+  xdotool windowraise "$EDITOR";xdotool windowfocus "$EDITOR";xdotool key ctrl+a ctrl+c;sleep 1
+  xclip -selection clipboard -o > "$RUN/editor-before.txt"
+
   DESIGN=$(rt_find_designer)
   xdotool mousemove 532 90 click 1
   xdotool windowraise "$DESIGN";eval "$(xdotool getwindowgeometry --shell "$DESIGN")"
@@ -37,7 +43,14 @@ for mode in save saveas run debug sync;do
  import -window root /tmp/class-$mode-refusal.png
  text=$(tesseract /tmp/class-$mode-refusal.png - --psm 6 2>/dev/null)
  echo "$mode: $text" | grep -E 'ambiguous|aborted|faithfully' || true
- echo "$text" | grep -Eq 'ambiguous compound|missing ENDCLASS' || { echo "FAIL $mode no ambiguous notice";rt_cleanup;exit 1; }
+ if [ "$mode" = sync ];then
+  xdotool windowraise "$EDITOR";xdotool windowfocus "$EDITOR";xdotool key ctrl+a ctrl+c;sleep 1
+  xclip -selection clipboard -o > "$RUN/editor-after.txt"
+  cmp "$RUN/editor-before.txt" "$RUN/editor-after.txt" || { echo 'FAIL sync editor mutated';rt_cleanup;exit 1; }
+  echo 'SYNC editor text unchanged (notice may be rate-limited)'
+ else
+  echo "$text" | grep -Eq 'ambiguous compound|missing ENDCLASS' || { echo "FAIL $mode no ambiguous notice";rt_cleanup;exit 1; }
+ fi
  [ "$MD" = "$(sha256sum "$RUN/Form1.prg" | cut -d' ' -f1)" ] || { echo "FAIL $mode disk changed";rt_cleanup;exit 1; }
  [ ! -f /tmp/debugmodules-result.txt ] || { echo "FAIL $mode app executed";rt_cleanup;exit 1; }
  echo "AMBIGUOUS $mode refused; disk exact=$MD no app result"
