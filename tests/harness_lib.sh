@@ -64,7 +64,7 @@ rt_find_designer() {
   local w t
   for w in $(rt_ide_windows); do
     t=$(xdotool getwindowname "$w" 2>/dev/null)
-    case "$t" in Form1*|*"Fixture Roundtrip"*|*"Fixture HandEdit"*) echo "$w"; return 0;; esac
+    case "$t" in Form1*|*"Fixture Roundtrip"*|*"Fixture HandEdit"*|*"Fixture PreClass"*) echo "$w"; return 0;; esac
   done
   return 1
 }
