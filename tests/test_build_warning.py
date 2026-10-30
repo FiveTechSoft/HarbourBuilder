@@ -5,7 +5,7 @@ import subprocess,shutil
 r=Path(__file__).resolve().parents[1];s=(r/'source/hbbuilder_linux.prg').read_text();p=Path('/tmp/build-warning-probe');shutil.rmtree(p,ignore_errors=True);p.mkdir()
 (p/'warning.c').write_text('#warning harmless compiler diagnostic\nint sample(void){return 0;}\n')
 (p/'error.c').write_text('this is invalid C;\n')
-a=s.index('      if ! HB_BuildExec( cCmd, @cOutput )',s.index('cLog += "[5] Compiling C sources..."'));b=s.index('      GTK_ShellExec( "rm -f "',a);branch=s[a:b]
+a=s.index('      if ! HB_BuildExec( cCmd, @cOutput )',s.index('cLog += "[5] Compiling C sources..."'));b=s.index('      if ! lError\n',a);branch=s[a:b]
 a=s.index('static function HB_BuildExec');b=s.index('static function TBRun',a);helper=s[a:b]
 main='''function Main()
  local nFail:=0

@@ -21,6 +21,7 @@ fi
 if [ "$WARN_ONLY" = 1 ]; then
  case "$*" in *main.c*) echo "warning: compiler-success-regression-probe" >&2;; esac
 fi
+echo "$*" >> /tmp/build_exit_gui/all-gcc
 exec /usr/bin/gcc "$@"
 EOF
 chmod +x "$RUN/tools/gcc"
@@ -52,6 +53,7 @@ if [ "$WARN_ONLY" = 1 ]; then
 fi
 OLD=$(sha256sum "$B/$OBJ" | cut -d' ' -f1)
 rm -f "$B/.srchash" /tmp/debugmodules-result.txt
+rm -f "$RUN/all-gcc"
 touch "$RUN/fail"
 press_run
 sleep 5
@@ -74,6 +76,12 @@ fi
 import -window root /tmp/build-exit-$MODE-refused.png
 tesseract /tmp/build-exit-$MODE-refused.png - --psm 6 2>/dev/null | tee "$RUN/ocr"
 grep -q 'exited 7' "$RUN/ocr" || { rt_cleanup; exit 1; }
+if [ "$MODE" = run ] && [ "$FAIL_STAGE" = compile ]; then
+ grep -q 'FAILED (main.c)' "$RUN/ocr" || { rt_cleanup; exit 1; }
+ if grep -q 'classes.c' "$RUN/all-gcc" 2>/dev/null; then echo 'FAIL classes compiled after main error'; rt_cleanup; exit 1; fi
+ if grep -q 'FAILED (classes.c)' "$RUN/ocr"; then echo 'FAIL wrong classes diagnostic'; rt_cleanup; exit 1; fi
+ echo 'GUI main.c failure stops subsequent compilation and names only main.c'
+fi
 echo "BUILD EXIT GUI refusal PASS mode=$MODE stale $OBJ=$OLD not executed"
 # IDE_ShowBuildResult only shows Messages; no modal to dismiss.
 rm "$RUN/fail"
