@@ -4768,14 +4768,14 @@ static function TBDebugRun( lRunToBreak )
    cMainPrg := CodeEditorGetTabText( hCodeEditor, 1 )
    cMainPrg := StrTran( cMainPrg, '#include "hbbuilder.ch"', "" )
    cAllPrg += cMainPrg + Chr(10)
-   nCurLine += NumLines( cMainPrg ) + 1
+   nCurLine := NumLines( cAllPrg )
 
    // Form files
    for i := 1 to Len( aForms )
-      AAdd( aDbgOffsets, { nCurLine, aForms[i][1] + ".prg", i + 1, 2 } )
+      AAdd( aDbgOffsets, { nCurLine, aForms[i][1] + ".prg", i + 1, 1 } )
       cSection := MemoRead( cBuildDir + "/" + aForms[i][1] + ".prg" )
       cAllPrg += cSection + Chr(10)
-      nCurLine += NumLines( cSection ) + 1
+      nCurLine := NumLines( cAllPrg )
    next
 
    // Module tabs follow all form tabs. Read the current editor text, not
@@ -4786,14 +4786,14 @@ static function TBDebugRun( lRunToBreak )
       cSection := StrTran( StrTran( cSection, '#include "classes.prg"', "" ), ;
          '#include "hbbuilder.ch"', "" )
       cAllPrg += cSection + Chr(10)
-      nCurLine += NumLines( cSection ) + 1
+      nCurLine := NumLines( cAllPrg )
    next
 
    // classes.prg (framework — not in editor)
    AAdd( aDbgOffsets, { nCurLine, "classes.prg", 0, 0 } )
    cSection := MemoRead( cBuildDir + "/classes.prg" )
    cAllPrg += cSection + Chr(10)
-   nCurLine += NumLines( cSection ) + 1
+   nCurLine := NumLines( cAllPrg )
 
    // dbgclient.prg (debug — not in editor)
    AAdd( aDbgOffsets, { nCurLine, "dbgclient.prg", 0, 0 } )

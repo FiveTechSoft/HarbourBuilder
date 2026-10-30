@@ -6,7 +6,7 @@ src='''static aForms := {{'Form1',nil,''}}
 static aModules := {{'HelperA','OLD',''},{'HelperB','OLD',''}}
 static aDbgOffsets := {}
 function Main()
- local nCurLine:=7, cAllPrg:='', cMainPrg, cSection, cBuildDir:='/tmp/h9-debug-modules', i, nFail:=0
+ local nCurLine:=7, cAllPrg:=Replicate(Chr(10),6), cMainPrg, cSection, cBuildDir:='/tmp/h9-debug-modules', i, nFail:=0
  MemoWrit(cBuildDir+'/Form1.prg','FORMMARK')
 '''+s[a:b]+''' if !('NEWMODULE' $ cAllPrg); nFail++; endif
  if 'OLD' $ cAllPrg; nFail++; endif
@@ -16,7 +16,7 @@ function Main()
  else
  if !(aDbgOffsets[3][2]=='HelperA.prg').or.aDbgOffsets[3][3]!=3.or.aDbgOffsets[3][4]!=1; nFail++; endif
  if !(aDbgOffsets[4][2]=='HelperB.prg').or.aDbgOffsets[4][3]!=4.or.aDbgOffsets[4][4]!=1; nFail++; endif
- if aDbgOffsets[4][1] != aDbgOffsets[3][1]+4; nFail++; endif
+ if aDbgOffsets[4][1] != aDbgOffsets[3][1]+3; nFail++; endif
  endif
  QOut('DEBUG MODULE failures='+hb_ntos(nFail))
  QOut(cAllPrg)
@@ -26,7 +26,11 @@ function CodeEditorGetTabText(h,t)
  HB_SYMBOL_UNUSED(h)
 return iif(t==1,'MAINMARK',iif(t==3,'#include "hbbuilder.ch"'+Chr(10)+'NEWMODULE'+Chr(10)+'return nil',iif(t==4,'#include "classes.prg"'+Chr(10)+'MODULE2','FORMMARK')))
 function NumLines(c)
-return Len(hb_ATokens(c,Chr(10)))
+ local n:=1,i
+ for i:=1 to Len(c)
+ if SubStr(c,i,1)==Chr(10); n++; endif
+ next
+return n
 '''
 src='static hCodeEditor := 0\n'+src
 p=pathlib.Path('/tmp/h9-debug-modules');p.mkdir(exist_ok=True);(p/'probe.prg').write_text(src)
