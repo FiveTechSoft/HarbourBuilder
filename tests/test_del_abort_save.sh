@@ -194,6 +194,8 @@ xdotool mousemove "$GX" "$GY" click 1; sleep 1
 xdotool mousemove 712 81 click 1; sleep 0.8
 DROPX=$((X+380)); DROPY=$((Y+300))
 xdotool mousemove "$DROPX" "$DROPY" click 1; sleep 2.5
+import -window root /tmp/das_after_tb_drop.png 2>/dev/null
+echo "after TB drop click, inspector: $(inspector_title)"
 D=$(wait_dialog) || fail "no abort dialog after dropping unserializable control"
 echo "abort-on-drop dialog up (expected)"; dismiss_dialog "$D"
 [ "$(md5sum "$RUN/Form1.prg" | cut -d' ' -f1)" = "$MD0" ] || fail "file changed after drop abort"
@@ -241,6 +243,10 @@ echo "explicit save refused; disk intact; button line still on disk"
 # start at DROPX+180 lands at X+560 - past the form's right edge (X+520),
 # on dead root space, and the band never begins (verified on screenshot).
 SX=$((DROPX+110)); SY=$((DROPY+55)); EX=$((DROPX-25)); EY=$((DROPY-25))
+import -window root /tmp/das_before_tb_band.png 2>/dev/null
+echo "band: $SX,$SY -> $EX,$EY (drop at $DROPX,$DROPY)"
+echo "--- designer child stacking (bottom-to-top) ---"
+xwininfo -id "$RT_DESIGNER" -children 2>/dev/null | tail -8
 xdotool mousemove "$SX" "$SY" mousedown 1; sleep 0.3
 xdotool mousemove $((SX-60)) $((SY-30)); sleep 0.2
 xdotool mousemove $((SX-110)) $((SY-55)); sleep 0.2

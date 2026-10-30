@@ -965,30 +965,44 @@ return nil
 static function OnDesignSelChange( hCtrl )
 
    local hTarget, i, nCount, nSel
+   static lInSelChange := .F.
 
-   hTarget := If( hCtrl == 0, oDesignForm:hCpp, hCtrl )
-   InspectorRefresh( hTarget )
+   // Re-entrant guard: selecting a combo row below fires the combo-changed
+   // handler, which selects in the designer and notifies sel-change again.
+   if lInSelChange; return nil; endif
+   lInSelChange := .T.
+   begin sequence
+      hTarget := If( hCtrl == 0, oDesignForm:hCpp, hCtrl )
+      InspectorRefresh( hTarget )
 
-   nSel := 0
-   if hCtrl != 0 .and. hCtrl != oDesignForm:hCpp
-      nCount := UI_GetChildCount( oDesignForm:hCpp )
-      for i := 1 to nCount
-         if UI_GetChild( oDesignForm:hCpp, i ) == hCtrl
-            nSel := i
-            exit
-         endif
-      next
-   endif
-   INS_ComboSelect( _InsGetData(), nSel )
+      nSel := 0
+      if hCtrl != 0 .and. hCtrl != oDesignForm:hCpp
+         nCount := UI_GetChildCount( oDesignForm:hCpp )
+         for i := 1 to nCount
+            if UI_GetChild( oDesignForm:hCpp, i ) == hCtrl
+               nSel := i
+               exit
+            endif
+         next
+      endif
+      // The combo must mirror the live child list: after a designer delete
+      // the stale map points INS_ComboSelect at the wrong row (or a freed
+      // control), and the combo-changed handler then re-selects and refreshes
+      // that wrong control in the designer.
+      InspectorPopulateCombo( oDesignForm:hCpp )
+      INS_ComboSelect( _InsGetData(), nSel )
 
-   // Two-way: sync designer changes to code.
-   // A just-dropped control is selected before OnComponentDrop names it;
-   // syncing now would emit a fallback ::octrlN line that later merges as
-   // "hand-written" and resurrects on delete. Skip sync for a nameless
-   // control - OnComponentDrop syncs right after naming it.
-   if ! ( hCtrl != 0 .and. hCtrl != oDesignForm:hCpp .and. Empty( UI_GetProp( hCtrl, "cName" ) ) )
-      SyncDesignerToCode()
-   endif
+      // Two-way: sync designer changes to code.
+      // A just-dropped control is selected before OnComponentDrop names it;
+      // syncing now would emit a fallback ::octrlN line that later merges as
+      // "hand-written" and resurrects on delete. Skip sync for a nameless
+      // control - OnComponentDrop syncs right after naming it.
+      if ! ( hCtrl != 0 .and. hCtrl != oDesignForm:hCpp .and. Empty( UI_GetProp( hCtrl, "cName" ) ) )
+         SyncDesignerToCode()
+      endif
+   always
+      lInSelChange := .F.
+   end sequence
 
 return nil
 
