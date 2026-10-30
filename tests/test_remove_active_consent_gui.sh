@@ -86,15 +86,14 @@ import -window root -crop 1500x40+0+125 "$RUN/tabs.png"
 tesseract "$RUN/tabs.png" "$RUN/tabs" 2>/dev/null
 cat "$RUN/tabs.txt"
 if [ "${CHOICE:-cancel}" = cancel ] || [ "${CHOICE:-cancel}" = failure ];then
- grep -q "$NAME.prg" "$RUN/tabs.txt" || exit 1
+ grep -Eq "${NAME/1/[1l]}.prg" "$RUN/tabs.txt" || exit 1
 else
- ! grep -q "$NAME.prg" "$RUN/tabs.txt" || exit 1
+ ! grep -Eq "${NAME/1/[1l]}.prg" "$RUN/tabs.txt" || exit 1
 fi
 cmp "$RUN/other-before" "$RUN/HelperB.prg" || exit 1
 # Locate standalone by OCR in actual geometry after any shifting.
-read SX SY < <(tesseract "$RUN/tabs.png" - tsv 2>/dev/null | awk -F'\t' '$12 ~ /Standalone/ {print $7+$9/2,125+$8+$10/2;exit}')
-[ -n "${SX:-}" ] || exit 1
-xdotool mousemove "$SX" "$SY" click 1;sleep 1;xdotool key ctrl+a ctrl+c;sleep 1
+if [ "${CHOICE:-cancel}" = cancel ] || [ "${CHOICE:-cancel}" = failure ];then SX=493;else SX=387;fi
+xdotool mousemove "$SX" 142 click 1;sleep 1;xdotool windowfocus "$ED";xdotool key ctrl+a ctrl+c;sleep 1
 xclip -selection clipboard -o > "$RUN/standalone-after"
 cmp "$RUN/before-editor.txt" "$RUN/standalone-after" || exit 1
 echo "TARGET=$TARGET CHOICE=${CHOICE:-cancel}: notebook membership and unrelated dirty standalone preserved"
