@@ -5975,6 +5975,31 @@ static function AddToProject()
    MenuAddModule()
 return nil
 
+static function HB_ConfirmRemoveProjectTab( nTab, nForm )
+   local cText := CodeEditorGetTabText( hCodeEditor, nTab )
+   local cPath, lDirty, n
+   if Empty( cCurrentFile )
+      lDirty := ! HB_TabTextIsKnown( nTab, cText )
+   else
+      cPath := HB_ProjectDirFromFile( cCurrentFile )
+      if nForm > 0
+         cPath += aForms[ nForm ][ 1 ] + ".prg"
+      else
+         cPath += aModules[ nTab - 1 - Len( aForms ) ][ 1 ] + ".prg"
+      endif
+      lDirty := ! HB_DiskBaseMatch( cPath, cText )
+   endif
+   // Loaded form normalization is clean only at its frozen baseline.
+   if nForm > 0 .and. Len( aForms[ nForm ] ) >= 6 .and. ;
+      aForms[ nForm ][ 6 ] != nil
+      if cText == aForms[ nForm ][ 6 ]; lDirty := .F.; endif
+   endif
+   if ! lDirty; return .T.; endif
+   n := UI_MsgYesNoCancel( "This project item has unsaved changes." + Chr(10) + ;
+      "Removing it would discard them. Save the project first?", "Unsaved changes" )
+   if n == 1; return TBSave(); endif
+return n == 2
+
 static function RemoveFromProject()
 
    local aNames := {}, i, nSel
@@ -6000,6 +6025,7 @@ static function RemoveFromProject()
          MsgInfo( "Cannot remove the last item from the project" )
          return nil
       endif
+      if ! HB_ConfirmRemoveProjectTab( nSel + 1, nSel ); return nil; endif
       HB_ClearParseBlock( aForms[nSel][2]:hCpp )
       aForms[nSel][2]:Destroy()
       CodeEditorRemoveTab( hCodeEditor, nSel + 1 )
@@ -6015,6 +6041,7 @@ static function RemoveFromProject()
    else
       // Removing a module
       i := nSel - Len( aForms )
+      if ! HB_ConfirmRemoveProjectTab( 1 + Len( aForms ) + i, 0 ); return nil; endif
       CodeEditorRemoveTab( hCodeEditor, 1 + Len(aForms) + i )
          HB_TabRemoveKnown( 1 + Len(aForms) + i )
       ADel( aModules, i )
