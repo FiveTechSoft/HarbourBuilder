@@ -52,13 +52,20 @@ dirty_the_buffer() {  # tail edit VERSION-A -> VERSION-Y, OCR-verified; sets CED
 }
 
 buffer_shows() {  # $1 = token; 0 if the code editor tail shows it
+  # on miss, dump what the tail actually shows for diagnosis
+
   local BAR
   BAR=$(rt_find_bar); rt_park_all_but "$CED" "$BAR"; sleep 0.5
   eval "$(xdotool getwindowgeometry --shell "$CED")"
   xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT/2)) click 1; sleep 0.4
   xdotool key ctrl+End; sleep 0.5
   import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/dl_check.png 2>/dev/null
-  tesseract /tmp/dl_check.png - 2>/dev/null | grep -q "$1"
+  if tesseract /tmp/dl_check.png - 2>/dev/null | grep -q "$1"; then
+    return 0
+  fi
+  echo "  [diag] editor tail OCR:"; tesseract /tmp/dl_check.png - 2>/dev/null | tail -4
+  cp /tmp/dl_check.png "/tmp/dl_check_fail_$$.png" 2>/dev/null
+  return 1
 }
 
 rt_is_unsaved_dialog() {  # $1 = window id; 0 if titled like the protection dialog
@@ -83,10 +90,24 @@ trigger_and_expect_dialog() {  # $1 = key sequence; echoes dialog window id
   echo "$DLG"
 }
 
-cancel_dialog() {  # Escape = cancel, no effects
-  [ -n "$1" ] || return 0
-  xdotool windowmap "$1" 2>/dev/null; xdotool windowactivate "$1" 2>/dev/null
+cancel_dialog() {  # $1 = dialog window id: Escape, verify closed, else click Cancel
+  local DLGID="$1" X Y WIDTH HEIGHT rel
+  [ -n "$DLGID" ] || return 0
+  xdotool windowmap "$DLGID" 2>/dev/null; xdotool windowactivate "$DLGID" 2>/dev/null
   sleep 0.5; xdotool key Escape; sleep 1
+  if xdotool search --pid "$RT_IDEPID" 2>/dev/null | grep -qx "$DLGID"; then
+    echo "  [diag] dialog survived Escape; clicking its Cancel button"
+    eval "$(xdotool getwindowgeometry --shell "$DLGID")"
+    import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/dl_dialog.png 2>/dev/null
+    rel=$(tesseract /tmp/dl_dialog.png - tsv 2>/dev/null | awk -F'\t' '$12 ~ /Cancel/ {print $7" "$8" "$9" "$10; exit}')
+    if [ -n "$rel" ]; then
+      set -- $rel
+      xdotool mousemove $((X + $1 + $3/2)) $((Y + $2 + $4/2)) click 1; sleep 1
+    else
+      echo "  [diag] Cancel button not found by OCR"; tesseract /tmp/dl_dialog.png - 2>/dev/null | head -3
+    fi
+    xdotool search --pid "$RT_IDEPID" 2>/dev/null | grep -qx "$DLGID"       && echo "  [diag] dialog STILL open after Cancel click"       || echo "  [diag] dialog closed via Cancel button"
+  fi
 }
 
 run_reopen() {
