@@ -9,7 +9,7 @@ mkdir -p "$RUN"
 cp "$REPO/tests/fixtures/debugmodules/"* "$RUN/"
 sed -i '1i #stdout Error-count=0 informational build note' "$RUN/Project1.prg"
 rt_provenance
-/tmp/harbour-review/bin/linux/gcc/harbour "$RUN/Project1.prg" -n -w -q -I"$REPO/include" -o"$RUN/control.c"
+/tmp/harbour-review/bin/linux/gcc/harbour "$RUN/Project1.prg" -n -w -q -I"$REPO/include" -I/tmp/harbour-review/include -o"$RUN/control.c"
 EC=$?;echo standalone_compiler_exit=$EC
 [ "$EC" = 0 ] || exit 1
 rt_setup "$RUN";rt_launch_ide
