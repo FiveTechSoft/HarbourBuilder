@@ -1546,6 +1546,17 @@ static function RegenerateFormCode( cName, hForm )
             endif
          endif
 
+         // Emit lReadOnly / lPassword for edits when set (.T. instead of
+         // default .F.); both drive entry behavior at runtime
+         if nType == CT_EDIT
+            if UI_GetProp( hCtrl, "lReadOnly" ) == .T.
+               cCreate += '   ::o' + cCtrlName + ':lReadOnly := .T.' + e
+            endif
+            if UI_GetProp( hCtrl, "lPassword" ) == .T.
+               cCreate += '   ::o' + cCtrlName + ':lPassword := .T.' + e
+            endif
+         endif
+
          // Emit oFont if non-default (skip Linux/Windows defaults)
          cVal := UI_GetProp( hCtrl, "oFont" )
          if ! Empty( cVal ) .and. cVal != "System,12" .and. ;
@@ -4125,6 +4136,10 @@ static function RestoreFormFromCode( hForm, cCode )
          UI_SetProp( hCtrl, "lDefault", AllTrim( cText ) == ".T." )
       elseif cVal == "lCancel"
          UI_SetProp( hCtrl, "lCancel", AllTrim( cText ) == ".T." )
+      elseif cVal == "lReadOnly"
+         UI_SetProp( hCtrl, "lReadOnly", AllTrim( cText ) == ".T." )
+      elseif cVal == "lPassword"
+         UI_SetProp( hCtrl, "lPassword", AllTrim( cText ) == ".T." )
       elseif cVal == "nAlign"
          UI_SetProp( hCtrl, "nAlign", Val( cText ) )
       elseif cVal == "oFont"

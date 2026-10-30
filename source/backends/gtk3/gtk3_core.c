@@ -3591,6 +3591,14 @@ HB_FUNC( UI_SETPROP )
       t->FInterval = hb_parni(3);
       if( t->base.FEnabled && t->FOnTimer ) HBTimer_Start( t );
    }
+   else if( strcasecmp(szProp,"lReadOnly")==0 && p->FControlType == CT_EDIT ) {
+      ((HBEdit *)p)->FReadOnly = hb_parl(3);
+      if( p->FWidget ) gtk_editable_set_editable( GTK_EDITABLE(p->FWidget), !((HBEdit *)p)->FReadOnly );
+   }
+   else if( strcasecmp(szProp,"lPassword")==0 && p->FControlType == CT_EDIT ) {
+      ((HBEdit *)p)->FPassword = hb_parl(3);
+      if( p->FWidget ) gtk_entry_set_visibility( GTK_ENTRY(p->FWidget), !((HBEdit *)p)->FPassword );
+   }
    else if( strcasecmp(szProp,"lDefault")==0 && p->FControlType == CT_BUTTON )
       ((HBButton *)p)->FDefault = hb_parl(3);
    else if( strcasecmp(szProp,"lCancel")==0 && p->FControlType == CT_BUTTON )
@@ -4127,6 +4135,10 @@ HB_FUNC( UI_GETPROP )
    else if( strcasecmp(szProp,"nTop")==0 )       hb_retni( p->FTop );
    else if( strcasecmp(szProp,"nWidth")==0 )     hb_retni( p->FWidth );
    else if( strcasecmp(szProp,"nHeight")==0 )    hb_retni( p->FHeight );
+   else if( strcasecmp(szProp,"lReadOnly")==0 && p->FControlType==CT_EDIT )
+      hb_retl( ((HBEdit *)p)->FReadOnly );
+   else if( strcasecmp(szProp,"lPassword")==0 && p->FControlType==CT_EDIT )
+      hb_retl( ((HBEdit *)p)->FPassword );
    else if( strcasecmp(szProp,"lDefault")==0 && p->FControlType==CT_BUTTON )
       hb_retl( ((HBButton *)p)->FDefault );
    else if( strcasecmp(szProp,"lCancel")==0 && p->FControlType==CT_BUTTON )
