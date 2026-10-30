@@ -3830,6 +3830,7 @@ static function TBSave()
 
    local cDir, cFile, cHbp, i, cExtern
    local lAllOk := .T., cFailed := "", cConflicts := ""
+   local lNewIdentity := .F.
 
    // freshness guard FIRST: saving over a file that changed on disk since
    // load/last save would silently overwrite external work. Refuse and
@@ -3877,6 +3878,7 @@ static function TBSave()
          endif
       endif
       cCurrentFile := cFile
+      lNewIdentity := .T.
    endif
 
    cDir := HB_ProjectDirFromFile( cCurrentFile )
@@ -3924,10 +3926,20 @@ static function TBSave()
       endif
    next
 
-   // a failed save must never be silent: name what did not get written
+   // a failed save must never be silent: name what did not get written.
+   // On a new-identity save (Save As, first save) also name the destination
+   // and warn that some files may already have been written there: the
+   // rollback restores identity and protection, it does not undo writes.
    if ! lAllOk
-      MsgInfo( "Save FAILED - these files were NOT written:" + Chr(10) + Chr(10) + ;
-         cFailed + Chr(10) + "Your changes remain unsaved.", "HbBuilder" )
+      if lNewIdentity
+         MsgInfo( "Save FAILED - these files were NOT written:" + Chr(10) + Chr(10) + ;
+            cFailed + Chr(10) + "Some files may already have been written to " + cDir + ;
+            " - they were not removed." + Chr(10) + ;
+            "Your changes remain unsaved.", "HbBuilder" )
+      else
+         MsgInfo( "Save FAILED - these files were NOT written:" + Chr(10) + Chr(10) + ;
+            cFailed + Chr(10) + "Your changes remain unsaved.", "HbBuilder" )
+      endif
    endif
 
    // the dirty flag clears only when every write really succeeded

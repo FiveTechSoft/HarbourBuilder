@@ -355,7 +355,7 @@ rt_cleanup
 click_menu_item() {  # $1 = OCR token; clicks that word in the open File menu
   import -window root -crop "240x340+0+0" /tmp/dl_menu.png 2>/dev/null
   local rel
-  rel=$(tesseract /tmp/dl_menu.png - tsv 2>/dev/null | awk -F'\t' -v w="$1" '$12 ~ ("^" w) {print $7" "$8" "$9" "$10; exit}')
+  rel=$(tesseract /tmp/dl_menu.png - tsv 2>/dev/null | awk -F'\t' -v w="$1" '$12 ~ ("^" w) && $8+0 > 30 {print $7" "$8" "$9" "$10; exit}')
   [ -n "$rel" ] || { echo "  [diag] menu token $1 not found:"; tesseract /tmp/dl_menu.png - 2>/dev/null | head -5; return 1; }
   set -- $rel
   xdotool mousemove $(($1 + $3/2)) $(($2 + $4/2)) click 1; sleep 1
@@ -445,6 +445,170 @@ else
   echo "  OCCUPIED: no overwrite confirmation for foreign files"; FAILN=$((FAILN+1))
 fi
 echo "occupied case done (FAILN=$FAILN)"
+rt_cleanup
+}
+
+run_saveclose() {
+launch_a
+dirty_the_buffer
+BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"; sleep 0.3
+xdotool mousemove 700 12 click 1; sleep 0.4
+xdotool key ctrl+s; sleep 3
+rt_map_all; sleep 0.5
+grep -q 'VERSION-Y' "$RUNA/Form1.prg"   && echo "  saveclose: ctrl+s wrote the edit to disk"   || { echo "  SAVECLOSE: edit not on disk after ctrl+s"; FAILN=$((FAILN+1)); }
+DLG=$(trigger_and_expect_dialog "ctrl+q")
+if [ -n "$DLG" ]; then
+  echo "  SAVECLOSE: FALSE PROMPT on Exit right after a successful save"
+  shot_dialog "$DLG" saveclose
+  cancel_dialog "$DLG"; FAILN=$((FAILN+1))
+else
+  sleep 2
+  kill -0 "$IDEPID" 2>/dev/null     && { echo "  SAVECLOSE: IDE did not exit after clean save"; FAILN=$((FAILN+1)); }     || echo "  saveclose: save then exit, no prompt, IDE closed"
+fi
+echo "saveclose case done (FAILN=$FAILN)"
+rt_cleanup
+}
+
+run_discard() {
+launch_a
+dirty_the_buffer
+DLG=$(trigger_and_expect_dialog "ctrl+q")
+if [ -z "$DLG" ]; then
+  echo "  DISCARD: no protection dialog on Exit"; FAILN=$((FAILN+1))
+else
+  shot_dialog "$DLG" discard
+  click_dialog_button "$DLG" '^Discard$'
+  sleep 3
+  kill -0 "$IDEPID" 2>/dev/null     && { echo "  DISCARD: IDE still running after Discard on Exit"; FAILN=$((FAILN+1)); }     || echo "  discard: Discard on Exit closed the IDE"
+  grep -q 'VERSION-A' "$RUNA/Form1.prg" && ! grep -q 'VERSION-Y' "$RUNA/Form1.prg"     && echo "  discard: disk content untouched (VERSION-A intact)"     || { echo "  DISCARD: disk changed despite Discard"; FAILN=$((FAILN+1)); }
+fi
+echo "discard case done (FAILN=$FAILN)"
+rt_cleanup
+}
+
+run_parkonly() {
+launch_a
+# programmatic designer move (no user edit): sync regenerates to the frozen
+# clean text, so Exit must not prompt
+local D DX DY
+D=$(rt_find_designer) || fail "designer window not found"
+eval "$(xdotool getwindowgeometry --shell "$D")"; DX=$X; DY=$Y
+xdotool windowmove "$D" 1300 850; sleep 1.5
+xdotool windowmove "$D" "$DX" "$DY"; sleep 1.5
+DLG=$(trigger_and_expect_dialog "ctrl+q")
+if [ -n "$DLG" ]; then
+  echo "  PARKONLY: FALSE PROMPT on Exit after programmatic move only"
+  shot_dialog "$DLG" parkonly
+  cancel_dialog "$DLG"; FAILN=$((FAILN+1))
+else
+  sleep 2
+  kill -0 "$IDEPID" 2>/dev/null     && { echo "  PARKONLY: IDE did not exit"; FAILN=$((FAILN+1)); }     || echo "  parkonly: programmatic move produced no false dirty"
+fi
+echo "parkonly case done (FAILN=$FAILN)"
+rt_cleanup
+}
+
+run_realmoved() {
+launch_a
+# real model change: drag a control in the designer
+local D X Y WIDTH HEIGHT rel
+D=$(rt_find_designer) || fail "designer window not found"
+BAR=$(rt_find_bar); rt_park_all_but "$D" "$BAR"; sleep 0.5
+eval "$(xdotool getwindowgeometry --shell "$D")"
+import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/dl_designer.png 2>/dev/null
+rel=$(tesseract /tmp/dl_designer.png - tsv 2>/dev/null | awk -F'\t' '$12 ~ /Button|Btn|Aceptar|OK/ {print $7" "$8" "$9" "$10; exit}')
+if [ -z "$rel" ]; then
+  echo "  [diag] no control found by OCR; dragging designer center instead"
+  rel="$((WIDTH/2)) $((HEIGHT/2)) 10 10"
+fi
+set -- $rel
+local CX=$((X + $1 + $3/2)) CY=$((Y + $2 + $4/2))
+xdotool mousemove "$CX" "$CY" mousedown 1 mousemove $((CX+40)) $((CY+40)) sleep 0.3 mousemove $((CX+45)) $((CY+45)) mouseup 1
+sleep 1.5
+rt_map_all; sleep 0.5
+DLG=$(trigger_and_expect_dialog "ctrl+q")
+if [ -n "$DLG" ]; then
+  echo "  realmoved: real designer change flagged dirty (dialog on Exit)"
+  shot_dialog "$DLG" realmoved
+  cancel_dialog "$DLG"
+  kill -0 "$IDEPID" 2>/dev/null     || { echo "  REALMOVED: IDE closed despite Cancel"; FAILN=$((FAILN+1)); }
+else
+  sleep 1
+  kill -0 "$IDEPID" 2>/dev/null     && echo "  REALMOVED: no dialog and IDE alive (unexpected)"     || echo "  REALMOVED: real designer change did NOT set dirty (silent loss risk)"
+  FAILN=$((FAILN+1))
+fi
+echo "realmoved case done (FAILN=$FAILN)"
+rt_cleanup
+}
+
+run_closefile() {
+launch_a
+echo 'line one' > /tmp/rt_openme.txt
+# File > Open File...
+BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"; sleep 0.3
+xdotool mousemove 20 12 click 1; sleep 0.8
+click_menu_item 'File'
+sleep 1
+xdotool key ctrl+l; sleep 0.5
+xdotool type --delay 15 '/tmp/rt_openme.txt'; sleep 0.5
+xdotool key Return; sleep 2
+rt_map_all; sleep 0.5
+# edit the opened file tab
+CED=""
+for w in $(rt_ide_windows); do
+  [ "$(xdotool getwindowname "$w" 2>/dev/null)" = "Code Editor" ] && { CED=$w; break; }
+done
+[ -n "$CED" ] || fail "Code Editor window not found"
+BAR=$(rt_find_bar); rt_park_all_but "$CED" "$BAR"; sleep 0.5
+eval "$(xdotool getwindowgeometry --shell "$CED")"
+xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT/2)) click 1; sleep 0.4
+xdotool key ctrl+End; sleep 0.3
+xdotool type --delay 15 '// edited'; sleep 1
+rt_map_all; sleep 0.3
+# File > Close File -> expect Save/Discard/Cancel
+BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"; sleep 0.3
+local BEFORE w i
+BEFORE=$(rt_ide_windows | sort -n | tr '\n' ' ')
+xdotool mousemove 20 12 click 1; sleep 0.8
+click_menu_item 'Close'
+DLG=""
+for i in $(seq 1 8); do
+  for w in $(rt_ide_windows); do
+    case " $BEFORE " in *" $w "*) ;; *) rt_is_unsaved_dialog "$w" && DLG=$w;; esac
+  done
+  [ -n "$DLG" ] && break
+  sleep 2
+done
+rt_map_all; sleep 0.5
+if [ -z "$DLG" ]; then
+  echo "  CLOSEFILE: no guard closing a modified open file"; FAILN=$((FAILN+1))
+else
+  echo "  closefile: guard appeared for modified open file"
+  shot_dialog "$DLG" closefile
+  cancel_dialog "$DLG"
+  # Cancel must keep the file open: closing again prompts again
+  BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"; sleep 0.3
+  BEFORE=$(rt_ide_windows | sort -n | tr '\n' ' ')
+  xdotool mousemove 20 12 click 1; sleep 0.8
+  click_menu_item 'Close'
+  DLG=""
+  for i in $(seq 1 8); do
+    for w in $(rt_ide_windows); do
+      case " $BEFORE " in *" $w "*) ;; *) rt_is_unsaved_dialog "$w" && DLG=$w;; esac
+    done
+    [ -n "$DLG" ] && break
+    sleep 2
+  done
+  rt_map_all; sleep 0.5
+  if [ -n "$DLG" ]; then
+    echo "  closefile: Cancel kept the file open (guard prompts again)"
+    click_dialog_button "$DLG" '^Discard$'; sleep 1
+    grep -q 'edited' /tmp/rt_openme.txt       && { echo "  CLOSEFILE: Discard wrote to disk?!"; FAILN=$((FAILN+1)); }       || echo "  closefile: Discard closed without writing"
+  else
+    echo "  CLOSEFILE: file gone after Cancel (Cancel lost the tab)"; FAILN=$((FAILN+1))
+  fi
+fi
+echo "closefile case done (FAILN=$FAILN)"
 rt_cleanup
 }
 
