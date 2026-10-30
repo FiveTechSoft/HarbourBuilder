@@ -186,11 +186,12 @@ read GX GY <<< $(rt_ocr_bar_token '^GTK3' 5)   # OCR reads the tab as 'GTK3_-' a
 [ -n "${GX:-}" ] || fail "GTK3 palette tab not found"
 xdotool mousemove "$GX" "$GY" click 1; sleep 1
 # The GTK3 palette is icon-only (no text labels - verified by pixel
-# inspection of the strip), so OCR cannot locate "TB". Fixed geometry:
-# component icons start at x~420 with ~78px pitch in the 1600x1000 harness
-# display; TrackBar is the 6th icon -> (805, 81). If the click misses, no
-# TrackBar drops and the required abort dialog never appears: no false green.
-xdotool mousemove 805 81 click 1; sleep 0.8
+# inspection of the strip), so OCR cannot locate "TB". Fixed geometry
+# (measured on the strip pixels): 60px pitch starting at x=412 -> Fol 412,
+# TV 472, LV 532, PB 592, RE 652, TB 712, UD 772, DTP 832, MC 892.
+# TrackBar = (712, 81). If the click misses, the mandatory abort dialog
+# names the control type that actually dropped: no false green.
+xdotool mousemove 712 81 click 1; sleep 0.8
 DROPX=$((X+380)); DROPY=$((Y+300))
 xdotool mousemove "$DROPX" "$DROPY" click 1; sleep 2.5
 D=$(wait_dialog) || fail "no abort dialog after dropping unserializable control"
