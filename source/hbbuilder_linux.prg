@@ -4632,6 +4632,10 @@ static function HB_PublishProjectApp( cBuildDir )
 return .T.
 
 // Build success depends on process status, not localized compiler text.
+// One POSIX shell argument. Keep command syntax outside this helper.
+static function HB_ShellArg( cText )
+return "'" + StrTran( cText, "'", "'" + Chr(34) + "'" + Chr(34) + "'" ) + "'"
+
 static function HB_BuildExec( cCommand, cOutput )
    local nExit := -1
    cOutput := GTK_ShellExec( cCommand, @nExit )
@@ -4783,8 +4787,8 @@ static function TBRun()
    if ! lError
       GTK_ProgressStep( "Compiling Harbour code..." )
       cLog += "[3] Compiling main.prg..." + Chr(10)
-      cCmd := cHbBin + "/harbour " + cBuildDir + "/main.prg -n -w -q" + ;
-              " -I" + cHbInc + " -I" + cBuildDir + ;
+      cCmd := HB_ShellArg( cHbBin + "/harbour" ) + " " + cBuildDir + "/main.prg -n -w -q" + ;
+              " -I" + HB_ShellArg( cHbInc ) + " -I" + cBuildDir + ;
               " -o" + cBuildDir + "/main.c 2>&1"
       if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
       if lError .or. "Error" $ cOutput
@@ -4799,8 +4803,8 @@ static function TBRun()
    if ! lError
       GTK_ProgressStep( "Compiling framework..." )
       cLog += "[4] Compiling framework..." + Chr(10)
-      cCmd := cHbBin + "/harbour " + cBuildDir + "/classes.prg -n -w -q" + ;
-              " -I" + cHbInc + " -I" + cBuildDir + ;
+      cCmd := HB_ShellArg( cHbBin + "/harbour" ) + " " + cBuildDir + "/classes.prg -n -w -q" + ;
+              " -I" + HB_ShellArg( cHbInc ) + " -I" + cBuildDir + ;
               " -o" + cBuildDir + "/classes.c 2>&1"
       if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
       if lError .or. "Error" $ cOutput
@@ -4808,8 +4812,8 @@ static function TBRun()
          lError := .T.
       endif
       if ! lError .and. File( cBuildDir + "/hix_runtime.prg" )
-         cCmd := cHbBin + "/harbour " + cBuildDir + "/hix_runtime.prg -n -w -q" + ;
-                 " -I" + cHbInc + " -I" + cBuildDir + ;
+         cCmd := HB_ShellArg( cHbBin + "/harbour" ) + " " + cBuildDir + "/hix_runtime.prg -n -w -q" + ;
+                 " -I" + HB_ShellArg( cHbInc ) + " -I" + cBuildDir + ;
                  " -o" + cBuildDir + "/hix_runtime.c 2>&1"
          if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
          if lError .or. "Error" $ cOutput
@@ -4818,8 +4822,8 @@ static function TBRun()
          endif
       endif
       if ! lError .and. File( cBuildDir + "/hix_template.prg" )
-         cCmd := cHbBin + "/harbour " + cBuildDir + "/hix_template.prg -n -w -q" + ;
-                 " -I" + cHbInc + " -I" + cBuildDir + ;
+         cCmd := HB_ShellArg( cHbBin + "/harbour" ) + " " + cBuildDir + "/hix_template.prg -n -w -q" + ;
+                 " -I" + HB_ShellArg( cHbInc ) + " -I" + cBuildDir + ;
                  " -o" + cBuildDir + "/hix_template.c 2>&1"
          if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
          if lError .or. "Error" $ cOutput
@@ -4834,7 +4838,7 @@ static function TBRun()
    if ! lError
       GTK_ProgressStep( "Compiling C sources..." )
       cLog += "[5] Compiling C sources..." + Chr(10)
-      cCmd := "gcc -c -O2 -Wno-unused-value -I" + cHbInc + ;
+      cCmd := "gcc -c -O2 -Wno-unused-value -I" + HB_ShellArg( cHbInc ) + ;
               " " + cBuildDir + "/main.c -o " + cBuildDir + "/main.o 2>&1"
       if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
       if lError
@@ -4845,7 +4849,7 @@ static function TBRun()
       endif
       if ! lError
          GTK_ShellExec( "rm -f " + cBuildDir + "/classes.o" )
-         cCmd := "gcc -c -O2 -Wno-unused-value -I" + cHbInc + ;
+         cCmd := "gcc -c -O2 -Wno-unused-value -I" + HB_ShellArg( cHbInc ) + ;
                  " " + cBuildDir + "/classes.c -o " + cBuildDir + "/classes.o 2>&1"
          if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
          if lError .or. ! File( cBuildDir + "/classes.o" )
@@ -4857,7 +4861,7 @@ static function TBRun()
       endif
       if ! lError .and. File( cBuildDir + "/hix_runtime.c" )
          GTK_ShellExec( "rm -f " + cBuildDir + "/hix_runtime.o" )
-         cCmd := "gcc -c -O2 -Wno-unused-value -I" + cHbInc + ;
+         cCmd := "gcc -c -O2 -Wno-unused-value -I" + HB_ShellArg( cHbInc ) + ;
                  " " + cBuildDir + "/hix_runtime.c -o " + cBuildDir + "/hix_runtime.o 2>&1"
          if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
          if lError .or. ! File( cBuildDir + "/hix_runtime.o" )
@@ -4869,7 +4873,7 @@ static function TBRun()
       endif
       if ! lError .and. File( cBuildDir + "/hix_template.c" )
          GTK_ShellExec( "rm -f " + cBuildDir + "/hix_template.o" )
-         cCmd := "gcc -c -O2 -Wno-unused-value -I" + cHbInc + ;
+         cCmd := "gcc -c -O2 -Wno-unused-value -I" + HB_ShellArg( cHbInc ) + ;
                  " " + cBuildDir + "/hix_template.c -o " + cBuildDir + "/hix_template.o 2>&1"
          if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
          if lError .or. ! File( cBuildDir + "/hix_template.o" )
@@ -4887,7 +4891,7 @@ static function TBRun()
       GTK_ProgressStep( "Compiling GTK3 backend..." )
       cLog += "[6] Compiling GTK3 backend..." + Chr(10)
       GTK_ShellExec( "rm -f " + cBuildDir + "/gtk3_core.o" )
-      cCmd := "gcc -c -O2 -DHIX_PRGRUNTIME -I" + cHbInc + ;
+      cCmd := "gcc -c -O2 -DHIX_PRGRUNTIME -I" + HB_ShellArg( cHbInc ) + ;
               " -I" + cProjDir + "/include" + ;
               " $(pkg-config --cflags gtk+-3.0)" + ;
               " $(pkg-config --exists webkit2gtk-4.1 2>/dev/null && echo '-DHAVE_WEBKIT2GTK '$(pkg-config --cflags webkit2gtk-4.1) || " + ;
@@ -4906,7 +4910,7 @@ static function TBRun()
                      cBuildDir + "/hbpgsql.o " + cBuildDir + "/hbdb_stub.o" )
       if ! lError
          GTK_ShellExec( "rm -f " + cBuildDir + "/hbdb_real.o" )
-         cCmd := "gcc -c -O2 -I" + cHbInc + ;
+         cCmd := "gcc -c -O2 -I" + HB_ShellArg( cHbInc ) + ;
                  " " + cProjDir + "/source/backends/gtk3/gtk3_db_real.c" + ;
                  " -o " + cBuildDir + "/hbdb_real.o 2>&1"
          if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
@@ -4929,7 +4933,7 @@ static function TBRun()
               If( File( cBuildDir + "/hix_template.o" ), " " + cBuildDir + "/hix_template.o", "" ) + ;
               " " + cBuildDir + "/gtk3_core.o" + ;
               If( File( cBuildDir + "/hbdb_real.o" ), " " + cBuildDir + "/hbdb_real.o", "" ) + ;
-              " -L" + cHbLib + ;
+              " -L" + HB_ShellArg( cHbLib ) + ;
               " -Wl,--start-group" + ;
               " -lhbvm -lhbrtl -lhbcommon -lhbcpage -lhblang" + ;
               " -lhbmacro -lhbpp -lhbrdd -lhbcplr -lhbdebug" + ;
