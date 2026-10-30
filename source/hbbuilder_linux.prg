@@ -37,6 +37,9 @@ static aOpenFiles    // Array of open files (not in project): { { cName, cCode, 
 static oTB2          // Debug toolbar (for highlighting Debug button)
 static aDbgOffsets   // line offset tracking for debug_main.prg sections
 static lSyncingFromCode := .f.  // Guard: prevents re-entrant loop when syncing code→form
+static lProjectDirty   := .f.  // unsaved project/form/module edits exist
+static lOpenFilesDirty := .f.  // unsaved edits in File>Open (non-project) tabs
+static s_aTabKnown     := {}   // last loaded/saved/programmatic text per editor tab
 static s_aUnserializable := {}  // Visual controls the generator cannot serialize; non-empty aborts a destructive save
 static s_cLastRefusal := ""  // rate-limit: do not re-show the same refusal on every auto-sync
 static s_cUnidentClass := ""  // form whose class declaration could not be identified (refusal signal)
@@ -119,7 +122,7 @@ function Main()
    MENUITEM "Save"       OF oFile ACTION TBSave()                   ACCEL "s"
    MENUITEM "Save As..." OF oFile ACTION TBSaveAs()
    MENUSEPARATOR OF oFile
-   MENUITEM "Exit"       OF oFile ACTION oIDE:Close()               ACCEL "q"
+   MENUITEM "Exit"       OF oFile ACTION TBExit()                   ACCEL "q"
 
    DEFINE POPUP oEdit PROMPT "Edit" OF oIDE
    MENUITEM "Undo"  OF oEdit ACTION CodeEditorUndo( hCodeEditor )  ACCEL "z"
@@ -289,7 +292,7 @@ function Main()
    BUTTON "Step"  OF oTB2 TOOLTIP "Step Into (F7)"         ACTION DebugStepInto()
    BUTTON "Over"  OF oTB2 TOOLTIP "Step Over (F8)"         ACTION DebugStepOver()
    BUTTON "Stop"  OF oTB2 TOOLTIP "Stop Debugging"         ACTION IDE_DebugStop()
-   BUTTON "Exit"  OF oTB2 TOOLTIP "Exit IDE"               ACTION oIDE:Close()
+   BUTTON "Exit"  OF oTB2 TOOLTIP "Exit IDE"               ACTION TBExit()
 
    UI_ToolBarLoadImages( oTB2:hCpp, "../resources/toolbar_debug.bmp" )
 
@@ -315,10 +318,10 @@ function Main()
    oDesignForm:Show()
 
    // Set up editor tabs: Project1.prg (tab 1) + Form1.prg (tab 2)
-   CodeEditorSetTabText( hCodeEditor, 1, GenerateProjectCode() )
+   HB_SetTabText( 1, GenerateProjectCode() )
    CodeEditorAddTab( hCodeEditor, "Form1.prg" )
    SyncDesignerToCode()
-   CodeEditorSetTabText( hCodeEditor, 2, aForms[1][3] )
+   HB_SetTabText( 2, aForms[1][3] )
    CodeEditorSelectTab( hCodeEditor, 2 )
 
    CodeEditorOnTabChange( hCodeEditor, { |hEd, nTab| OnEditorTabChange( hEd, nTab ) } )
@@ -342,6 +345,13 @@ function Main()
 
    oIDE:OnClose := { || DestroyAllForms(), InspectorClose(), ;
                        CodeEditorDestroy( hCodeEditor ) }
+
+   // window-manager close (X): veto while unsaved work would be lost
+   oIDE:OnCloseQuery := { || HB_ConfirmDiscardChanges( "Closing HbBuilder" ) }
+
+   // startup sync marked the fresh project dirty; it is not user work
+   lProjectDirty := .f.
+   lOpenFilesDirty := .f.
 
    oIDE:Activate()
 
@@ -1797,7 +1807,7 @@ function INS_DeleteHandler( cHandler )
    cNew := Left( cCode, nStart - 1 ) + SubStr( cCode, nEnd )
 
    // Update editor and form data
-   CodeEditorSetTabText( hCodeEditor, nActiveForm + 1, cNew )
+   HB_SetTabText( nActiveForm + 1, cNew )
    aForms[ nActiveForm ][ 3 ] := cNew
 
    // Re-sync to remove event binding
@@ -1822,6 +1832,104 @@ function INS_GetAllCode()
 return cAll
 
 // Determine what kind of tab is at position nTab
+// === Unsaved-work tracking helpers ===
+
+static function HB_TabsKnownReset()
+   s_aTabKnown := {}
+return nil
+
+static function HB_TabMarkKnown( nTab, cText )
+   do while Len( s_aTabKnown ) < nTab
+      AAdd( s_aTabKnown, nil )
+   enddo
+   s_aTabKnown[ nTab ] := cText
+return nil
+
+static function HB_TabTextIsKnown( nTab, cText )
+   if nTab >= 1 .and. nTab <= Len( s_aTabKnown )
+      return s_aTabKnown[ nTab ] != nil .and. s_aTabKnown[ nTab ] == cText
+   endif
+return .F.
+
+static function HB_TabRemoveKnown( nTab )
+   if nTab >= 1 .and. nTab <= Len( s_aTabKnown )
+      ADel( s_aTabKnown, nTab )
+      ASize( s_aTabKnown, Len( s_aTabKnown ) - 1 )
+   endif
+return nil
+
+// Programmatic tab text writes (load, new, sync, generate): mark the new
+// text as known so the debounced change callback does not flag it dirty.
+static function HB_SetTabText( nTab, cText )
+   CodeEditorSetTabText( hCodeEditor, nTab, cText )
+   HB_TabMarkKnown( nTab, cText )
+return nil
+
+// .T. when every modified File>Open tab is written back to its path
+static function HB_SaveOpenFiles()
+
+   local i, nTab, cText, lOk := .T.
+
+   for i := 1 to Len( aOpenFiles )
+      nTab := 1 + Len( aForms ) + Len( aModules ) + i
+      cText := CodeEditorGetTabText( hCodeEditor, nTab )
+      if !( cText == aOpenFiles[ i ][ 2 ] )
+         if MemoWrit( aOpenFiles[ i ][ 3 ], cText )
+            aOpenFiles[ i ][ 2 ] := cText
+            HB_TabMarkKnown( nTab, cText )
+         else
+            lOk := .F.
+         endif
+      endif
+   next
+
+   if lOk
+      lOpenFilesDirty := .f.
+   endif
+
+return lOk
+
+static function HB_RecomputeOpenFilesDirty()
+
+   local i, nTab
+
+   lOpenFilesDirty := .f.
+   for i := 1 to Len( aOpenFiles )
+      nTab := 1 + Len( aForms ) + Len( aModules ) + i
+      if !( CodeEditorGetTabText( hCodeEditor, nTab ) == aOpenFiles[ i ][ 2 ] )
+         lOpenFilesDirty := .t.
+         exit
+      endif
+   next
+
+return nil
+
+// Unsaved-work guard for destructive paths (New/Open/Reopen/Exit/close).
+// Returns .T. only when the action may proceed: nothing unsaved, the user
+// chose Save and every write succeeded, or the user explicitly chose
+// Discard. Cancel (or a failed/refused save) returns .F. with no effects.
+static function HB_ConfirmDiscardChanges( cAction )
+
+   local n
+
+   if ! lProjectDirty .and. ! lOpenFilesDirty
+      return .T.
+   endif
+
+   n := UI_MsgYesNoCancel( "There are unsaved changes." + Chr(10) + ;
+      cAction + " would discard them.", "Unsaved changes" )
+
+   if n == 1
+      // Save, then continue only if every write really succeeded
+      TBSave()
+      HB_SaveOpenFiles()
+      return ( ! lProjectDirty .and. ! lOpenFilesDirty )
+   elseif n == 2
+      return .T.
+   endif
+
+return .F.
+
 static function TabInfo( nTab )
 return HB_ProjectTabInfo( nTab, Len( aForms ), Len( aModules ) )
 
@@ -1964,6 +2072,11 @@ static function SyncDesignerToCode( lFromSave )
 
    // If already syncing from code→form, don't sync back form→code
    if lSyncingFromCode; return nil; endif
+
+   // A designer-driven sync outside save/run means the user edited the form
+   if ! lFromSave
+      lProjectDirty := .t.
+   endif
 
    lSyncingFromCode := .t.
 
@@ -2115,7 +2228,7 @@ static function SyncDesignerToCode( lFromSave )
    UI_PopDeletedCtrls( oDesignForm:hCpp )
 
    aForms[ nActiveForm ][ 3 ] := cNewCode
-   CodeEditorSetTabText( hCodeEditor, nActiveForm + 1, cNewCode )
+   HB_SetTabText( nActiveForm + 1, cNewCode )
 
    lSyncingFromCode := .f.
 
@@ -2257,6 +2370,18 @@ static function OnEditorTextChange( hEd, nTab )
       return nil
    endif
 
+   // Unsaved-work tracking outside form tabs (forms compare against their
+   // stored code below): project tab, module tabs, File>Open tabs.
+   if nTab <= 1 .or. nTab > 1 + Len( aForms )
+      if ! HB_TabTextIsKnown( nTab, CodeEditorGetTabText( hCodeEditor, nTab ) )
+         if nTab > 1 + Len( aForms ) + Len( aModules )
+            lOpenFilesDirty := .t.
+         else
+            lProjectDirty := .t.
+         endif
+      endif
+   endif
+
    // Only sync form tabs (tab 1 = project, tab 2+ = forms)
    if nTab <= 1
       return nil
@@ -2279,6 +2404,8 @@ static function OnEditorTextChange( hEd, nTab )
    if cCode == aForms[ nFormIdx ][ 3 ]
       return nil
    endif
+
+   lProjectDirty := .t.
 
    hForm := aForms[ nFormIdx ][ 2 ]:hCpp
    if hForm == 0
@@ -2370,10 +2497,10 @@ static function MenuNewForm()
    WireDesignForm()
 
    CodeEditorAddTab( hCodeEditor, aForms[ nActiveForm ][ 1 ] + ".prg" )
-   CodeEditorSetTabText( hCodeEditor, nActiveForm + 1, aForms[ nActiveForm ][ 3 ] )
+   HB_SetTabText( nActiveForm + 1, aForms[ nActiveForm ][ 3 ] )
    CodeEditorSelectTab( hCodeEditor, nActiveForm + 1 )
 
-   CodeEditorSetTabText( hCodeEditor, 1, GenerateProjectCode() )
+   HB_SetTabText( 1, GenerateProjectCode() )
 
    InspectorRefresh( oDesignForm:hCpp )
    InspectorPopulateCombo( oDesignForm:hCpp )
@@ -2431,7 +2558,7 @@ static function MenuAddModule()
 
    nTabPos := 1 + Len( aForms ) + Len( aModules )
    CodeEditorAddTab( hCodeEditor, cName + ".prg" )
-   CodeEditorSetTabText( hCodeEditor, nTabPos, cCode )
+   HB_SetTabText( nTabPos, cCode )
    CodeEditorSelectTab( hCodeEditor, nTabPos )
 
 return nil
@@ -2467,7 +2594,7 @@ static function MenuOpenFile()
 
    nTabPos := 1 + Len( aForms ) + Len( aModules ) + Len( aOpenFiles )
    CodeEditorAddTab( hCodeEditor, cName + ".prg" )
-   CodeEditorSetTabText( hCodeEditor, nTabPos, cCode )
+   HB_SetTabText( nTabPos, cCode )
    CodeEditorSelectTab( hCodeEditor, nTabPos )
 
 return nil
@@ -2475,7 +2602,7 @@ return nil
 // Close the current open-file tab (only for open files, not forms/modules)
 static function MenuCloseFile()
 
-   local nTab, aInfo, nIdx
+   local nTab, aInfo, nIdx, cText, n
 
    nTab := CodeEditorGetActiveTab( hCodeEditor )
    aInfo := TabInfo( nTab )
@@ -2490,10 +2617,31 @@ static function MenuCloseFile()
       return nil
    endif
 
+   // never discard unsaved edits implicitly: Save / Discard / Cancel
+   cText := CodeEditorGetTabText( hCodeEditor, nTab )
+   if !( cText == aOpenFiles[ nIdx ][ 2 ] )
+      n := UI_MsgYesNoCancel( aOpenFiles[ nIdx ][ 1 ] + " has unsaved changes." + ;
+         Chr(10) + "Closing it would discard them.", "Unsaved changes" )
+      if n == 1
+         if MemoWrit( aOpenFiles[ nIdx ][ 3 ], cText )
+            aOpenFiles[ nIdx ][ 2 ] := cText
+            HB_TabMarkKnown( nTab, cText )
+         else
+            MsgInfo( "Could not write " + aOpenFiles[ nIdx ][ 3 ], "HbBuilder" )
+            return nil
+         endif
+      elseif n != 2
+         return nil
+      endif
+   endif
+
    CodeEditorRemoveTab( hCodeEditor, nTab )
+   HB_TabRemoveKnown( nTab )
 
    ADel( aOpenFiles, nIdx )
    ASize( aOpenFiles, Len(aOpenFiles) - 1 )
+
+   HB_RecomputeOpenFilesDirty()
 
 return nil
 
@@ -2509,10 +2657,20 @@ return nil
 
 // === Toolbar actions ===
 
+static function TBExit()
+   if HB_ConfirmDiscardChanges( "Exiting HbBuilder" )
+      oIDE:Close()
+   endif
+return nil
+
 static function TBNew()
 
    local i, nFormX, nFormY, nInsW, nEditorX, nEditorW, nEditorH
    local nInsTop, nEditorTop
+
+   if ! HB_ConfirmDiscardChanges( "Creating a new application" )
+      return nil
+   endif
 
    for i := 1 to Len( aForms )
       aForms[i][2]:Destroy()
@@ -2539,12 +2697,15 @@ static function TBNew()
    WireDesignForm()
 
    CodeEditorClearTabs( hCodeEditor )
-   CodeEditorSetTabText( hCodeEditor, 1, GenerateProjectCode() )
+   HB_TabsKnownReset()
+   HB_SetTabText( 1, GenerateProjectCode() )
    CodeEditorAddTab( hCodeEditor, "Form1.prg" )
-   CodeEditorSetTabText( hCodeEditor, 2, aForms[1][3] )
+   HB_SetTabText( 2, aForms[1][3] )
    CodeEditorSelectTab( hCodeEditor, 2 )
    cCurrentFile := ""
    HB_DiskBaseReset()
+   lProjectDirty := .f.
+   lOpenFilesDirty := .f.
 
    InspectorRefresh( oDesignForm:hCpp )
    InspectorPopulateCombo( oDesignForm:hCpp )
@@ -3356,11 +3517,16 @@ static function TBOpen()
    OpenProjectFile( cFile )
 return nil
 
-static function OpenProjectFile( cFile )
+static function OpenProjectFile( cFile, cAction )
 
    local cContent, cDir, i, aParsed, aFormNames, aModuleNames
    local cFormName, cFormCode, nFormX, nFormY
    local nInsW, nInsTop, nEditorTop, nEditorX, nEditorW, nEditorH
+
+   if cAction == nil; cAction := "Opening another project"; endif
+   if ! HB_ConfirmDiscardChanges( cAction )
+      return nil
+   endif
 
    cContent := MemoRead( cFile )
    if Empty( cContent )
@@ -3382,6 +3548,7 @@ static function OpenProjectFile( cFile )
    aOpenFiles := {}
 
    CodeEditorClearTabs( hCodeEditor )
+   HB_TabsKnownReset()
 
    nInsW := Int( nScreenW * 0.18 ) + 20
    nInsTop := GTK_GetWindowBottom( oIDE:hCpp )
@@ -3401,7 +3568,7 @@ static function OpenProjectFile( cFile )
 
    cFormCode := MemoRead( cDir + "Project1.prg" )
    if ! Empty( cFormCode )
-      CodeEditorSetTabText( hCodeEditor, 1, cFormCode )
+      HB_SetTabText( 1, cFormCode )
       HB_DiskBaseSet( cDir + "Project1.prg", cFormCode )
    endif
 
@@ -3423,7 +3590,7 @@ static function OpenProjectFile( cFile )
       aForms[ Len(aForms) ][ 3 ] := cFormCode
 
       CodeEditorAddTab( hCodeEditor, cFormName + ".prg" )
-      CodeEditorSetTabText( hCodeEditor, Len(aForms) + 1, cFormCode )
+      HB_SetTabText( Len(aForms) + 1, cFormCode )
 
       // Wire SelChange + ComponentDrop + OnResize. Without OnResize the
       // form's editor/inspector coordinates would not refresh when the
@@ -3440,7 +3607,7 @@ static function OpenProjectFile( cFile )
       HB_DiskBaseSet( cDir + cFormName + ".prg", cFormCode )
       AAdd( aModules, { cFormName, cFormCode, cDir + cFormName + ".prg" } )
       CodeEditorAddTab( hCodeEditor, cFormName + ".prg" )
-      CodeEditorSetTabText( hCodeEditor, HB_ModuleEditorTab( Len( aForms ), Len( aModules ) ), cFormCode )
+      HB_SetTabText( HB_ModuleEditorTab( Len( aForms ), Len( aModules ) ), cFormCode )
    next
 
    lSyncingFromCode := .f.
@@ -3456,6 +3623,8 @@ static function OpenProjectFile( cFile )
 
    cCurrentFile := cFile
    AddRecentProject( cFile )
+   lProjectDirty := .f.
+   lOpenFilesDirty := .f.
 
 return nil
 
@@ -3519,6 +3688,7 @@ return .T.
 static function TBSave()
 
    local cDir, cFile, cHbp, i, cExtern
+   local lAllOk := .T.
 
    // freshness guard FIRST: saving over a file that changed on disk since
    // load/last save would silently overwrite external work. Refuse and
@@ -3550,15 +3720,23 @@ static function TBSave()
    cHbp := HB_BuildHbpFromProject( aForms, aModules )
    if MemoWrit( cCurrentFile, cHbp )
       HB_DiskBaseSet( cCurrentFile, cHbp )
+   else
+      lAllOk := .F.
    endif
 
    if MemoWrit( cDir + "Project1.prg", CodeEditorGetTabText( hCodeEditor, 1 ) )
       HB_DiskBaseSet( cDir + "Project1.prg", CodeEditorGetTabText( hCodeEditor, 1 ) )
+      HB_TabMarkKnown( 1, CodeEditorGetTabText( hCodeEditor, 1 ) )
+   else
+      lAllOk := .F.
    endif
 
    for i := 1 to Len( aForms )
       if MemoWrit( cDir + aForms[i][1] + ".prg", aForms[i][3] )
          HB_DiskBaseSet( cDir + aForms[i][1] + ".prg", aForms[i][3] )
+         HB_TabMarkKnown( 1 + i, aForms[i][3] )
+      else
+         lAllOk := .F.
       endif
    next
 
@@ -3567,8 +3745,16 @@ static function TBSave()
       aModules[i][2] := CodeEditorGetTabText( hCodeEditor, 1 + Len(aForms) + i )
       if MemoWrit( cDir + aModules[i][1] + ".prg", aModules[i][2] )
          HB_DiskBaseSet( cDir + aModules[i][1] + ".prg", aModules[i][2] )
+         HB_TabMarkKnown( 1 + Len( aForms ) + i, aModules[i][2] )
+      else
+         lAllOk := .F.
       endif
    next
+
+   // the dirty flag clears only when every write really succeeded
+   if lAllOk
+      lProjectDirty := .f.
+   endif
 
    AddRecentProject( cCurrentFile )
 
@@ -4456,7 +4642,7 @@ static function NewComponent()
    // Add as module
    AAdd( aModules, { "MyComponent", cCode, "" } )
    CodeEditorAddTab( hCodeEditor, "MyComponent.prg" )
-   CodeEditorSetTabText( hCodeEditor, 1 + Len(aForms) + Len(aModules), cCode )
+   HB_SetTabText( 1 + Len(aForms) + Len(aModules), cCode )
    CodeEditorSelectTab( hCodeEditor, 1 + Len(aForms) + Len(aModules) )
 return nil
 
@@ -4685,7 +4871,7 @@ function AIAddCode( cCode )
    endif
    nFromLine := Len( hb_ATokens( cExisting + Chr(10), Chr(10) ) ) - 2
    cNew := cExisting + Chr(10) + cCode + Chr(10)
-   CodeEditorSetTabText( hCodeEditor, nTab, cNew )
+   HB_SetTabText( nTab, cNew )
    nToLine := Len( hb_ATokens( cNew, Chr(10) ) ) - 2
    CodeEditorClearMarks( hCodeEditor )
    CodeEditorMarkLines( hCodeEditor, nFromLine, nToLine, 32896 )
@@ -4880,6 +5066,7 @@ static function RemoveFromProject()
       endif
       aForms[nSel][2]:Destroy()
       CodeEditorRemoveTab( hCodeEditor, nSel + 1 )
+      HB_TabRemoveKnown( nSel + 1 )
       ADel( aForms, nSel )
       ASize( aForms, Len(aForms) - 1 )
       if nActiveForm > Len( aForms )
@@ -4892,11 +5079,12 @@ static function RemoveFromProject()
       // Removing a module
       i := nSel - Len( aForms )
       CodeEditorRemoveTab( hCodeEditor, 1 + Len(aForms) + i )
+         HB_TabRemoveKnown( 1 + Len(aForms) + i )
       ADel( aModules, i )
       ASize( aModules, Len(aModules) - 1 )
    endif
 
-   CodeEditorSetTabText( hCodeEditor, 1, GenerateProjectCode() )
+   HB_SetTabText( 1, GenerateProjectCode() )
 
 return nil
 
@@ -5014,7 +5202,7 @@ static function ReopenLastProject()
       MsgInfo( "File not found: " + cFile, "HbBuilder" )
       return nil
    endif
-   OpenProjectFile( cFile )
+   OpenProjectFile( cFile, "Reopening the project" )
 return nil
 
 static function LoadDarkMode()

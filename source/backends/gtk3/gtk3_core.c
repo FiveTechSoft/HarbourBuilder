@@ -2444,6 +2444,23 @@ static void on_window_destroy( GtkWidget * widget, gpointer data )
       gtk_main_quit();
 }
 
+/* Window-manager close (X button): consult FOnCloseQuery; a .F. answer
+ * vetoes the close so unsaved work is never discarded implicitly. */
+static gboolean on_form_delete_event( GtkWidget * widget, GdkEvent * event, gpointer data )
+{
+   HBForm * form = (HBForm *)data;
+   (void)widget; (void)event;
+   if( form->FOnCloseQuery && HB_IS_BLOCK( form->FOnCloseQuery ) )
+   {
+      PHB_ITEM pRet = hb_itemDo( form->FOnCloseQuery, 0 );
+      int lAllow = pRet ? hb_itemGetL( pRet ) : 1;
+      if( pRet ) hb_itemRelease( pRet );
+      if( !lAllow )
+         return TRUE;
+   }
+   return FALSE;
+}
+
 /* Forward declaration: TMainMenu runtime attach (defined later near Menu bridge) */
 static void HBMainMenu_Attach( HBControl * p, HBForm * form );
 
@@ -2515,6 +2532,7 @@ static void HBForm_Run( HBForm * form )
    gtk_window_set_resizable( GTK_WINDOW(form->FWindow),
       (form->FDesignMode || (form->FSizable && !form->FAppBar)) ? TRUE : FALSE );
    g_signal_connect( form->FWindow, "destroy", G_CALLBACK(on_window_destroy), form );
+   g_signal_connect( form->FWindow, "delete-event", G_CALLBACK(on_form_delete_event), form );
    g_signal_connect( form->FWindow, "configure-event", G_CALLBACK(on_window_configure), form );
 
    /* Set background color via CSS — only when user explicitly set FClrPane,
@@ -2709,6 +2727,7 @@ static void HBForm_Show( HBForm * form )
    gtk_window_set_resizable( GTK_WINDOW(form->FWindow),
       (form->FDesignMode || (form->FSizable && !form->FAppBar)) ? TRUE : FALSE );
    g_signal_connect( form->FWindow, "destroy", G_CALLBACK(on_window_destroy), form );
+   g_signal_connect( form->FWindow, "delete-event", G_CALLBACK(on_form_delete_event), form );
    g_signal_connect( form->FWindow, "configure-event", G_CALLBACK(on_window_configure), form );
 
    /* Background color — only when user explicitly set FClrPane */
@@ -2809,6 +2828,7 @@ static int HBForm_ShowModal( HBForm * form )
       g_list_free( toplevels );
    }
    g_signal_connect( form->FWindow, "destroy", G_CALLBACK(on_window_destroy), form );
+   g_signal_connect( form->FWindow, "delete-event", G_CALLBACK(on_form_delete_event), form );
    g_signal_connect( form->FWindow, "configure-event", G_CALLBACK(on_window_configure), form );
 
    /* Background color — only when user explicitly set FClrPane */
@@ -5377,6 +5397,24 @@ HB_FUNC( UI_MSGYESNO )
    gint result = gtk_dialog_run( GTK_DIALOG(dialog) );
    gtk_widget_destroy( dialog );
    hb_retl( result == GTK_RESPONSE_YES );
+}
+
+/* UI_MsgYesNoCancel( cText [, cTitle] ) --> nChoice: 1 = Save, 2 = Discard,
+ * 3 = Cancel (also window close / Escape). Used by unsaved-work guards. */
+HB_FUNC( UI_MSGYESNOCANCEL )
+{
+   EnsureGTK();
+   GtkWidget * dialog = gtk_message_dialog_new( NULL,
+      GTK_DIALOG_MODAL, GTK_MESSAGE_QUESTION, GTK_BUTTONS_NONE,
+      "%s", hb_parc(1) ? hb_parc(1) : "" );
+   gtk_window_set_title( GTK_WINDOW(dialog),
+      hb_parc(2) ? hb_parc(2) : "Confirm" );
+   gtk_dialog_add_button( GTK_DIALOG(dialog), "_Save",    GTK_RESPONSE_YES );
+   gtk_dialog_add_button( GTK_DIALOG(dialog), "_Discard", GTK_RESPONSE_NO );
+   gtk_dialog_add_button( GTK_DIALOG(dialog), "_Cancel",  GTK_RESPONSE_CANCEL );
+   gint result = gtk_dialog_run( GTK_DIALOG(dialog) );
+   gtk_widget_destroy( dialog );
+   hb_retni( result == GTK_RESPONSE_YES ? 1 : ( result == GTK_RESPONSE_NO ? 2 : 3 ) );
 }
 
 /* ======================================================================
