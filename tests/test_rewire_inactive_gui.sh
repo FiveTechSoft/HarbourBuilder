@@ -49,6 +49,7 @@ done
 xdotool windowmap "$APPWIN";xdotool windowraise "$APPWIN";eval "$(xdotool getwindowgeometry --shell "$APPWIN")"
 xdotool mousemove $((X+70)) $((Y+35)) click 1;sleep 1
 grep -q CLICK /tmp/rewire-binding-sentinel.txt||{ echo 'FAIL inactive convention click not executed';exit 1; }
+import -window root /tmp/rewire-inactive-runtime.png
 xdotool windowclose "$APPWIN"
 B=/tmp/hbbuilder_build/$(printf '%s' "$RUN/Project1.hbp"|md5sum|cut -d' ' -f1)
 python3 - "$RUN/Form1.prg" "$B/main.prg" <<'CHECK'
@@ -61,4 +62,5 @@ print('startup_sentinel_exists='+str(Path('/tmp/rewire-startup-sentinel.txt').ex
 CHECK
 grep -q STARTUP /tmp/rewire-startup-sentinel.txt||exit 1
 grep -n 'Button1Click\|Button1:OnClick' "$B/main.prg"
+echo 'CLICK sentinel verified from real runtime GTK click'
 if grep -q '::oButton1:OnClick.*Button1Click' "$B/main.prg";then echo 'INACTIVE convention wiring present';else echo 'INACTIVE convention wiring ABSENT';exit 2;fi
