@@ -17,10 +17,20 @@ rt_launch_ide
 rt_reopen_project
 
 INS=""
-for w in $(rt_ide_windows); do
-  [ "$(xdotool getwindowname "$w" 2>/dev/null)" = "Inspector" ] && { INS=$w; break; }
+for i in 1 2 3 4 5; do
+  for w in $(rt_ide_windows); do
+    [ "$(xdotool getwindowname "$w" 2>/dev/null)" = "Inspector" ] && { INS=$w; break; }
+  done
+  [ -n "$INS" ] && break
+  sleep 1
 done
-[ -n "$INS" ] || fail "Inspector window not found"
+if [ -z "$INS" ]; then
+  echo "  [diag] IDE windows seen:"
+  for w in $(rt_ide_windows); do
+    echo "    $w '$(xdotool getwindowname "$w" 2>/dev/null)'"
+  done
+  fail "Inspector window not found"
+fi
 echo "Inspector window: $INS"
 
 # --- simpler, deterministic path: the combo lists entries in build order ---
