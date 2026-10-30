@@ -47,7 +47,7 @@ grep -q BASE-ONE "$RUN/One.prg";grep -q BASE-TWO "$RUN/Two.prg"
 echo 'Project save routes module correctly and leaves standalone disk untouched'
 # Close each standalone choosing Save; verify exact destination and buffer.
 rt_map_all
-for n in One Two;do
+for n in Two One;do
  select_tab "$n"
  BAR=$(rt_find_bar);rt_unmap_all_but "$BAR";xdotool mousemove 700 12 click 1
  xdotool mousemove 20 12 mousedown 1;sleep .5;xdotool mousemove 100 187 mouseup 1;sleep 1
