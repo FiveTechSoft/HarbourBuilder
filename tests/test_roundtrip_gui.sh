@@ -125,10 +125,13 @@ GEOM_BAD=$(diff <(tr -d '\r' < "$CYC/original.prg") <(tr -d '\r' < "$CYC/cycle2.
   grep -vE '^[<>] +@ 430, 300 LISTBOX ::oList1 OF Self SIZE 160, (90|100) ITEMS "Alfa", "Beta"$' | \
   # SAY lines are regenerated with their explicit height (the width-only
   # emission that dropped a hand-written SAY height was fixed in this
-  # batch): the fixture line is width-only, so the saved form gains the
-  # height the parser applied (default 15 when absent).
+  # batch). The fixture line is width-only; the parser defaults the height
+  # to 15, but GTK realizes the label at its natural height 21, and the
+  # generator emits the live height. Verified stable: cycle1 == cycle2
+  # (one-shot 15->21 at first realize, no progressive drift). A regression
+  # that drops the height again produces a width-only '>' line and fails.
   grep -vE '^< +@ 20, 160 SAY ::oLabel1 PROMPT "Etiqueta fija" OF Self SIZE 200$' | \
-  grep -vE '^> +@ 20, 160 SAY ::oLabel1 PROMPT "Etiqueta fija" OF Self SIZE 200, 15$' | \
+  grep -vE '^> +@ 20, 160 SAY ::oLabel1 PROMPT "Etiqueta fija" OF Self SIZE 200, 21$' | \
   grep -vE '^[<>] +@ 140, 20 COMBOBOX ::oCombo1 OF Self SIZE 180, 26 ITEMS "Uno", "Di " \+ Chr\( ?34 ?\) \+ "si" \+ Chr\( ?34 ?\), "Tre, s"$' | \
 
   grep -vE '^[<>] +DATA o(Label1|Edit1|Chk1|Combo1|Group1|Radio1|Image1|Memo1|List1|Ledit1) +// [A-Za-z0-9_]+$' | \
