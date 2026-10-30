@@ -12,8 +12,12 @@ rt_provenance() {
   echo "date:   $(date -Is)"
 }
 
+# Capture the absolute repo root ONCE at source time: after rt_launch_ide's
+# cd into bin/, a relative test invocation path would resolve wrong here.
+RT_REPO_ABS=$(cd "$(dirname "${BASH_SOURCE[1]}")/.." && pwd)
+
 rt_setup() {  # $1 = project dir to point the IDE at
-  REPO=$(cd "$(dirname "${BASH_SOURCE[1]}")/.." && pwd)
+  REPO=$RT_REPO_ABS
   RT_PROJDIR=$1
   # start Xvfb only when the display does not actually accept connections:
   # pgrep -x matches ZOMBIE Xvfb entries (their comm survives), which once
