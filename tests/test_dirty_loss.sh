@@ -546,9 +546,21 @@ launch_a
 echo 'line one' > /tmp/rt_openme.txt
 # File > Open File...
 for attempt in 1 2; do
+  local W0; W0=$(xdotool search --onlyvisible --name ".*" 2>/dev/null | sort -n | tr '\n' ' ')
   menu_path_click '^File\.\.\.$' || { echo "  [diag] Open File menu failed (attempt $attempt)"; continue; }
   sleep 1
-  import -window root -crop "800x600+400+200" /tmp/dl_chooser.png 2>/dev/null
+  # the chooser opens modal and may land behind other windows: find, raise
+  # and focus it before typing into its location bar
+  local CH="" w
+  for w in $(xdotool search --onlyvisible --name ".*" 2>/dev/null | sort -n); do
+    case " $W0 " in *" $w "*) ;; *) CH=$w;; esac
+  done
+  if [ -n "$CH" ]; then
+    echo "  [diag] chooser window $CH: $(xdotool getwindowname "$CH" 2>/dev/null)"
+    xdotool windowmap "$CH" 2>/dev/null; xdotool windowraise "$CH" 2>/dev/null; xdotool windowactivate "$CH" 2>/dev/null; sleep 0.6
+  else
+    echo "  [diag] no chooser window appeared (attempt $attempt)"
+  fi
   xdotool key ctrl+l; sleep 0.6
   xdotool type --delay 15 '/tmp/rt_openme.txt'; sleep 0.5
   xdotool key Return; sleep 2
