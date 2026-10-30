@@ -1,8 +1,13 @@
 #!/bin/bash
 # Run-stale regression (TBRun quick-path cache key):
-#   tail:     editing the code BEYOND char 5000 must invalidate the build
-#             cache; the second Run must rebuild and the APP EFFECT must
-#             change (trace marker VERSION-A -> VERSION-B), not just the hash
+#   tail:     three Runs in one IDE process: (1) full build, (2) no edit -
+#             the quick-path MUST fire (UserApp mtime unchanged), (3) after
+#             editing the code BEYOND char 5000 the cache must invalidate:
+#             rebuild and the APP EFFECT must change (trace VERSION-A -> B),
+#             not just the hash. The designer window is parked off-screen
+#             for the edit OCR and moved back afterwards, because its live
+#             position is written back into the generated nLeft/nTop and
+#             would otherwise legitimately change the hash (drift).
 #   identity: project B with IDENTICAL text but different path must get a
 #             real build and its own exe copy, not A's cached binary
 # RED with the 5000-char toy hash + process-static nLastHash; GREEN after
@@ -55,11 +60,23 @@ ctrl_r_and_trace() {  # echoes app trace line
 
 run_tail() {
 launch_a
-# --- build 1: full build, effect VERSION-A
+# --- Run 1: full build, effect VERSION-A
 T1=$(ctrl_r_and_trace)
 echo "trace after first Run: ${T1:-<missing>}"
 echo "${T1:-}" | grep -q 'version:VERSION-A' \
   || { echo "  first Run did not produce the VERSION-A effect"; FAILN=$((FAILN+1)); }
+M1=$(stat -c %Y /tmp/hbbuilder_build/UserApp)
+
+# --- Run 2, NO edit: quick-path must fire (same binary, no rebuild)
+T2=$(ctrl_r_and_trace)
+M2=$(stat -c %Y /tmp/hbbuilder_build/UserApp)
+echo "trace after no-edit Run: ${T2:-<missing>}"
+if [ "$M1" = "$M2" ]; then
+  echo "  no-edit Run: quick-path fired (UserApp mtime unchanged: $M1)"
+else
+  echo "  NO-EDIT RUN REBUILT (mtime $M1 -> $M2): cache invalidated without any edit"
+  FAILN=$((FAILN+1))
+fi
 
 # --- case tail: edit the code tab BEYOND char 5000 (VERSION-A -> VERSION-B)
 CED=""
@@ -67,6 +84,8 @@ for w in $(rt_ide_windows); do
   [ "$(xdotool getwindowname "$w" 2>/dev/null)" = "Code Editor" ] && { CED=$w; break; }
 done
 [ -n "$CED" ] || fail "Code Editor window not found"
+D=$(rt_find_designer) || fail "designer window not found"
+eval "$(xdotool getwindowgeometry --shell "$D")"; DX=$X; DY=$Y
 BAR=$(rt_find_bar); rt_park_all_but "$CED" "$BAR"; sleep 0.5
 eval "$(xdotool getwindowgeometry --shell "$CED")"
 xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT/2)) click 1; sleep 0.5
@@ -79,11 +98,14 @@ xdotool type --delay 15 'return "VERSION-B"'; sleep 1
 import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/rh_tail_edit.png 2>/dev/null
 tesseract /tmp/rh_tail_edit.png - 2>/dev/null | grep -q 'VERSION-B'   || { tesseract /tmp/rh_tail_edit.png - 2>/dev/null | tail -3; fail "tail edit did not land in the editor (harness)"; }
 echo "  [t=$SECONDS] tail edit verified visible"
-T2=$(ctrl_r_and_trace)
-echo "trace after tail-edit Run: ${T2:-<missing>}"
-echo "${T2:-}" | grep -q 'version:VERSION-B' \
+# restore the designer window position so only the tail edit changes the code
+xdotool windowmove "$D" "$DX" "$DY"; sleep 0.5
+T3=$(ctrl_r_and_trace)
+M3=$(stat -c %Y /tmp/hbbuilder_build/UserApp)
+echo "trace after tail-edit Run: ${T3:-<missing>} (UserApp mtime $M2 -> $M3)"
+echo "${T3:-}" | grep -q 'version:VERSION-B' \
   || { echo "  TAIL-EDIT: app effect STILL the old build (stale quick-path)"; FAILN=$((FAILN+1)); }
-echo "${T2:-}" | grep -q 'version:VERSION-A' \
+echo "${T3:-}" | grep -q 'version:VERSION-A' \
   && { echo "  TAIL-EDIT: stale binary executed"; }
 
 echo "tail case done (FAILN=$FAILN)"
