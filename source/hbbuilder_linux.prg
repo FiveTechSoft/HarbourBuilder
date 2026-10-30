@@ -1855,7 +1855,7 @@ static function SyncDesignerToCode( lFromSave )
       cParseBlock := HB_ParseBlockFor( aForms[ nActiveForm ][ 2 ]:hCpp )
    endif
    if ! Empty( cParseBlock )
-      if lFromSave .or. cParseBlock != s_cLastRefusal
+      if lFromSave .or. !( cParseBlock == s_cLastRefusal )
          s_cLastRefusal := cParseBlock
          MsgInfo( "Save/sync aborted: this form has an expression that could not be" + ;
             Chr(10) + "understood when the code was loaded:" + Chr(10) + Chr(10) + ;
@@ -1953,7 +1953,7 @@ static function SyncDesignerToCode( lFromSave )
       next
       // auto-syncs (resize, inspector) warn only when the refusal set changes;
       // an explicit save always warns
-      if lFromSave .or. cNewCode != s_cLastRefusal
+      if lFromSave .or. !( cNewCode == s_cLastRefusal )
          MsgInfo( "Save aborted: these controls cannot be saved faithfully and" + ;
             Chr(10) + "would be lost on reopen:" + Chr(10) + Chr(10) + cNewCode + ;
             Chr(10) + "Keep them in code, or use a supported control type.", ;
