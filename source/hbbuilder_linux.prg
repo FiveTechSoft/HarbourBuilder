@@ -5162,10 +5162,11 @@ static function TBDebugRun( lRunToBreak )
               " " + cBuildDir + "/debug_main.c" + ;
               " -o " + cBuildDir + "/debug_main.o 2>&1"
       if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
-      if lError .or. "error:" $ Lower( cOutput )
+      if lError
          cLog += cOutput + Chr(10)
          lError := .t.
       else
+         if ! Empty( cOutput ); cLog += cOutput + Chr(10); endif
          cLog += "    OK" + Chr(10)
       endif
    endif
