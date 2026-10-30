@@ -78,10 +78,10 @@ elif [ "${CHOICE:-cancel}" = cancel ];then
  cmp "$RUN/module-before.txt" "$RUN/module-after.txt" || exit 1
  cmp "$RUN/hbp-before" "$RUN/Project1.hbp" || exit 1
  cmp "$RUN/disk-before" "$RUN/$NAME.prg" || exit 1
- echo 'CANCEL preserves exact unsaved module buffer HBP disk'
+ echo 'CANCEL preserves exact target buffer HBP disk'
 else
- if [ "$CHOICE" = save ];then grep -q UNSAVED-MODULE-WORK "$RUN/$NAME.prg" || exit 1;echo 'SAVE before removal persisted module edit';else
-  ! grep -q UNSAVED-MODULE-WORK "$RUN/$NAME.prg" || exit 1;echo 'DISCARD explicitly removed edit without disk write'
+ if [ "$CHOICE" = save ];then grep -q UNSAVED-MODULE-WORK "$RUN/$NAME.prg" || exit 1;echo 'SAVE before removal persisted target edit';else
+  ! grep -q UNSAVED-MODULE-WORK "$RUN/$NAME.prg" || exit 1;echo "${CHOICE:-cancel}: target absent from notebook, disk has no unsaved edit"
  fi
 fi
 # Check the actual notebook header, not generated main (modules are not emitted there).
