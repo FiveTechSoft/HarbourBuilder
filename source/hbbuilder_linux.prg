@@ -4948,10 +4948,11 @@ static function TBRun()
               "  (pkg-config --exists webkit2gtk-4.0 2>/dev/null && pkg-config --libs webkit2gtk-4.0 || echo ''))" + ;
               " -lm -lpthread -ldl -lrt -lsqlite3 -l:libncurses.so.6 2>&1"
       if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
-      if lError .or. "error" $ Lower( cOutput )
+      if lError
          cLog += "    FAILED:" + Chr(10) + cOutput + Chr(10)
          lError := .T.
       else
+         if ! Empty( cOutput ); cLog += cOutput + Chr(10); endif
          cLog += "    OK" + Chr(10)
       endif
    endif
@@ -5199,10 +5200,11 @@ static function TBDebugRun( lRunToBreak )
               " " + cWebKitLibs + ;
               " -lm -lpthread -ldl -lrt -lsqlite3 -l:libncurses.so.6 2>&1"
       if ! HB_BuildExec( cCmd, @cOutput ); lError := .T.; endif
-      if lError .or. "error" $ Lower( cOutput )
+      if lError
          cLog += cOutput + Chr(10)
          lError := .t.
       else
+         if ! Empty( cOutput ); cLog += cOutput + Chr(10); endif
          cLog += "    OK" + Chr(10)
       endif
    endif
