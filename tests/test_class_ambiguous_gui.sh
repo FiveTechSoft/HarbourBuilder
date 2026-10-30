@@ -1,0 +1,55 @@
+#!/bin/bash
+set -u
+REPO=$(cd "$(dirname "$0")/.." && pwd)
+source "$REPO/tests/harness_lib.sh"
+RUN=/tmp/class_ambiguous_gui
+rt_provenance
+mkdir -p "$RUN"
+cp "$REPO/tests/fixtures/debugmodules/"* "$RUN/"
+python3 - "$RUN/Form1.prg" <<'PY'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1]);s=p.read_text();s=s.replace('   METHOD CreateForm()','   DATA oOther, oAdded INIT nil // AMBIGUOUS-USER\n   DATA oKeep INIT 42 // USER-KEEP\n   METHOD CreateForm()',1)
+s=s.replace('return nil','   @ 20, 20 BUTTON ::oAdded PROMPT "Probe" OF Self SIZE 100, 24\nreturn nil',1)
+p.write_text(s)
+PY
+MD=$(sha256sum "$RUN/Form1.prg" | cut -d' ' -f1)
+rt_setup "$RUN";rt_launch_ide
+for try in $(seq 1 12);do rt_find_bar >/dev/null&&break;sleep 1;done
+rt_reopen_project
+for mode in sync save saveas run debug;do
+ W0=$(rt_ide_windows | tr '\n' ' ')
+ BAR=$(rt_find_bar)
+ if [ "$mode" = sync ];then
+  DESIGN=$(rt_find_designer);xdotool windowraise "$DESIGN";eval "$(xdotool getwindowgeometry --shell "$DESIGN")";xdotool windowsize "$DESIGN" $((WIDTH+1)) "$HEIGHT"
+ else
+  rt_unmap_all_but "$BAR";xdotool mousemove 700 12 click 1
+  case "$mode" in save)xdotool key ctrl+s;; saveas)menu_path_click '^As' || { xdotool mousemove 20 12 click 1;sleep 1;xdotool mousemove 100 237 click 1; };;run)xdotool key ctrl+r;;debug)xdotool mousemove 15 62 click 1;;esac
+ fi
+ sleep 2
+ import -window root /tmp/class-$mode-refusal.png
+ text=$(tesseract /tmp/class-$mode-refusal.png - --psm 6 2>/dev/null)
+ echo "$mode: $text" | grep -E 'ambiguous|aborted|faithfully' || true
+ echo "$text" | grep -q 'ambiguous compound' || { echo "FAIL $mode no ambiguous notice";rt_cleanup;exit 1; }
+ [ "$MD" = "$(sha256sum "$RUN/Form1.prg" | cut -d' ' -f1)" ] || { echo "FAIL $mode disk changed";rt_cleanup;exit 1; }
+ echo "AMBIGUOUS $mode refused; disk exact=$MD"
+ xdotool key Return;sleep 1
+done
+rt_cleanup
+# Repair ambiguity on disk and reopen, rather than relying on hidden editor state.
+python3 - "$RUN/Form1.prg" <<'PY'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1]);s=p.read_text().replace('DATA oOther, oAdded INIT nil','DATA oAdded INIT nil');p.write_text(s)
+PY
+rt_setup "$RUN";rt_launch_ide
+for try in $(seq 1 12);do rt_find_bar >/dev/null&&break;sleep 1;done
+rt_reopen_project
+BAR=$(rt_find_bar);rt_unmap_all_but "$BAR";xdotool mousemove 700 12 click 1;xdotool key ctrl+s;sleep 2
+[ "$(grep -c 'DATA oAdded' "$RUN/Form1.prg")" = 1 ] || { rt_cleanup;exit 1; }
+rm -f /tmp/debugmodules-result.txt
+xdotool key ctrl+r
+for try in $(seq 1 45);do [ -f /tmp/debugmodules-result.txt ]&&break;sleep 1;done
+grep -q MODULES-EXECUTED /tmp/debugmodules-result.txt || { rt_cleanup;exit 1; }
+rt_cleanup
+echo 'AMBIGUOUS recovery save and Run executed PASS'
