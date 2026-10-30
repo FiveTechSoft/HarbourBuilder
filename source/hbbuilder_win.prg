@@ -981,8 +981,14 @@ static function OnDesignSelChange( hCtrl )
    endif
    INS_ComboSelect( _InsGetData(), nSel )
 
-   // Two-way: sync designer changes to code
-   SyncDesignerToCode()
+   // Two-way: sync designer changes to code.
+   // A just-dropped control is selected before OnComponentDrop names it;
+   // syncing now would emit a fallback ::octrlN line that later merges as
+   // "hand-written" and resurrects on delete. Skip sync for a nameless
+   // control - OnComponentDrop syncs right after naming it.
+   if ! ( hCtrl != 0 .and. hCtrl != oDesignForm:hCpp .and. Empty( UI_GetProp( hCtrl, "cName" ) ) )
+      SyncDesignerToCode()
+   endif
 
 return nil
 
