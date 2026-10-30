@@ -26,9 +26,14 @@ rt_reopen_project
 BAR=$(rt_find_bar);rt_unmap_all_but "$BAR";xdotool mousemove 700 12 click 1;xdotool key ctrl+r;sleep 2
 import -window root /tmp/ensureharbour-setup-question.png
 # Click Yes in the visually checked setup question; default Return is No.
-xdotool mousemove 296 126 click 1;sleep 2
+for w in $(rt_ide_windows);do [ "$(xdotool getwindowname "$w")" = 'HbBuilder Setup' ] && DLG=$w;done
+[ -n "${DLG:-}" ] || { echo 'FAIL setup dialog absent';exit 1; }
+eval "$(xdotool getwindowgeometry --shell "$DLG")"
+xdotool mousemove $((X+3*WIDTH/4)) $((Y+HEIGHT-16)) click 1;sleep 2
 import -window root /tmp/ensureharbour-setup-result.png
-xdotool mousemove 180 125 click 1
+for w in $(rt_ide_windows);do [ "$(xdotool getwindowname "$w")" = 'HbBuilder Setup' ] && DLG=$w;done
+eval "$(xdotool getwindowgeometry --shell "$DLG")"
+xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT-16)) click 1
 for try in $(seq 1 70);do [ -f /tmp/debugmodules-result.txt ]&&break;sleep 1;done
 python3 - "$INSTALL_RECORD" "$HOME/harbour" <<'CHECK'
 from pathlib import Path
