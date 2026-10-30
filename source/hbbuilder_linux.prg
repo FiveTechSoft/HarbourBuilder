@@ -4400,6 +4400,10 @@ static function HB_StageFramework( cProjDir, cBuildDir, lDebug )
          next
          loop
       endif
+      if hb_DirExists( cSource )
+         MsgInfo( "Build aborted: framework source is a directory " + cSource, "HbBuilder" )
+         return .F.
+      endif
       nHandle := FOpen( cSource )
       if nHandle == -1
          MsgInfo( "Build aborted: could not read framework " + cSource, "HbBuilder" )
