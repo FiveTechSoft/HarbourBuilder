@@ -27,7 +27,7 @@ positive = main.replace("if !('diagnostic copy not written' $ cLog).or.!('build 
 (p/'probe.prg').write_text(positive)
 subprocess.run(['/tmp/harbour-review/bin/linux/gcc/hbmk2',str(p/'probe.prg'),'-gtstd','-q','-quiet','-o'+str(p/'probe')],check=True)
 status=subprocess.run([str(p/'probe')]).returncode
-assert (p/'diagnostic.prg').read_bytes()==b'NEW'
-assert (p/'.srchash').read_bytes()==b'CURRENT'
+assert (p/'diagnostic.prg').read_bytes()==b'NEW\x1a'
+assert (p/'.srchash').read_bytes()==b'CURRENT\x1a'
 print('AUX POSITIVE exact diagnostic/cache bytes checked; exit='+str(status),flush=True)
 raise SystemExit(status)
