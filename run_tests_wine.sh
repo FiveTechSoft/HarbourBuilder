@@ -5,6 +5,7 @@
 # linux host tools and win/mingw64 libs), WINE, and a mingw-w64 cross toolchain.
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
+echo "== provenance: $(date -Is) HEAD $(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown) =="
 HBDIR_SRC="${HBDIR_SRC:-$HOME/harbour}"
 WINE="${WINE:-wine}"
 HB_HOST_BIN="$HBDIR_SRC/bin/linux/gcc"

@@ -2,6 +2,7 @@
 # Run HarbourBuilder headless unit tests (Linux / macOS).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
+echo "== provenance: $(date -Is) HEAD $(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown) =="
 HBDIR="${HBDIR:-$HOME/harbour}"
 HB_BIN=""
 for dir in "$HBDIR/bin" "$HBDIR/bin/linux/gcc" "$HBDIR/bin/darwin/clang"; do
