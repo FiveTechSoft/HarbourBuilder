@@ -187,6 +187,8 @@ grep -q 'VERSION-Z' "$RUNA/Form1.prg" \
   && echo "  conflict: disk content untouched (VERSION-Z)" \
   || { echo "  CONFLICT: disk file was overwritten"; FAILN=$((FAILN+1)); }
 # the refused Run must have preserved the pending buffer edit
+# (dismiss the modal dialog first: it holds the keyboard grab)
+dismiss_dialog "$DLG"; DLG=""
 BAR=$(rt_find_bar); rt_park_all_but "$CED" "$BAR"; sleep 0.5
 eval "$(xdotool getwindowgeometry --shell "$CED")"
 xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT/2)) click 1; sleep 0.4
@@ -195,8 +197,7 @@ import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/ee_conflict_buffer
 tesseract /tmp/ee_conflict_buffer.png - 2>/dev/null | grep -q 'VERSION-Y' \
   && echo "  conflict: buffer edit preserved after refusal (VERSION-Y)" \
   || { echo "  CONFLICT: buffer edit lost by the refused Run"; FAILN=$((FAILN+1)); }
-# recovery: dismiss dialog, explicit Reopen, Run again -> external content
-dismiss_dialog "$DLG"
+# recovery: explicit Reopen, Run again -> external content
 reopen_and_retarget
 T3=$(ctrl_r_and_trace)
 echo "trace after reopen+Run: ${T3:-<missing>}"
