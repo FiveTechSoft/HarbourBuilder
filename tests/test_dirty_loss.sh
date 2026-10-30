@@ -690,8 +690,10 @@ rt_cleanup
 
 run_newrevert() {
 launch_fresh
-# edit then exact revert (BackSpace) on a never-saved project: back to frozen text = clean
-local CED w
+# edit then exact revert (BackSpace) on the Project1.prg tab of a never-saved
+# project: back to the known text = clean. (Form-tab edits rebuild the form
+# from code; that interaction is exercised separately.)
+local CED w rel
 CED=""
 for w in $(rt_ide_windows); do
   [ "$(xdotool getwindowname "$w" 2>/dev/null)" = "Code Editor" ] && { CED=$w; break; }
@@ -699,11 +701,14 @@ done
 [ -n "$CED" ] || fail "Code Editor window not found"
 BAR=$(rt_find_bar); rt_park_all_but "$CED" "$BAR"; sleep 0.5
 eval "$(xdotool getwindowgeometry --shell "$CED")"
+import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/dl_tabs.png 2>/dev/null
+rel=$(tesseract /tmp/dl_tabs.png - tsv 2>/dev/null | awk -F'\t' '$12 ~ /Project1/ {print $7" "$8" "$9" "$10; exit}')
+[ -n "$rel" ] || { echo "  [diag] Project1 tab not found by OCR"; tesseract /tmp/dl_tabs.png - 2>/dev/null | head -3; rt_cleanup; FAILN=$((FAILN+1)); return; }
+set -- $rel
+xdotool mousemove $((X + $1 + $3/2)) $((Y + $2 + $4/2)) click 1; sleep 0.8
 xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT/2)) click 1; sleep 0.4
 xdotool key ctrl+End; sleep 0.3
 xdotool type --delay 15 'x'; sleep 0.5
-# the code->form rebuild may steal focus; click back into the editor and
-# return to the buffer end before deleting the char (exact revert)
 xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT/2)) click 1; sleep 0.4
 xdotool key ctrl+End; sleep 0.3
 xdotool key BackSpace; sleep 0.8
