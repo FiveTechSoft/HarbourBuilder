@@ -29,10 +29,15 @@ for mode in ${CLASS_MODES:-save saveas run debug sync};do
  BAR=$(rt_find_bar)
  if [ "$mode" = sync ];then
   for w in $(rt_ide_windows);do
+   [ "$(xdotool getwindowname "$w")" = HbBuilder ] && { xdotool windowmap "$w";xdotool windowfocus "$w";xdotool key Return; }
+  done
+  sleep 1
+  for w in $(rt_ide_windows);do
    [ "$(xdotool getwindowname "$w")" = "Code Editor" ] && EDITOR=$w
   done
   xdotool windowraise "$EDITOR";xdotool windowfocus "$EDITOR";xdotool key ctrl+a ctrl+c;sleep 1
-  xclip -selection clipboard -o > "$RUN/editor-before.txt"
+  xclip -selection clipboard -o > "$RUN/editor-before.txt" || { echo "FAIL clipboard before";rt_cleanup;exit 1; }
+  [ -s "$RUN/editor-before.txt" ] || { rt_cleanup;exit 1; }
 
   DESIGN=$(rt_find_designer)
   xdotool mousemove 532 90 click 1
@@ -52,8 +57,13 @@ for mode in ${CLASS_MODES:-save saveas run debug sync};do
  text=$(tesseract /tmp/class-$mode-refusal.png - --psm 6 2>/dev/null)
  echo "$mode: $text" | grep -E 'ambiguous|aborted|faithfully' || true
  if [ "$mode" = sync ];then
+  for w in $(rt_ide_windows);do
+   [ "$(xdotool getwindowname "$w")" = HbBuilder ] && { xdotool windowfocus "$w";xdotool key Return; }
+  done
+  sleep 1
   xdotool windowraise "$EDITOR";xdotool windowfocus "$EDITOR";xdotool key ctrl+a ctrl+c;sleep 1
-  xclip -selection clipboard -o > "$RUN/editor-after.txt"
+  xclip -selection clipboard -o > "$RUN/editor-after.txt" || { echo "FAIL clipboard after";rt_cleanup;exit 1; }
+  [ -s "$RUN/editor-after.txt" ] || { rt_cleanup;exit 1; }
   cmp "$RUN/editor-before.txt" "$RUN/editor-after.txt" || { echo 'FAIL sync editor mutated';rt_cleanup;exit 1; }
   echo 'SYNC editor text unchanged (notice may be rate-limited)'
  else
