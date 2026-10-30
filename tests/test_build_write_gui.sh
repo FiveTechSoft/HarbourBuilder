@@ -23,7 +23,7 @@ for mode in run debug; do
  else xdotool mousemove 15 62 click 1; fi
  sleep 3
  import -window root "/tmp/staging-${mode}.png"
- text=$(tesseract "/tmp/staging-${mode}.png" - 2>/dev/null)
+ text=$(tesseract "/tmp/staging-${mode}.png" - --psm 6 2>/dev/null)
  echo "$text" | grep -E 'Build aborted|Project1|compiler' || true
  if ! echo "$text" | grep -q 'Build aborted'; then echo "GUI WRITE FAIL: no refusal $mode"; rt_cleanup; exit 1; fi
  if [ -f /tmp/debugmodules-result.txt ]; then echo 'GUI WRITE FAIL: app ran'; rt_cleanup; exit 1; fi
