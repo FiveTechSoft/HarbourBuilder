@@ -39,6 +39,17 @@ rm -f /tmp/debugmodules-result.txt
 BAR=$(rt_find_bar);rt_unmap_all_but "$BAR";xdotool mousemove 700 12 click 1;xdotool key ctrl+r
 for try in $(seq 1 40);do [ -f /tmp/debugmodules-result.txt ]&&break;sleep 1;done
 grep -q MODULES-EXECUTED /tmp/debugmodules-result.txt||exit 1
+# Click the real runtime button, not a synthetic handler call.
+APPWIN=""
+for w in $(xdotool search --name '^Fixture Roundtrip$' 2>/dev/null);do
+ pid=$(xdotool getwindowpid "$w" 2>/dev/null)
+ [ "$pid" != "$RT_IDEPID" ] && APPWIN=$w
+done
+[ -n "$APPWIN" ]||{ echo 'FAIL runtime form absent';exit 1; }
+xdotool windowmap "$APPWIN";xdotool windowraise "$APPWIN";eval "$(xdotool getwindowgeometry --shell "$APPWIN")"
+xdotool mousemove $((X+70)) $((Y+35)) click 1;sleep 1
+grep -q CLICK /tmp/rewire-binding-sentinel.txt||{ echo 'FAIL inactive convention click not executed';exit 1; }
+xdotool windowclose "$APPWIN"
 B=/tmp/hbbuilder_build/$(printf '%s' "$RUN/Project1.hbp"|md5sum|cut -d' ' -f1)
 python3 - "$RUN/Form1.prg" "$B/main.prg" <<'CHECK'
 from pathlib import Path

@@ -4283,25 +4283,13 @@ return nil
 // none of them writes or executes stale code after a refused sync.
 static function HB_CheckFormsSerializable()
 
-   local i
+   local i, cCode, aPending := {}
+   local nPrev := nActiveForm, oPrev := oDesignForm
 
-   if nActiveForm >= 1 .and. nActiveForm <= Len( aForms )
-      SyncDesignerToCode( .T. )
-      if ! Empty( s_aUnserializable )
-         return .F.
-      endif
-      if ValType( aForms[ nActiveForm ][ 2 ] ) == "O" .and. ;
-         ! Empty( HB_ParseBlockFor( aForms[ nActiveForm ][ 2 ]:hCpp ) )
-         return .F.   // refusal dialog already shown by SyncDesignerToCode
-      endif
-      if ! Empty( s_cUnidentClass )
-         return .F.   // refusal dialog already shown by SyncDesignerToCode
-      endif
-   endif
-   // non-active forms keep live designer objects: check them too before
-   // their stored code is written to disk or compiled
+   // Probe every form through the same preserving merge. Do not apply any
+   // buffer or consume deletion records until ALL forms pass validation.
    for i := 1 to Len( aForms )
-      if i != nActiveForm .and. ValType( aForms[ i ][ 2 ] ) == "O" .and. ;
+      if ValType( aForms[ i ][ 2 ] ) == "O" .and. ;
          ValType( aForms[ i ][ 2 ]:hCpp ) == "N" .and. aForms[ i ][ 2 ]:hCpp != 0
          if ! Empty( HB_ParseBlockFor( aForms[ i ][ 2 ]:hCpp ) )
             MsgInfo( "Operation aborted: form " + aForms[ i ][ 1 ] + ;
@@ -4311,7 +4299,11 @@ static function HB_CheckFormsSerializable()
                "HbBuilder" )
             return .F.
          endif
-         RegenerateFormCode( aForms[ i ][ 1 ], aForms[ i ][ 2 ]:hCpp )
+         nActiveForm := i
+         oDesignForm := aForms[ i ][ 2 ]
+         cCode := SyncDesignerToCode( .T., .T. )
+         nActiveForm := nPrev
+         oDesignForm := oPrev
          if ! Empty( s_cUnidentClass )
             MsgInfo( "Operation aborted: form " + aForms[ i ][ 1 ] + ;
                " has no identifiable form class declaration in its code;" + ;
@@ -4325,7 +4317,17 @@ static function HB_CheckFormsSerializable()
                "Open it and remove or replace them first.", "HbBuilder" )
             return .F.
          endif
+         if ValType( cCode ) != "C" .or. Empty( cCode )
+            return .F.
+         endif
+         AAdd( aPending, { i, cCode } )
       endif
+   next
+
+   for i := 1 to Len( aPending )
+      aForms[ aPending[ i ][ 1 ] ][ 3 ] := aPending[ i ][ 2 ]
+      HB_SetTabText( aPending[ i ][ 1 ] + 1, aPending[ i ][ 2 ] )
+      UI_PopDeletedCtrls( aForms[ aPending[ i ][ 1 ] ][ 2 ]:hCpp )
    next
 
 return .T.
