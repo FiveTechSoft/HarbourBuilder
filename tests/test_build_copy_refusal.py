@@ -26,6 +26,10 @@ function Main()
  if File('/tmp/build-copy-refusal/run/hix_runtime.prg').or.File('/tmp/build-copy-refusal/run/hix_runtime.c').or.File('/tmp/build-copy-refusal/run/hix_runtime.o'); nFail++; endif
  FErase('/tmp/build-copy-refusal/repo/include/hbide.ch')
  if ProbeRun('/tmp/build-copy-refusal/repo','/tmp/build-copy-refusal/run'); nFail++; endif
+ hb_DirCreate('/tmp/build-copy-refusal/repo/include/hbide.ch')
+ hb_MemoWrit('/tmp/build-copy-refusal/run/hbide.ch','KEEPME')
+ if ProbeRun('/tmp/build-copy-refusal/repo','/tmp/build-copy-refusal/run'); nFail++; endif
+ if !(hb_MemoRead('/tmp/build-copy-refusal/run/hbide.ch')=='KEEPME'); nFail++; endif
  QOut('COPY failure refusal failures='+hb_ntos(nFail)+' continued='+hb_ntos(nContinued))
  ErrorLevel(nFail)
 return nil
