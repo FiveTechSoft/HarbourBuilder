@@ -56,7 +56,7 @@ for w in $(rt_ide_windows);do
 done
 import -window root /tmp/openfile-conflict-refusal.png
 tesseract /tmp/openfile-conflict-refusal.png - --psm 6 2>/dev/null | tee "$RUN/refusal-ocr"
-grep -q 'Save refused' "$RUN/refusal-ocr"||exit 1
+tesseract /tmp/openfile-conflict-refusal.png - --psm 11 2>/dev/null | grep -q 'Save refused'||exit 1
 for w in $(rt_ide_windows);do
  [ "$(xdotool getwindowname "$w")" = HbBuilder ] && { xdotool windowfocus "$w";xdotool key Return; }
 done
