@@ -22,20 +22,11 @@ run_case() {  # $1 name, $2 sed expr, $3 reason regex expected in dialog OCR
   rt_reopen_project
   local MD0=$(md5sum "$RUN/Form1.prg" | cut -d' ' -f1)
   local W0=$(rt_ide_windows | tr '\n' ' ')
-  # dirty the editor buffer first: Ctrl+S on a clean buffer is a no-op and
-  # would never reach the parse-block refusal
-  local CED=""
-  for w in $(rt_ide_windows); do
-    [ "$(xdotool getwindowname "$w" 2>/dev/null)" = "Code Editor" ] && { CED=$w; break; }
-  done
-  [ -n "$CED" ] || fail "$1: Code Editor window not found"
-  eval "$(xdotool getwindowgeometry --shell "$CED")"
-  xdotool windowactivate "$CED" 2>/dev/null
-  xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT/2)) click 1; sleep 0.5
-  xdotool key ctrl+End; sleep 0.3
-  xdotool key End; sleep 0.2
-  xdotool type --delay 15 " // t4neg"; sleep 0.8
-  xdotool key ctrl+s; sleep 2
+  # the designer parsed the corrupted form at open (rt_reopen_project waits
+  # for it); a designer->code sync must hit the parse-block refusal
+  eval "$(xdotool getwindowgeometry --shell "$RT_DESIGNER")"
+  xdotool windowsize "$RT_DESIGNER" $((WIDTH+1)) "$HEIGHT"; sleep 1.5
+  xdotool windowsize "$RT_DESIGNER" "$WIDTH" "$HEIGHT"; sleep 1.5
   local DLG=""
   for i in 1 2 3 4 5; do
     for w in $(rt_ide_windows); do
