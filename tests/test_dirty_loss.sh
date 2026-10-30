@@ -545,11 +545,27 @@ run_closefile() {
 launch_a
 echo 'line one' > /tmp/rt_openme.txt
 # File > Open File...
-menu_path_click '^File\.\.\.$' || { FAILN=$((FAILN+1)); echo "  CLOSEFILE: Open File menu failed (harness)"; rt_cleanup; return; }
-sleep 1
-xdotool key ctrl+l; sleep 0.5
-xdotool type --delay 15 '/tmp/rt_openme.txt'; sleep 0.5
-xdotool key Return; sleep 2
+for attempt in 1 2; do
+  menu_path_click '^File\.\.\.$' || { echo "  [diag] Open File menu failed (attempt $attempt)"; continue; }
+  sleep 1
+  import -window root -crop "800x600+400+200" /tmp/dl_chooser.png 2>/dev/null
+  xdotool key ctrl+l; sleep 0.6
+  xdotool type --delay 15 '/tmp/rt_openme.txt'; sleep 0.5
+  xdotool key Return; sleep 2
+  # did a tab with the file content appear?
+  CED=""
+  for w in $(rt_ide_windows); do
+    [ "$(xdotool getwindowname "$w" 2>/dev/null)" = "Code Editor" ] && { CED=$w; break; }
+  done
+  [ -n "$CED" ] || fail "Code Editor window not found"
+  BAR=$(rt_find_bar); rt_park_all_but "$CED" "$BAR"; sleep 0.5
+  eval "$(xdotool getwindowgeometry --shell "$CED")"
+  xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT/2)) click 1; sleep 0.4
+  xdotool key ctrl+Home; sleep 0.3
+  import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/dl_opened.png 2>/dev/null
+  tesseract /tmp/dl_opened.png - 2>/dev/null | grep -q 'line one' && break
+  echo "  [diag] open attempt $attempt did not land; chooser OCR:"; tesseract /tmp/dl_chooser.png - 2>/dev/null | grep -v '^$' | head -4
+done
 # edit the opened file tab
 CED=""
 for w in $(rt_ide_windows); do
@@ -558,16 +574,7 @@ done
 [ -n "$CED" ] || fail "Code Editor window not found"
 BAR=$(rt_find_bar); rt_park_all_but "$CED" "$BAR"; sleep 0.5
 eval "$(xdotool getwindowgeometry --shell "$CED")"
-# verify the opened document is really the active tab before editing
-OK=""
-for i in $(seq 1 6); do
-  xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT/2)) click 1; sleep 0.4
-  xdotool key ctrl+Home; sleep 0.3
-  import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/dl_opened.png 2>/dev/null
-  tesseract /tmp/dl_opened.png - 2>/dev/null | grep -q 'line one' && { OK=1; break; }
-  sleep 1.5
-done
-[ -n "$OK" ] || { echo "  CLOSEFILE: /tmp/rt_openme.txt not shown in editor (harness)"; tesseract /tmp/dl_opened.png - 2>/dev/null | grep -v '^$' | head -4; FAILN=$((FAILN+1)); rt_cleanup; return; }
+tesseract /tmp/dl_opened.png - 2>/dev/null | grep -q 'line one'   || { echo "  CLOSEFILE: /tmp/rt_openme.txt not shown in editor after 2 attempts (harness)"; FAILN=$((FAILN+1)); rt_cleanup; return; }
 xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT/2)) click 1; sleep 0.4
 xdotool key ctrl+End; sleep 0.3
 xdotool type --delay 15 '// edited'; sleep 1
