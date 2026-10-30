@@ -31,6 +31,7 @@ static nUIScale      // Proportional UI scale (1.0 = 1920x1080 reference)
 static nUIFont       // Default UI font size in pt (scaled)
 static cCurrentFile  // Current file path (empty = untitled)
 static lSwitching := .f.  // Guard against re-entrant SwitchToForm
+static lUpdatingInspectorCombo := .F. // no callbacks during programmatic mirror rebuild
 static lSyncingFromCode := .f.  // Guard: true while syncing code editor -> form
 
 // Project form list (C++Builder: each form = a unit)
@@ -916,6 +917,9 @@ static function OnComboSelect( nSel )
    local hTarget, aMap, aEntry
    local cTabs, aLabels, cCap, hIns
 
+   if lUpdatingInspectorCombo; return nil; endif
+   if nSel < 0; return nil; endif
+
    aMap := InspectorGetComboMap()
 
    if ! Empty( aMap ) .and. nSel >= 0 .and. nSel < Len( aMap )
@@ -948,11 +952,8 @@ static function OnComboSelect( nSel )
       // Form or control
       hTarget := aEntry[2]
    else
-      if nSel == 0
-         hTarget := oDesignForm:hCpp
-      else
-         hTarget := UI_GetChild( oDesignForm:hCpp, nSel )
-      endif
+      if nSel != 0; return nil; endif
+      hTarget := oDesignForm:hCpp
    endif
 
    if hTarget != 0
@@ -964,7 +965,7 @@ return nil
 
 static function OnDesignSelChange( hCtrl )
 
-   local hTarget, i, nCount, nSel
+   local hTarget
    static lInSelChange := .F.
 
    // Re-entrant guard: selecting a combo row below fires the combo-changed
@@ -975,22 +976,7 @@ static function OnDesignSelChange( hCtrl )
       hTarget := If( hCtrl == 0, oDesignForm:hCpp, hCtrl )
       InspectorRefresh( hTarget )
 
-      nSel := 0
-      if hCtrl != 0 .and. hCtrl != oDesignForm:hCpp
-         nCount := UI_GetChildCount( oDesignForm:hCpp )
-         for i := 1 to nCount
-            if UI_GetChild( oDesignForm:hCpp, i ) == hCtrl
-               nSel := i
-               exit
-            endif
-         next
-      endif
-      // The combo must mirror the live child list: after a designer delete
-      // the stale map points INS_ComboSelect at the wrong row (or a freed
-      // control), and the combo-changed handler then re-selects and refreshes
-      // that wrong control in the designer.
-      InspectorPopulateCombo( oDesignForm:hCpp )
-      INS_ComboSelect( _InsGetData(), nSel )
+      MirrorInspectorControl( oDesignForm:hCpp, hTarget )
 
       // Two-way: sync designer changes to code.
       // A just-dropped control is selected before OnComponentDrop names it;
@@ -1911,9 +1897,7 @@ static function OnComponentDrop( hForm, nType, nL, nT, nW, nH )
       endif
       SyncDesignerToCode()
       nCount := UI_GetChildCount( hForm )
-      InspectorPopulateCombo( hForm )
-      INS_ComboSelect( _InsGetData(), nCount )
-      InspectorRefresh( hCtrl )
+      MirrorInspectorControl( hForm, hCtrl )
       return nil
    endif
 
@@ -1934,9 +1918,7 @@ static function OnComponentDrop( hForm, nType, nL, nT, nW, nH )
          endif
       endif
       SyncDesignerToCode()
-      InspectorPopulateCombo( hForm )
-      INS_ComboSelect( _InsGetData(), UI_GetChildCount( hForm ) )
-      InspectorRefresh( hLastCtrl )
+      MirrorInspectorControl( hForm, hLastCtrl )
       return nil
    endif
 
@@ -1950,9 +1932,7 @@ static function OnComponentDrop( hForm, nType, nL, nT, nW, nH )
          UI_SetProp( hCtrl, "cName", cName )
       endif
       SyncDesignerToCode()
-      InspectorPopulateCombo( hForm )
-      INS_ComboSelect( _InsGetData(), nCount )
-      InspectorRefresh( hCtrl )
+      MirrorInspectorControl( hForm, hCtrl )
       return nil
    endif
 
@@ -1966,9 +1946,7 @@ static function OnComponentDrop( hForm, nType, nL, nT, nW, nH )
          UI_SetProp( hCtrl, "cName", cName )
       endif
       SyncDesignerToCode()
-      InspectorPopulateCombo( hForm )
-      INS_ComboSelect( _InsGetData(), nCount )
-      InspectorRefresh( hCtrl )
+      MirrorInspectorControl( hForm, hCtrl )
       return nil
    endif
 
@@ -2127,13 +2105,33 @@ static function OnComponentDrop( hForm, nType, nL, nT, nW, nH )
    SyncDesignerToCode()
 
    // Refresh inspector and select the new component
-   InspectorPopulateCombo( hForm )
-   INS_ComboSelect( _InsGetData(), nCount )  // select last item (new component)
-   InspectorRefresh( hCtrl )
+   MirrorInspectorControl( hForm, hCtrl )
 
 return nil
 
 // Wire all design-mode callbacks on the active form
+// Programmatic rebuilds must not act as a new user selection. Pages and
+// columns expand the combo, so resolve the control's identity in its map.
+static function MirrorInspectorControl( hForm, hTarget )
+   local aMap, i, nSel := 0
+   if hTarget == nil .or. hTarget == 0; return nil; endif
+   lUpdatingInspectorCombo := .T.
+   begin sequence
+      InspectorPopulateCombo( hForm )
+      aMap := InspectorGetComboMap()
+      for i := 1 to Len( aMap )
+         if ( aMap[i][1] == 0 .or. aMap[i][1] == 1 ) .and. aMap[i][2] == hTarget
+            nSel := i - 1
+            exit
+         endif
+      next
+      INS_ComboSelect( _InsGetData(), nSel )
+   always
+      lUpdatingInspectorCombo := .F.
+   end sequence
+   InspectorRefresh( hTarget )
+return nil
+
 static function WireDesignForm()
 
    UI_SetDesignForm( oDesignForm:hCpp )
