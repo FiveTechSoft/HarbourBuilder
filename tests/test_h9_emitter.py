@@ -16,6 +16,8 @@ macradio=branch('macos','            case nType == 8  // RadioButton','         
 winradio=branch('win','            case nType == 8  // RadioButton','            case nType == 12  // BitBtn')
 macimage=branch('macos','            case nType == 14  // Image','            case nType == 16  // Bevel')
 macpic=branch('macos','            case nType == 12 .or. nType == 13  // BitBtn / SpeedButton','            case nType == 20  // TreeView')
+linuxcombo=branch('linux','            case nType == 5  // ComboBox','            case nType == 21  // ListView')
+linuxlist=branch('linux','            case nType == 7  // ListBox','            case nType == 8  // RadioButton')
 pre='''#include "hbide.ch"
 static nFails := 0
 static nSelection := 2
@@ -31,9 +33,13 @@ function Main()
  Check('Win BitBtn picture', ('PICTURE ' + HB_QHarbourStr('icon.png')) $ c)
  c := EmitWin(14)
  Check('Win Image picture', ('PICTURE ' + HB_QHarbourStr('icon.png')) $ c)
+ Check('Linux Combo Value2', '::oProbe:Value := 2' $ EmitLinux(5))
+ Check('Linux List Value2', '::oProbe:Value := 2' $ EmitLinux(7))
  nSelection := 0
  Check('Mac Combo deselection', '::oProbe:Value := 0' $ EmitMac(5))
  Check('Mac List deselection', '::oProbe:Value := 0' $ EmitMac(7))
+ Check('Linux Combo deselection', '::oProbe:Value := 0' $ EmitLinux(5))
+ Check('Linux List deselection', '::oProbe:Value := 0' $ EmitLinux(7))
  lChecked := .T.
  Check('Mac Radio checked', ' CHECKED' $ EmitMac(8))
  Check('Win Radio checked', ' CHECKED' $ EmitWin(8))
@@ -75,7 +81,7 @@ function UI_ComboGetItem(h,n)
  HB_SYMBOL_UNUSED(h)
 return iif(n==1,'Uno','Dos')
 '''
-src=pre+'function EmitMac(nType)\n'+locals+' do case\n'+maccombo+maclist+macradio+macimage+macpic+' endcase\nreturn cCreate\n'+'function EmitWin(nType)\n'+locals+' do case\n'+winradio+winpic+winimage+' endcase\nreturn cCreate\n'+post
+src=pre+'function EmitMac(nType)\n'+locals+' do case\n'+maccombo+maclist+macradio+macimage+macpic+' endcase\nreturn cCreate\n'+'function EmitWin(nType)\n'+locals+' do case\n'+winradio+winpic+winimage+' endcase\nreturn cCreate\n'+'function EmitLinux(nType)\n'+locals+' do case\n'+linuxcombo+linuxlist+' endcase\nreturn cCreate\n'+post
 out=pathlib.Path('/tmp/h9-emitter');out.mkdir(exist_ok=True);(out/'probe.prg').write_text(src)
 hb=pathlib.Path(os.environ.get('HBDIR','/tmp/harbour-review'))
 cmd=[str(hb/'bin/linux/gcc/hbmk2'),str(out/'probe.prg'),str(root/'source/hbbuilder_common.prg'),str(root/'tests/messages_stubs.prg'),'-I'+str(root/'include'),'-gtstd','-quiet','-q','-o'+str(out/'probe')]
