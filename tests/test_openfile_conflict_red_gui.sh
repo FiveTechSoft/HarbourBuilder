@@ -12,7 +12,7 @@ rt_setup "$RUN";rt_launch_ide
 for try in $(seq 1 12);do rt_find_bar >/dev/null&&break;sleep 1;done
 rt_reopen_project
 BAR=$(rt_find_bar);rt_unmap_all_but "$BAR";xdotool mousemove 700 12 click 1
-menu_path_click '^Open$' || exit 1
+xdotool mousemove 20 12 mousedown 1;sleep .5;xdotool mousemove 100 163 mouseup 1
 sleep 1
 xdotool key ctrl+l;xdotool type --delay 1 "$RUN/Standalone.prg";xdotool key Return
 sleep 2
@@ -26,7 +26,7 @@ xclip -selection clipboard -o > "$RUN/editor.txt"
 grep -q UNSAVED-EDITOR-WORK "$RUN/editor.txt" || exit 1
 printf 'function Standalone()\nreturn "EXTERNAL-NEW-WORK"\n' > "$RUN/Standalone.prg"
 BAR=$(rt_find_bar);rt_unmap_all_but "$BAR";xdotool mousemove 700 12 click 1
-menu_path_click '^Close$' || exit 1
+xdotool mousemove 20 12 mousedown 1;sleep .5;xdotool mousemove 100 187 mouseup 1
 sleep 1
 for w in $(rt_ide_windows);do echo "window $w $(xdotool getwindowname "$w")";done
 import -window root /tmp/openfile-close-choice.png
