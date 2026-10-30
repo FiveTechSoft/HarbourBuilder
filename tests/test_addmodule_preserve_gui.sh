@@ -43,6 +43,14 @@ for n in One Two;do select_tab "$n";copy_editor "$n-after";cmp "$RUN/$n-before.t
 # Save project: modules must route to NewModule, not either standalone buffer.
 BAR=$(rt_find_bar);rt_unmap_all_but "$BAR";xdotool mousemove 700 12 click 1;xdotool key ctrl+s;sleep 2
 grep -q MODULE-CONTENT "$RUN/NewModule.prg"
+python3 - "$RUN" <<'ORDER'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1]);h=(p/'Project1.hbp').read_text();assert h.index('HelperA')<h.index('HelperB')<h.index('NewModule')
+for n in ['HelperA','HelperB']:
+ assert (p/(n+'.prg')).read_text().replace('\x1a','').strip()==(Path('/tmp/deep-research/harbourbuilder/repo')/'tests/fixtures/debugmodules'/(n+'.prg')).read_text().strip()
+print('MODULE ORDER HelperA HelperB NewModule, existing source contents intact')
+ORDER
 grep -q BASE-ONE "$RUN/One.prg";grep -q BASE-TWO "$RUN/Two.prg"
 echo 'Project save routes module correctly and leaves standalone disk untouched'
 # Close each standalone choosing Save; verify exact destination and buffer.
