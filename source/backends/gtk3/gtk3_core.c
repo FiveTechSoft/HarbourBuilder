@@ -4255,6 +4255,8 @@ HB_FUNC( UI_GETPROP )
    else if( strcasecmp(szProp,"nClrPane")==0 )   hb_retnint( (HB_MAXINT)p->FClrPane );
    else if( strcasecmp(szProp,"nClrText")==0 )   hb_retnint( (HB_MAXINT)p->FClrText );
    else if( strcasecmp(szProp,"lTransparent")==0 ) hb_retl( p->FTransparent );
+   else if( strcasecmp(szProp,"lVisible")==0 )     hb_retl( p->FVisible );
+   else if( strcasecmp(szProp,"lEnabled")==0 )     hb_retl( p->FEnabled );
    else if( strcasecmp(szProp,"nAlign")==0 )     hb_retni( p->FAlign );
    else if( strcasecmp(szProp,"oFont")==0 )
    {

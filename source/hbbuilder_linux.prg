@@ -1526,6 +1526,15 @@ static function RegenerateFormCode( cName, hForm )
             cCreate += '   ::o' + cCtrlName + ':lTransparent := .F.' + e
          endif
 
+         // Emit lVisible / lEnabled when not default (.F. instead of default .T.);
+         // without this an Inspector edit of either flag was silently lost on save
+         if UI_GetProp( hCtrl, "lVisible" ) == .F.
+            cCreate += '   ::o' + cCtrlName + ':lVisible := .F.' + e
+         endif
+         if UI_GetProp( hCtrl, "lEnabled" ) == .F.
+            cCreate += '   ::o' + cCtrlName + ':lEnabled := .F.' + e
+         endif
+
          // Emit oFont if non-default (skip Linux/Windows defaults)
          cVal := UI_GetProp( hCtrl, "oFont" )
          if ! Empty( cVal ) .and. cVal != "System,12" .and. ;
@@ -4097,6 +4106,10 @@ static function RestoreFormFromCode( hForm, cCode )
          UI_SetProp( hCtrl, "nClrText", Val( cText ) )
       elseif cVal == "lTransparent"
          UI_SetProp( hCtrl, "lTransparent", AllTrim( cText ) == ".T." )
+      elseif cVal == "lVisible"
+         UI_SetProp( hCtrl, "lVisible", AllTrim( cText ) == ".T." )
+      elseif cVal == "lEnabled"
+         UI_SetProp( hCtrl, "lEnabled", AllTrim( cText ) == ".T." )
       elseif cVal == "nAlign"
          UI_SetProp( hCtrl, "nAlign", Val( cText ) )
       elseif cVal == "oFont"
