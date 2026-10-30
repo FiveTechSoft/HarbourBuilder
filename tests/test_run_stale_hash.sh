@@ -18,6 +18,9 @@ FIX="$REPO/tests/fixtures/runhash"
 RUNA=/tmp/rt_runhash_a
 RUNB=/tmp/rt_runhash_b
 TRACE=/tmp/rt_runhash_trace.log
+build_dir_for() {  # $1 = project dir; per-project build subdir keyed by MD5 of the .hbp absolute path
+  printf '/tmp/hbbuilder_build/%s' "$(printf '%s' "$1/Project1.hbp" | md5sum | cut -d' ' -f1)"
+}
 source "$REPO/tests/harness_lib.sh"
 fail() { echo "RUNHASH FAIL: $1"; rt_cleanup; exit 1; }
 rt_provenance
@@ -65,11 +68,11 @@ T1=$(ctrl_r_and_trace)
 echo "trace after first Run: ${T1:-<missing>}"
 echo "${T1:-}" | grep -q 'version:VERSION-A' \
   || { echo "  first Run did not produce the VERSION-A effect"; FAILN=$((FAILN+1)); }
-M1=$(stat -c %Y /tmp/hbbuilder_build/UserApp)
+M1=$(stat -c %Y "$(build_dir_for "$RUNA")/UserApp")
 
 # --- Run 2, NO edit: quick-path must fire (same binary, no rebuild)
 T2=$(ctrl_r_and_trace)
-M2=$(stat -c %Y /tmp/hbbuilder_build/UserApp)
+M2=$(stat -c %Y "$(build_dir_for "$RUNA")/UserApp")
 echo "trace after no-edit Run: ${T2:-<missing>}"
 if [ "$M1" = "$M2" ]; then
   echo "  no-edit Run: quick-path fired (UserApp mtime unchanged: $M1)"
@@ -101,7 +104,7 @@ echo "  [t=$SECONDS] tail edit verified visible"
 # restore the designer window position so only the tail edit changes the code
 xdotool windowmove "$D" "$DX" "$DY"; sleep 0.5
 T3=$(ctrl_r_and_trace)
-M3=$(stat -c %Y /tmp/hbbuilder_build/UserApp)
+M3=$(stat -c %Y "$(build_dir_for "$RUNA")/UserApp")
 echo "trace after tail-edit Run: ${T3:-<missing>} (UserApp mtime $M2 -> $M3)"
 echo "${T3:-}" | grep -q 'version:VERSION-B' \
   || { echo "  TAIL-EDIT: app effect STILL the old build (stale quick-path)"; FAILN=$((FAILN+1)); }
