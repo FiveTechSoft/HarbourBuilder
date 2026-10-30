@@ -87,11 +87,17 @@ edit_row() {  # $1 prop name, $2 new value
   xdotool mousemove $((X+100)) $((Y+80)) click 1
   xdotool key ctrl+a
   printf '%s' "$NEWVAL" | tr '|' '\n' > /tmp/t4insp_newvalue.txt
-  xdotool type --clearmodifiers --file /tmp/t4insp_newvalue.txt; sleep 0.5
+  local item first=1
+  while IFS= read -r item || [ -n "$item" ]; do
+    [ "$first" = 1 ] || xdotool key Return
+    xdotool type --clearmodifiers -- "$item"
+    first=0
+  done < /tmp/t4insp_newvalue.txt
+  sleep 0.5
   import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/t4insp_array_${PROP}.png
   echo "  [$PROP] Array Editor content: $(tesseract /tmp/t4insp_array_${PROP}.png - 2>/dev/null | tr '\n' ' ')"
   local ok
-  ok=$(tesseract /tmp/t4insp_array_${PROP}.png - tsv 2>/dev/null | awk -F'\t' '$12 == "OK" {printf "%d %d", $7+$9/2, $8+$10/2; exit}')
+  ok=$(tesseract /tmp/t4insp_array_${PROP}.png - tsv 2>/dev/null | awk -F'\t' 'tolower($12) == "ok" {printf "%d %d", $7+$9/2, $8+$10/2; exit}')
   [ -n "$ok" ] || fail "$PROP: OK button not located"
   set -- $ok
   xdotool mousemove $((X+$1)) $((Y+$2)) click 1; sleep 1.5
