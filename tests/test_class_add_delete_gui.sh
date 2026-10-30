@@ -125,17 +125,14 @@ rt_cleanup
 rt_setup "$RUN";rt_launch_ide
 for try in $(seq 1 12);do rt_find_bar >/dev/null&&break;sleep 1;done
 rt_reopen_project
-BAR=$(rt_find_bar);rt_park_all_but "$BAR" "$RT_DESIGNER"
-# Map and expose palette, initially at its known startup position.
-for w in $(rt_ide_windows);do
- [ "$w" = "$BAR" ] && continue
- t=$(xdotool getwindowname "$w")
- case "$t" in HbBuilder*) xdotool windowmove "$w" 320 25;xdotool windowmap "$w";xdotool windowraise "$w";;esac
-done
-sleep 1
+BAR=$(rt_find_bar)
+# Fresh startup palette remains at its original screen position.
+import -window root /tmp/class-add-start.png
 # Standard palette BUTTON is the third icon at x451.
 xdotool mousemove 450 76 click 1
 sleep 1
+sleep 1
+import -window root /tmp/class-add-selected.png
 xdotool windowmap "$RT_DESIGNER"; xdotool windowraise "$RT_DESIGNER"
 eval "$(xdotool getwindowgeometry --shell "$RT_DESIGNER")"
 xdotool mousemove $((X+260)) $((Y+220)) click 1
