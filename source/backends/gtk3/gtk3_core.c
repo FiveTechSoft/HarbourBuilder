@@ -769,6 +769,26 @@ static void HBButton_CreateWidget( HBButton * p, GtkWidget * container )
    clean[j] = 0;
 
    GtkWidget * btn = gtk_button_new_with_label( clean );
+   /* BitBtn cGlyph/cPicture: stored and exposed but never rendered (only
+      CT_BITBTN carries FGlyph; plain buttons have no icon) */
+   if( p->base.FControlType == CT_BITBTN && ((HBBitBtn *)p)->FGlyph[0] )
+   {
+      GdkPixbuf * pb = gdk_pixbuf_new_from_file( ((HBBitBtn *)p)->FGlyph, NULL );
+      if( pb )
+      {
+         int h = p->base.FHeight > 4 ? p->base.FHeight - 8 : 16;
+         if( h > 32 ) h = 32;
+         GdkPixbuf * scaled = gdk_pixbuf_scale_simple( pb, h, h, GDK_INTERP_BILINEAR );
+         g_object_unref( pb );
+         if( scaled )
+         {
+            GtkWidget * icon = gtk_image_new_from_pixbuf( scaled );
+            g_object_unref( scaled );
+            gtk_button_set_image( GTK_BUTTON(btn), icon );
+            gtk_button_set_always_show_image( GTK_BUTTON(btn), TRUE );
+         }
+      }
+   }
    g_signal_connect( btn, "clicked", G_CALLBACK(on_button_clicked), p );
    gtk_fixed_put( GTK_FIXED(container), btn, p->base.FLeft, p->base.FTop );
    gtk_widget_set_size_request( btn, p->base.FWidth, p->base.FHeight );
@@ -1231,8 +1251,25 @@ static void HBSpeedButton_CreateWidget( HBControl * p, GtkWidget * container )
 
 static void HBImage_CreateWidget( HBControl * p, GtkWidget * container )
 {
+   HBImage * im = (HBImage *) p;
    GtkWidget * img = gtk_image_new();
    GtkWidget * ev = gtk_event_box_new();
+   /* cPicture was stored/exposed but never rendered: load it when set */
+   if( im->FPicture[0] )
+   {
+      GdkPixbuf * pb = gdk_pixbuf_new_from_file( im->FPicture, NULL );
+      if( pb )
+      {
+         if( im->FStretch && p->FWidth > 0 && p->FHeight > 0 )
+         {
+            GdkPixbuf * scaled = gdk_pixbuf_scale_simple( pb, p->FWidth, p->FHeight, GDK_INTERP_BILINEAR );
+            g_object_unref( pb );
+            pb = scaled;
+         }
+         if( pb ) gtk_image_set_from_pixbuf( GTK_IMAGE(img), pb );
+         if( pb ) g_object_unref( pb );
+      }
+   }
    gtk_container_add( GTK_CONTAINER(ev), img );
    HBGeneric_CreateWidget( p, container, ev );
 }
