@@ -2,7 +2,7 @@
 """Execute actual UserApp publication statement, not a rewritten copy."""
 import pathlib,subprocess,shutil
 r=pathlib.Path(__file__).resolve().parents[1];s=(r/'source/hbbuilder_linux.prg').read_text();p=pathlib.Path('/tmp/userapp-copy');shutil.rmtree(p,ignore_errors=True);p.mkdir()
-a=s.index('         GTK_ShellExec( "cp " + cBuildDir + "/UserApp',s.index('static function TBRun')) if 'HB_PublishUserApp' not in s else s.index('         if ! HB_PublishUserApp(',s.index('static function TBRun'));b=s.index('\n      endif',a)
+a=s.index('         GTK_ShellExec( "cp " + cBuildDir + "/UserApp',s.index('static function HB_PublishProjectApp')) if 'HB_PublishUserApp' not in s else s.index('         if ! HB_PublishUserApp(',s.index('static function HB_PublishProjectApp'));b=s.index('\n      endif',a)
 main='''static nContinued:=0
 function Main()
  local nFail:=0
@@ -29,7 +29,7 @@ return nil
 (p/'build').mkdir();f=p/'build/UserApp';f.write_bytes(b'#!/bin/sh\nprintf COPIED\n');f.chmod(0o755);(p/'dest/Program').mkdir(parents=True)
 helper=''
 if 'static function HB_PublishUserApp' in s:
- a=s.index('static function HB_BuildCopy');b=s.index('static function TBRun',a);helper=s[a:b]
+ a=s.index('static function HB_BuildCopy');b=s.index('static function HB_PublishProjectApp',a);helper=s[a:b]
 (p/'probe.prg').write_text(main+helper)
 print('commit:',subprocess.check_output(['git','rev-parse','HEAD'],cwd=r,text=True).strip(),flush=True)
 subprocess.run(['/tmp/harbour-review/bin/linux/gcc/hbmk2',str(p/'probe.prg'),'-gtstd','-q','-quiet','-o'+str(p/'probe')],check=True)

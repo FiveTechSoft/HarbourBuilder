@@ -4445,11 +4445,32 @@ static function HB_PublishUserApp( cSource, cDest )
    endif
 return .T.
 
+static function HB_PublishProjectApp( cBuildDir )
+   local cDestDir, cAppTitle, cAppExe
+      if ! Empty( cCurrentFile )
+         cDestDir := Left( cCurrentFile, RAt( "/", cCurrentFile ) )
+         cAppTitle := ""
+         if Len( aForms ) >= 1
+            cAppTitle := UI_GetProp( aForms[1][2]:hCpp, "cAppTitle" )
+            if ValType( cAppTitle ) != "C"; cAppTitle := ""; endif
+            cAppTitle := StrTran( AllTrim( cAppTitle ), " ", "_" )
+         endif
+         if Empty( cAppTitle )
+            cAppTitle := Left( cDestDir, Len( cDestDir ) - 1 )
+            cAppTitle := SubStr( cAppTitle, RAt( "/", cAppTitle ) + 1 )
+         endif
+         cAppExe := iif( ! Empty( cAppTitle ), cAppTitle, "UserApp" )
+         if ! HB_PublishUserApp( cBuildDir + "/UserApp", cDestDir + cAppExe )
+            return .F.
+         endif
+      endif
+return .T.
+
 static function TBRun()
 
    local cBuildDir, cOutput, cLog, i, lError
    local cHbDir, cHbBin, cHbInc, cHbLib, cProjDir
-   local cAllPrg, cCmd, cHashSrc, cT, cHash, cDestDir, cAppExe, cAppTitle, cExtern
+   local cAllPrg, cCmd, cHashSrc, cT, cHash, cExtern
    static cLastHash := ""
 
    // freshness guard FIRST: everything below can regenerate buffers or
@@ -4501,6 +4522,7 @@ static function TBRun()
    if cHash == cLastHash .and. ! Empty( cLastHash ) .and. ;
       File( cBuildDir + "/UserApp" ) .and. ;
       File( cBuildDir + "/.srchash" ) .and. MemoRead( cBuildDir + "/.srchash" ) == cHash
+      if ! HB_PublishProjectApp( cBuildDir ); return .F.; endif
       GTK_ShellExec( cBuildDir + "/UserApp 2>/tmp/userapp_debug.log &" )
       return nil
    endif
@@ -4750,23 +4772,7 @@ static function TBRun()
    else
       cLog += Chr(10) + "Build succeeded. Running..." + Chr(10)
       IDE_SetMessages( cLog )
-      if ! Empty( cCurrentFile )
-         cDestDir := Left( cCurrentFile, RAt( "/", cCurrentFile ) )
-         cAppTitle := ""
-         if Len( aForms ) >= 1
-            cAppTitle := UI_GetProp( aForms[1][2]:hCpp, "cAppTitle" )
-            if ValType( cAppTitle ) != "C"; cAppTitle := ""; endif
-            cAppTitle := StrTran( AllTrim( cAppTitle ), " ", "_" )
-         endif
-         if Empty( cAppTitle )
-            cAppTitle := Left( cDestDir, Len( cDestDir ) - 1 )
-            cAppTitle := SubStr( cAppTitle, RAt( "/", cAppTitle ) + 1 )
-         endif
-         cAppExe := iif( ! Empty( cAppTitle ), cAppTitle, "UserApp" )
-         if ! HB_PublishUserApp( cBuildDir + "/UserApp", cDestDir + cAppExe )
-            return .F.
-         endif
-      endif
+      if ! HB_PublishProjectApp( cBuildDir ); return .F.; endif
       cLastHash := cHash
       MemoWrit( cBuildDir + "/.srchash", cHash )
       GTK_ShellExec( cBuildDir + "/UserApp 2>/tmp/userapp_debug.log &" )
