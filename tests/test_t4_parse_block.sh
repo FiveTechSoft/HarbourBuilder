@@ -33,6 +33,8 @@ run_case() {  # $1 name, $2 sed expr, $3 reason regex expected in dialog OCR
     [ -n "$DLG" ] && break
     sleep 1
   done
+  DLGATOPEN=no
+  [ -n "$DLG" ] && DLGATOPEN=yes
   if [ -z "$DLG" ]; then
     eval "$(xdotool getwindowgeometry --shell "$RT_DESIGNER")"
     xdotool windowsize "$RT_DESIGNER" $((WIDTH+1)) "$HEIGHT"; sleep 1.5
@@ -47,6 +49,7 @@ run_case() {  # $1 name, $2 sed expr, $3 reason regex expected in dialog OCR
     done
   fi
   [ -n "$DLG" ] || fail "$1: save/sync was not refused (no dialog at open nor on sync)"
+  echo "  [$1] SEQ: refusal dialog present (at open=$DLGATOPEN)"
   eval "$(xdotool getwindowgeometry --shell "$DLG")"
   import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/t4neg_$1.png
   local TXT=$(tesseract /tmp/t4neg_$1.png - 2>/dev/null)
@@ -55,12 +58,57 @@ run_case() {  # $1 name, $2 sed expr, $3 reason regex expected in dialog OCR
   echo "$TXT" | grep -qE "$3" || fail "$1: dialog does not name the reason ($3)"
   local MD1=$(md5sum "$RUN/Form1.prg" | cut -d' ' -f1)
   [ "$MD0" = "$MD1" ] || fail "$1: Form1.prg changed on disk after the refused save"
-  echo "  [$1] refused, disk byte-identical"
+  # dismiss, then an explicit dirty save must be refused again
+  xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT-14)) click 1; sleep 1
+  echo "  [$1] SEQ: dialog dismissed, forcing explicit save via designer resize"
+  eval "$(xdotool getwindowgeometry --shell "$RT_DESIGNER")"
+  xdotool windowsize "$RT_DESIGNER" $((WIDTH+2)) "$HEIGHT"; sleep 1
+  BAR=$(rt_find_bar); xdotool windowactivate "$BAR" 2>/dev/null
+  xdotool mousemove 700 12 click 1; sleep 0.4
+  xdotool key ctrl+s; sleep 2
+  local DLG2=""
+  for w in $(xdotool search --pid "$RT_IDEPID" 2>/dev/null); do
+    [ "$(xdotool getwindowname "$w" 2>/dev/null)" = "HbBuilder" ] &&       xwininfo -id "$w" 2>/dev/null | grep -q IsViewable && { DLG2=$w; break; }
+  done
+  [ -n "$DLG2" ] || fail "$1: explicit Ctrl+S after the first refusal was not refused"
+  eval "$(xdotool getwindowgeometry --shell "$DLG2")"
+  import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/t4neg_$1-ctrls.png
+  local TXT2=$(tesseract /tmp/t4neg_$1-ctrls.png - 2>/dev/null)
+  echo "  [$1] SEQ: second refusal OCR: $(echo "$TXT2" | tr '\n' ' ' | cut -c1-100)"
+  echo "$TXT2" | grep -qi 'aborted' || fail "$1: second dialog is not the abort notice"
+  local MD2=$(md5sum "$RUN/Form1.prg" | cut -d' ' -f1)
+  [ "$MD0" = "$MD2" ] || fail "$1: Form1.prg changed on disk after the refused Ctrl+S"
+  xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT-14)) click 1; sleep 1
+  # repair the corrupted line in the editor; the save must then succeed
+  echo "  [$1] SEQ: repairing line $4 in the code editor"
+  local CED=""
+  for w in $(rt_ide_windows); do
+    [ "$(xdotool getwindowname "$w" 2>/dev/null)" = "Code Editor" ] && { CED=$w; break; }
+  done
+  [ -n "$CED" ] || fail "$1: Code Editor window not found"
+  eval "$(xdotool getwindowgeometry --shell "$CED")"
+  xdotool windowactivate "$CED" 2>/dev/null
+  xdotool mousemove $((X+WIDTH/2)) $((Y+HEIGHT/2)) click 1; sleep 0.5
+  xdotool key ctrl+Home; sleep 0.3
+  xdotool key --repeat $(( $4 - 1 )) --repeat-delay 15 Down; sleep 0.5
+  xdotool key Home; sleep 0.2
+  xdotool key shift+End; sleep 0.2
+  xdotool type --delay 15 "$5"; sleep 0.8
+  xdotool key ctrl+s; sleep 2.5
+  local MD3=$(md5sum "$RUN/Form1.prg" | cut -d' ' -f1)
+  [ "$MD3" != "$MD0" ] || fail "$1: save after repair did not write the file"
+  grep -qF "$6" "$RUN/Form1.prg" || fail "$1: repaired line not in the saved file"
+  echo "  [$1] SEQ: save after repair succeeded, repaired line on disk"
+  echo "  [$1] refused twice byte-identical, repair recovered the save"
   rt_cleanup
   sleep 1
 }
 
-run_case prompts 's/PROMPTS "P1", "P2"/PROMPTS "P1", "P2/' 'PROMPTS'
-run_case colsizes 's/COLSIZES 90, 60/COLSIZES 90x, 60/' 'COLSIZES'
+run_case prompts 's/PROMPTS "P1", "P2"/PROMPTS "P1", "P2/' 'PROMPTS' 54 \
+  '   @ 60, 460 FOLDER ::oFld1 OF Self SIZE 165, 160 PROMPTS "P1", "P2"' \
+  'PROMPTS "P1", "P2"'
+run_case colsizes 's/COLSIZES 90, 60/COLSIZES 90x, 60/' 'COLSIZES' 56 \
+  '   @ 240, 460 BROWSE ::oBrw1 OF Self SIZE 165, 150 HEADERS "Nombre", "Edad" COLSIZES 90, 60 FOOTERS "Total", ""' \
+  'COLSIZES 90, 60'
 
 echo "T4BLOCK PASS: unparseable FOLDER PROMPTS and non-numeric COLSIZES both refused; disk byte-identical."
