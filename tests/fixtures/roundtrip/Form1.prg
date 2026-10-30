@@ -16,6 +16,9 @@ CLASS TForm1 FROM TForm
    DATA oMemo1     // TMemo
    DATA oList1     // TListBox
    DATA oLedit1    // TLabeledEdit
+   DATA oFld1      // TFolder
+   DATA oBtnPg2    // TButton (folder page 2)
+   DATA oBrw1      // TBrowse
 
    // Event handlers
 
@@ -48,6 +51,12 @@ METHOD CreateForm() CLASS TForm1
    @ 60, 320 LABELEDEDIT ::oLedit1 VAR "editable" OF Self SIZE 160, 24
    @ 430, 300 LISTBOX ::oList1 OF Self SIZE 160, 90 ITEMS "Alfa", "Beta"
    ::oList1:Value := 2
+   @ 60, 460 FOLDER ::oFld1 OF Self SIZE 165, 160 PROMPTS "P1", "P2"
+   @ 90, 475 BUTTON ::oBtnPg2 PROMPT "Pag2" OF ::oFld1:aPages[2] SIZE 90, 26
+   @ 240, 460 BROWSE ::oBrw1 OF Self SIZE 165, 150 HEADERS "Nombre", "Edad" COLSIZES 90, 60 FOOTERS "Total", ""
+   FixtureTraceRaw( "folder-tabs:" + UI_GetProp( ::oFld1:hCpp, "aTabs" ) )
+   FixtureTraceRaw( "browse-cols:" + hb_ValToStr( UI_BrowseColCount( ::oBrw1:hCpp ) ) )
+   FixtureTraceRaw( "page2-btn:" + UI_GetProp( ::oBtnPg2:hCpp, "cText" ) )
 
    // comentario manual del usuario
    ::oEdit1:cText := "modificado"
@@ -65,6 +74,14 @@ static function FixtureHelper( x )
 
 function FixtureCaption( oCtrl )
    return iif( oCtrl:ClassName() == "TCOMBOBOX", "caption-ok", "caption-bad" )
+
+function FixtureTraceRaw( cLine )
+   local c := ""
+   if File( "/tmp/fixture_trace.log" )
+      c := MemoRead( "/tmp/fixture_trace.log" )
+   endif
+   MemoWrit( "/tmp/fixture_trace.log", c + cLine + Chr(10) )
+return nil
 
 function FixtureTrace( cTag, oCtrl )
    MemoWrit( "/tmp/fixture_trace.log", cTag + ":" + oCtrl:cText + Chr(10) )
