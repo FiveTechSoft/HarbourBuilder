@@ -7,7 +7,9 @@ rt_provenance
 mkdir -p "$RUN"
 cp "$REPO/tests/fixtures/debugmodules/"* "$RUN/"
 rm -f /tmp/debugmodules-result.txt
-rt_setup "$RUN"; rt_launch_ide; rt_reopen_project
+rt_setup "$RUN"; rt_launch_ide
+for try in $(seq 1 12); do rt_find_bar >/dev/null && break; sleep 1; done
+rt_reopen_project
 BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"
 xdotool mousemove 15 62 click 1
 sleep 30
