@@ -71,6 +71,10 @@ done
 sleep 3
 echo "app window $APPW pid $APPPID"
 
+# The saved form may legitimately start outside the display after designer
+# parking. Move only the runtime app for visible checks, not its model.
+xdotool windowmove "$APPW" 400 200; xdotool windowraise "$APPW"; sleep 0.5
+
 # evidence screenshot of the app window region
 eval "$(xdotool getwindowgeometry --shell "$APPW")"
 import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/rt_runtime.png

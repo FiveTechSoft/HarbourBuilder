@@ -37,6 +37,7 @@ static aOpenFiles    // Array of open files (not in project): { { cName, cCode, 
 static oTB2          // Debug toolbar (for highlighting Debug button)
 static aDbgOffsets   // line offset tracking for debug_main.prg sections
 static lSyncingFromCode := .f.  // Guard: prevents re-entrant loop when syncing code→form
+static lUpdatingInspectorCombo := .F. // programmatic combo rebuild must not select another object
 static lProjectDirty   := .f.  // unsaved project/form/module edits exist
 static lOpenFilesDirty := .f.  // unsaved edits in File>Open (non-project) tabs
 static s_aTabKnown     := {}   // last loaded/saved/programmatic text per editor tab
@@ -690,6 +691,8 @@ static function OnComboSelect( nSel )
    local hTarget, aMap, aEntry
    local cTabs, aLabels, cCap, hIns
 
+   if lUpdatingInspectorCombo; return nil; endif
+
    aMap := InspectorGetComboMap()
 
    if ! Empty( aMap ) .and. nSel >= 0 .and. nSel < Len( aMap )
@@ -739,7 +742,7 @@ return nil
 
 static function OnDesignSelChange( hCtrl )
 
-   local hTarget, i, nCount, nSel
+   local hTarget, i, nSel, aMap
    static lInSelChange := .F.
 
    // Re-entrant guard: selecting a combo row below fires the combo-changed
@@ -750,22 +753,22 @@ static function OnDesignSelChange( hCtrl )
       hTarget := If( hCtrl == 0, oDesignForm:hCpp, hCtrl )
       InspectorRefresh( hTarget )
 
-      nSel := 0
-      if hCtrl != 0 .and. hCtrl != oDesignForm:hCpp
-         nCount := UI_GetChildCount( oDesignForm:hCpp )
-         for i := 1 to nCount
-            if UI_GetChild( oDesignForm:hCpp, i ) == hCtrl
-               nSel := i
-               exit
-            endif
-         next
-      endif
-      // The combo must mirror the live child list: after a designer delete
-      // the stale map points INS_ComboSelect at the wrong row (or a freed
-      // control), and the combo-changed handler then re-selects and refreshes
-      // that wrong control in the designer.
+      // Rebuild from live controls after deletion, then resolve the selected
+      // object by identity in the expanded map (pages/columns add entries).
+      // Suppress callbacks for both the temporary form selection made by
+      // PopulateCombo and the final mirror selection. Neither is user intent.
+      lUpdatingInspectorCombo := .T.
       InspectorPopulateCombo( oDesignForm:hCpp )
+      aMap := InspectorGetComboMap()
+      nSel := 0
+      for i := 1 to Len( aMap )
+         if ( aMap[i][1] == 0 .or. aMap[i][1] == 1 ) .and. aMap[i][2] == hTarget
+            nSel := i - 1
+            exit
+         endif
+      next
       INS_ComboSelect( _InsGetData(), nSel )
+      lUpdatingInspectorCombo := .F.
 
       // A just-dropped control is selected before OnComponentDrop names it;
       // syncing now would emit a fallback ::octrlN line that later merges as
@@ -775,6 +778,7 @@ static function OnDesignSelChange( hCtrl )
          SyncDesignerToCode()
       endif
    always
+      lUpdatingInspectorCombo := .F.
       lInSelChange := .F.
    end sequence
 
