@@ -66,6 +66,7 @@ static aOpenFiles    // Array of open files (not in project): { { cName, cCode, 
 static aDbgOffsets   // Debug line offsets: { {startLine, "tabName", nTabIndex, nAdj}, ... }
 static oTB2          // Debug toolbar (for highlighting Debug button)
 static lIgnoreSelChange := .f.  // Flag to prevent re-entrant selection change
+static aSelectionParseBlocks := {}
 static lUpdatingInspectorCombo := .F. // no callbacks during programmatic mirror rebuild
 static lSyncingFromCode := .f.  // Guard: true while syncing code -> designer
 
@@ -851,7 +852,7 @@ static function RegenerateFormCode( cName, hForm )
    local aMenuHandlers := {}, lHasHandlers, aMenuNodes, aMFields, cHndl, nMI
    local nPendingLevels, cMNode, cCap, cScut, nLv, nPL, cInd, bIsPopup, aNextF
    local aHdrs, kk, nColCount, aColProps, nColW, nCtrlClr, nInterval
-   local cParent, nOwnerH, nPos, nPos2, cLine
+   local cParent, nOwnerH, nPos, nPos2, cLine, nVal
    local aMethodNames, cMethodName
    local lCommented
    local nWSPort, cWSRoot, nWSTimeout, nWSMaxUpload, lWSHttps, lWSTrace, cWSCookie, nWSTTL
@@ -964,6 +965,10 @@ static function RegenerateFormCode( cName, hForm )
                   cCreate += ' }'
                endif
                cCreate += ' SIZE ' + LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
+               nVal := UI_GetProp( hCtrl, "nItemIndex" )
+               if ValType( nVal ) == "N" .and. nVal >= 0
+                  cCreate += '   ::o' + cCtrlName + ':Value := ' + LTrim( Str( nVal ) ) + e
+               endif
             case nType == 6  // GroupBox
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' GROUPBOX ::o' + cCtrlName + ' PROMPT ' + HB_QHarbourStr( cText ) + ' OF ' + cParent + ' SIZE ' + ;
@@ -982,6 +987,10 @@ static function RegenerateFormCode( cName, hForm )
                   next
                endif
                cCreate += e
+               nVal := UI_GetProp( hCtrl, "nItemIndex" )
+               if ValType( nVal ) == "N" .and. nVal >= 0
+                  cCreate += '   ::o' + cCtrlName + ':Value := ' + LTrim( Str( nVal ) ) + e
+               endif
             case nType == 8  // RadioButton
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' RADIOBUTTON ::o' + cCtrlName + ' PROMPT ' + HB_QHarbourStr( cText ) + ' OF ' + cParent + ' SIZE ' + ;
@@ -1781,6 +1790,53 @@ static function RegenerateFormCode( cName, hForm )
 return cCode
 
 // Restore visual controls on a design form by parsing the form .prg code
+// Selection assignments accept unsigned integer literals only. Name lookup
+// is case-insensitive and independent of creation order or the last hCtrl.
+static function RestoreSelectionAssignment( hForm, cLine )
+   local nPos, cName, cNumber, i, hTarget := 0, nType
+   nPos := At( ":VALUE", Upper( cLine ) )
+   if nPos == 0 .or. !( Left( Upper( cLine ), 3 ) == "::O" )
+      return .F.
+   endif
+   cName := AllTrim( SubStr( cLine, 4, nPos - 4 ) )
+   cNumber := AllTrim( SubStr( cLine, nPos + 6 ) )
+   if !( Left( cNumber, 2 ) == ":=" )
+      AAdd( aSelectionParseBlocks, { hForm, "Value assignment is not a numeric literal" } )
+      return .T.
+   endif
+   cNumber := AllTrim( SubStr( cNumber, 3 ) )
+   for i := 1 to Len( cNumber )
+      if ! IsDigit( SubStr( cNumber, i, 1 ) )
+         AAdd( aSelectionParseBlocks, { hForm, "Value assignment is not a numeric literal" } )
+         return .T.
+      endif
+   next
+   for i := 1 to UI_GetChildCount( hForm )
+      if Upper( UI_GetProp( UI_GetChild( hForm, i ), "cName" ) ) == Upper( cName )
+         hTarget := UI_GetChild( hForm, i )
+         exit
+      endif
+   next
+   if hTarget != 0
+      nType := UI_GetType( hTarget )
+      if ( nType == 5 .or. nType == 7 ) .and. Len( cNumber ) > 0
+         UI_SetProp( hTarget, "nItemIndex", Val( cNumber ) )
+         return .T.
+      endif
+   endif
+   AAdd( aSelectionParseBlocks, { hForm, "Value target is not a resolved ComboBox/ListBox (creation must precede assignment)" } )
+return .T.
+
+static function SelectionParseAllowed( hForm )
+   local row
+   for each row in aSelectionParseBlocks
+      if hForm == nil .or. row[1] == hForm
+         MsgInfo( "Save/sync refused: " + row[2] + ". Fix the Value assignment in the code editor.", "HbBuilder" )
+         return .F.
+      endif
+   next
+return .T.
+
 static function RestoreFormFromCode( hForm, cCode )
 
    local aLines, cLine, cTrim, i, j, nType, nCount, lInCreateForm
@@ -1798,6 +1854,13 @@ static function RestoreFormFromCode( hForm, cCode )
    if Empty( cCode ) .or. hForm == 0
       return nil
    endif
+
+   for i := Len( aSelectionParseBlocks ) to 1 step -1
+      if aSelectionParseBlocks[i][1] == hForm
+         ADel( aSelectionParseBlocks, i )
+         ASize( aSelectionParseBlocks, Len( aSelectionParseBlocks ) - 1 )
+      endif
+   next
 
    // Join Harbour line-continuations (`;` at end of line) so clauses
    // spanning multiple lines (e.g. COMBOBOX ... ; ITEMS ...) parse as one.
@@ -1818,6 +1881,10 @@ static function RestoreFormFromCode( hForm, cCode )
    for i := 1 to Len( aLines )
       cLine := aLines[i]
       cTrim := AllTrim( cLine )
+
+      if RestoreSelectionAssignment( hForm, cTrim )
+         loop
+      endif
 
       // Parse form properties: ::cTitle, ::nWidth, ::nHeight, ::nLeft, ::nTop
       if '::cTitle' $ cTrim .and. ':=' $ cTrim
@@ -3468,6 +3535,8 @@ static function SyncDesignerToCode()
       return nil
    endif
 
+   if ! SelectionParseAllowed( oDesignForm:hCpp ); return .F.; endif
+
    // Get existing code to preserve METHOD implementations
    cOldCode := CodeEditorGetTabText( hCodeEditor, nActiveForm + 1 )
 
@@ -3888,6 +3957,8 @@ static function TBSave()
 
    local cDir, cFile, cHbp, i
 
+   if ! SelectionParseAllowed( nil ); return .F.; endif
+
    // Sync current form code
    SaveActiveFormCode()
 
@@ -4022,6 +4093,8 @@ static function TBRun()
    local cArch, cArchFlags
    local hForm, nCount, hCtrl, oReport, oBand, cBandType, nBandH
    static nLastHash := 0
+
+   if ! SelectionParseAllowed( nil ); return .F.; endif
 
    // If the active form is a report (has bands), preview instead of compile+run
    if nActiveForm > 0 .and. nActiveForm <= Len( aForms ) .and. ;
