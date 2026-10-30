@@ -16,6 +16,7 @@ METHOD CreateForm() CLASS TTestForm
    ::oSrv:AddRoute( "GET", "/", { || UI_HIX_WRITE( "hello-root" ) } )
    ::oSrv:AddRoute( "GET", "/q", { || UI_HIX_WRITE( "q=" + UI_HIX_Query() ) } )
    ::oSrv:Start()
+   HIX_Heartbeat_Start( "/tmp/hix_mainloop_hb.txt" )
    MemoWrit( "/tmp/hix_mainloop_out.txt", "lRunning=" + iif( ::oSrv:lRunning, "T", "F" ) )
 return nil
 PROCEDURE Main()
