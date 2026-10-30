@@ -940,8 +940,20 @@ return Upper( SubStr( cName, 2 ) )
 static function HB_MergeClassBody( cExisting, nClassLine, cDatas, cDeleted )
    local aLines := HB_ATokens( cExisting, Chr(10) ), aNew := HB_ATokens( cDatas, Chr(10) )
    local aSeen := {}, cBody := "", cLine, cName, j, k, e := Chr(13) + Chr(10)
-   local lCreate := .F., cTrim
+   local lCreate := .F., cTrim, nEndClass := 0
+   // Missing boundary must never copy later functions into the class.
    for j := nClassLine + 1 to Len( aLines )
+      cTrim := Upper( AllTrim( StrTran( aLines[j], Chr(13), "" ) ) )
+      if cTrim == "ENDCLASS" .or. Left( cTrim, 10 ) == "ENDCLASS /"
+         nEndClass := j
+         exit
+      endif
+   next
+   if nEndClass == 0
+      AAdd( s_aUnserializable, "missing ENDCLASS boundary in form class" )
+      return ""
+   endif
+   for j := nClassLine + 1 to nEndClass - 1
       cLine := StrTran( aLines[j], Chr(13), "" )
       cTrim := Upper( AllTrim( cLine ) )
       if Left( cTrim, 8 ) == "ENDCLASS"; exit; endif
@@ -991,7 +1003,9 @@ static function HB_IsDeletedButtonData( cLine, cExisting, cName )
 return .F.
 
 static function HB_ClassDeclaresMember( cLine, cMember )
-   local aWords := HB_ATokens( StrTran( AllTrim( Upper( cLine ) ), Chr(9), " " ), " " )
+   local nComment := At( "//", cLine )
+   local cCode := iif( nComment > 0, Left( cLine, nComment - 1 ), cLine )
+   local aWords := HB_ATokens( StrTran( AllTrim( Upper( cCode ) ), Chr(9), " " ), " " )
    local cDecl
    if Len( aWords ) < 2 .or. !( aWords[1] == "DATA" ); return .F.; endif
    cDecl := aWords[2]
