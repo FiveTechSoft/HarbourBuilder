@@ -5,12 +5,13 @@ source "$REPO/tests/harness_lib.sh"
 trap 'rt_cleanup' EXIT
 RUN=/tmp/loaded_form_names_gui
 mkdir -p "$RUN";cp "$REPO/tests/fixtures/debugmodules/"* "$RUN/"
-python3 - "$RUN" <<'FIX'
+python3 - "$RUN" "$REPO" <<'FIX'
 from pathlib import Path
 import sys
 p=Path(sys.argv[1]);s=(p/'Form1.prg').read_text()
-for n in ['Invoice','Form7']:
- (p/(n+'.prg')).write_text(s.replace('Form1',n).replace('FIXTURE roundtrip v3','KEEP-'+n))
+(p/'Form7.prg').write_text(s.replace('Form1','Form7').replace('FIXTURE roundtrip v3','KEEP-Form7'))
+s=(Path(sys.argv[2])/'tests/fixtures/preclass2/healthy/Form2.prg').read_text()
+(p/'Invoice.prg').write_text(s.replace('Form2','Invoice').replace('COMENTARIO-PRECLASS-F2','KEEP-Invoice'))
 (p/'Project1.hbp').write_text('Project1\nForm7\nInvoice\n[modules]\nHelperA\nHelperB\n')
 FIX
 rt_provenance;rt_setup "$RUN";rt_launch_ide
