@@ -47,7 +47,7 @@ pick_combo() {  # $1 = entry text regex
   [ -n "$rel" ] || fail "inspector combo not located"
   set -- $rel
   xdotool mousemove $((X+$1)) $((Y+$2)) click 1; sleep 1
-  import -window root /tmp/t4insp_combo.png
+  import -window root -crop 1600x1000+0+0 +repage /tmp/t4insp_combo.png
   local pick
   pick=$(tesseract /tmp/t4insp_combo.png - tsv 2>/dev/null | \
     awk -F'\t' -v w="$PICKRE" '$12 ~ w {printf "%d %d\n", $7+$9/2, $8+$10/2; exit}')
