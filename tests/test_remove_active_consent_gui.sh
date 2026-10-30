@@ -40,9 +40,10 @@ if [ "$TARGET" = form ];then
 else
  printf 'function HelperA()\nreturn "UNSAVED-MODULE-WORK"\n' | xclip -selection clipboard
 fi
-xdotool key ctrl+a ctrl+v;sleep 1;xdotool key ctrl+a ctrl+c;sleep 1
+if [ "${CHOICE:-cancel}" != clean ];then xdotool key ctrl+a ctrl+v;fi
+sleep 1;xdotool key ctrl+a ctrl+c;sleep 1
 xclip -selection clipboard -o > "$RUN/module-before.txt"
-grep -q UNSAVED-MODULE-WORK "$RUN/module-before.txt" || exit 1
+if [ "${CHOICE:-cancel}" != clean ];then grep -q UNSAVED-MODULE-WORK "$RUN/module-before.txt" || exit 1;fi
 BAR=$(rt_find_bar);rt_unmap_all_but "$BAR";xdotool mousemove 700 12 click 1
 xdotool mousemove 217 12 mousedown 1;sleep .5;xdotool mousemove 300 62 mouseup 1;sleep 1
 for w in $(rt_ide_windows);do [ "$(xdotool getwindowname "$w")" = 'Remove from Project' ] && DLG=$w;done
@@ -51,12 +52,16 @@ xdotool windowmap "$DLG";xdotool windowraise "$DLG";xdotool windowfocus "$DLG";i
 xdotool key Tab Return;sleep 2
 DLG=''
 for w in $(rt_ide_windows);do [ "$(xdotool getwindowname "$w")" = 'Unsaved changes' ] && DLG=$w;done
+if [ "${CHOICE:-cancel}" = clean ];then
+ [ -z "$DLG" ] || { echo 'FAIL spurious clean prompt';exit 1; }
+else
 [ -n "$DLG" ] || { echo 'FAIL unsaved prompt absent';exit 1; }
 xdotool windowmap "$DLG";xdotool windowraise "$DLG";eval "$(xdotool getwindowgeometry --shell "$DLG")"
 import -window root /tmp/remove-consent-prompt.png
 if [ "${CHOICE:-cancel}" = failure ];then printf '\n// EXTERNAL-WORK\n' >> "$RUN/$NAME.prg";fi
 case "${CHOICE:-cancel}" in save|failure) K=1;;discard) K=3;;cancel) K=5;;esac
 xdotool mousemove $((X+K*WIDTH/6)) $((Y+HEIGHT-20)) click 1;sleep 2
+fi
 rt_map_all;xdotool windowraise "$ED";xdotool windowfocus "$ED"
 if [ "${CHOICE:-cancel}" = failure ];then
  for w in $(rt_ide_windows);do
