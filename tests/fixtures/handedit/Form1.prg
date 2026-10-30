@@ -1,6 +1,8 @@
 // Form1.prg - FIXTURE handedit parser: COMPONENT case/tab + menu END trailing comments
 //--------------------------------------------------------------------
 
+#include "hbbuilder.ch"
+
 CLASS TForm1 FROM TForm
 
    // IDE-managed Components
