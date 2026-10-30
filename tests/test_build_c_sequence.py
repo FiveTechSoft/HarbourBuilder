@@ -11,14 +11,14 @@ main='''static aCommands:={}
 function Main()
  local nFail:=0,cLog,c,cGood:=MemoRead('/tmp/build-c-sequence/main.c')
  hb_MemoWrit('/tmp/build-c-sequence/classes.o','KEEP-OLD-CLASS')
- MemoWrit('/tmp/build-c-sequence/main.c','this is invalid C;')
+ hb_MemoWrit('/tmp/build-c-sequence/main.c','this is invalid C;')
  cLog:=Probe()
  if !('FAILED (main.c)' $ cLog).or.'FAILED (classes.c)' $ cLog; nFail++; endif
  if Len(aCommands)!=1; nFail++; endif
  if !(hb_MemoRead('/tmp/build-c-sequence/classes.o')=='KEEP-OLD-CLASS'); nFail++; endif
  QOut('NEGATIVE commands='+hb_ntos(Len(aCommands)))
  QOut(cLog)
- MemoWrit('/tmp/build-c-sequence/main.c',cGood)
+ hb_MemoWrit('/tmp/build-c-sequence/main.c',cGood)
  aCommands:={}
  cLog:=Probe()
  for each c in {'main','classes','hix_runtime','hix_template'}
