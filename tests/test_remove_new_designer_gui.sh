@@ -15,7 +15,8 @@ for w in $(rt_ide_windows);do
 done
 [ -n "$DES" ]&&[ -n "$ED" ] || { echo 'FAIL designer/editor missing';exit 1; }
 xdotool windowmap "$DES";xdotool windowraise "$DES";eval "$(xdotool getwindowgeometry --shell "$DES")"
-xdotool windowsize "$DES" $((WIDTH+33)) "$HEIGHT";sleep 2
+if [ "${CLEAN:-0}" != 1 ];then xdotool windowsize "$DES" $((WIDTH+33)) "$HEIGHT";fi
+sleep 2
 xdotool windowmap "$ED";xdotool windowmove "$ED" 0 125;xdotool windowsize "$ED" 1500 820;xdotool windowraise "$ED";xdotool windowfocus "$ED";xdotool mousemove 350 250 click 1;xdotool key ctrl+a ctrl+c;sleep 1
 xclip -selection clipboard -o > "$RUN/before"
 grep -q TForm2 "$RUN/before" || exit 1
@@ -25,6 +26,10 @@ DLG='';for w in $(rt_ide_windows);do [ "$(xdotool getwindowname "$w")" = 'Remove
 [ -n "$DLG" ]||exit 1
 xdotool windowmap "$DLG";xdotool windowraise "$DLG";xdotool windowfocus "$DLG";xdotool key Down Tab Return;sleep 2
 DLG='';for w in $(rt_ide_windows);do [ "$(xdotool getwindowname "$w")" = 'Unsaved changes' ]&&DLG=$w;done
+if [ "${CLEAN:-0}" = 1 ];then
+ [ -z "$DLG" ] || { echo 'FAIL spurious prompt for unchanged new form';exit 1; }
+ echo 'GREEN unchanged new form removed without spurious prompt';exit 0
+fi
 if [ -z "$DLG" ];then echo 'RED new unsaved designer-resized form removed without consent';import -window root /tmp/new-designer-remove-red.png;exit 1;fi
 xdotool windowmap "$DLG";xdotool windowraise "$DLG";eval "$(xdotool getwindowgeometry --shell "$DLG")"
 xdotool mousemove $((X+5*WIDTH/6)) $((Y+HEIGHT-20)) click 1;sleep 1
