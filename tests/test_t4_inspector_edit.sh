@@ -38,7 +38,7 @@ echo "Inspector window: $INS"
 # Select via keyboard: focus combo, then arrow down N times.
 pick_combo() {  # $1 = entry text regex
   local PICKRE=$1
-  xdotool windowactivate "$INS"; sleep 0.5
+  xdotool windowmove "$INS" 0 165; xdotool windowraise "$INS"; xdotool windowfocus "$INS"; sleep 0.5
   eval "$(xdotool getwindowgeometry --shell "$INS")"
   import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/t4insp_win.png
   local rel
@@ -58,6 +58,7 @@ pick_combo() {  # $1 = entry text regex
 
 edit_row() {  # $1 prop name, $2 new value
   local NEWVAL=$2 PROP=$1
+  xdotool windowraise "$INS"; xdotool windowfocus "$INS"; sleep 0.5
   local rel try
   # the property list scrolls: page it until the row is confidently visible
   for try in 1 2 3 4 5 6; do
@@ -71,6 +72,7 @@ edit_row() {  # $1 prop name, $2 new value
   done
   [ -n "$rel" ] || { tesseract /tmp/t4insp_props.png - 2>/dev/null | head -25; fail "property row $PROP not found after scrolling"; }
   set -- $rel
+  echo "  [$PROP] row at +$1,+$2; inspector $INS origin=$X,$Y size=${WIDTH}x${HEIGHT}"
   # value column: right half of the inspector, same row
   xdotool mousemove $((X+WIDTH-60)) $((Y+$2)) click --repeat 2 --delay 120 1; sleep 0.7
   xdotool key ctrl+a; sleep 0.2
