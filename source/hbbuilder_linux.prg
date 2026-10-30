@@ -4374,6 +4374,35 @@ static function HB_BuildWrite( cFile, cText )
    endif
 return .T.
 
+// Read and verify exact bytes instead of unchecked shell cp. A missing
+// runtime asset blocks the build, so an older staged copy is never reused.
+static function HB_StageFramework( cProjDir, cBuildDir, lDebug )
+   local aAssets := { { "/source/core/classes.prg", "/classes.prg" }, ;
+      { "/source/hix_runtime.prg", "/hix_runtime.prg" }, ;
+      { "/source/hix_template.prg", "/hix_template.prg" }, ;
+      { "/include/hbbuilder.ch", "/hbbuilder.ch" }, ;
+      { "/include/hbide.ch", "/hbide.ch" } }
+   local row, cSource, cDest, cBytes, nHandle
+   if lDebug
+      AAdd( aAssets, { "/source/debugger/dbgclient.prg", "/dbgclient.prg" } )
+   endif
+   for each row in aAssets
+      cSource := cProjDir + row[1]
+      cDest := cBuildDir + row[2]
+      nHandle := FOpen( cSource )
+      if nHandle == -1
+         MsgInfo( "Build aborted: could not read framework " + cSource, "HbBuilder" )
+         return .F.
+      endif
+      FClose( nHandle )
+      cBytes := hb_MemoRead( cSource )
+      if ! hb_MemoWrit( cDest, cBytes ) .or. !( hb_MemoRead( cDest ) == cBytes )
+         MsgInfo( "Build aborted: could not stage framework " + cDest, "HbBuilder" )
+         return .F.
+      endif
+   next
+return .T.
+
 static function TBRun()
 
    local cBuildDir, cOutput, cLog, i, lError
@@ -4484,11 +4513,10 @@ static function TBRun()
       endif
       cLog += "    " + aModules[i][1] + ".prg (module)" + Chr(10)
    next
-   GTK_ShellExec( "cp " + cProjDir + "/source/core/classes.prg " + cBuildDir + "/" )
-   GTK_ShellExec( "cp " + cProjDir + "/source/hix_runtime.prg " + cBuildDir + "/ 2>/dev/null" )
-   GTK_ShellExec( "cp " + cProjDir + "/source/hix_template.prg " + cBuildDir + "/ 2>/dev/null" )
-   GTK_ShellExec( "cp " + cProjDir + "/include/hbbuilder.ch " + cBuildDir + "/" )
-   GTK_ShellExec( "cp " + cProjDir + "/include/hbide.ch " + cBuildDir + "/" )
+   if ! HB_StageFramework( cProjDir, cBuildDir, .F. )
+      GTK_ProgressClose()
+      return .F.
+   endif
 
    // Step 2: Assemble main.prg
    GTK_ProgressStep( "Assembling main.prg..." )
@@ -4768,12 +4796,9 @@ static function TBDebugRun( lRunToBreak )
          return .F.
       endif
    next
-   GTK_ShellExec( "cp " + cProjDir + "/source/core/classes.prg " + cBuildDir + "/" )
-   GTK_ShellExec( "cp " + cProjDir + "/source/hix_runtime.prg " + cBuildDir + "/ 2>/dev/null" )
-   GTK_ShellExec( "cp " + cProjDir + "/source/hix_template.prg " + cBuildDir + "/ 2>/dev/null" )
-   GTK_ShellExec( "cp " + cProjDir + "/include/hbbuilder.ch " + cBuildDir + "/" )
-   GTK_ShellExec( "cp " + cProjDir + "/include/hbide.ch " + cBuildDir + "/" )
-   GTK_ShellExec( "cp " + cProjDir + "/source/debugger/dbgclient.prg " + cBuildDir + "/" )
+   if ! HB_StageFramework( cProjDir, cBuildDir, .T. )
+      return .F.
+   endif
 
    // Step 2: Assemble debug_main.prg (tracking line offsets for each section)
    cLog += "[2] Assembling debug_main.prg..." + Chr(10)
