@@ -4687,8 +4687,9 @@ static function TBRun()
 
    SaveActiveFormCode()
 
-   // Re-sync all forms so new event handlers get wired into CreateForm()
-   RewireAllFormEvents()
+   // HB_CheckFormsSerializable already merged generated wiring while
+   // preserving manual lines. A second text-only rewrite erased custom
+   // bindings and startup calls from the assembled program.
 
    cBuildDir := "/tmp/hbbuilder_build/" + iif( Empty( cCurrentFile ), "_default", hb_MD5( cCurrentFile ) )
 
