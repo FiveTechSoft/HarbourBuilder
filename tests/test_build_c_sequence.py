@@ -6,7 +6,7 @@ r=Path(__file__).resolve().parents[1];s=(r/'source/hbbuilder_linux.prg').read_te
 for name in ['main','classes','hix_runtime','hix_template']:
  (p/(name+'.c')).write_text('#warning '+name+'_diagnostic\nint '+name+'_sample(void){return 0;}\n')
 a=s.index('   // Step 5: Compile C sources',s.index('static function TBRun'));b=s.index('   // Step 6:',a);step=s[a:b]
-a=s.index('static function HB_BuildExec');b=s.index('static function TBRun',a);helper=s[a:b]
+a=s.index('static function HB_ShellArg');b=s.index('static function TBRun',a);helper=s[a:b]
 main='''static aCommands:={}
 function Main()
  local nFail:=0,cLog,c,cGood:=MemoRead('/tmp/build-c-sequence/main.c')
