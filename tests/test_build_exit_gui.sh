@@ -2,6 +2,7 @@
 set -u
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 source "$REPO/tests/harness_lib.sh"
+MODE=${MODE:-run}
 RUN=/tmp/build_exit_gui
 rt_provenance
 mkdir -p "$RUN/tools"
@@ -17,34 +18,43 @@ chmod +x "$RUN/tools/gcc"
 export PATH="$RUN/tools:$PATH"
 rm -f "$RUN/fail" "$RUN/refusals"
 B=/tmp/hbbuilder_build/$(printf '%s' "$RUN/Project1.hbp" | md5sum | cut -d' ' -f1)
+[ "$MODE" != debug ] || B=/tmp/hbbuilder_debug
 rt_setup "$RUN"; rt_launch_ide
 for try in $(seq 1 12); do rt_find_bar >/dev/null && break; sleep 1; done
 rt_reopen_project
-press_run(){ BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"; xdotool mousemove 700 12 click 1; xdotool key ctrl+r; }
+press_run(){ BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"; xdotool mousemove 700 12 click 1; if [ "$MODE" = debug ]; then xdotool mousemove 15 62 click 1; else xdotool key ctrl+r; fi; }
 rm -f /tmp/debugmodules-result.txt
 press_run
 for try in $(seq 1 50); do [ -f /tmp/debugmodules-result.txt ] && break; sleep 1; done
 grep -q MODULES-EXECUTED /tmp/debugmodules-result.txt || { rt_cleanup; exit 1; }
-OLD=$(sha256sum "$B/main.o" | cut -d' ' -f1)
-rm "$B/.srchash" /tmp/debugmodules-result.txt
+OBJ=main.o
+[ "$MODE" != debug ] || OBJ=debug_main.o
+OLD=$(sha256sum "$B/$OBJ" | cut -d' ' -f1)
+rm -f "$B/.srchash" /tmp/debugmodules-result.txt
 touch "$RUN/fail"
 press_run
 sleep 5
+if [ "${EXPECT_OLD:-0}" = 1 ]; then
+ for try in $(seq 1 40); do [ -f /tmp/debugmodules-result.txt ] && break; sleep 1; done
+ grep -q MODULES-EXECUTED /tmp/debugmodules-result.txt || { rt_cleanup; exit 1; }
+ echo "RED reproduced: silent gcc exit7 reused stale $OBJ and executed app"
+ rt_cleanup; exit 0
+fi
 [ ! -f /tmp/debugmodules-result.txt ] || { echo 'FAIL stale app launched'; rt_cleanup; exit 1; }
-[ "$OLD" = "$(sha256sum "$B/main.o" | cut -d' ' -f1)" ] || { rt_cleanup; exit 1; }
+[ "$OLD" = "$(sha256sum "$B/$OBJ" | cut -d' ' -f1)" ] || { rt_cleanup; exit 1; }
 [ -s "$RUN/refusals" ] || { rt_cleanup; exit 1; }
 for w in $(rt_ide_windows); do
  case "$(xdotool getwindowname "$w")" in *Messages*|*Compiler*) xdotool windowmap "$w"; xdotool windowmove "$w" 0 125; xdotool windowsize "$w" 1300 700; xdotool windowraise "$w";; esac
 done
 sleep 1
-import -window root /tmp/build-exit-refused.png
-tesseract /tmp/build-exit-refused.png - --psm 6 2>/dev/null | tee "$RUN/ocr"
+import -window root /tmp/build-exit-$MODE-refused.png
+tesseract /tmp/build-exit-$MODE-refused.png - --psm 6 2>/dev/null | tee "$RUN/ocr"
 grep -q 'exited 7' "$RUN/ocr" || { rt_cleanup; exit 1; }
-echo "BUILD EXIT GUI refusal PASS stale main.o=$OLD not executed"
+echo "BUILD EXIT GUI refusal PASS mode=$MODE stale $OBJ=$OLD not executed"
 # IDE_ShowBuildResult only shows Messages; no modal to dismiss.
 rm "$RUN/fail"
 press_run
 for try in $(seq 1 50); do [ -f /tmp/debugmodules-result.txt ] && break; sleep 1; done
 grep -q MODULES-EXECUTED /tmp/debugmodules-result.txt || { rt_cleanup; exit 1; }
 rt_cleanup
-echo 'BUILD EXIT GUI recovery PASS'
+echo 'BUILD EXIT GUI mode=$MODE recovery PASS'
