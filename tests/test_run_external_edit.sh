@@ -5,7 +5,11 @@
 #             NOT the contract until the disk->editor->model circuit is
 #             proven safe; stale execution is the defect under test.
 #   conflict: disk edit AND unsaved buffer edit -> Run must REFUSE with a
-#             dialog and touch nothing (no app run, disk keeps VERSION-Z).
+#             dialog and touch nothing (no app run, disk keeps VERSION-Z,
+#             buffer keeps VERSION-Y); explicit Reopen then recovers Run
+#             with the external content.
+#   recover:  clean disk edit -> refusal -> dismiss -> Reopen -> Run works
+#             and executes the external content (VERSION-X).
 # RED on binaries without a freshness contract: clean runs the stale
 # buffer (VERSION-A), conflict silently runs the buffer side.
 set -u
@@ -53,6 +57,22 @@ ctrl_r_and_trace() {  # echoes app trace; fails hard if no app appears
   kill "$APPPID" 2>/dev/null; sleep 1
   rt_map_all
   [ -f "$TRACE" ] && cat "$TRACE"
+}
+
+dismiss_dialog() {  # $1 = window id
+  [ -n "$1" ] || return 0
+  xdotool windowmap "$1" 2>/dev/null; xdotool windowactivate "$1" 2>/dev/null
+  sleep 0.5; xdotool key Return; sleep 1
+}
+
+reopen_and_retarget() {  # File > Reopen Last Project; re-resolve the IDE pid
+  local OLD=$IDEPID
+  RT_IDEPID=$IDEPID
+  rt_reopen_project
+  if ! kill -0 "$OLD" 2>/dev/null; then
+    IDEPID=$(pgrep -f '\./hbbuilder_linux' | head -1)
+    echo "  (IDE restarted as pid $IDEPID during reopen)"
+  fi
 }
 
 run_clean() {
@@ -166,7 +186,57 @@ fi
 grep -q 'VERSION-Z' "$RUNA/Form1.prg" \
   && echo "  conflict: disk content untouched (VERSION-Z)" \
   || { echo "  CONFLICT: disk file was overwritten"; FAILN=$((FAILN+1)); }
+# the refused Run must have preserved the pending buffer edit
+BAR=$(rt_find_bar); rt_park_all_but "$CED" "$BAR"; sleep 0.5
+eval "$(xdotool getwindowgeometry --shell "$CED")"
+import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/ee_conflict_buffer.png 2>/dev/null
+tesseract /tmp/ee_conflict_buffer.png - 2>/dev/null | grep -q 'VERSION-Y' \
+  && echo "  conflict: buffer edit preserved after refusal (VERSION-Y)" \
+  || { echo "  CONFLICT: buffer edit lost by the refused Run"; FAILN=$((FAILN+1)); }
+# recovery: dismiss dialog, explicit Reopen, Run again -> external content
+dismiss_dialog "$DLG"
+reopen_and_retarget
+T3=$(ctrl_r_and_trace)
+echo "trace after reopen+Run: ${T3:-<missing>}"
+echo "${T3:-}" | grep -q 'version:VERSION-Z' \
+  && echo "  conflict: after explicit Reopen, Run uses the external content (VERSION-Z)" \
+  || { echo "  CONFLICT: Run after Reopen did not pick the external content"; FAILN=$((FAILN+1)); }
+echo "  note: Reopen discards pending buffer edits without warning (OpenProjectFile has no dirty check; refusal dialog states the loss)"
 echo "conflict case done (FAILN=$FAILN)"
+rt_cleanup
+}
+
+run_recover() {
+launch_a
+T1=$(ctrl_r_and_trace)
+echo "trace after baseline Run: ${T1:-<missing>}"
+echo "${T1:-}" | grep -q 'version:VERSION-A' \
+  || { echo "  baseline Run did not produce VERSION-A"; FAILN=$((FAILN+1)); }
+sed -i 's/VERSION-A/VERSION-X/' "$RUNA/Form1.prg"
+echo "  [t=$SECONDS] external disk edit VERSION-A -> VERSION-X (buffer clean)"
+sleep 1
+BEFORE=$(rt_ide_windows | sort -n | tr '\n' ' ')
+BAR=$(rt_find_bar); rt_unmap_all_but "$BAR"; sleep 0.3
+xdotool mousemove 700 12 click 1; sleep 0.4
+xdotool key ctrl+r
+DLG=""
+for i in $(seq 1 8); do
+  for w in $(rt_ide_windows); do
+    case " $BEFORE " in *" $w "*) ;; *) DLG=$w;; esac
+  done
+  [ -n "$DLG" ] && break
+  sleep 2
+done
+rt_map_all
+[ -n "$DLG" ] && echo "  recover: refusal dialog appeared"   || { echo "  RECOVER: no refusal dialog after external edit"; FAILN=$((FAILN+1)); }
+dismiss_dialog "$DLG"
+reopen_and_retarget
+T2=$(ctrl_r_and_trace)
+echo "trace after reopen+Run: ${T2:-<missing>}"
+echo "${T2:-}" | grep -q 'version:VERSION-X' \
+  && echo "  recover: after explicit Reopen, Run works with the external content (VERSION-X)" \
+  || { echo "  RECOVER: Run after Reopen did not pick the external content"; FAILN=$((FAILN+1)); }
+echo "recover case done (FAILN=$FAILN)"
 rt_cleanup
 }
 

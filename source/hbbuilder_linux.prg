@@ -3518,7 +3518,18 @@ return .T.
 
 static function TBSave()
 
-   local cDir, cFile, cHbp, i
+   local cDir, cFile, cHbp, i, cExtern
+
+   // freshness guard FIRST: saving over a file that changed on disk since
+   // load/last save would silently overwrite external work. Refuse and
+   // preserve both sides; the user reviews by reopening.
+   cExtern := HB_DiskBaseCheck()
+   if ! Empty( cExtern )
+      MsgInfo( "Save refused: " + cExtern + " changed on disk since it was loaded." + ;
+               " Reopen the project to load the external changes" + ;
+               " (unsaved IDE edits are lost on reload).", "HbBuilder" )
+      return nil
+   endif
 
    if ! HB_CheckFormsSerializable()
       return nil
@@ -3534,23 +3545,29 @@ static function TBSave()
 
    cDir := HB_ProjectDirFromFile( cCurrentFile )
 
+   // a failed write keeps its old baseline, so the next Run/Save still
+   // refuses for that file instead of clearing the conflict
    cHbp := HB_BuildHbpFromProject( aForms, aModules )
-   MemoWrit( cCurrentFile, cHbp )
-   HB_DiskBaseSet( cCurrentFile, cHbp )
+   if MemoWrit( cCurrentFile, cHbp )
+      HB_DiskBaseSet( cCurrentFile, cHbp )
+   endif
 
-   MemoWrit( cDir + "Project1.prg", CodeEditorGetTabText( hCodeEditor, 1 ) )
-   HB_DiskBaseSet( cDir + "Project1.prg", CodeEditorGetTabText( hCodeEditor, 1 ) )
+   if MemoWrit( cDir + "Project1.prg", CodeEditorGetTabText( hCodeEditor, 1 ) )
+      HB_DiskBaseSet( cDir + "Project1.prg", CodeEditorGetTabText( hCodeEditor, 1 ) )
+   endif
 
    for i := 1 to Len( aForms )
-      MemoWrit( cDir + aForms[i][1] + ".prg", aForms[i][3] )
-      HB_DiskBaseSet( cDir + aForms[i][1] + ".prg", aForms[i][3] )
+      if MemoWrit( cDir + aForms[i][1] + ".prg", aForms[i][3] )
+         HB_DiskBaseSet( cDir + aForms[i][1] + ".prg", aForms[i][3] )
+      endif
    next
 
    // Write each module .prg
    for i := 1 to Len( aModules )
       aModules[i][2] := CodeEditorGetTabText( hCodeEditor, 1 + Len(aForms) + i )
-      MemoWrit( cDir + aModules[i][1] + ".prg", aModules[i][2] )
-      HB_DiskBaseSet( cDir + aModules[i][1] + ".prg", aModules[i][2] )
+      if MemoWrit( cDir + aModules[i][1] + ".prg", aModules[i][2] )
+         HB_DiskBaseSet( cDir + aModules[i][1] + ".prg", aModules[i][2] )
+      endif
    next
 
    AddRecentProject( cCurrentFile )
@@ -3647,20 +3664,19 @@ static function TBRun()
    local cAllPrg, cCmd, cHashSrc, cT, cHash, cDestDir, cAppExe, cAppTitle, cExtern
    static cLastHash := ""
 
-   // refuse to compile/run stale code after a refused sync
-   if ! HB_CheckFormsSerializable()
-      return nil
-   endif
-
-   // refuse to run when a project file changed on disk since load/last
-   // save: the build would silently use stale buffer content. No
-   // auto-reload: the disk->editor->model circuit is not proven safe, so
-   // the user resolves it explicitly (reopen = load external, save =
-   // overwrite).
+   // freshness guard FIRST: everything below can regenerate buffers or
+   // write files (HB_CheckFormsSerializable syncs/regenerates), so check
+   // the disk baselines before any of it runs.
    cExtern := HB_DiskBaseCheck()
    if ! Empty( cExtern )
       MsgInfo( "Run refused: " + cExtern + " changed on disk since it was loaded." + ;
-               " Reopen the project to load the external changes, or save to overwrite them.", "HbBuilder" )
+               " Reopen the project to load the external changes" + ;
+               " (unsaved IDE edits are lost on reload).", "HbBuilder" )
+      return nil
+   endif
+
+   // refuse to compile/run stale code after a refused sync
+   if ! HB_CheckFormsSerializable()
       return nil
    endif
 
@@ -3968,7 +3984,15 @@ static function TBDebugRun( lRunToBreak )
    local cBuildDir, cOutput, cLog, i, lError
    local cHbDir, cHbBin, cHbInc, cHbLib, cProjDir
    local cAllPrg, cCmd, cMainPrg, cSection
-   local nCurLine, cWebKitLibs
+   local nCurLine, cWebKitLibs, cExtern
+
+   cExtern := HB_DiskBaseCheck()
+   if ! Empty( cExtern )
+      MsgInfo( "Run refused: " + cExtern + " changed on disk since it was loaded." + ;
+               " Reopen the project to load the external changes" + ;
+               " (unsaved IDE edits are lost on reload).", "HbBuilder" )
+      return nil
+   endif
 
    // refuse to debug stale code after a refused sync
    if ! HB_CheckFormsSerializable()
