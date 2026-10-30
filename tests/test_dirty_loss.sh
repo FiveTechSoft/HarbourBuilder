@@ -516,10 +516,10 @@ D=$(rt_find_designer) || fail "designer window not found"
 BAR=$(rt_find_bar); rt_park_all_but "$D" "$BAR"; sleep 0.5
 eval "$(xdotool getwindowgeometry --shell "$D")"
 import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/dl_designer.png 2>/dev/null
-rel=$(tesseract /tmp/dl_designer.png - tsv 2>/dev/null | awk -F'\t' '$12 ~ /Button|Btn|Aceptar|OK/ {print $7" "$8" "$9" "$10; exit}')
+rel=$(tesseract /tmp/dl_designer.png - tsv 2>/dev/null | awk -F'\t' '$12 ~ /Button|Btn|Boton|Aceptar|OK/ {print $7" "$8" "$9" "$10; exit}')
 if [ -z "$rel" ]; then
-  echo "  [diag] no control found by OCR; dragging designer center instead"
-  rel="$((WIDTH/2)) $((HEIGHT/2)) 10 10"
+  echo "  [diag] no control found by OCR; dragging fixture button coords (70,33)"
+  rel="70 33 10 10"
 fi
 set -- $rel
 local CX=$((X + $1 + $3/2)) CY=$((Y + $2 + $4/2))
