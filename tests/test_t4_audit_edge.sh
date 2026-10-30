@@ -90,7 +90,7 @@ run() { local kind=$1 name=$2; shift 2; [ "$WANT" = "all" ] || [ "$WANT" = "$nam
 
 run refuse surplus_sizes 's/COLSIZES 90, 60/COLSIZES 90, 60, 30/' 'COLSIZES'
 run refuse surplus_footers 's/FOOTERS "Total", ""/FOOTERS "Total", "", "X"/' 'FOOTERS'
-run refuse sizes_no_headers 's/ HEADERS "Nombre", "Edad"//' 'COLSIZES'
+run refuse sizes_no_headers 's/ HEADERS "Nombre", "Edad"//' 'for 0 column'
 run refuse page_oob 's/::oFld1:aPages\[2\]/::oFld1:aPages[9]/' 'not resolved'
 run refuse page_junk 's/::oFld1:aPages\[2\]/::oFld1:aPages[2x]/' 'not resolved'
 run keep empty_prompt 's/PROMPTS "P1", "P2"/PROMPTS "", "P2"/' 'PROMPTS "", "P2"'
