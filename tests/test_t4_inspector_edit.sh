@@ -58,12 +58,18 @@ pick_combo() {  # $1 = entry text regex
 
 edit_row() {  # $1 prop name, $2 new value
   local NEWVAL=$2 PROP=$1
-  eval "$(xdotool getwindowgeometry --shell "$INS")"
-  import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/t4insp_props.png
-  local rel
-  rel=$(tesseract /tmp/t4insp_props.png - tsv 2>/dev/null | \
-    awk -F'\t' -v w="^$PROP$" '$12 ~ w {printf "%d %d\n", $7, $8+$10/2; exit}')
-  [ -n "$rel" ] || { tesseract /tmp/t4insp_props.png - 2>/dev/null | grep -iE "atabs|acolum|behavior|data" | head -5; fail "property row $PROP not found"; }
+  local rel try
+  # the property list scrolls: page it until the row is confidently visible
+  for try in 1 2 3 4 5 6; do
+    eval "$(xdotool getwindowgeometry --shell "$INS")"
+    import -window root -crop "${WIDTH}x${HEIGHT}+${X}+${Y}" /tmp/t4insp_props.png
+    rel=$(tesseract /tmp/t4insp_props.png - tsv 2>/dev/null | \
+      awk -F'\t' -v w="^$PROP$" '$11+0 > 40 && $12 ~ w {printf "%d %d\n", $7, $8+$10/2; exit}')
+    [ -n "$rel" ] && break
+    xdotool mousemove $((X+150)) $((Y+400)) click 1; sleep 0.4
+    xdotool key Next; sleep 0.8
+  done
+  [ -n "$rel" ] || { tesseract /tmp/t4insp_props.png - 2>/dev/null | head -25; fail "property row $PROP not found after scrolling"; }
   set -- $rel
   # value column: right half of the inspector, same row
   xdotool mousemove $((X+WIDTH-60)) $((Y+$2)) click --repeat 2 --delay 120 1; sleep 0.7
