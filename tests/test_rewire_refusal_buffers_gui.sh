@@ -1,5 +1,5 @@
 #!/bin/bash
-set -u
+set -eu
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 source "$REPO/tests/harness_lib.sh"
 trap 'rt_cleanup' EXIT
@@ -30,28 +30,28 @@ rt_reopen_project
 # then select Form2 before Run. GTK notebook tabs are at top of code editor.
 for w in $(rt_ide_windows);do [ "$(xdotool getwindowname "$w")" = 'Code Editor' ] && ED=$w;done
 rt_map_all;xdotool windowmove "$ED" 0 125;xdotool windowsize "$ED" 1500 820;xdotool windowraise "$ED";xdotool windowfocus "$ED"
-xdotool mousemove 155 142 click 1;sleep 1
+xdotool windowraise "$ED";xdotool windowfocus "$ED";xdotool mousemove 135 120 click 1;sleep 1
 xclip -selection clipboard -i "$RUN/edited-form1.prg"
 xdotool mousemove 350 250 click 1;xdotool key ctrl+a ctrl+v;sleep 2
-xdotool key ctrl+a ctrl+c;sleep 0.4
+xdotool key ctrl+a ctrl+c;sleep 1
 xclip -selection clipboard -o > /tmp/refusal-f1-before.txt
-xdotool mousemove 250 142 click 1;sleep 1
-xdotool mousemove 350 250 click 1;xdotool key ctrl+a ctrl+c;sleep 0.4
+xdotool windowraise "$ED";xdotool windowfocus "$ED";xdotool mousemove 220 120 click 1;sleep 1
+xdotool mousemove 350 250 click 1;xdotool key ctrl+a ctrl+c;sleep 1
 xclip -selection clipboard -o > /tmp/refusal-f2-before.txt
 python3 - <<'BREAK'
 from pathlib import Path
 p=Path('/tmp/refusal-f2-before.txt');s=p.read_text();assert 'CLASS TForm2 FROM TForm' in s;p=Path('/tmp/refusal-f2-broken.txt');p.write_text(s.replace('CLASS TForm2 FROM TForm','// removed class declaration'))
 BREAK
 xclip -selection clipboard -i /tmp/refusal-f2-broken.txt;xdotool key ctrl+a ctrl+v;sleep 1
-xdotool key ctrl+a ctrl+c;sleep 0.4
+xdotool key ctrl+a ctrl+c;sleep 1
 xclip -selection clipboard -o > /tmp/refusal-f2-inserted.txt
 sha256sum "$RUN/Form1.prg" "$RUN/Form2.prg" > /tmp/refusal-disks-before.txt
 BAR=$(rt_find_bar);rt_unmap_all_but "$BAR";xdotool mousemove 700 12 click 1;xdotool key ctrl+s;sleep 2
 import -window root /tmp/rewire-refusal-dialog.png
 xdotool key Return;sleep 1
-rt_map_all;xdotool windowraise "$ED";xdotool windowfocus "$ED";xdotool mousemove 350 250 click 1;xdotool key ctrl+a ctrl+c;sleep 0.4
+rt_map_all;xdotool windowraise "$ED";xdotool windowfocus "$ED";xdotool mousemove 350 250 click 1;xdotool key ctrl+a ctrl+c;sleep 1
 xclip -selection clipboard -o > /tmp/refusal-f2-after.txt
-xdotool mousemove 155 142 click 1;sleep 1;xdotool mousemove 350 250 click 1;xdotool key ctrl+a ctrl+c;sleep 0.4
+xdotool windowraise "$ED";xdotool windowfocus "$ED";xdotool mousemove 135 120 click 1;sleep 1;xdotool mousemove 350 250 click 1;xdotool key ctrl+a ctrl+c;sleep 1
 xclip -selection clipboard -o > /tmp/refusal-f1-after.txt
 sha256sum "$RUN/Form1.prg" "$RUN/Form2.prg" > /tmp/refusal-disks-after.txt
 python3 - <<'VERIFY'
