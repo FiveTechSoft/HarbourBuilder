@@ -14,10 +14,15 @@ source "$REPO/tests/harness_lib.sh"
 fail() { echo "RUNTIME FAIL: $1"; rt_cleanup; exit 1; }
 
 rt_provenance
+PICTURE_FILES="${PICTURE_FILES:-yes}"
 rm -f /tmp/fixture_trace.log /tmp/rt_runtime.png
 rm -rf "$RUN"; mkdir -p "$RUN"
 cp "$FIX"/Project1.hbp "$FIX"/Project1.prg "$FIX"/Form1.prg "$RUN"/
 rt_setup "$RUN"
+# the user app inherits the IDE cwd ($REPO/bin): relative PICTURE paths
+# resolve there. PICTURE_FILES=no runs the negative control (files absent).
+rm -f "$REPO/bin/icon.png" "$REPO/bin/test.png"
+[ "$PICTURE_FILES" = "yes" ] && cp "$FIX/icon.png" "$FIX/test.png" "$REPO/bin/"
 rt_launch_ide
 IDEPID=$RT_IDEPID
 
@@ -81,7 +86,24 @@ echo "  OCR: $OCR"
 echo "$OCR" | grep -q 'caption-ok' || { echo "  caption effect missing"; FAILN=$((FAILN+1)); }
 echo "$OCR" | grep -q 'modificado' || { echo "  edit effect missing"; FAILN=$((FAILN+1)); }
 
+# 4. PICTURE really loads (auditor: only textual preservation was covered,
+# with nonexistent images). icon.png = solid cyan 16x16 (BITBTN), test.png =
+# solid magenta 32x32 (IMAGE). Fraction of exact-color pixels in the window
+# capture proves the pixbuf rendered, not just the property survived.
+if [ "$PICTURE_FILES" = "yes" ]; then COPIED="with" ; else COPIED="without"; fi
+echo "  picture check ($COPIED image files in the app cwd):"
+MAG=$(convert /tmp/rt_runtime.png -fill white -opaque 'rgb(255,0,255)' -fill black +opaque white -colorspace gray -format "%[fx:mean*100]" info: 2>/dev/null)
+CYA=$(convert /tmp/rt_runtime.png -fill white -opaque 'rgb(0,255,255)' -fill black +opaque white -colorspace gray -format "%[fx:mean*100]" info: 2>/dev/null)
+echo "  magenta(test.png IMAGE)=${MAG}% cyan(icon.png BITBTN)=${CYA}% of window pixels"
+if [ "$PICTURE_FILES" = "yes" ]; then
+  awk -v m="$MAG" 'BEGIN{exit !(m+0 >= 0.3)}' || { echo "  IMAGE test.png not rendered (magenta < 0.3%)"; FAILN=$((FAILN+1)); }
+  awk -v c="$CYA" 'BEGIN{exit !(c+0 >= 0.05)}' || { echo "  BITBTN icon.png not rendered (cyan < 0.05%)"; FAILN=$((FAILN+1)); }
+else
+  awk -v m="$MAG" 'BEGIN{exit !(m+0 < 0.3)}' || { echo "  CONTROL FAIL: magenta present without the image file (check cannot detect absence)"; FAILN=$((FAILN+1)); }
+fi
+
 kill "$APPPID" 2>/dev/null
+rm -f "$REPO/bin/icon.png" "$REPO/bin/test.png"
 [ "$FAILN" -gt 0 ] && fail "$FAILN runtime effect(s) missing (screenshot /tmp/rt_runtime.png)"
 echo "RUNTIME PASS: side-effect call, dependent caption and custom edit all executed."
 rt_cleanup
