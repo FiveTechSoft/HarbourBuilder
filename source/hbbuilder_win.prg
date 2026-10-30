@@ -31,6 +31,7 @@ static nUIScale      // Proportional UI scale (1.0 = 1920x1080 reference)
 static nUIFont       // Default UI font size in pt (scaled)
 static cCurrentFile  // Current file path (empty = untitled)
 static lSwitching := .f.  // Guard against re-entrant SwitchToForm
+static aPictureParseBlocks := {}
 static lUpdatingInspectorCombo := .F. // no callbacks during programmatic mirror rebuild
 static lSyncingFromCode := .f.  // Guard: true while syncing code editor -> form
 
@@ -1221,11 +1222,21 @@ static function RegenerateFormCode( cName, hForm )
             case nType == 12  // BitBtn
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' BITBTN ::o' + cCtrlName + ' PROMPT ' + HB_QHarbourStr( cText ) + ' OF Self SIZE ' + ;
-                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
+                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH))
+               cVal := UI_GetProp( hCtrl, "cPicture" )
+               if ValType( cVal ) == "C" .and. Len( cVal ) > 0
+                  cCreate += ' PICTURE ' + HB_QHarbourStr( cVal )
+               endif
+               cCreate += e
             case nType == 14  // Image
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' IMAGE ::o' + cCtrlName + ' OF Self SIZE ' + ;
-                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH)) + e
+                  LTrim(Str(nCW)) + ", " + LTrim(Str(nCH))
+               cVal := UI_GetProp( hCtrl, "cPicture" )
+               if ValType( cVal ) == "C" .and. Len( cVal ) > 0
+                  cCreate += ' PICTURE ' + HB_QHarbourStr( cVal )
+               endif
+               cCreate += e
             case nType == 15  // Shape
                cCreate += '   @ ' + LTrim(Str(nT)) + ", " + LTrim(Str(nL)) + ;
                   ' SHAPE ::o' + cCtrlName + ' OF Self SIZE ' + ;
@@ -2200,6 +2211,8 @@ static function SyncDesignerToCode()
       return nil
    endif
 
+   if ! PictureParseAllowed( oDesignForm:hCpp ); return .F.; endif
+
    // Get existing code to preserve METHOD implementations
    cOldCode := CodeEditorGetTabText( hCodeEditor, nActiveForm + 1 )
 
@@ -2520,6 +2533,31 @@ static function TBNew()
 return nil
 
 // Restore visual controls on a design form by parsing the form .prg code
+// PICTURE expressions are evaluated only by the restricted string inverse.
+// Anything else blocks regeneration/Save rather than replacing the path.
+static function RestorePictureClause( hForm, hCtrl, cLine )
+   local nPos := At( " PICTURE ", Upper( HB_StripStrings( cLine ) ) )
+   local cExpr, xValue
+   if nPos == 0; return .T.; endif
+   cExpr := AllTrim( SubStr( cLine, nPos + 9 ) )
+   xValue := HB_HarbourStrEval( cExpr )
+   if xValue == nil
+      AAdd( aPictureParseBlocks, { hForm, "PICTURE expression not understood" } )
+      return .F.
+   endif
+   UI_SetProp( hCtrl, "cPicture", xValue )
+return .T.
+
+static function PictureParseAllowed( hForm )
+   local row
+   for each row in aPictureParseBlocks
+      if hForm == nil .or. row[1] == hForm
+         MsgInfo( "Save/sync refused: " + row[2] + ". Fix the PICTURE clause in the code editor.", "HbBuilder" )
+         return .F.
+      endif
+   next
+return .T.
+
 static function RestoreFormFromCode( hForm, cCode )
 
    local aLines, cLine, cTrim, i, nType, kk
@@ -2539,6 +2577,13 @@ static function RestoreFormFromCode( hForm, cCode )
    if Empty( cCode ) .or. hForm == 0
       return nil
    endif
+
+   for i := Len( aPictureParseBlocks ) to 1 step -1
+      if aPictureParseBlocks[i][1] == hForm
+         ADel( aPictureParseBlocks, i )
+         ASize( aPictureParseBlocks, Len( aPictureParseBlocks ) - 1 )
+      endif
+   next
 
    aLines := HB_ATokens( cCode, Chr(10) )
 
@@ -3238,8 +3283,10 @@ static function RestoreFormFromCode( hForm, cCode )
             endif
          case " BITBTN " $ Upper( cTrim )
             hCtrl := UI_BitBtnNew( hForm, cText, nL, nT, nW, nH )
+            if hCtrl != 0; RestorePictureClause( hForm, hCtrl, cTrim ); endif
          case " IMAGE " $ Upper( cTrim )
             hCtrl := UI_ImageNew( hForm, nL, nT, nW, nH )
+            if hCtrl != 0; RestorePictureClause( hForm, hCtrl, cTrim ); endif
          case " SHAPE " $ Upper( cTrim )
             hCtrl := UI_ShapeNew( hForm, nL, nT, nW, nH )
          case " MEMO " $ Upper( cTrim )
@@ -3682,6 +3729,8 @@ static function TBSave()
 
    local cDir, cFile, cHbp, i
 
+   if ! PictureParseAllowed( nil ); return .F.; endif
+
    // Sync current form code. SyncDesignerToCode first so the live
    // designer state (including any post-Open form drag) is captured,
    // then SaveActiveFormCode picks up any manual edits in the editor.
@@ -3979,6 +4028,8 @@ static function TBRun()
    local cFldData, aFldLines, cFldLine, aFldRec, oFld
    local cDestDir, cAppExe, cSmart, cBin64, cMyDll
    static nLastHash := 0
+
+   if ! PictureParseAllowed( nil ); return .F.; endif
 
    SaveActiveFormCode()
    SyncDesignerToCode()  // Ensure event bindings are up to date
