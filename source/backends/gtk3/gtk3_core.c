@@ -720,6 +720,17 @@ static void HBLabel_CreateWidget( HBLabel * p, GtkWidget * container )
    gtk_widget_show( label );
 }
 
+/* Sync widget -> model on user input. Without this, typing in a GtkEntry
+ * never reaches FText, so Value/cText read back stale. Deliberately does
+ * NOT fire FOnChange: event semantics need their own verification. */
+static void on_edit_changed( GtkWidget * widget, gpointer data )
+{
+   HBEdit * p = (HBEdit *)data;
+   const char * text = gtk_entry_get_text( GTK_ENTRY(widget) );
+   strncpy( p->base.FText, text, sizeof(p->base.FText) - 1 );
+   p->base.FText[sizeof(p->base.FText) - 1] = 0;
+}
+
 static void HBEdit_CreateWidget( HBEdit * p, GtkWidget * container )
 {
    GtkWidget * entry = gtk_entry_new();
@@ -728,6 +739,7 @@ static void HBEdit_CreateWidget( HBEdit * p, GtkWidget * container )
       gtk_editable_set_editable( GTK_EDITABLE(entry), FALSE );
    if( p->FPassword )
       gtk_entry_set_visibility( GTK_ENTRY(entry), FALSE );
+   g_signal_connect( entry, "changed", G_CALLBACK(on_edit_changed), p );
    gtk_fixed_put( GTK_FIXED(container), entry, p->base.FLeft, p->base.FTop );
    gtk_widget_set_size_request( entry, p->base.FWidth, p->base.FHeight );
    p->base.FWidget = entry;
