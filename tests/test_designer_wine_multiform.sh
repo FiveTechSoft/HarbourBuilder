@@ -126,10 +126,14 @@ done
 xdotool search --onlyvisible --name 'Open HbBuilder Project' >/dev/null 2>&1 || fail "Open dialog did not open"
 comdlg_type_path "$WINPATH"
 sleep 2
-# load evidence: both design forms restored
+# load evidence: the ACTIVE form (Form1) is restored; the inactive form must
+# NOT be mapped right after Open. Ghost regression guard: under Wine the old
+# show-then-hide in Open left Form2 mapped on screen while win32 reported it
+# hidden, so it received no mouse input and edits landed in the active form.
 F1=$(xdotool search --onlyvisible --name '^Form1$' 2>/dev/null | head -1)
 F2=$(xdotool search --onlyvisible --name '^Form2$' 2>/dev/null | head -1)
-[ -n "$F1" ] && [ -n "$F2" ] || fail "Open did not restore both form windows (F1=$F1 F2=$F2)"
+[ -n "$F1" ] || fail "Open did not restore the active form window (F1=$F1)"
+[ -z "$F2" ] || fail "inactive Form2 is mapped right after Open (ghost window: on screen, win32-hidden, no input)"
 # Form activation is driven by the IDE (SwitchToForm), not by window clicks:
 # clicking an inactive form's window does not activate it (validated: the edit
 # landed in Form1's cTitle). Use View > Forms... (first menu item), whose
@@ -142,6 +146,9 @@ win_geo "$SF"
 xdotool mousemove $((X + 60)) $((Y + 38)) click 1; sleep 0.8
 xdotool mousemove $((X + 97)) $((Y + 291)) click 1; sleep 2
 xdotool search --onlyvisible --name 'Select a form' >/dev/null 2>&1 && fail "'Select a form' dialog did not close"
+# activation must show the never-mapped form (exercises the show path post-fix)
+F2=$(xdotool search --onlyvisible --name '^Form2$' 2>/dev/null | head -1)
+[ -n "$F2" ] || fail "Form2 not shown after View>Forms activation"
 win_geo "$F2"
 xdotool mousemove $((X + 240)) $((Y + 122)) click 1; sleep 2
 inspector_edit 'HolaF2b'
@@ -155,4 +162,4 @@ cmp -s "$RUN/f1_leg1.sha" <(sha1sum "$RUN/Form1.prg" | awk '{print $1}') || fail
 save_click
 cmp -s "$RUN/f2_leg2.sha" <(sha1sum "$RUN/Form2.prg" | awk '{print $1}') || fail "second save not a fixpoint (Form2.prg)"
 import -window root "$RUN/reopened.png" 2>/dev/null
-echo "WINE MULTIFORM PASS: F1 edit -> save -> NewForm -> F2 edit -> save(4 files) -> restart -> open(both forms) -> activate F2 (View>Forms) -> edit -> save -> fixpoint (RUN=$RUN)"
+echo "WINE MULTIFORM PASS: F1 edit -> save -> NewForm -> F2 edit -> save(4 files) -> restart -> open(F1 shown, F2 never mapped = no ghost) -> activate F2 via View>Forms (now shown) -> edit -> save -> fixpoint (RUN=$RUN)"
