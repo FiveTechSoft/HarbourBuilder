@@ -7850,6 +7850,21 @@ return ""
 #include <shlobj.h>
 #include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
+
+/* Debug trace: appends to scintilla_trace.log in the process CWD with no
+ * rotation. Off by default; enable explicitly with env var HBBUILDER_TRACE
+ * (any value except empty or "0"). Read once, cached. */
+static int HbTraceEnabled( void )
+{
+   static int s_iTrace = -1;
+   if( s_iTrace < 0 )
+   {
+      const char * e = getenv( "HBBUILDER_TRACE" );
+      s_iTrace = ( e && e[0] && strcmp( e, "0" ) != 0 ) ? 1 : 0;
+   }
+   return s_iTrace;
+}
 
 /* GDI+ flat API for C (no C++ headers needed) */
 typedef struct { UINT32 GdiplusVersion; void *DebugEventCallback;
@@ -11333,7 +11348,7 @@ static BOOL InitScintilla( void )
 
    if( s_hScintilla ) return TRUE;  /* already loaded */
 
-   fLog = fopen( "scintilla_trace.log", "a" );
+   fLog = HbTraceEnabled() ? fopen( "scintilla_trace.log", "a" ) : NULL;
 
    GetModuleFileNameA( NULL, szDir, MAX_PATH );
    { char * p = strrchr( szDir, '\\' ); if( p ) { *p = 0; } }
@@ -11551,7 +11566,7 @@ static void ConfigureScintilla( HWND hSci )
    /* Indentation guides */
    SciMsg( hSci, SCI_SETINDENTATIONGUIDES, SC_IV_LOOKBOTH, 0 );
 
-   { FILE * fLog = fopen( "scintilla_trace.log", "a" );
+   { FILE * fLog = HbTraceEnabled() ? fopen( "scintilla_trace.log", "a" ) : NULL;
      if( fLog ) { fprintf( fLog, "ConfigureScintilla done for hwnd=%p\n", hSci ); fclose( fLog ); }
    }
 }
@@ -13059,7 +13074,7 @@ HB_FUNC( CODEEDITORCREATE )
    int nWidth = hb_parni(3), nHeight = hb_parni(4);
    FILE * fLog;
 
-   fLog = fopen( "scintilla_trace.log", "a" );
+   fLog = HbTraceEnabled() ? fopen( "scintilla_trace.log", "a" ) : NULL;
    if( fLog ) fprintf( fLog, "CodeEditorCreate: %d,%d %dx%d\n", nLeft, nTop, nWidth, nHeight );
 
    /* Load Scintilla + Lexilla DLLs */
