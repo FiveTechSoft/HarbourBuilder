@@ -1955,6 +1955,15 @@ static void HBControl_CreateWidget( HBControl * child, GtkWidget * fixed, const 
             HBNonVisual_CreateWidget( child, fixed );
          break;
    }
+
+   /* Honor lVisible/lEnabled assigned before widget creation (generated apps
+      set them in CreateForm, before Activate creates widgets): without this
+      the stored flags were silently ignored at startup. */
+   if( child->FWidget )
+   {
+      if( !child->FVisible ) gtk_widget_set_visible( child->FWidget, FALSE );
+      if( !child->FEnabled ) gtk_widget_set_sensitive( child->FWidget, FALSE );
+   }
 }
 
 static HBControl * HBForm_CreateControlOfType( HBForm * form, int ctrlType,

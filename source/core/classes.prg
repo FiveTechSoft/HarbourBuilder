@@ -57,6 +57,9 @@ CLASS TControl
    ACCESS lEnabled       INLINE UI_GetProp( ::hCpp, "lEnabled" )
    ASSIGN lEnabled( l )  INLINE UI_SetProp( ::hCpp, "lEnabled", l )
 
+   ACCESS lVisible       INLINE UI_GetProp( ::hCpp, "lVisible" )
+   ASSIGN lVisible( l )  INLINE UI_SetProp( ::hCpp, "lVisible", l )
+
    ASSIGN OnClick( b )  INLINE UI_OnEvent( ::hCpp, "OnClick", b )
    ASSIGN OnChange( b ) INLINE UI_OnEvent( ::hCpp, "OnChange", b )
    ASSIGN OnClose( b )  INLINE UI_OnEvent( ::hCpp, "OnClose", b )
@@ -262,6 +265,12 @@ CLASS TEdit INHERIT TControl
 
    ACCESS Value      INLINE UI_GetProp( ::hCpp, "cText" )
    ASSIGN Value( c ) INLINE UI_SetProp( ::hCpp, "cText", c )
+
+   ACCESS lReadOnly       INLINE UI_GetProp( ::hCpp, "lReadOnly" )
+   ASSIGN lReadOnly( l )  INLINE UI_SetProp( ::hCpp, "lReadOnly", l )
+
+   ACCESS lPassword       INLINE UI_GetProp( ::hCpp, "lPassword" )
+   ASSIGN lPassword( l )  INLINE UI_SetProp( ::hCpp, "lPassword", l )
 
    METHOD New( oParent, cText, nLeft, nTop, nWidth, nHeight )
 
