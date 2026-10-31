@@ -865,6 +865,14 @@ HB_FUNC( UI_FORMHIDE )
       ShowWindow( p->FHandle, SW_HIDE );
 }
 
+/* UI_FormCreateHidden( hForm ) - create the form window fully but never map
+   it (see TForm::CreateHidden). */
+HB_FUNC( UI_FORMCREATEHIDDEN )
+{
+   TForm * p = GetForm(1);
+   if( p ) p->CreateHidden();
+}
+
 /* UI_FormClose( hForm ) */
 HB_FUNC( UI_FORMCLOSE )
 {

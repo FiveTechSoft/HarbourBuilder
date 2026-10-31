@@ -239,6 +239,7 @@ public:
 
    void         Run();
    void         Show();    /* Create + show without entering message loop */
+   void         CreateHidden(); /* Create + children, never mapped (Wine ghost fix) */
    int          ShowModal();  /* Show as modal, block until closed, return FModalResult */
    void         Close();
    void         Center();

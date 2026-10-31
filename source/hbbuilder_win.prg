@@ -3614,15 +3614,23 @@ static function OpenProjectFile( cFile )
       // get their Win32 windows created. CT_BAND controls already have handles
       // from UI_BandNew; TControl::CreateHandle guards against double-creation.
       CreateDesignForm( nFormX, nFormY )
-      oDesignForm:Show()
+      if Len( aForms ) > 1
+         // Create fully but never map: under Wine a show-then-hide here leaves
+         // the X window mapped as a non-hit-testable ghost (win32 reports it
+         // hidden, clicks fall through, edits then land in the ACTIVE form).
+         if UI_FormIsVisible( oDesignForm:hCpp ) == .f.
+            UI_FormCreateHidden( oDesignForm:hCpp )
+         else
+            oDesignForm:Show()
+            UI_FormHide( oDesignForm:hCpp )
+         endif
+      else
+         oDesignForm:Show()
+      endif
       oDesignForm:SetDesign( .t. )
       RestoreFormFromCode( oDesignForm:hCpp, cFormCode )
       UI_FormCreateChildren( oDesignForm:hCpp )
 
-      // Hide all forms except the first
-      if Len( aForms ) > 1
-         UI_FormHide( oDesignForm:hCpp )
-      endif
 
       // Store the loaded code
       aForms[ Len(aForms) ][ 3 ] := cFormCode
@@ -3662,6 +3670,7 @@ static function OpenProjectFile( cFile )
       UI_FormBringToFront( oDesignForm:hCpp )
       InspectorRefresh( oDesignForm:hCpp )
       InspectorPopulateCombo( oDesignForm:hCpp )
+
    endif
 
    cCurrentFile := cFile

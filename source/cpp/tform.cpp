@@ -1769,6 +1769,41 @@ void TForm::Show()
 /* ShowModal() - Create window as modal, block until closed, return FModalResult.
  * Disables the owner window so the user can only interact with this form.
  * Uses a nested message loop (like GTK3's gtk_main / Cocoa's runModalForWindow). */
+/* TForm::CreateHidden() - full creation sequence of Show() but WITHOUT
+   ShowWindow/UpdateWindow: the window handle and children exist, the window
+   is never mapped. Used by the IDE Open path for forms that must stay hidden:
+   under Wine, ShowWindow(SW_HIDE) on these freshly created windows leaves the
+   X window mapped (ghost on screen, hidden at win32, receives no input), so
+   the reliable way to keep them hidden is to never show them. On native
+   Windows the end state is identical to show-then-hide. */
+void TForm::CreateHidden()
+{
+   CreateHandle( NULL );
+   HBMenu_AttachPending( this );
+
+   if( FHandle )
+   {
+      if( g_bDarkIDE ) SetDarkTitleBar( FHandle, TRUE );
+      {
+         HMODULE hUx = GetModuleHandleA("uxtheme.dll");
+         if( !hUx ) hUx = LoadLibraryA("uxtheme.dll");
+         if( hUx ) {
+            typedef BOOL (WINAPI *fnADMFW)(HWND, BOOL);
+            fnADMFW fn = (fnADMFW) GetProcAddress(hUx, MAKEINTRESOURCEA(133));
+            if( fn ) fn( FHandle, TRUE );
+         }
+      }
+   }
+
+   CreateAllChildren();
+
+   if( FDesignMode )
+      SubclassChildren();
+
+   if( FCenter )
+      Center();
+}
+
 int TForm::ShowModal()
 {
    HWND hOwner = GetActiveWindow();
