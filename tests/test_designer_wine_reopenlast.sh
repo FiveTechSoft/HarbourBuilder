@@ -25,7 +25,7 @@ echo "RUN=$RUN"
 fail() { echo "WINE REOPENLAST FAIL: $* (RUN=$RUN)"; exit 1; }
 WINESERVER="$(dirname "$WINE")/wineserver"
 cleanup() { [ -x "$WINESERVER" ] && WINEPREFIX="$WINEPREFIX" "$WINESERVER" -k 2>/dev/null
-  [ -f "$RUN/ini.bak" ] && cp "$RUN/ini.bak" "$INI"; }
+  if [ -f "$RUN/ini.bak" ]; then cp "$RUN/ini.bak" "$INI"; else rm -f "$INI"; fi; }
 trap cleanup EXIT
 win_geo() { local g; g=$(xdotool getwindowgeometry "$1") || return 1
   X=$(echo "$g" | awk -F'[ ,]' '/Position/{print $4}'); Y=$(echo "$g" | awk -F'[ ,]' '/Position/{print $5}')
@@ -94,7 +94,7 @@ if [ -n "$D" ]; then
   echo "  legA2: 'HbBuilder' dialog appeared (expected MsgInfo 'No recent project'); shot $RUN/msginfo.png"
   click_dialog_button 0   # OK centered
 else
-  echo "  legA2: no dialog after Reopen with empty recents - unexpected (MsgInfo expected)"
+  fail "legA2: no MsgInfo dialog after Reopen with empty recents (expected 'No recent project')"
 fi
 xdotool search --onlyvisible --name '^Form1$' >/dev/null 2>&1 || fail "default Form1 gone unexpectedly after leg A"
 
