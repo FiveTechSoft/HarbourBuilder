@@ -94,6 +94,37 @@ if build_group formprops; then
   else note "FAIL formprops: no window"; FAIL=1; fi
   kill $APP 2>/dev/null
 else note "FAIL formprops: build"; FAIL=1; fi
+# behavior: read-only rejects typed input while a normal edit accepts it;
+# disabled button never fires its callback while a live one does.
+if build_group behavior; then
+  pkill -f "$WORK/.*/UserApp" 2>/dev/null; sleep 0.5
+  rm -rf "$WORK/out"; mkdir -p "$WORK/out"
+  "$WORK/behavior/UserApp" >/dev/null 2>&1 & APP=$!; sleep 3
+  WID=$(xdotool search --name "Form1" | head -1)
+  if [ -n "$WID" ]; then
+    eval $(xdotool getwindowgeometry --shell "$WID")
+    xdotool mousemove $((X+60)) $((Y+53)) click 1; sleep 0.4; xdotool type "NO"; sleep 0.4
+    xdotool mousemove $((X+60)) $((Y+93)) click 1; sleep 0.4; xdotool type "YES"; sleep 0.4
+    xdotool mousemove $((X+100)) $((Y+145)) click 1; sleep 1
+    xdotool mousemove $((X+260)) $((Y+145)) click 1; sleep 1
+    [ -f "$WORK/out/btnok.txt" ] && note "PASS behavior: live button callback fired" || { note "FAIL behavior: live button callback missing"; FAIL=1; }
+    [ ! -f "$WORK/out/btnoff.txt" ] && note "PASS behavior: disabled button callback absent" || { note "FAIL behavior: disabled button fired"; FAIL=1; }
+  else note "FAIL behavior: no window"; FAIL=1; fi
+  kill $APP 2>/dev/null
+else note "FAIL behavior: build"; FAIL=1; fi
+# cancel: clicking an lCancel button closes the form
+if build_group cancel; then
+  pkill -f "$WORK/.*/UserApp" 2>/dev/null; sleep 0.5
+  "$WORK/cancel/UserApp" >/dev/null 2>&1 & APP=$!; sleep 3
+  WID=$(xdotool search --name "Form1" | head -1)
+  if [ -n "$WID" ]; then
+    eval $(xdotool getwindowgeometry --shell "$WID")
+    xdotool mousemove $((X + 40 + 70)) $((Y + 100 + 16)) click 1; sleep 2
+    if xdotool search --name "Form1" | grep -q .; then note "FAIL cancel: window survived lCancel click"; FAIL=1
+    else note "PASS cancel: lCancel click closed the form"; fi
+  else note "FAIL cancel: no window"; FAIL=1; fi
+  kill $APP 2>/dev/null
+else note "FAIL cancel: build"; FAIL=1; fi
 kill $XPID 2>/dev/null
 echo "TEST SUMMARY: runtime persisted props: $([ $FAIL -eq 0 ] && echo PASS || echo FAIL)"
 exit $FAIL
