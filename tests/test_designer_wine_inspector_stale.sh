@@ -9,6 +9,10 @@
 # Assertion by PIXELS (no OCR): crop the cText value cell before the edit; after
 # committing a DIFFERENT value, the crop must CHANGE. Stale = crops identical.
 # STALE_OK=1 env inverts the expectation (RED mode: PASS means stale reproduced).
+# The model-commit binding reads inspector_trace.log, which the IDE writes ONLY
+# when HBBUILDER_TRACE is set (debug trace, off by default). This probe enables
+# it deliberately for its asserted legs, and leg0 verifies a normal run writes
+# no trace files at all.
 set -u
 ROOT="$HOME/HarbourBuilder"
 WINE="$HOME/wine-toolchain/wine-11.20-amd64-wow64/bin/wine"
@@ -22,7 +26,7 @@ echo "HEAD $(git -C "$ROOT" rev-parse HEAD)"
 echo "exe sha256: $(sha256sum "$ROOT/bin/hbbuilder_win.exe" | awk '{print $1}')"
 echo "RUN=$RUN"
 TRACE="$ROOT/inspector_trace.log"
-rm -f "$TRACE"
+rm -f "$TRACE" "$ROOT/scintilla_trace.log"
 fail() { echo "WINE STALE FAIL: $* (RUN=$RUN)"; exit 1; }
 WINESERVER="$(dirname "$WINE")/wineserver"
 cleanup() { [ -x "$WINESERVER" ] && WINEPREFIX="$WINEPREFIX" "$WINESERVER" -k 2>/dev/null; }
@@ -30,8 +34,7 @@ trap cleanup EXIT
 win_geo() { local g; g=$(xdotool getwindowgeometry "$1") || return 1
   X=$(echo "$g" | awk -F'[ ,]' '/Position/{print $4}'); Y=$(echo "$g" | awk -F'[ ,]' '/Position/{print $5}')
   WIDTH=$(echo "$g" | awk -F'[ x]' '/Geometry/{print $4}'); HEIGHT=$(echo "$g" | awk -F'[ x]' '/Geometry/{print $5}'); }
-launch() {
-  setsid nohup "$WINE" "$ROOT/bin/hbbuilder_win.exe" >>"$RUN/ide.log" 2>&1 < /dev/null &
+wait_up() {
   local i
   for i in $(seq 1 90); do
     if xdotool search --onlyvisible --name 'HbBuilder 1.4.4' >/dev/null 2>&1; then
@@ -40,6 +43,14 @@ launch() {
     sleep 1
   done
   fail "IDE window did not appear 90s after launch"
+}
+launch() {        # asserted legs: debug trace enabled deliberately
+  setsid nohup env HBBUILDER_TRACE=1 "$WINE" "$ROOT/bin/hbbuilder_win.exe" >>"$RUN/ide.log" 2>&1 < /dev/null &
+  wait_up
+}
+launch_notrace() { # leg0: normal run, trace must stay off
+  setsid nohup env -u HBBUILDER_TRACE "$WINE" "$ROOT/bin/hbbuilder_win.exe" >>"$RUN/ide.log" 2>&1 < /dev/null &
+  wait_up
 }
 dismiss_curl() {
   local i W
@@ -58,6 +69,23 @@ cell_crop() { import -window root "$RUN/root.png"
 from PIL import Image
 im=Image.open('$RUN/root.png'); im.crop((120,280,336,306)).save('$1')" ; }
 
+# --- leg0: normal run (HBBUILDER_TRACE unset) + real interaction -> NO trace files ---
+echo "-- leg0: normal run, trace unset --"
+launch_notrace; dismiss_curl
+xdotool mousemove 472 79 click 1; sleep 1
+F0=$(xdotool search --onlyvisible --name '^Form1$' 2>/dev/null | head -1)
+[ -n "$F0" ] || fail "leg0: Form1 design window not found"
+win_geo "$F0"
+xdotool mousemove $((X + 200)) $((Y + 110)) click 1; sleep 2   # drop TLabel
+xdotool mousemove 189 293 click 1; sleep 0.4; xdotool click 1; sleep 1
+xdotool key Home; sleep 0.3; xdotool key shift+End; sleep 0.3
+xdotool type --delay 40 'NoTrace'; sleep 0.4; xdotool key Return; sleep 2
+[ ! -f "$TRACE" ] || fail "leg0: inspector_trace.log written with HBBUILDER_TRACE unset (default must be off)"
+[ ! -f "$ROOT/scintilla_trace.log" ] || fail "leg0: scintilla_trace.log written with HBBUILDER_TRACE unset (default must be off)"
+echo "  leg0 OK: boot + drop + edit commit wrote no trace files"
+"$WINESERVER" -k 2>/dev/null; sleep 3
+
+echo "-- leg1: fresh drop, trace enabled deliberately --"
 launch; dismiss_curl
 xdotool mousemove 472 79 click 1; sleep 1
 F1=$(xdotool search --onlyvisible --name '^Form1$' 2>/dev/null | head -1)
