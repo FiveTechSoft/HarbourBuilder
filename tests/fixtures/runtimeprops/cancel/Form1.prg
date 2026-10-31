@@ -27,7 +27,15 @@ METHOD CreateForm() CLASS TForm1
 
    @ 100, 40 BUTTON ::oButton1 PROMPT "CancelBtn" OF Self SIZE 140, 32
    ::oButton1:lCancel := .T.
+   ::oButton1:OnClick := { || CancelClick( Self ) }
    @ 160, 40 SAY ::oLabel1 PROMPT "AnchorLabel" OF Self SIZE 120, 24
 
 return nil
 //--------------------------------------------------------------------
+//--------------------------------------------------------------------
+
+static function CancelClick( oForm )
+
+   hb_MemoWrit( "/tmp/hb-runtimeprops-out/cancelclick.txt", "fired" )
+
+return nil

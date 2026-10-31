@@ -27,7 +27,15 @@ METHOD CreateForm() CLASS TForm1
 
    @ 100, 40 BUTTON ::oButton1 PROMPT "DefaultBtn" OF Self SIZE 140, 32
    ::oButton1:lDefault := .T.
+   ::oButton1:OnClick := { || DefClick( Self ) }
    @ 160, 40 SAY ::oLabel1 PROMPT "AnchorLabel" OF Self SIZE 120, 24
 
 return nil
 //--------------------------------------------------------------------
+//--------------------------------------------------------------------
+
+static function DefClick( oForm )
+
+   hb_MemoWrit( "/tmp/hb-runtimeprops-out/defclick.txt", "fired" )
+
+return nil
