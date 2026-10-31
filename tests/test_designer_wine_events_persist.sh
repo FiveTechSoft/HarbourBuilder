@@ -11,7 +11,7 @@ WINE="$HOME/wine-toolchain/wine-11.20-amd64-wow64/bin/wine"
 RUN="$(mktemp -d /tmp/designer_evp.XXXXXX)"
 TEMPLATE_PREFIX="${TEMPLATE_PREFIX:-$HOME/wine-toolchain/prefix}"
 cp -a "$TEMPLATE_PREFIX" "$RUN/prefix"
-cp /tmp/evfix/Form1.prg /tmp/evfix/Project1.prg /tmp/evfix/EvFix.hbp "$RUN/"
+cp "$ROOT/tests/fixtures/events_persist/Form1.prg" "$ROOT/tests/fixtures/events_persist/Project1.prg" "$ROOT/tests/fixtures/events_persist/EvFix.hbp" "$RUN/"
 export WINEPREFIX="$RUN/prefix" WINEDEBUG=err DISPLAY="${DISPLAY:-:99}"
 exec > >(tee "$RUN/probe.log") 2>&1
 echo "== wine events-persist probe: $(date -Is) =="
@@ -54,6 +54,11 @@ comdlg_type_path() {
   xdotool key End; sleep 0.4; xdotool key shift+Home; sleep 0.4
   xdotool type --delay 35 "$1"; sleep 0.6; xdotool key Return; sleep 3
 }
+inspector_edit() { # $1 = new value; requires the label already selected (click on it first)
+  xdotool mousemove 189 293 click 1; sleep 0.4; xdotool click 1; sleep 1
+  xdotool key Home; sleep 0.3; xdotool key shift+End; sleep 0.3
+  xdotool type --delay 40 "$1"; sleep 0.4; xdotool key Return; sleep 2
+}
 WINPATH="Z:${RUN//\//\\}\\EvFix.hbp"
 
 launch; dismiss_curl
@@ -75,12 +80,15 @@ comdlg_type_path "$WINPATH"
 F1=$(xdotool search --onlyvisible --name '^Form1$' 2>/dev/null | head -1)
 [ -n "$F1" ] || fail "Form1 did not appear after Open"
 win_geo "$F1"
-xdotool mousemove $((X + 205)) $((Y + 115)) click 1; sleep 2   # load proof: click label
+xdotool mousemove $((X + 205)) $((Y + 115)) click 1; sleep 2   # select the loaded label
+inspector_edit 'EvFixOK'   # marker edit: proves load (label exists in designer) AND save (lands on disk)
 file_menu; xdotool mousemove 95 194 click 1; sleep 3          # Save
+grep -q 'PROMPT "EvFixOK"' "$RUN/Form1.prg" || { echo "--- Form1.prg after save:"; cat "$RUN/Form1.prg"; fail 'EFFECT: marker edit missing - open/save ineffective (or edit lost)'; }
 grep -q 'static function Label1Click' "$RUN/Form1.prg" || { echo "--- Form1.prg after save:"; cat "$RUN/Form1.prg"; fail 'PERSIST: handler stub lost after open+save'; }
 grep -q '::oLabel1:OnClick :=' "$RUN/Form1.prg" || { echo "--- Form1.prg after save:"; cat "$RUN/Form1.prg"; fail 'PERSIST: OnClick wiring lost after open+save'; }
-echo "  save1 keeps stub + wiring"
 S1=$(sha256sum "$RUN/Form1.prg" | awk '{print $1}')
+[ "$S1" != "0910d3808ac5a0fa3afd802f5ab9dc05303908e18c5c1b0d9643465b92556d6d" ] || fail "EFFECT: file identical to fixture after save - Save did not run"
+echo "  save1 effective (marker on disk, sha differs from fixture) and keeps stub + wiring"
 file_menu; xdotool mousemove 95 194 click 1; sleep 3          # Save again
 S2=$(sha256sum "$RUN/Form1.prg" | awk '{print $1}')
 [ "$S1" = "$S2" ] || fail "second save not a fixpoint ($S1 != $S2)"
