@@ -285,7 +285,38 @@ typedef struct {
 /* Forward */
 static void InsPopulate( INSDATA * d );
 static void InsRebuild( INSDATA * d );
+typedef struct { const char * szPropName; const char ** aValues; int nCount; BOOL bIsString; } ENUMDEF;
+
+static ENUMDEF * InsGetEnum( const char * szName );
+
 static void InsStartEdit( INSDATA * d, int nLVRow );
+/* Display text for a row's raw value: mirrors the transform InsRebuild
+   applies when (re)writing value cells, so a committed edit shows exactly
+   what a full rebuild would. */
+static const char * InsDisplayValue( INSDATA * d, int nReal, char * szDisp, int nMax )
+{
+   const char * pDisp = d->rows[nReal].szValue;
+   ENUMDEF * pE;
+   szDisp[0] = 0;
+   if( d->rows[nReal].cType == 'A' ) {
+      int cnt = 0;
+      const char * pp;
+      if( d->rows[nReal].szValue[0] ) {
+         cnt = 1;
+         for( pp = d->rows[nReal].szValue; *pp; pp++ )
+            if( *pp == '|' ) cnt++;
+      }
+      sprintf( szDisp, "(%d items)", cnt );
+      pDisp = szDisp;
+   } else if( ( pE = InsGetEnum( d->rows[nReal].szName ) ) != NULL && !pE->bIsString ) {
+      int idx = atoi( d->rows[nReal].szValue );
+      if( idx >= 0 && idx < pE->nCount )
+         pDisp = (char *) pE->aValues[idx];
+   }
+   (void) nMax;
+   return pDisp;
+}
+
 static void InsEndEdit( INSDATA * d, BOOL bApply );
 static void InsApplyValue( INSDATA * d, int nReal, const char * szVal );
 static void InsColorPick( INSDATA * d, int nLVRow );
@@ -2587,7 +2618,6 @@ static LRESULT CALLBACK InsWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
    bIsString: TRUE means the stored value is one of the strings in aValues
    (e.g. cRDD = "DBFCDX"); FALSE means the stored value is the numeric
    index into aValues (legacy behavior). */
-typedef struct { const char * szPropName; const char ** aValues; int nCount; BOOL bIsString; } ENUMDEF;
 
 static const char * s_borderStyle[] = { "bsNone", "bsSingle", "bsSizeable", "bsDialog", "bsToolWindow", "bsSizeToolWin" };
 static const char * s_position[]    = { "poDesigned", "poCenter", "poCenterScreen" };
@@ -2802,7 +2832,16 @@ static void InsEndEdit( INSDATA * d, BOOL bApply )
          already triggers SyncDesignerToCode -> InspectorRefresh
          which rebuilds the property list. Calling InsRebuild again
          would operate on stale/invalid data and crash. */
-      InsLog( "  -> skipping InsRebuild (pOnPropChanged handles refresh)" );
+      /* But the painted value cell stores its own text (no owner-data),
+         and nothing on this path rewrites it, so it kept showing the old
+         value until a reselect rebuilt the list. Write the committed
+         display value directly to the visible cell. */
+      {
+         char szCell[256];
+         const char * pCell = InsDisplayValue( d, nReal, szCell, sizeof(szCell) );
+         ListView_SetItemText( d->hList, d->nEditRow, 1, (LPSTR) pCell );
+      }
+      InsLog( "  -> skipping InsRebuild (pOnPropChanged handles refresh); cell text written directly" );
    }
    InsLog( "  -> destroying edit control" );
    if( d->hBtn ) { HWND hb = d->hBtn; d->hBtn = NULL; DestroyWindow( hb ); }
@@ -3058,27 +3097,10 @@ static void InsRebuild( INSDATA * d )
          if( !d->rows[i].bIsCat )
          {
             char szDisp[256];
-            char * pDisp = d->rows[i].szValue;
-            if( d->rows[i].cType == 'A' ) {
-               int cnt = 0;
-               if( d->rows[i].szValue[0] ) {
-                  const char * pp; cnt = 1;
-                  for( pp = d->rows[i].szValue; *pp; pp++ )
-                     if( *pp == '|' ) cnt++;
-               }
-               sprintf( szDisp, "(%d items)", cnt );
-               pDisp = szDisp;
-            } else {
-               ENUMDEF * pE = InsGetEnum( d->rows[i].szName );
-               if( pE && !pE->bIsString ) {
-                  int idx = atoi( d->rows[i].szValue );
-                  if( idx >= 0 && idx < pE->nCount )
-                     pDisp = (char *) pE->aValues[idx];
-               }
-            }
+            const char * pDisp = InsDisplayValue( d, i, szDisp, sizeof(szDisp) );
             ListView_GetItemText( d->hList, nVis, 1, szOld, sizeof(szOld) );
             if( lstrcmpA( szOld, pDisp ) != 0 )
-               ListView_SetItemText( d->hList, nVis, 1, pDisp );
+               ListView_SetItemText( d->hList, nVis, 1, (LPSTR) pDisp );
          }
 
          nVis++;
