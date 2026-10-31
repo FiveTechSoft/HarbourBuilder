@@ -21,7 +21,7 @@ done
 [ -n "$RT_DISPLAY" ] || { echo "FAIL: no free display"; exit 1; }
 XVFB_PID=""; APP_PID=""
 cleanup() {
-  [ -n "$APP_PID" ] && kill "$APP_PID" 2>/dev/null && wait "$APP_PID" 2>/dev/null
+  [ -n "$APP_PID" ] && { kill "$APP_PID" 2>/dev/null; wait "$APP_PID" 2>/dev/null; }
   rt_cleanup
   if [ -n "$XVFB_PID" ]; then kill "$XVFB_PID" 2>/dev/null; wait "$XVFB_PID" 2>/dev/null; fi
 }
@@ -66,10 +66,10 @@ printf '%s\n' \
   '' \
   'Return Nil' > "$RUN/Form1.prg"
 rt_setup "$RUN"
-# rt_setup starts Xvfb itself when the display is down; record whether we own one
-if ! xdotool getdisplaygeometry >/dev/null 2>&1; then
-  Xvfb $RT_DISPLAY -screen 0 1600x1000x24 & XVFB_PID=$!; sleep 2
-fi
+# rt_setup starts an Xvfb child when the display is down but does not record
+# its pid; adopt it so cleanup does not leak a live server
+XVFB_PID=$(pgrep -f "Xvfb $RT_DISPLAY " | head -1)
+[ -z "$XVFB_PID" ] && { Xvfb $RT_DISPLAY -screen 0 1600x1000x24 & XVFB_PID=$!; sleep 2; }
 rt_launch_ide
 for try in $(seq 1 12); do rt_find_bar >/dev/null && break; sleep 1; done
 rt_reopen_project
