@@ -64,6 +64,7 @@ dismiss_curl() {
   xdotool search --onlyvisible --name 'curl.exe Not Found' >/dev/null 2>&1 || return 0
   fail "curl.exe modal did not dismiss"
 }
+file_menu() { xdotool mousemove 12 33 click 1; sleep 1; }
 cell_crop() { import -window root "$RUN/root.png"
   python3 -c "
 from PIL import Image
@@ -80,9 +81,18 @@ xdotool mousemove $((X + 200)) $((Y + 110)) click 1; sleep 2   # drop TLabel
 xdotool mousemove 189 293 click 1; sleep 0.4; xdotool click 1; sleep 1
 xdotool key Home; sleep 0.3; xdotool key shift+End; sleep 0.3
 xdotool type --delay 40 'NoTrace'; sleep 0.4; xdotool key Return; sleep 2
+# independent disk marker: the edit must have REALLY committed (otherwise
+# absent logs would be vacuous - dead input also produces zero logs)
+file_menu; xdotool mousemove 95 211 click 1; sleep 2.5
+xdotool search --onlyvisible --name 'Save HbBuilder Project' >/dev/null 2>&1 || fail "leg0: Save As dialog did not open"
+xdotool mousemove 200 239 click 1; sleep 0.6
+xdotool key End; sleep 0.4; xdotool key shift+Home; sleep 0.4
+xdotool type --delay 35 "Z:${RUN//\//\\}\\Leg0.hbp"; sleep 0.6; xdotool key Return; sleep 3
+grep -q 'PROMPT "NoTrace"' "$RUN/Form1.prg" || fail 'leg0: edit never committed (no NoTrace in saved Form1.prg) - absence of logs is vacuous, harness input issue'
+echo "  leg0 marker: edit committed to disk (NoTrace in Form1.prg)"
 [ ! -f "$TRACE" ] || fail "leg0: inspector_trace.log written with HBBUILDER_TRACE unset (default must be off)"
 [ ! -f "$ROOT/scintilla_trace.log" ] || fail "leg0: scintilla_trace.log written with HBBUILDER_TRACE unset (default must be off)"
-echo "  leg0 OK: boot + drop + edit commit wrote no trace files"
+echo "  leg0 OK: real edit committed to disk AND no trace files written"
 "$WINESERVER" -k 2>/dev/null; sleep 3
 
 echo "-- leg1: fresh drop, trace enabled deliberately --"
@@ -123,7 +133,6 @@ PYE
 echo "  cell pixels identical after commit: $SAME (1=stale, 0=refreshed)"
 LEG1SAME=$SAME
 # backend must have taken the value regardless (widget/code updated)
-file_menu() { xdotool mousemove 12 33 click 1; sleep 1; }
 file_menu; xdotool mousemove 95 211 click 1; sleep 2.5
 xdotool search --onlyvisible --name 'Save HbBuilder Project' >/dev/null 2>&1 || fail "Save As dialog did not open"
 xdotool mousemove 200 239 click 1; sleep 0.6
