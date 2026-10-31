@@ -46,13 +46,13 @@ return nil
 
 static function BtnOffClick( oForm )
 
-   hb_MemoWrit( "/tmp/hb-runtimeprops-out/btnoff.txt", "fired" )
+   hb_MemoWrit( "@OUTDIR@/btnoff.txt", "fired" )
 
 return nil
 
 static function BtnOKClick( oForm )
 
-   hb_MemoWrit( "/tmp/hb-runtimeprops-out/btnok.txt", ;
+   hb_MemoWrit( "@OUTDIR@/btnok.txt", ;
       "RO=[" + oForm:oEditRO:Value + "] OK=[" + oForm:oEditOK:Value + "]" )
 
 return nil

@@ -36,6 +36,6 @@ return nil
 
 static function CancelClick( oForm )
 
-   hb_MemoWrit( "/tmp/hb-runtimeprops-out/cancelclick.txt", "fired" )
+   hb_MemoWrit( "@OUTDIR@/cancelclick.txt", "fired" )
 
 return nil

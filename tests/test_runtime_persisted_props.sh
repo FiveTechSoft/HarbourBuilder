@@ -20,7 +20,7 @@ WORK=$(mktemp -d /tmp/hb-runtimeprops.XXXXXX)
 SRCKEY=$(sha256sum "$ROOT/source/core/classes.prg" "$ROOT/source/hix_runtime.prg" "$ROOT/source/hix_template.prg" "$ROOT/source/backends/gtk3/gtk3_core.c" "$ROOT/source/backends/gtk3/gtk3_db_real.c" | sha256sum | cut -c1-16)
 CACHE="$WORK/cache-$SRCKEY"
 APPPIDS=""
-OUT=/tmp/hb-runtimeprops-out
+OUT="$WORK/out"
 mkdir -p "$OUT"
 # Free display owned by this probe only; never signal other Xvfb instances.
 RT_DISPLAY=""
@@ -45,7 +45,7 @@ build_group() {
   local B="$WORK/$G"
   mkdir -p "$B"
   cp "$CACHE"/{classes.prg,hix_runtime.prg,hix_template.prg,hbbuilder.ch,hbide.ch} "$B/"
-  { echo '#include "hbbuilder.ch"'; echo; grep -v '#include "hbbuilder.ch"' "$ROOT/tests/fixtures/runtimeprops/$G/Project1.prg"; echo; cat "$ROOT/tests/fixtures/runtimeprops/$G/Form1.prg"; } > "$B/main.prg"
+  { echo '#include "hbbuilder.ch"'; echo; grep -v '#include "hbbuilder.ch"' "$ROOT/tests/fixtures/runtimeprops/$G/Project1.prg"; echo; sed "s|@OUTDIR@|$OUT|g" "$ROOT/tests/fixtures/runtimeprops/$G/Form1.prg"; } > "$B/main.prg"
   "$HB_BIN/harbour" "$B/main.prg" -n -w -q -I"$HBDIR/include" -I"$B" -o"$B/main.c" 2>&1 || return 1
   gcc -c -O2 -Wno-unused-value -I"$HBDIR/include" "$B/main.c" -o "$B/main.o" || return 1
   if [ ! -f "$CACHE/classes.o" ]; then
@@ -146,6 +146,6 @@ if build_group cancel; then
   else note "FAIL cancel: no window"; FAIL=1; fi
   kill $APP 2>/dev/null
 else note "FAIL cancel: build"; FAIL=1; fi
-stop_apps; kill $XPID 2>/dev/null; rm -rf "$WORK" "$OUT"
+stop_apps; kill $XPID 2>/dev/null; rm -rf "$WORK"
 echo "TEST SUMMARY: runtime persisted props: $([ $FAIL -eq 0 ] && echo PASS || echo FAIL)"
 exit $FAIL

@@ -36,6 +36,6 @@ return nil
 
 static function DefClick( oForm )
 
-   hb_MemoWrit( "/tmp/hb-runtimeprops-out/defclick.txt", "fired" )
+   hb_MemoWrit( "@OUTDIR@/defclick.txt", "fired" )
 
 return nil
