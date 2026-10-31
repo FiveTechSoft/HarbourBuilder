@@ -150,5 +150,7 @@ if [ "${STALE_OK:-0}" = "1" ]; then
   echo "WINE STALE RED: stale cell reproduced with backend updated (RUN=$RUN)"
 else
   [ "$SAME" = "0" ] || fail "stale cell: value cell pixels unchanged after committing a different value"
-  echo "WINE STALE GREEN: value cell refreshed after commit (RUN=$RUN)"
+  echo "WINE STALE GREEN (repaint signal only): model commit trace-confirmed and cell pixels changed."
+echo "  NOT a text-content oracle: focus/highlight can change pixels. Visually confirm the"
+echo "  crops show the typed value: $RUN/cell_before.png vs $RUN/cell_after.png"
 fi
