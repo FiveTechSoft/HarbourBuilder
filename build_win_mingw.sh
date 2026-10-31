@@ -13,14 +13,18 @@ MINGW_BIN="${MINGW_BIN:-$HOME/wine-toolchain/mingw-root/usr/bin}"
 export PATH="$MINGW_BIN:$PATH" HBDIR="$HBDIR_SRC" HB_CCPATH="$MINGW_BIN/" HB_CCPREFIX=x86_64-w64-mingw32-
 # _WIN32_WINNT/_WIN32_IE: mingw headers default lower than MSVC; match what the
 # code uses (SetProcessDPIAware, TBCDRF_USECDCOLORS).
+# hbmk2 (3.2.1dev r2610242111) mishandles absolute source paths: it derives an
+# empty object basename ('/tmp/hbmk_*.dir/.c'), skips every compile and still
+# exits 0 with a stale/partial output. Build from $ROOT with relative paths.
+cd "$ROOT"
 "$HBDIR_SRC/bin/linux/gcc/hbmk2" -plat=win -comp=mingw64 -gui -w -es2 -O2 \
-   -o"$ROOT/bin/hbbuilder_win" \
-   "$ROOT/source/hbbuilder_win.prg" "$ROOT/source/hbbuilder_common.prg" \
-   "$ROOT/source/cpp/hbbridge.cpp" "$ROOT/source/cpp/tform.cpp" \
-   "$ROOT/source/cpp/tcontrol.cpp" "$ROOT/source/cpp/tcontrols.cpp" \
-   "$ROOT/source/cpp/hb_db_real.cpp" \
-   "$ROOT/source/backends/win32/webview2/fwh_webview2.cpp" \
-   -I"$ROOT/include" -I"$ROOT/source/backends/win32/webview2" \
+   -obin/hbbuilder_win \
+   source/hbbuilder_win.prg source/hbbuilder_common.prg \
+   source/cpp/hbbridge.cpp source/cpp/tform.cpp \
+   source/cpp/tcontrol.cpp source/cpp/tcontrols.cpp \
+   source/cpp/hb_db_real.cpp \
+   source/backends/win32/webview2/fwh_webview2.cpp \
+   -Iinclude -Isource/backends/win32/webview2 \
    -cflag=-D_WIN32_WINNT=0x0601 -cflag=-D_WIN32_IE=0x0800 \
    -lgdiplus -lcomctl32 -lcomdlg32 -lmsimg32 -ldwmapi -lshlwapi -lwinspool \
    -lwininet -lhbsqlit3 -lsqlite3 -lstdc++
