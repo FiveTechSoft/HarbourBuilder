@@ -3,7 +3,7 @@
 # line added to the emitted file externally, equivalent external runtime
 # compile, GTK3 run under Xvfb. Asserts Value readback of typed input.
 # Scope note: the IDE event editor and the IDE Compile action are NOT used;
-# those legs are covered separately. GTK3/Linux only.
+# those legs are not covered by this test. GTK3/Linux only.
 # Isolation: unique run dir, own display, own-PID cleanup with reaping.
 # Diagnostics: if palette icon coordinates go stale (IDE layout change), the
 # emitted file will lack the expected control lines and the test says so.
@@ -19,11 +19,13 @@ for d in 97 96 95 94 93; do
   if [ ! -e "/tmp/.X$d-lock" ] && [ ! -S "/tmp/.X11-unix/X$d" ]; then RT_DISPLAY=":$d"; break; fi
 done
 [ -n "$RT_DISPLAY" ] || { echo "FAIL: no free display"; exit 1; }
-XVFB_PID=""; APP_PID=""
+XVFB_PID=""; APP_PID=""; APP_XVFB=""
+# idempotent: fail() runs it and the EXIT trap runs it again
 cleanup() {
-  [ -n "$APP_PID" ] && { kill "$APP_PID" 2>/dev/null; wait "$APP_PID" 2>/dev/null; }
+  if [ -n "$APP_PID" ]; then kill "$APP_PID" 2>/dev/null; wait "$APP_PID" 2>/dev/null; APP_PID=""; fi
+  if [ -n "$APP_XVFB" ]; then kill "$APP_XVFB" 2>/dev/null; wait "$APP_XVFB" 2>/dev/null; APP_XVFB=""; fi
   rt_cleanup
-  if [ -n "$XVFB_PID" ]; then kill "$XVFB_PID" 2>/dev/null; wait "$XVFB_PID" 2>/dev/null; fi
+  if [ -n "$XVFB_PID" ]; then kill "$XVFB_PID" 2>/dev/null; wait "$XVFB_PID" 2>/dev/null; XVFB_PID=""; fi
 }
 fail() { echo "E2E READBACK FAIL: $1"; cleanup; exit 1; }
 source "$REPO/tests/harness_lib.sh"
@@ -65,11 +67,12 @@ printf '%s\n' \
   '   ::nHeight := 600' \
   '' \
   'Return Nil' > "$RUN/Form1.prg"
+# start the display server BEFORE rt_setup so this script owns the child pid
+# (rt_setup would start its own unrecorded child when the display is down)
+if ! DISPLAY=$RT_DISPLAY xdotool getdisplaygeometry >/dev/null 2>&1; then
+  Xvfb $RT_DISPLAY -screen 0 1600x1000x24 & XVFB_PID=$!; sleep 2
+fi
 rt_setup "$RUN"
-# rt_setup starts an Xvfb child when the display is down but does not record
-# its pid; adopt it so cleanup does not leak a live server
-XVFB_PID=$(pgrep -f "Xvfb $RT_DISPLAY " | head -1)
-[ -z "$XVFB_PID" ] && { Xvfb $RT_DISPLAY -screen 0 1600x1000x24 & XVFB_PID=$!; sleep 2; }
 rt_launch_ide
 for try in $(seq 1 12); do rt_find_bar >/dev/null && break; sleep 1; done
 rt_reopen_project
@@ -153,7 +156,7 @@ DISPLAY="$APP_DISPLAY" xdotool type "$TOKEN"; sleep 0.4
 DISPLAY="$APP_DISPLAY" xdotool mousemove $((X+316)) $((Y+53)) click 1; sleep 1
 DISPLAY="$APP_DISPLAY" timeout 10 import -window root "$RUN/readback.png" 2>/dev/null
 kill "$APP_PID" 2>/dev/null; wait "$APP_PID" 2>/dev/null; APP_PID=""
-kill "$APP_XVFB" 2>/dev/null; wait "$APP_XVFB" 2>/dev/null
+kill "$APP_XVFB" 2>/dev/null; wait "$APP_XVFB" 2>/dev/null; APP_XVFB=""
 READ=$(cat "$OUT/read.txt" 2>/dev/null || echo MARKER-MISSING)
 echo "typed: $TOKEN  readback: $READ"
 if [ "$READ" = "VALUE=[$TOKEN]" ]; then
